@@ -9,33 +9,6 @@ export const metadata = {
   description: "Visualize e acompanhe seu progresso em cada tópico do edital.",
 }
 
-// Fallback de tópicos para não ficar vazio caso a base não tenha os tópicos da disciplina
-const DEFAULT_TOPICS_BY_DISCIPLINE: Record<string, TopicItem[]> = {
-  "Raciocínio Lógico": [
-    { id: "rlm-1", number: 1, title: "PROPOSIÇÕES, CONECTIVOS, EQUIVALÊNCIAS LÓGICAS, QUANTIFICADORES E NEGAÇÕES.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    { id: "rlm-2", number: 2, title: "NÚMEROS INTEIROS, RACIONAIS E REAIS E SUAS OPERAÇÕES, PORCENTAGEM E PROPORÇÃO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    { id: "rlm-3", number: 3, title: "PROPORCIONALIDADE DIRETA E INVERSA.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    { id: "rlm-4", number: 4, title: "COMPREENSÃO DE DADOS APRESENTADOS EM GRÁFICOS E TABELAS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-  ],
-  "Direito Administrativo": [
-    { id: "adm-1", number: 1, title: "ESTADO, GOVERNO E ADMINISTRAÇÃO PÚBLICA: CONCEITOS E ELEMENTOS.", correct: 14, wrong: 3, questions: 17, accuracy: 82, lastStudy: "2026-08-04", studyCount: 2, link: "https://qconcursos.com" },
-    { id: "adm-2", number: 2, title: "DIREITO ADMINISTRATIVO: CONCEITO, FONTES E PRINCÍPIOS EXPRESSOS E IMPLÍCITOS.", correct: 18, wrong: 2, questions: 20, accuracy: 90, lastStudy: "2026-08-02", studyCount: 3, link: null },
-    { id: "adm-3", number: 3, title: "ATOS ADMINISTRATIVOS: CONCEITO, REQUISITOS, ATRIBUTOS, CLASSIFICAÇÃO E ESPÉCIES.", correct: 25, wrong: 5, questions: 30, accuracy: 83, lastStudy: "2026-07-29", studyCount: 4, link: null },
-  ],
-  "Direito Constitucional": [
-    { id: "const-1", number: 1, title: "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988: PRINCÍPIOS FUNDAMENTAIS.", correct: 20, wrong: 4, questions: 24, accuracy: 83, lastStudy: "2026-08-05", studyCount: 3, link: null },
-    { id: "const-2", number: 2, title: "DIREITOS E GARANTIAS FUNDAMENTAIS: DIREITOS E DEVERES INDIVIDUAIS E COLETIVOS.", correct: 35, wrong: 5, questions: 40, accuracy: 87, lastStudy: "2026-08-03", studyCount: 5, link: null },
-  ],
-  "Administração Geral": [
-    { id: "ag-1", number: 1, title: "ABORDAGENS DA ADMINISTRAÇÃO: CLÁSSICA, BUROCRÁTICA, SISTÊMICA.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    { id: "ag-2", number: 2, title: "PROCESSO ADMINISTRATIVO: PLANEJAMENTO, ORGANIZAÇÃO, DIREÇÃO E CONTROLE.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-  ],
-  "Administração Pública": [
-    { id: "ap-1", number: 1, title: "REFORMAS ADMINISTRATIVAS NO BRASIL.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    { id: "ap-2", number: 2, title: "MODELOS DE ADMINISTRAÇÃO PÚBLICA: PATRIMONIALISTA, BUROCRÁTICO, GERENCIAL.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-  ]
-}
-
 const COLOR_PALETTE = [
   "#2563EB", "#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444", "#f59e0b"
 ]
@@ -82,8 +55,8 @@ async function getActiveConcursoData() {
         id: discId,
         name: name,
         color: COLOR_PALETTE[idx % COLOR_PALETTE.length] || "#000000",
-        // Usa os tópicos customizados se existirem, senão defaults, senão genérico
-        topics: customTopics || DEFAULT_TOPICS_BY_DISCIPLINE[name] || [
+        // Usa os tópicos customizados se existirem, senão cria um default 0% genérico
+        topics: customTopics || [
           { id: `gen-${idx}`, number: 1, title: `ESTUDO COMPLETO DA DISCIPLINA DE ${name.toUpperCase()}.`, correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
         ]
       }

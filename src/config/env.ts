@@ -6,8 +6,10 @@ const envSchema = z.object({
 })
 
 const _env = envSchema.safeParse({
-  NEXT_PUBLIC_SUPABASE_URL: process.env['NEXT_PUBLIC_SUPABASE_URL'],
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'],
+  // @ts-expect-error: TS4111 prevents dot notation, but Next.js requires it for build-time inline replacement
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  // @ts-expect-error: TS4111 prevents dot notation, but Next.js requires it for build-time inline replacement
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 })
 
 if (!_env.success) {

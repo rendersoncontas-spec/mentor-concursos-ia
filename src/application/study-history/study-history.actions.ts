@@ -2,9 +2,23 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
-import { createStudySession, finishStudySession } from "./study-history.service"
+import { createStudySession, finishStudySession, getUserHistory } from "./study-history.service"
 import { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
 import { isMaintenanceMode } from "@/lib/maintenance"
+
+export async function getUserHistoryAction(limit = 50) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: "Usuário não autenticado" }
+
+    const history = await getUserHistory(supabase, user.id, limit)
+    return { data: history, error: null }
+  } catch (error: any) {
+    return { data: null, error: error.message }
+  }
+}
+
 
 export async function startStudySessionAction(data: Omit<StudyHistoryInsert, "user_id">) {
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }

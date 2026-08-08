@@ -53,46 +53,7 @@ export interface DisciplineData {
   topics: TopicItem[]
 }
 
-const DEFAULT_EDITAL_DATA: DisciplineData[] = [
-  {
-    id: "rlm",
-    name: "Raciocínio Lógico",
-    color: "#2563EB",
-    topics: [
-      { id: "rlm-1", number: 1, title: "PROPOSIÇÕES, CONECTIVOS, EQUIVALÊNCIAS LÓGICAS, QUANTIFICADORES E NEGAÇÕES.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-2", number: 2, title: "NÚMEROS INTEIROS, RACIONAIS E REAIS E SUAS OPERAÇÕES, PORCENTAGEM E PROPORÇÃO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-3", number: 3, title: "PROPORCIONALIDADE DIRETA E INVERSA.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-4", number: 4, title: "MEDIDAS DE COMPRIMENTO, ÁREA, VOLUME, MASSA E TEMPO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-5", number: 5, title: "ESTRUTURA LÓGICA DE RELAÇÕES ARBITRÁRIAS ENTRE PESSOAS, LUGARES, OBJETOS E EVENTOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-6", number: 6, title: "COMPREENSÃO E ANÁLISE DA LÓGICA DE UMA SITUAÇÃO, UTILIZANDO AS FUNÇÕES DO RACIOCÍNIO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-7", number: 7, title: "COMPREENSÃO DE DADOS APRESENTADOS EM GRÁFICOS E TABELAS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-8", number: 8, title: "RACIOCÍNIO LÓGICO ENVOLVENDO PROBLEMAS ARITMÉTICOS, GEOMÉTRICOS E MATRICIAIS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-9", number: 9, title: "PROBLEMAS DE CONTAGEM E PROBABILIDADE.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-10", number: 10, title: "GEOMETRIA BÁSICA: ÂNGULOS, TRIÂNGULOS, POLÍGONOS, DISTÂNCIAS, PERÍMETROS E ÁREAS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-11", number: 11, title: "PLANO CARTESIANO: SISTEMA DE COORDENADAS, DISTÂNCIA ENTRE PONTOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "rlm-12", number: 12, title: "PROBLEMAS DE LÓGICA E RACIOCÍNIO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    ],
-  },
-  {
-    id: "dir-adm",
-    name: "Direito Administrativo",
-    color: "#f97316",
-    topics: [
-      { id: "adm-1", number: 1, title: "ESTADO, GOVERNO E ADMINISTRAÇÃO PÚBLICA: CONCEITOS E ELEMENTOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "adm-2", number: 2, title: "DIREITOS ADMINISTRATIVO: CONCEITO, FONTES E PRINCÍPIOS EXPRESSOS E IMPLÍCITOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "adm-3", number: 3, title: "ATOS ADMINISTRATIVOS: CONCEITO, REQUISITOS, ATRIBUTOS, CLASSIFICAÇÃO E ESPÉCIES.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    ],
-  },
-  {
-    id: "dir-const",
-    name: "Direito Constitucional",
-    color: "#3b82f6",
-    topics: [
-      { id: "const-1", number: 1, title: "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988: PRINCÍPIOS FUNDAMENTAIS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-      { id: "const-2", number: 2, title: "DIREITOS E GARANTIAS FUNDAMENTAIS: DIREITOS E DEVERES INDIVIDUAIS E COLETIVOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
-    ],
-  },
-]
+const DEFAULT_EDITAL_DATA: DisciplineData[] = []
 
 export function EditalAccordion({ initialDisciplines, activeTargetName, activeTargetId }: { initialDisciplines?: DisciplineData[], activeTargetName?: string, activeTargetId?: string }) {
   const router = useRouter()

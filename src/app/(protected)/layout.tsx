@@ -21,7 +21,8 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     console.warn("Conexão Supabase indisponível no ProtectedLayout. Modo de desenvolvimento/contingência ativado.")
   }
 
-  const isDevMode = process.env['NEXT_PUBLIC_APP_MODE'] === 'development' || process.env.NODE_ENV === 'development'
+  // @ts-expect-error: TS4111 prevents dot notation, but Next.js requires it for build-time inline replacement
+  const isDevMode = process.env.NEXT_PUBLIC_APP_MODE === 'development' || process.env.NODE_ENV === 'development'
 
   if (!user && !isDevMode) {
     redirect("/login")

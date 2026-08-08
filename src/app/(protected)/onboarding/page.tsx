@@ -1,5 +1,4 @@
-import { createClient } from "@/infrastructure/supabase/server"
-import { getGlobalExams } from "@/application/disciplines/disciplines.service"
+
 import { OnboardingWizard } from "@/features/onboarding/components/onboarding-wizard"
 import { Logo } from "@/components/ui/logo"
 
@@ -8,9 +7,6 @@ export const metadata = {
 }
 
 export default async function OnboardingPage() {
-  const supabase = await createClient()
-  const exams = await getGlobalExams(supabase)
-
   return (
     <div className="flex min-h-screen flex-col items-center bg-muted/40 p-4 md:p-8">
       <header className="mb-8 flex w-full max-w-3xl items-center justify-between">
@@ -24,7 +20,7 @@ export default async function OnboardingPage() {
             <p className="text-muted-foreground mb-8">
               Precisamos de algumas informações para personalizar a Inteligência Artificial exclusivamente para o seu objetivo.
             </p>
-            <OnboardingWizard exams={exams} />
+            <OnboardingWizard />
           </div>
         </div>
       </main>

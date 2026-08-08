@@ -39,7 +39,8 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
       console.warn("Supabase auth unreachable:", supabaseError?.message || supabaseError)
 
       // Em modo de desenvolvimento, se o Supabase Cloud antigo estiver inacessível, libera acesso local de demonstração
-      const isDev = process.env['NEXT_PUBLIC_APP_MODE'] === 'development' || process.env.NODE_ENV === 'development'
+      // @ts-expect-error: TS4111 prevents dot notation, but Next.js requires it for build-time inline replacement
+      const isDev = process.env.NEXT_PUBLIC_APP_MODE === 'development' || process.env.NODE_ENV === 'development'
       if (isDev) {
         return { success: true }
       }
