@@ -3,8 +3,10 @@
 import { type RegisterInput, registerSchema } from "@/domain/auth/auth.schemas"
 import { type AuthResponse } from "@/domain/auth/auth.types"
 import { createClient } from "@/infrastructure/supabase/server"
+import { isMaintenanceMode } from "@/lib/maintenance"
 
 export async function registerAction(data: RegisterInput): Promise<AuthResponse> {
+  if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const validatedData = registerSchema.parse(data)
 
@@ -24,8 +26,12 @@ export async function registerAction(data: RegisterInput): Promise<AuthResponse>
     })
 
     if (error) {
-      if (error.status === 422 || error.message.includes("already registered")) {
-        return { success: false, error: "Este e-mail já está em uso." }
+      if (error.status === 422 || error.message.includes("already registered") || error.message.includes("already exist")) {
+        return { 
+          success: false, 
+          error: "Este e-mail já está cadastrado. Que tal fazer login?",
+          code: "ALREADY_REGISTERED"
+        }
       }
       return { success: false, error: error.message }
     }

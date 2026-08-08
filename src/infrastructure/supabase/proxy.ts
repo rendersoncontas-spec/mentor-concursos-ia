@@ -45,19 +45,50 @@ export async function updateSession(request: NextRequest) {
   const isProtectedRoute =
     request.nextUrl.pathname.startsWith("/dashboard") ||
     request.nextUrl.pathname.startsWith("/profile")
+    
+  const isOnboardingRoute = request.nextUrl.pathname.startsWith("/onboarding")
 
-  if (isProtectedRoute && !user) {
+  // Se não estiver logado e tentar rota protegida ou onboarding
+  if ((isProtectedRoute || isOnboardingRoute) && !user) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/login"
-    // Mantém a rota original para redirecionar após login
     redirectUrl.searchParams.set("redirectedFrom", request.nextUrl.pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
-  if (isAuthRoute && user) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = "/dashboard"
-    return NextResponse.redirect(redirectUrl)
+  // Se estiver logado
+  if (user) {
+    // Redirecionar auth para dashboard
+    if (isAuthRoute) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = "/dashboard"
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Checagem de Onboarding (apenas em rotas protegidas e onboarding para não travar arquivos estáticos)
+    if (isProtectedRoute || isOnboardingRoute) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .single()
+
+      const hasCompletedOnboarding = profile?.onboarding_completed === true
+
+      // Se não completou e tenta acessar dashboard, manda pro onboarding
+      if (!hasCompletedOnboarding && isProtectedRoute) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = "/onboarding"
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      // Se já completou e tenta acessar onboarding, manda pro dashboard
+      if (hasCompletedOnboarding && isOnboardingRoute) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = "/dashboard"
+        return NextResponse.redirect(redirectUrl)
+      }
+    }
   }
 
   return supabaseResponse

@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { loginAction } from "@/application/auth/login.action"
+import { resendConfirmationAction } from "@/application/auth/resend-confirmation.action"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -39,7 +40,29 @@ export function LoginForm() {
       const response = await loginAction(values)
 
       if (!response.success) {
-        toast.error(response.error)
+        if (response.code === "UNCONFIRMED_EMAIL") {
+          toast.error(response.error, {
+            action: {
+              label: "Reenviar E-mail",
+              onClick: async () => {
+                const res = await resendConfirmationAction(values.email)
+                if (res.success) toast.success("E-mail reenviado com sucesso!")
+                else toast.error(res.error)
+              }
+            },
+            duration: 10000,
+          })
+        } else if (response.code === "INVALID_CREDENTIALS") {
+          toast.error(response.error, {
+            action: {
+              label: "Esqueci a senha",
+              onClick: () => router.push("/forgot-password")
+            },
+            duration: 5000,
+          })
+        } else {
+          toast.error(response.error)
+        }
         return
       }
 

@@ -3,8 +3,10 @@
 import { type ForgotPasswordInput, forgotPasswordSchema } from "@/domain/auth/auth.schemas"
 import { type AuthResponse } from "@/domain/auth/auth.types"
 import { createClient } from "@/infrastructure/supabase/server"
+import { isMaintenanceMode } from "@/lib/maintenance"
 
 export async function forgotPasswordAction(data: ForgotPasswordInput): Promise<AuthResponse> {
+  if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const validatedData = forgotPasswordSchema.parse(data)
 

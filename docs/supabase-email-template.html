@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirme seu e-mail no Mentor Concursos IA</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #0e9bf0 0%, #a855f7 100%);
+      padding: 32px 24px;
+      text-align: center;
+      color: #ffffff;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    .content {
+      padding: 32px 24px;
+      color: #374151;
+      line-height: 1.6;
+    }
+    .content h2 {
+      margin-top: 0;
+      color: #111827;
+      font-size: 20px;
+    }
+    .button-container {
+      text-align: center;
+      margin: 32px 0;
+    }
+    .button {
+      display: inline-block;
+      background-color: #0e9bf0;
+      color: #ffffff;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    .button:hover {
+      background-color: #0280d5;
+    }
+    .footer {
+      background-color: #f9fafb;
+      padding: 24px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .link-raw {
+      word-break: break-all;
+      color: #0e9bf0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Mentor Concursos IA</h1>
+    </div>
+    <div class="content">
+      <h2>Confirme seu endereço de e-mail</h2>
+      <p>Olá,</p>
+      <p>Falta muito pouco para você começar a sua jornada rumo à aprovação com o Mentor Concursos IA! Para garantir a segurança da sua conta, precisamos que você confirme o seu e-mail clicando no botão abaixo:</p>
+      
+      <div class="button-container">
+        <!-- A tag {{ .ConfirmationURL }} é utilizada pelo Supabase -->
+        <a href="{{ .ConfirmationURL }}" class="button">Confirmar Meu E-mail</a>
+      </div>
+      
+      <p>Se o botão não funcionar, você pode copiar e colar o link abaixo no seu navegador:</p>
+      <p class="link-raw"><a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a></p>
+      
+      <p>Se você não criou uma conta no Mentor Concursos IA, por favor ignore este e-mail.</p>
+      <p>Um abraço,<br>Equipe Mentor Concursos IA</p>
+    </div>
+    <div class="footer">
+      <p>&copy; 2026 Mentor Concursos IA. Todos os direitos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>

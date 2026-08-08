@@ -1,10 +1,25 @@
-export default function DashboardPage() {
-  return (
-    <div className="container py-10">
-      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-      <p className="text-muted-foreground">
-        Bem-vindo ao Mentor Concursos IA. O dashboard será implementado nas próximas fases.
-      </p>
-    </div>
-  )
+import { redirect } from "next/navigation"
+import { createClient } from "@/infrastructure/supabase/server"
+import { getDashboardData } from "@/application/dashboard/dashboard.service"
+import { DashboardLayout } from "@/features/dashboard/components/dashboard-layout"
+import { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Home - Mentor Concursos IA",
+}
+
+export default async function DashboardPage() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect("/login")
+  }
+
+  const snapshot = await getDashboardData(supabase, user.id)
+
+  return <DashboardLayout snapshot={snapshot} />
 }

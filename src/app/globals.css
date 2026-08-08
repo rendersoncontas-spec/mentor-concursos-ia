@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  --font-display: var(--font-display, var(--font-sans));
+  --font-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+}
+
 /* ─────────────────────────────────────────
    MENTOR CONCURSOS IA — DESIGN SYSTEM
    Tokens via CSS Custom Properties
@@ -8,64 +38,57 @@
 
 @layer base {
   :root {
-    /* ── Brand Colors ─────────────────── */
-    --brand-50:  240 249 255;
-    --brand-100: 219 243 255;
-    --brand-200: 178 228 255;
-    --brand-300: 118 206 255;
-    --brand-400: 56 181 252;
-    --brand-500: 14 155 240;   /* Primary */
-    --brand-600: 2 128 213;
-    --brand-700: 1 102 177;
-    --brand-800: 6 82 142;
-    --brand-900: 11 68 117;
-    --brand-950: 8 44 80;
+    /* ── Brand Colors (Azul Mentor IA) ─────────────────── */
+    --brand-50:  239 246 255;
+    --brand-100: 219 234 254;
+    --brand-200: 191 219 254;
+    --brand-300: 147 197 253;
+    --brand-400: 96 165 250;
+    --brand-500: 59 130 246;   
+    --brand-600: 37 99 235;   /* Primary #2563EB */
+    --brand-700: 29 78 216;   /* Primary Hover #1D4ED8 */
+    --brand-800: 30 64 175;   /* Primary Pressed #1E40AF */
+    --brand-900: 30 58 138;
+    --brand-950: 23 37 84;
 
-    /* ── Accent (Purple) ──────────────── */
-    --accent-50:  250 245 255;
-    --accent-100: 243 232 255;
-    --accent-200: 233 213 255;
-    --accent-300: 216 180 254;
-    --accent-400: 192 132 252;
-    --accent-500: 168 85 247;   /* Accent */
-    --accent-600: 147 51 234;
-    --accent-700: 126 34 206;
-    --accent-800: 107 33 168;
-    --accent-900: 88 28 135;
-    --accent-950: 59 7 100;
+    /* ── Secondary & Accent (Sky Blue) ─── */
+    --secondary-500: 14 165 233; /* Secondary #0EA5E9 */
+    --accent-400: 56 189 248;   /* Accent #38BDF8 */
 
     /* ── Success / Warning / Danger ───── */
-    --success-500: 34 197 94;
-    --warning-500: 234 179 8;
-    --danger-500:  239 68 68;
+    --success-500: 16 185 129; /* #10B981 */
+    --warning-500: 245 158 11; /* #F59E0B */
+    --danger-500:  239 68 68;  /* #EF4444 */
 
     /* ── Light Theme Semantic Tokens ─── */
-    --background:         0 0% 100%;
+    --background:         210 40% 98%; /* #F8FAFC */
     --foreground:         222 47% 11%;
-    --card:               0 0% 100%;
+    --card:               0 0% 100%;   /* #FFFFFF */
     --card-foreground:    222 47% 11%;
     --popover:            0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary:            205 89% 50%;
+    --primary:            221 83% 53%; /* #2563EB */
+    --primary-hover:      224 76% 48%; /* #1D4ED8 */
+    --primary-pressed:    226 71% 40%; /* #1E40AF */
     --primary-foreground: 0 0% 100%;
-    --secondary:          210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary:          199 89% 48%; /* #0EA5E9 */
+    --secondary-foreground: 0 0% 100%;
     --muted:              210 40% 96%;
     --muted-foreground:   215 16% 47%;
-    --accent:             270 95% 65%;
-    --accent-foreground:  0 0% 100%;
+    --accent:             199 94% 60%; /* #38BDF8 */
+    --accent-foreground:  222 47% 11%;
     --destructive:        0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     --border:             214 32% 91%;
     --input:              214 32% 91%;
-    --ring:               205 89% 50%;
+    --ring:               221 83% 53%; /* #2563EB */
 
-    /* ── Sidebar ─────────────────────── */
-    --sidebar-background:  222 47% 6%;
+    /* ── Sidebar (Dark Navy #0B1220) ──── */
+    --sidebar-background:  221 48% 8%;  /* #0B1220 */
     --sidebar-foreground:  210 40% 96%;
-    --sidebar-primary:     205 89% 50%;
-    --sidebar-accent:      222 47% 12%;
-    --sidebar-border:      222 47% 15%;
+    --sidebar-primary:     221 83% 53%; /* #2563EB */
+    --sidebar-accent:      221 40% 14%;
+    --sidebar-border:      221 35% 16%;
     --sidebar-width:       260px;
     --sidebar-width-collapsed: 72px;
 
@@ -103,31 +126,33 @@
 
   /* ── Dark Theme ──────────────────────── */
   .dark {
-    --background:         222 47% 6%;
+    --background:         221 48% 6%;  /* #070C14 */
     --foreground:         210 40% 98%;
-    --card:               222 47% 8%;
+    --card:               221 45% 9%;  /* #0F172A */
     --card-foreground:    210 40% 98%;
-    --popover:            222 47% 8%;
+    --popover:            221 45% 9%;
     --popover-foreground: 210 40% 98%;
-    --primary:            205 89% 55%;
+    --primary:            221 83% 55%; /* #3B82F6 */
+    --primary-hover:      224 76% 48%; /* #1D4ED8 */
+    --primary-pressed:    226 71% 40%; /* #1E40AF */
     --primary-foreground: 0 0% 100%;
-    --secondary:          217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary:          199 89% 48%; /* #0EA5E9 */
+    --secondary-foreground: 0 0% 100%;
     --muted:              217 33% 17%;
     --muted-foreground:   215 20% 65%;
-    --accent:             270 95% 65%;
+    --accent:             199 94% 60%; /* #38BDF8 */
     --accent-foreground:  0 0% 100%;
     --destructive:        0 62% 50%;
     --destructive-foreground: 0 0% 98%;
     --border:             217 33% 17%;
     --input:              217 33% 17%;
-    --ring:               205 89% 55%;
+    --ring:               221 83% 55%;
 
-    --sidebar-background: 222 47% 4%;
+    --sidebar-background: 221 48% 5%;  /* #070B14 */
     --sidebar-foreground: 210 40% 90%;
-    --sidebar-primary:    205 89% 55%;
-    --sidebar-accent:     222 47% 9%;
-    --sidebar-border:     222 47% 12%;
+    --sidebar-primary:    221 83% 55%;
+    --sidebar-accent:     221 40% 11%;
+    --sidebar-border:     221 35% 14%;
 
     --shadow-glow: 0 0 30px -5px hsl(var(--primary) / 0.4);
   }
@@ -136,24 +161,27 @@
 /* ── Base Reset ──────────────────────────── */
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--color-border);
   }
 
   html {
-    @apply scroll-smooth;
+    scroll-behavior: smooth;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
     min-height: 100dvh;
   }
 
   /* Focus visible for accessibility */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-ring;
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
   }
 
   /* Scrollbar styling */
@@ -167,26 +195,29 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-muted-foreground/30;
+    border-radius: 9999px;
+    background-color: hsl(var(--muted-foreground) / 0.3);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/50;
+    background-color: hsl(var(--muted-foreground) / 0.5);
   }
 
   /* Selection */
   ::selection {
-    @apply bg-primary/20 text-foreground;
+    background-color: hsl(var(--primary) / 0.2);
+    color: var(--color-foreground);
   }
 
   /* Headings */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight;
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
   }
 
   /* Code */
   code, kbd, pre {
-    @apply font-mono;
+    font-family: var(--font-mono);
   }
 }
 
