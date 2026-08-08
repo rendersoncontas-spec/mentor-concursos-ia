@@ -13,6 +13,78 @@ const COLOR_PALETTE = [
   "#2563EB", "#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444", "#f59e0b"
 ]
 
+// Base de dados local (cache) para simular editais pré-cadastrados do sistema (Estudei original)
+function getPreRegisteredTopics(disciplineName: string): TopicItem[] | null {
+  const normalized = disciplineName.trim().toLowerCase()
+  
+  if (normalized.includes("raciocínio lógico") || normalized.includes("matemática")) {
+    return [
+      { id: "rlm-1", number: 1, title: "PROPOSIÇÕES, CONECTIVOS, EQUIVALÊNCIAS LÓGICAS, QUANTIFICADORES E NEGAÇÕES.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "rlm-2", number: 2, title: "NÚMEROS INTEIROS, RACIONAIS E REAIS E SUAS OPERAÇÕES, PORCENTAGEM E PROPORÇÃO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "rlm-3", number: 3, title: "PROPORCIONALIDADE DIRETA E INVERSA.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "rlm-4", number: 4, title: "MEDIDAS DE COMPRIMENTO, ÁREA, VOLUME, MASSA E TEMPO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "rlm-5", number: 5, title: "ESTRUTURA LÓGICA DE RELAÇÕES ARBITRÁRIAS ENTRE PESSOAS, LUGARES, OBJETOS E EVENTOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "rlm-6", number: 6, title: "COMPREENSÃO E ANÁLISE DA LÓGICA DE UMA SITUAÇÃO, UTILIZANDO AS FUNÇÕES DO RACIOCÍNIO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "rlm-7", number: 7, title: "COMPREENSÃO DE DADOS APRESENTADOS EM GRÁFICOS E TABELAS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
+    ]
+  }
+
+  if (normalized.includes("administrativo")) {
+    return [
+      { id: "adm-1", number: 1, title: "ESTADO, GOVERNO E ADMINISTRAÇÃO PÚBLICA: CONCEITOS E ELEMENTOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "adm-2", number: 2, title: "DIREITO ADMINISTRATIVO: CONCEITO, FONTES E PRINCÍPIOS EXPRESSOS E IMPLÍCITOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "adm-3", number: 3, title: "ATOS ADMINISTRATIVOS: CONCEITO, REQUISITOS, ATRIBUTOS, CLASSIFICAÇÃO E ESPÉCIES.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "adm-4", number: 4, title: "AGENTES PÚBLICOS: ESPÉCIES E CLASSIFICAÇÃO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "adm-5", number: 5, title: "PODERES ADMINISTRATIVOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
+    ]
+  }
+
+  if (normalized.includes("constitucional")) {
+    return [
+      { id: "const-1", number: 1, title: "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988: PRINCÍPIOS FUNDAMENTAIS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "const-2", number: 2, title: "DIREITOS E GARANTIAS FUNDAMENTAIS: DIREITOS E DEVERES INDIVIDUAIS E COLETIVOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "const-3", number: 3, title: "DIREITOS SOCIAIS, DE NACIONALIDADE E POLÍTICOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "const-4", number: 4, title: "ORGANIZAÇÃO POLÍTICO-ADMINISTRATIVA DO ESTADO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "const-5", number: 5, title: "ADMINISTRAÇÃO PÚBLICA (ART. 37 A 41 DA CF).", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
+    ]
+  }
+
+  if (normalized.includes("portugu") || normalized.includes("portuguesa")) {
+    return [
+      { id: "port-1", number: 1, title: "COMPREENSÃO E INTERPRETAÇÃO DE TEXTOS DE GÊNEROS VARIADOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "port-2", number: 2, title: "RECONHECIMENTO DE TIPOS E GÊNEROS TEXTUAIS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "port-3", number: 3, title: "DOMÍNIO DA ORTOGRAFIA OFICIAL.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "port-4", number: 4, title: "DOMÍNIO DOS MECANISMOS DE COESÃO TEXTUAL.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "port-5", number: 5, title: "EMPREGO DE TEMPOS E MODOS VERBAIS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "port-6", number: 6, title: "SINTAXE DA ORAÇÃO E DO PERÍODO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "port-7", number: 7, title: "PONTUAÇÃO E CONCORDÂNCIA NOMINAL E VERBAL.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
+    ]
+  }
+
+  if (normalized.includes("penal")) {
+    return [
+      { id: "penal-1", number: 1, title: "PRINCÍPIOS BÁSICOS DO DIREITO PENAL.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "penal-2", number: 2, title: "APLICAÇÃO DA LEI PENAL.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "penal-3", number: 3, title: "O FATO TÍPICO E SEUS ELEMENTOS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "penal-4", number: 4, title: "IMPUTABILIDADE PENAL E CONCURSO DE PESSOAS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "penal-5", number: 5, title: "CRIMES CONTRA A PESSOA E CONTRA O PATRIMÔNIO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "penal-6", number: 6, title: "CRIMES CONTRA A ADMINISTRAÇÃO PÚBLICA.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
+    ]
+  }
+
+  if (normalized.includes("informática")) {
+    return [
+      { id: "info-1", number: 1, title: "CONCEITOS BÁSICOS E MODOS DE UTILIZAÇÃO DE TECNOLOGIAS.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "info-2", number: 2, title: "SISTEMAS OPERACIONAIS WINDOWS E LINUX.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "info-3", number: 3, title: "EDIÇÃO DE TEXTOS, PLANILHAS E APRESENTAÇÕES (OFFICE E LIBREOFFICE).", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "info-4", number: 4, title: "REDES DE COMPUTADORES E INTERNET.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null },
+      { id: "info-5", number: 5, title: "NOÇÕES DE SEGURANÇA DA INFORMAÇÃO.", correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
+    ]
+  }
+
+  return null
+}
+
 async function getActiveConcursoData() {
   try {
     const supabase = await createClient()
@@ -50,12 +122,12 @@ async function getActiveConcursoData() {
       const name = ud.discipline?.name || "Desconhecida"
       const discId = ud.discipline_id || `disc-${idx}`
       
-      const customTopics = customEdital[discId]
+      const customTopics = customEdital[discId] || getPreRegisteredTopics(name)
       return {
         id: discId,
         name: name,
         color: COLOR_PALETTE[idx % COLOR_PALETTE.length] || "#000000",
-        // Usa os tópicos customizados se existirem, senão cria um default 0% genérico
+        // Usa os tópicos customizados/pré-cadastrados se existirem, senão cria um default 0% genérico
         topics: customTopics || [
           { id: `gen-${idx}`, number: 1, title: `ESTUDO COMPLETO DA DISCIPLINA DE ${name.toUpperCase()}.`, correct: 0, wrong: 0, questions: 0, accuracy: 0, lastStudy: null, studyCount: 0, link: null }
         ]

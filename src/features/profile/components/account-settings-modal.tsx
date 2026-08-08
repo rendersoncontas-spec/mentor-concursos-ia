@@ -1,6 +1,6 @@
-﻿"use client"
+"use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   User,
   Settings,
@@ -39,6 +39,24 @@ export function AccountSettingsModal({
   const [activeTab, setActiveTab] = useState<
     "DADOS" | "PREFERENCIAS" | "RANKING" | "CATEGORIAS" | "NOTIFICACOES" | "SEGURANCA"
   >("DADOS")
+
+  // Estado para a foto de perfil carregada localmente (agora sincronizado)
+  const [avatarImg, setAvatarImg] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    // Carregar foto inicial
+    const saved = localStorage.getItem("mentor_user_avatar")
+    if (saved) setAvatarImg(saved)
+
+    // Escutar atualizações de outros componentes
+    const handleAvatarUpdate = () => {
+      const updated = localStorage.getItem("mentor_user_avatar")
+      setAvatarImg(updated)
+    }
+    window.addEventListener("avatarUpdated", handleAvatarUpdate)
+    return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
+  }, [])
 
   // Form States - Dados Pessoais
   const [nome, setNome] = useState("Renderson")
@@ -109,15 +127,38 @@ export function AccountSettingsModal({
 
               {/* Avatar + Carregar Foto */}
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs">
-                  <User className="h-8 w-8 stroke-[2]" />
+                <div className="w-14 h-14 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
+                  {avatarImg ? (
+                    <img src={avatarImg} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-8 w-8 stroke-[2]" />
+                  )}
                 </div>
                 <div>
                   <span className="text-[10px] font-bold uppercase text-muted-foreground block">
                     FOTO DE PERFIL
                   </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                          const base64String = reader.result as string
+                          setAvatarImg(base64String)
+                          localStorage.setItem("mentor_user_avatar", base64String)
+                          window.dispatchEvent(new Event("avatarUpdated"))
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                  />
                   <button
-                    onClick={() => toast.info("Selecione uma imagem do seu computador")}
+                    onClick={() => fileInputRef.current?.click()}
                     className="mt-1 px-3 py-1 bg-slate-700 hover:bg-slate-800 text-white font-bold text-[11px] rounded-md transition-colors"
                   >
                     Carregar Foto

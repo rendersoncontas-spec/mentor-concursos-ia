@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useCallback } from "react"
+import { useState, useTransition, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Plus,
@@ -43,6 +43,20 @@ interface ConcursosManagerViewProps {
   initialConcursos: ConcursoData[]
 }
 
+const PRE_REGISTERED_EXAMS = [
+  "Polícia Federal - Agente - policia",
+  "Polícia Federal - Escrivão",
+  "Polícia Rodoviária Federal (PRF)",
+  "Receita Federal - Auditor Fiscal",
+  "Receita Federal - Analista Tributário",
+  "INSS - Técnico do Seguro Social",
+  "Banco do Brasil - Escriturário",
+  "Caixa Econômica Federal - Técnico Bancário",
+  "Tribunal de Justiça (TJ-SP) - Escrevente",
+  "Polícia Civil - Investigador",
+  "Polícia Militar (PM-SP) - Soldado",
+]
+
 // ─── Concurso Form Modal ──────────────────────────────────────
 
 interface ConcursoFormModalProps {
@@ -62,21 +76,38 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
   const [examLocation, setExamLocation] = useState(initial?.exam_location || "")
   const [examPdfUrl, setExamPdfUrl] = useState(initial?.exam_pdf_url || "")
 
+  // Reset form when modal opens
+  useEffect(() => {
+    if (open) {
+      setName(initial?.name || "")
+      setRole(initial?.role || "")
+      setBanca(initial?.banca || "")
+      setExamDate(initial?.exam_date || "")
+      setExamTime(initial?.exam_time || "")
+      setExamLocation(initial?.exam_location || "")
+      setExamPdfUrl(initial?.exam_pdf_url || "")
+    }
+  }, [open, initial])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) {
-      toast.error("O nome do concurso é obrigatório.")
-      return
+    try {
+      if (!name.trim()) {
+        toast.error("O nome do concurso é obrigatório.")
+        return
+      }
+      await onSave({
+        name: name.trim(),
+        ...(role.trim() ? { role: role.trim() } : {}),
+        ...(banca.trim() ? { banca: banca.trim() } : {}),
+        ...(examDate ? { exam_date: examDate } : {}),
+        ...(examTime ? { exam_time: examTime } : {}),
+        ...(examLocation.trim() ? { exam_location: examLocation.trim() } : {}),
+        ...(examPdfUrl.trim() ? { exam_pdf_url: examPdfUrl.trim() } : {}),
+      })
+    } catch (err) {
+      toast.error("Erro fatal no modal: " + String(err))
     }
-    await onSave({
-      name: name.trim(),
-      ...(role.trim() ? { role: role.trim() } : {}),
-      ...(banca.trim() ? { banca: banca.trim() } : {}),
-      ...(examDate ? { exam_date: examDate } : {}),
-      ...(examTime ? { exam_time: examTime } : {}),
-      ...(examLocation.trim() ? { exam_location: examLocation.trim() } : {}),
-      ...(examPdfUrl.trim() ? { exam_pdf_url: examPdfUrl.trim() } : {}),
-    })
   }
 
   if (!open) return null
@@ -106,7 +137,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Nome */}
             <div className="sm:col-span-2 space-y-1.5">
@@ -116,12 +147,17 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
               <div className="relative">
                 <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
+                  list="pre-registered-exams"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Ex: Receita Federal"
-                  required
                   className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary placeholder:text-muted-foreground/50 transition-all"
                 />
+                <datalist id="pre-registered-exams">
+                  {PRE_REGISTERED_EXAMS.map(exam => (
+                    <option key={exam} value={exam} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -480,23 +516,37 @@ export function ConcursosManagerView({ initialConcursos }: ConcursosManagerViewP
     setIsSaving(true)
     try {
       let res
+      
+      // Criar um helper de timeout para evitar travamentos infinitos
+      const withTimeout = <T,>(promise: Promise<T>, ms: number = 10000) => {
+        let timeoutId: NodeJS.Timeout
+        const timeoutPromise = new Promise<T>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error(`Timeout de ${ms}ms excedido.`)), ms)
+        })
+        return Promise.race([
+          promise.finally(() => clearTimeout(timeoutId)),
+          timeoutPromise
+        ])
+      }
+
       if (editingConcurso?.id) {
-        res = await updateConcursoAction(editingConcurso.id, data)
+        res = await withTimeout(updateConcursoAction(editingConcurso.id, data))
         if (res.success) toast.success("Concurso atualizado com sucesso!")
       } else {
-        res = await createConcursoAction(data)
+        res = await withTimeout(createConcursoAction(data))
         if (res.success) toast.success("Concurso criado! Ele já está ativo.")
       }
+      
       if (res.success) {
         setFormOpen(false)
         setEditingConcurso(undefined)
         refreshList()
         router.refresh()
       } else {
-        toast.error(res.error || "Erro ao salvar concurso.")
+        toast.error(res.error || "Erro ao salvar concurso (Servidor).")
       }
-    } catch {
-      toast.error("Erro inesperado ao salvar.")
+    } catch (err) {
+      toast.error("Erro inesperado (Client): " + String(err))
     } finally {
       setIsSaving(false)
     }

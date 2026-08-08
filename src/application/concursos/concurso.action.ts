@@ -162,7 +162,7 @@ export async function createConcursoAction(
       .insert({
         user_id: user.id,
         target_exam: input.name.trim(),
-        target_role: input.role?.trim() ?? null,
+        target_role: input.role?.trim() || "",
         is_active: true,
         main_study_source: buildMeta(input),
       })
@@ -259,7 +259,7 @@ export async function duplicateConcursoAction(id: string): Promise<{ success: bo
       .insert({
         user_id: user.id,
         target_exam: `${original.target_exam as string} (Cópia)`,
-        target_role: original.target_role as string | null,
+        target_role: (original.target_role as string) || "",
         is_active: false,
         main_study_source: JSON.stringify(newMeta),
       })

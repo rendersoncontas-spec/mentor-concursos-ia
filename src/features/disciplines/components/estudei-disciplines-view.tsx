@@ -36,13 +36,7 @@ export interface DisciplineCardData {
   color: string
 }
 
-const DEFAULT_DISCIPLINES: DisciplineCardData[] = [
-  { id: "d1", name: "Administração Geral", topicsStudied: 0, topicsTotal: 34, questionsSolved: 0, color: "#fef08a" },
-  { id: "d2", name: "Administração Pública", topicsStudied: 0, topicsTotal: 28, questionsSolved: 0, color: "#e0f2fe" },
-  { id: "d3", name: "Contabilidade Geral", topicsStudied: 0, topicsTotal: 21, questionsSolved: 0, color: "#f3e8ff" },
-  { id: "d4", name: "Direito Administrativo", topicsStudied: 0, topicsTotal: 20, questionsSolved: 0, color: "#ffedd5" },
-  { id: "d5", name: "Direito Constitucional", topicsStudied: 0, topicsTotal: 23, questionsSolved: 0, color: "#dbeafe" },
-]
+// Removido DEFAULT_DISCIPLINES (não deve exibir mock data em produção)
 
 interface EstudeiDisciplinesViewProps {
   initialData?: DisciplinesPageData | null
@@ -54,10 +48,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   const nameParam = searchParams.get("name")
 
   const [disciplines, setDisciplines] = useState<DisciplineCardData[]>(() => {
-    if (initialData?.disciplines && initialData.disciplines.length > 0) {
-      return initialData.disciplines
-    }
-    return DEFAULT_DISCIPLINES
+    return initialData?.disciplines || []
   })
 
   useEffect(() => {
@@ -67,10 +58,10 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   }, [initialData])
 
   const targetInfo = initialData?.target || {
-    name: "Concurso Alvo",
-    editalName: "Edital Próprio",
-    role: "Concurseiro",
-    observations: "Sem informações extras",
+    name: "Nenhum Concurso Ativo",
+    editalName: "N/A",
+    role: "N/A",
+    observations: "Selecione ou crie um concurso para começar",
   }
 
   const totalStats = initialData?.totalStats || {
@@ -238,93 +229,118 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
         </div>
       </div>
 
-      {/* Grade de Cards de Disciplinas com Efeito Hover Flip/Overlay Estudei */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {disciplines.map((disc) => (
-          <div
-            key={disc.id}
-            className="group rounded-xl border bg-card p-5 shadow-sm transition-all duration-300 relative overflow-hidden h-[130px] flex flex-col justify-between"
-          >
-            {/* Top Color Line */}
-            <div
-              className="absolute top-0 left-0 right-0 h-1.5 transition-colors"
-              style={{ backgroundColor: disc.color }}
-            />
-
-            {/* Conteúdo Normal (Visível por padrão) */}
-            <div className="pt-1 transition-opacity duration-200 group-hover:opacity-0">
-              <h3 className="font-bold text-sm text-foreground truncate" title={disc.name}>
-                {disc.name}
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-center pt-2 pb-1 transition-opacity duration-200 group-hover:opacity-0">
-              <div>
-                <span className="text-xl font-extrabold text-foreground block leading-none">
-                  {disc.topicsStudied}
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
-                  Tópicos Estudados
-                </span>
-              </div>
-
-              <div>
-                <span className="text-xl font-extrabold text-foreground block leading-none">
-                  {disc.topicsTotal}
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
-                  Tópicos Totais
-                </span>
-              </div>
-
-              <div>
-                <span className="text-xl font-extrabold text-foreground block leading-none">
-                  {disc.questionsSolved}
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
-                  Questões Resolvidas
-                </span>
-              </div>
-            </div>
-
-            {/* Overlay de Ações no HOVER — 100% de Paridade com o Estudei */}
-            <div
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-around p-4 z-10"
-              style={{ backgroundColor: disc.color }}
-            >
-              {/* Botão 1: Visualizar */}
-              <button
-                onClick={() => setViewingDiscipline(disc)}
-                className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 transition-all font-bold group/btn"
-                title="Visualizar disciplina"
-              >
-                <Folder className="h-6 w-6 stroke-[2.2]" />
-                <span className="text-xs">Visualizar</span>
-              </button>
-
-              {/* Botão 2: Editar */}
-              <button
-                onClick={() => handleOpenEdit(disc)}
-                className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 transition-all font-bold group/btn"
-                title="Editar disciplina"
-              >
-                <Edit3 className="h-6 w-6 stroke-[2.2]" />
-                <span className="text-xs">Editar</span>
-              </button>
-
-              {/* Botão 3: Remover */}
-              <button
-                onClick={() => handleRemoveDiscipline(disc.id, disc.name)}
-                className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 hover:text-rose-700 transition-all font-bold group/btn"
-                title="Remover disciplina"
-              >
-                <Trash2 className="h-6 w-6 stroke-[2.2]" />
-                <span className="text-xs">Remover</span>
-              </button>
-            </div>
+      {/* Grade de Cards de Disciplinas */}
+      {disciplines.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 rounded-xl border border-dashed bg-card/50">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+            <Folder className="h-8 w-8 text-emerald-500/60" />
           </div>
-        ))}
-      </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-lg text-foreground">Nenhuma disciplina cadastrada</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              Você ainda não adicionou disciplinas ao seu concurso. Clique em "Nova Disciplina" para começar.
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              setEditingDisc(null)
+              setDisciplineNameInput("")
+              setIsModalOpen(true)
+            }}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold gap-2 rounded-xl mt-2"
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar Disciplina
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {disciplines.map((disc) => (
+            <div
+              key={disc.id}
+              className="group rounded-xl border bg-card p-5 shadow-sm transition-all duration-300 relative overflow-hidden h-[130px] flex flex-col justify-between"
+            >
+              {/* Top Color Line */}
+              <div
+                className="absolute top-0 left-0 right-0 h-1.5 transition-colors"
+                style={{ backgroundColor: disc.color }}
+              />
+
+              {/* Conteúdo Normal (Visível por padrão) */}
+              <div className="pt-1 transition-opacity duration-200 group-hover:opacity-0">
+                <h3 className="font-bold text-sm text-foreground truncate" title={disc.name}>
+                  {disc.name}
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center pt-2 pb-1 transition-opacity duration-200 group-hover:opacity-0">
+                <div>
+                  <span className="text-xl font-extrabold text-foreground block leading-none">
+                    {disc.topicsStudied}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
+                    Tópicos Estudados
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-xl font-extrabold text-foreground block leading-none">
+                    {disc.topicsTotal}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
+                    Tópicos Totais
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-xl font-extrabold text-foreground block leading-none">
+                    {disc.questionsSolved}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
+                    Questões Resolvidas
+                  </span>
+                </div>
+              </div>
+
+              {/* Overlay de Ações no HOVER — 100% de Paridade com o Estudei */}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-around p-4 z-10"
+                style={{ backgroundColor: disc.color }}
+              >
+                {/* Botão 1: Visualizar */}
+                <button
+                  onClick={() => setViewingDiscipline(disc)}
+                  className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 transition-all font-bold group/btn"
+                  title="Visualizar disciplina"
+                >
+                  <Folder className="h-6 w-6 stroke-[2.2]" />
+                  <span className="text-xs">Visualizar</span>
+                </button>
+
+                {/* Botão 2: Editar */}
+                <button
+                  onClick={() => handleOpenEdit(disc)}
+                  className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 transition-all font-bold group/btn"
+                  title="Editar disciplina"
+                >
+                  <Edit3 className="h-6 w-6 stroke-[2.2]" />
+                  <span className="text-xs">Editar</span>
+                </button>
+
+                {/* Botão 3: Remover */}
+                <button
+                  onClick={() => handleRemoveDiscipline(disc.id, disc.name)}
+                  className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 hover:text-rose-700 transition-all font-bold group/btn"
+                  title="Remover disciplina"
+                >
+                  <Trash2 className="h-6 w-6 stroke-[2.2]" />
+                  <span className="text-xs">Remover</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal Criar / Editar Disciplina */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

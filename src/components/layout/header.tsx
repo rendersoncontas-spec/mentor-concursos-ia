@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -40,8 +40,23 @@ export function AppHeader({ userEmail, userName = "Renders", logoutAction }: App
   const [isEditalModalOpen, setIsEditalModalOpen] = useState(false)
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
   const [editalRequestInput, setEditalRequestInput] = useState("")
+  const [avatarImg, setAvatarImg] = useState<string | null>(null)
 
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Carregar foto inicial
+    const saved = localStorage.getItem("mentor_user_avatar")
+    if (saved) setAvatarImg(saved)
+
+    // Escutar atualizações da foto
+    const handleAvatarUpdate = () => {
+      const updated = localStorage.getItem("mentor_user_avatar")
+      setAvatarImg(updated)
+    }
+    window.addEventListener("avatarUpdated", handleAvatarUpdate)
+    return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
+  }, [])
 
   // Fechar menu ao clicar fora
   useEffect(() => {
@@ -118,10 +133,14 @@ export function AppHeader({ userEmail, userName = "Renders", logoutAction }: App
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="w-9 h-9 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xs focus:outline-none"
+            className="w-9 h-9 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xs focus:outline-none overflow-hidden"
             title="Menu do Usuário"
           >
-            <User className="h-5 w-5 stroke-[2.2]" />
+            {avatarImg ? (
+              <img src={avatarImg} alt="User" className="w-full h-full object-cover" />
+            ) : (
+              <User className="h-5 w-5 stroke-[2.2]" />
+            )}
           </button>
 
           {isUserMenuOpen && (
