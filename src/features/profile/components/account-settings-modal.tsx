@@ -244,7 +244,10 @@ export function AccountSettingsModal({
 
             {/* Botão Sair no Rodapé da Sidebar */}
             <button
-              onClick={() => logoutAction()}
+              onClick={async () => {
+                await logoutAction()
+                window.location.href = "/login"
+              }}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-muted-foreground hover:text-rose-600 transition-colors"
             >
               <LogOut className="h-4 w-4" />

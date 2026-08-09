@@ -66,30 +66,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-      // Checagem de Novo Planejamento
-      // Em vez de onboarding_completed, verificamos se existe algum plano ativo
-      const { data: activePlan } = await supabase
-        .from("study_plans")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("active", true)
-        .single()
-
-      const hasActivePlan = !!activePlan
-
-      // Se não possui plano e tenta acessar dashboard, manda pro novo /planejamento
-      if (!hasActivePlan && isProtectedRoute) {
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = "/planejamento"
-        return NextResponse.redirect(redirectUrl)
-      }
-
-      // Se já possui plano e tenta acessar planejamento (wizard), manda pro dashboard
-      if (hasActivePlan && request.nextUrl.pathname.startsWith("/planejamento")) {
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = "/dashboard"
-        return NextResponse.redirect(redirectUrl)
-      }
+    // Checagem de Novo Planejamento foi removida para permitir acesso livre ao dashboard.
   }
 
   return supabaseResponse

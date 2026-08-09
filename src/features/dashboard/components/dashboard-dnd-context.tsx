@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useState, useEffect } from "react"
 import {
   DndContext,
   closestCenter,
@@ -24,6 +24,12 @@ interface DashboardDndContextProps {
 }
 
 export function DashboardDndContext({ items, onReorder, children }: DashboardDndContextProps) {
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -59,6 +65,14 @@ export function DashboardDndContext({ items, onReorder, children }: DashboardDnd
         }
       }
     }
+  }
+
+  if (!isMounted) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-min w-full">
+        {children}
+      </div>
+    )
   }
 
   return (

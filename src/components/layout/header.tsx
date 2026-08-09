@@ -200,11 +200,13 @@ export function AppHeader({ userEmail, userName = "Renders", logoutAction }: App
 
               <div className="border-t my-1" />
 
-              {/* Opção 5: Sair */}
+               {/* Opção 5: Sair */}
               <button
-                onClick={() => {
+                onClick={async () => {
                   setIsUserMenuOpen(false)
-                  logoutAction()
+                  await logoutAction()
+                  router.push("/login")
+                  router.refresh()
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors text-left"
               >

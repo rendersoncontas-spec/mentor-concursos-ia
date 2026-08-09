@@ -27,30 +27,27 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Escala de Trabalho e Dias de Estudo salvos
-  const [scheduleMode, setScheduleMode] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mentor_user_work_scale")
-      if (saved) return saved
-    }
-    return "normal"
-  })
+  const [scheduleMode, setScheduleMode] = useState<string>("normal")
+  const [firstShiftDay, setFirstShiftDay] = useState<number>(2)
+  const [studyDays, setStudyDays] = useState<string[]>(["seg", "ter", "qua", "qui", "sex", "sab", "dom"])
 
-  const [firstShiftDay, setFirstShiftDay] = useState<number>(() => {
+  useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mentor_user_first_shift_day")
-      if (saved) return parseInt(saved)
+      const savedScale = localStorage.getItem("mentor_user_work_scale")
+      if (savedScale) setScheduleMode(savedScale)
+      const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
+      if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay))
+      const savedStudyDays = localStorage.getItem("mentor_user_study_days")
+      if (savedStudyDays) setStudyDays(JSON.parse(savedStudyDays))
     }
-    return 2
-  })
-
-  const [studyDays, setStudyDays] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mentor_user_study_days")
-      if (saved) return JSON.parse(saved)
-    }
-    return ["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
-  })
+  }, [])
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -64,6 +61,10 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
     window.addEventListener("mentor_scale_updated", handleUpdate)
     return () => window.removeEventListener("mentor_scale_updated", handleUpdate)
   }, [])
+
+  if (!mounted) {
+    return null
+  }
 
   // Formatting date
   const dateFormatted = selectedDate.toLocaleDateString("pt-BR", {

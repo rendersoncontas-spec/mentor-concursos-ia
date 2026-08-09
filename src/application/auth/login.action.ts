@@ -10,26 +10,21 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
 
   try {
     const validatedData = loginSchema.parse(data)
+    console.log("LOGIN_ATTEMPT:", { email: validatedData.email })
 
     try {
       const supabase = await createClient()
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data: authData } = await supabase.auth.signInWithPassword({
         email: validatedData.email,
         password: validatedData.password,
       })
+      console.log("SUPABASE_AUTH_RESULT:", { error, session: authData.session ? "present" : "missing" })
 
-      if (error) {
-        if (error.message === "Email not confirmed") {
-          return { 
-            success: false, 
-            error: "Por favor, confirme seu e-mail antes de entrar.", 
-            code: "UNCONFIRMED_EMAIL" 
-          }
-        }
+      if (error || !authData.session) {
         return { 
           success: false, 
-          error: "E-mail ou senha incorretos. Verifique suas credenciais.",
+          error: "Email ou senha incorretos.",
           code: "INVALID_CREDENTIALS"
         }
       }
@@ -37,13 +32,6 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
       return { success: true }
     } catch (supabaseError: any) {
       console.warn("Supabase auth unreachable:", supabaseError?.message || supabaseError)
-
-      // Em modo de desenvolvimento, se o Supabase Cloud antigo estiver inacessível, libera acesso local de demonstração
-      // @ts-expect-error: TS4111 prevents dot notation, but Next.js requires it for build-time inline replacement
-      const isDev = process.env.NEXT_PUBLIC_APP_MODE === 'development' || process.env.NODE_ENV === 'development'
-      if (isDev) {
-        return { success: true }
-      }
 
       return {
         success: false,
