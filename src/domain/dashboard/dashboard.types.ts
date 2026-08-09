@@ -81,6 +81,14 @@ export interface DashboardAnalytics {
   }
 }
 
+export interface WidgetConfigItem {
+  widget_id: string
+  position_order: number
+  col_span: 1 | 2 | 3
+  row_span?: number
+  visible: boolean
+}
+
 export interface DashboardSnapshot {
   user: DashboardProfile | null
   activeTarget: DashboardTarget | null
@@ -95,10 +103,12 @@ export interface DashboardSnapshot {
   }
   disciplinesStats: DashboardDisciplinesStats
   todayPlanItems: StudyPlanItemWithDetails[]
+  cycleBlocks?: any[] | null
   rawDisciplines: any[]
   reviews: PendingReviewsSummary
   recentActivities: RecentActivityItem[]
   analytics: DashboardAnalytics
+  userLayout?: WidgetConfigItem[] | null | undefined
 }
 
 // Compatibilidade durante refatoração

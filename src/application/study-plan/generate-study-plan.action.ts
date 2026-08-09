@@ -36,11 +36,16 @@ export async function generateStudyPlanAction(
       return { success: false, error: "Nenhum concurso ativo encontrado." }
     }
 
+    let targetWeeklyHours: number | undefined = undefined
+
     if (config) {
+      const rawHours = Array.isArray(config.horasSemana) ? config.horasSemana[0] : config.horasSemana
+      targetWeeklyHours = typeof rawHours === "number" ? rawHours : parseInt(rawHours) || 25
+
       // 1. Atualizar perfil com os dados do Wizard (nível, horas/semana)
       await supabase.from("profiles").update({
         experience_level: config.nivel || "iniciante",
-        weekly_study_hours: config.horasSemana || 25,
+        weekly_study_hours: targetWeeklyHours,
       }).eq("id", user.id)
 
       // 2. Apagar disciplinas antigas caso esteja gerando do Wizard e tenha enviado as novas
@@ -74,7 +79,7 @@ export async function generateStudyPlanAction(
       }
     }
 
-    const plan = await generateStudyPlan(supabase, user.id, reason, rawTarget.id)
+    const plan = await generateStudyPlan(supabase, user.id, reason, rawTarget.id, targetWeeklyHours)
 
     if (!plan) {
       return {

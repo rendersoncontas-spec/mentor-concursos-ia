@@ -1,25 +1,24 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
 import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
-import { getTodayStudyItems } from "@/application/study-plan/study-plan.service"
+import { getTodayStudyItems, getCycleOverviewData } from "@/application/study-plan/study-plan.service"
 import { getUserDisciplines } from "@/application/disciplines/disciplines.service"
 import { getStudyHistoryForAnalytics, AnalyticsEngine } from "@/application/study-analytics/study-analytics.service"
 import { getPendingReviewsSummary } from "@/application/review-engine/review-engine.service"
 import { getRecentActivities } from "@/application/study-history/study-history.service"
 import { getStartOfWeek } from "@/application/study-analytics/utils"
 
-
-
 export async function getDashboardData(supabase: SupabaseClient, userId: string): Promise<DashboardSnapshot> {
   try {
     const [
       profileResult,
       targetResult,
-      _ ,
+      cycleOverview,
       todayPlanItems,
       rawHistory,
       reviewsSummary,
       recentActivities,
-      questionAttemptsResult
+      questionAttemptsResult,
+      userLayoutResult
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -35,7 +34,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         .limit(1)
         .maybeSingle(),
 
-      [] as any, // placeholder for disciplines, will be fetched after targetResult
+      getCycleOverviewData(supabase, userId).catch(() => null),
       getTodayStudyItems(supabase, userId).catch(() => []),
       getStudyHistoryForAnalytics(supabase, userId, 30).catch(() => []),
       getPendingReviewsSummary(supabase, userId).catch(() => ({
@@ -49,7 +48,12 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       supabase
         .from("question_attempts")
         .select("id, correct, discipline_id, created_at, answered_at")
+        .eq("user_id", userId),
+      supabase
+        .from("user_dashboard_layouts")
+        .select("widget_id, position_order, col_span, row_span, visible")
         .eq("user_id", userId)
+        .order("position_order")
     ])
 
     const profile = profileResult?.data || null;
@@ -184,6 +188,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       },
       disciplinesStats,
       todayPlanItems,
+      cycleBlocks: cycleOverview?.blocks || [],
       rawDisciplines: (disciplines || []).map((ud: any) => {
         const discId = ud.discipline?.id
         const discAttempts = attempts.filter((a: any) => a.discipline_id === discId)
@@ -245,7 +250,16 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
           studyDays: { target: targetDays, achieved: weeklyStudyDays, percentage: targetDays > 0 ? Math.min(100, Math.round((weeklyStudyDays / targetDays) * 100)) : 0, remaining: Math.max(0, targetDays - weeklyStudyDays) }
         },
         insights: AnalyticsEngine.ai.getInsights(ctx)
-      }
+      },
+      userLayout: (userLayoutResult?.data && userLayoutResult.data.length > 0)
+        ? userLayoutResult.data.map((item: any) => ({
+            widget_id: item.widget_id,
+            position_order: item.position_order,
+            col_span: Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3,
+            row_span: item.row_span || 1,
+            visible: item.visible
+          }))
+        : undefined
     }
   } catch (error) {
     console.error("Erro ao carregar Dashboard:", error)

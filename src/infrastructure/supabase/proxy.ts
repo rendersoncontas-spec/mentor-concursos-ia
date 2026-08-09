@@ -44,7 +44,8 @@ export async function updateSession(request: NextRequest) {
 
   const isProtectedRoute =
     request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/profile")
+    request.nextUrl.pathname.startsWith("/profile") ||
+    request.nextUrl.pathname.startsWith("/planejamento")
     
   const isOnboardingRoute = request.nextUrl.pathname.startsWith("/onboarding")
 
@@ -65,30 +66,30 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Checagem de Onboarding (apenas em rotas protegidas e onboarding para não travar arquivos estáticos)
-    if (isProtectedRoute || isOnboardingRoute) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("id", user.id)
+      // Checagem de Novo Planejamento
+      // Em vez de onboarding_completed, verificamos se existe algum plano ativo
+      const { data: activePlan } = await supabase
+        .from("study_plans")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("active", true)
         .single()
 
-      const hasCompletedOnboarding = profile?.onboarding_completed === true
+      const hasActivePlan = !!activePlan
 
-      // Se não completou e tenta acessar dashboard, manda pro onboarding
-      if (!hasCompletedOnboarding && isProtectedRoute) {
+      // Se não possui plano e tenta acessar dashboard, manda pro novo /planejamento
+      if (!hasActivePlan && isProtectedRoute) {
         const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = "/onboarding"
+        redirectUrl.pathname = "/planejamento"
         return NextResponse.redirect(redirectUrl)
       }
 
-      // Se já completou e tenta acessar onboarding, manda pro dashboard
-      if (hasCompletedOnboarding && isOnboardingRoute) {
+      // Se já possui plano e tenta acessar planejamento (wizard), manda pro dashboard
+      if (hasActivePlan && request.nextUrl.pathname.startsWith("/planejamento")) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = "/dashboard"
         return NextResponse.redirect(redirectUrl)
       }
-    }
   }
 
   return supabaseResponse

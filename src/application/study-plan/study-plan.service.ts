@@ -26,19 +26,17 @@ export async function generateStudyPlan(
   supabase: SupabaseClient,
   userId: string,
   reason: string = "manual",
-  targetId?: string
+  targetId?: string,
+  overrideWeeklyHours?: number
 ): Promise<{ id: string; version: number } | null> {
   // 1a. Buscar perfil
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("weekly_study_hours, experience_level")
     .eq("id", userId)
-    .single()
+    .maybeSingle()
 
-  if (profileError || !profile) {
-    console.error("generateStudyPlan: profile error", profileError)
-    return null
-  }
+  const targetHours = overrideWeeklyHours || profile?.weekly_study_hours || 25
 
   // 1b. Buscar concurso ativo (exam_id pode ser null para concursos customizados)
   const { data: target } = await supabase
@@ -156,7 +154,7 @@ export async function generateStudyPlan(
     })),
     userStats: {
       averageEnergy: 3,
-      weeklyHoursStudied: profile.weekly_study_hours ?? 20,
+      weeklyHoursStudied: profile?.weekly_study_hours ?? 20,
       currentStreak: 5,
       totalBacklogReviews: 0
     }
@@ -187,7 +185,7 @@ export async function generateStudyPlan(
   }
 
   // 2. Montar input e chamar algoritmo puro
-  const weeklyMinutes = (profile.weekly_study_hours ?? 20) * 60
+  const weeklyMinutes = targetHours * 60
   const availableDays: DayOfWeek[] = [0, 1, 2, 3, 4, 5, 6]  // Futuro: virá do perfil
 
   const algorithmInput: AlgorithmInput = {

@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getUserTargetsAction, switchActiveTargetAction, type UserTargetSummary } from "@/application/dashboard/target.action"
+import { RenderConcursoIcon } from "@/features/concursos/components/concursos-manager-view"
 
 export interface TargetSelectorDropdownProps {
   initialActiveTargetName?: string | null
@@ -176,14 +177,20 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
                         : "border-transparent hover:bg-muted/80 hover:border-border"
                     )}
                   >
-                    {/* Ícone de Selecionado */}
-                    <div className="mt-0.5 shrink-0">
+                    {/* Ícone de Selecionado e Logo do Concurso */}
+                    <div className="mt-0.5 shrink-0 flex items-center gap-2">
+                      <div className={cn(
+                        "w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden border shadow-2xs",
+                        isActive ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#2563EB]" : "bg-muted border-border text-muted-foreground"
+                      )}>
+                        <RenderConcursoIcon iconKey={target.icon} className="h-4 w-4" />
+                      </div>
                       {isActive ? (
-                        <div className="w-5 h-5 rounded-full bg-[#2563EB] text-white flex items-center justify-center shadow-xs">
-                          <Check className="h-3.5 w-3.5 stroke-[3]" />
+                        <div className="w-4 h-4 rounded-full bg-[#2563EB] text-white flex items-center justify-center shadow-xs">
+                          <Check className="h-3 w-3 stroke-[3]" />
                         </div>
                       ) : (
-                        <div className="w-5 h-5 rounded-full border border-muted-foreground/30 group-hover:border-foreground transition-colors" />
+                        <div className="w-4 h-4 rounded-full border border-muted-foreground/30 group-hover:border-foreground transition-colors" />
                       )}
                     </div>
 

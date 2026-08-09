@@ -232,10 +232,10 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
 
     const radius = 80
     const center = 100
-    const x1 = center + radius * Math.cos((Math.PI * (startAngle - 90)) / 180)
-    const y1 = center + radius * Math.sin((Math.PI * (startAngle - 90)) / 180)
-    const x2 = center + radius * Math.cos((Math.PI * (startAngle + angle - 90)) / 180)
-    const y2 = center + radius * Math.sin((Math.PI * (startAngle + angle - 90)) / 180)
+    const x1 = (center + radius * Math.cos((Math.PI * (startAngle - 90)) / 180)).toFixed(4)
+    const y1 = (center + radius * Math.sin((Math.PI * (startAngle - 90)) / 180)).toFixed(4)
+    const x2 = (center + radius * Math.cos((Math.PI * (startAngle + angle - 90)) / 180)).toFixed(4)
+    const y2 = (center + radius * Math.sin((Math.PI * (startAngle + angle - 90)) / 180)).toFixed(4)
     const largeArc = angle > 180 ? 1 : 0
 
     return {
@@ -269,7 +269,10 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
             {/* AI Option */}
             <div 
-              onClick={() => setIsChoiceModalOpen(true)}
+              onClick={() => {
+                setWizardTitle("Criar Planejamento com IA")
+                setIsWizardModalOpen(true)
+              }}
               className="bg-card border-2 border-[#2563EB]/20 hover:border-[#2563EB] rounded-3xl p-8 flex flex-col items-center text-center space-y-6 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/10 group"
             >
               <div className="w-16 h-16 bg-[#2563EB]/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -280,7 +283,7 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
                   Mentor IA <Sparkles className="w-4 h-4 text-[#2563EB]" />
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  O Mentor monta todo o seu planejamento automaticamente com base no seu perfil e carga horária.
+                  O Mentor monta todo o seu planejamento automaticamente com base no seu perfil, escala de trabalho e carga horária.
                 </p>
                 <div className="inline-flex items-center text-[10px] font-bold text-[#2563EB] bg-[#2563EB]/10 px-2 py-1 rounded-full uppercase tracking-wider">
                   Tempo: ~2 minutos
@@ -293,7 +296,10 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
 
             {/* Manual Option */}
             <div 
-              onClick={() => setIsManualChoiceModalOpen(true)}
+              onClick={() => {
+                setWizardTitle("Criar Planejamento Manual")
+                setIsWizardModalOpen(true)
+              }}
               className="bg-card border-2 border-muted hover:border-foreground/30 rounded-3xl p-8 flex flex-col items-center text-center space-y-6 cursor-pointer transition-all hover:shadow-md group"
             >
               <div className="w-16 h-16 bg-muted/50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -304,7 +310,7 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
                   Criar Manualmente
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Monte disciplina por disciplina, ajustando os pesos manualmente.
+                  Monte disciplina por disciplina, configurando sua escala e relevâncias em 4 passos.
                 </p>
                 <div className="inline-flex items-center text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded-full uppercase tracking-wider">
                   Para Usuários Avançados
@@ -523,6 +529,7 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
       {planningType === "diario" && (
         <DailyPlanningView
           blocks={blocks}
+          onSwitchToCiclo={() => setPlanningType("ciclo")}
           onReplan={() => {
             setWizardTitle("Editar Planejamento")
             setIsWizardModalOpen(true)
@@ -796,6 +803,7 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
         open={isWizardModalOpen}
         onOpenChange={setIsWizardModalOpen}
         modalTitle={wizardTitle}
+        initialBlocks={blocks}
         onComplete={() => {
           setHasPlanning(true)
           setIsManualCreation(false)

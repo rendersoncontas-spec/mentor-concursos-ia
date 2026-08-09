@@ -12,6 +12,7 @@ export interface UserTargetSummary {
   exam_date?: string | null
   exam_time?: string | null
   exam_location?: string | null
+  icon?: string | null
   daysRemaining?: number | null
   editalProgress?: number
 }
@@ -64,8 +65,9 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
       let exam_time = t.exam_time || null
       let exam_location = t.exam_location || null
       let exam_name = t.exam_name || t.target_exam || "Concurso Alvo"
+      let icon: string | null = null
 
-      if (!exam_date && t.main_study_source) {
+      if (t.main_study_source) {
         try {
           if (t.main_study_source.startsWith("{") && t.main_study_source.endsWith("}")) {
             const meta = JSON.parse(t.main_study_source)
@@ -73,6 +75,7 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
             if (meta.examTime) exam_time = meta.examTime
             if (meta.examLocation) exam_location = meta.examLocation
             if (meta.examName) exam_name = meta.examName
+            if (meta.icon) icon = meta.icon
           }
         } catch {
           // Ignorar se não for JSON válido
@@ -95,6 +98,7 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
         exam_date,
         exam_time,
         exam_location,
+        icon,
         daysRemaining,
         editalProgress,
       }

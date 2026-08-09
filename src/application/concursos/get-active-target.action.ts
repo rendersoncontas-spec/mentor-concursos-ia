@@ -2,7 +2,7 @@
 
 import { createClient } from "@/infrastructure/supabase/server"
 
-export async function getActiveTargetNameAction(): Promise<{ success: boolean; name?: string; error?: string }> {
+export async function getActiveTargetNameAction(): Promise<{ success: boolean; name?: string; role?: string; error?: string }> {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -10,17 +10,17 @@ export async function getActiveTargetNameAction(): Promise<{ success: boolean; n
 
     const { data } = await supabase
       .from("user_targets")
-      .select("target_exam")
+      .select("target_exam, target_role")
       .eq("user_id", user.id)
       .eq("is_active", true)
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    if (data && data.target_exam) {
-      return { success: true, name: data.target_exam }
+    if (data) {
+      return { success: true, name: data.target_exam || "Concurso", role: data.target_role || "" }
     }
     
-    return { success: true, name: "Concurso" }
+    return { success: true, name: "Concurso", role: "" }
   } catch (error) {
     return { success: false, error: "Erro interno." }
   }

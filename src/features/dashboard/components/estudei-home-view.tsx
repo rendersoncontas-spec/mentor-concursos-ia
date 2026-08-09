@@ -23,6 +23,8 @@ import { UserExamModal } from "@/features/dashboard/components/user-exam-modal"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { deleteUserExamAction } from "@/application/dashboard/user-exam.action"
 import { WeeklyGoalsModal } from "@/features/dashboard/components/weekly-goals-modal"
+import { DailyPlanningView } from "@/features/planejamento/components/daily-planning-view"
+import { type StudyCycleBlock } from "@/features/planejamento/components/estudei-planning-view"
 
 const MOTIVATIONAL_QUOTES = [
   { quote: "Não tenha medo de desistir do bom para perseguir o ótimo", author: "John D. Rockefeller" },
@@ -41,22 +43,7 @@ export interface HomeDisciplineRow {
   accuracyPercentage: number
 }
 
-const DEFAULT_PAINEL_DISCIPLINES: HomeDisciplineRow[] = [
-  { id: "pd-1", name: "Administração Geral", tempoFormatted: "10h00min", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-2", name: "Administração Pública", tempoFormatted: "10h00min", correctCount: 10, wrongCount: 1, notebookCount: 11, accuracyPercentage: 91 },
-  { id: "pd-3", name: "Contabilidade Geral", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-4", name: "Direito Administrativo", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-5", name: "Direito Constitucional", tempoFormatted: "10h00min", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-6", name: "Direito Previdenciário", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-7", name: "Direito Tributário", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-8", name: "Estatística", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-9", name: "Fluência em Dados", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-10", name: "Legislação Aduaneira", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-11", name: "Legislação Tributária", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-12", name: "Língua Inglesa", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-13", name: "Língua Portuguesa", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-  { id: "pd-14", name: "Raciocínio Lógico", tempoFormatted: "-", correctCount: 0, wrongCount: 0, notebookCount: 0, accuracyPercentage: 0 },
-]
+const DEFAULT_PAINEL_DISCIPLINES: HomeDisciplineRow[] = []
 
 import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 
@@ -193,8 +180,24 @@ export function EstudeiHomeView({ userName = "Estudante", snapshot }: EstudeiHom
     })
   }, [startDate, snapshot, customStudiedDates, streakOffset])
 
+  const homeCycleBlocks: StudyCycleBlock[] = useMemo(() => {
+    if (snapshot?.cycleBlocks && snapshot.cycleBlocks.length > 0) {
+      return snapshot.cycleBlocks.map((b: any) => ({
+        id: b.id,
+        disciplineName: b.disciplineName,
+        disciplineId: b.disciplineId,
+        durationMinutes: b.durationMinutes,
+        studiedMinutes: b.studiedMinutes || 0,
+        color: b.color || "#2563EB",
+        completed: b.status === "CONCLUIDO",
+      }))
+    }
+    return []
+  }, [snapshot?.cycleBlocks])
+
   const streakCount = snapshot?.stats?.consecutiveStreak ?? streakDays.filter((d) => d.studied).length
   const longestStreak = snapshot?.stats?.longestStreak ?? streakCount
+
 
   const toggleStreakDay = (dateIso: string, currentStudied: boolean) => {
     setCustomStudiedDates((prev) => ({
@@ -340,7 +343,7 @@ export function EstudeiHomeView({ userName = "Estudante", snapshot }: EstudeiHom
       </div>
 
       {/* 3. Card CONSTÂNCIA NOS ESTUDOS com Mensagem de Felicitação */}
-      <div className="rounded-xl border bg-card p-5 shadow-xs space-y-3 relative overflow-visible">
+      <div className="rounded-xl border bg-card p-5 shadow-xs space-y-3 relative overflow-hidden">
         <div className="flex items-center justify-between border-b pb-3 flex-wrap gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider">
@@ -377,38 +380,62 @@ export function EstudeiHomeView({ userName = "Estudante", snapshot }: EstudeiHom
           </div>
         </div>
 
-        {/* Heatmap de Quadradinhos com Círculos Checkmark (Tooltips sem corte) */}
-        <div className="flex items-center justify-between gap-1 sm:gap-1.5 py-4 overflow-visible relative">
-          {streakDays.map((day) => (
-            <div key={day.id} className="relative group cursor-pointer flex-1 flex justify-center">
-              {/* Tooltip sem corte - Posicionado com z-50 alto acima dos elementos */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none transition-all duration-200">
-                <div className="bg-slate-900 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap">
-                  {day.dayOfWeek}, {day.formattedDate}
-                  {day.studied ? " (Estudado ✓)" : " (Não estudado)"}
-                </div>
-                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 -mt-0.5" />
-              </div>
+        {/* Heatmap de Quadradinhos Adaptativo por Tamanho de Tela */}
+        <div className="w-full py-2">
+          <div className="flex items-center justify-between gap-1 sm:gap-1.5 w-full">
+            {streakDays.map((day, idx) => {
+              // Exibe dinamicamente conforme a largura da tela sem corte nem transbordo:
+              // Mobile (<640px): 10 dias (idx >= 20)
+              // SM (640px+): 15 dias (idx >= 15)
+              // MD (768px+): 20 dias (idx >= 10)
+              // LG (1024px+): 25 dias (idx >= 5)
+              // XL (1280px+): 30 dias (todos)
+              let visibilityClass = "flex"
+              if (idx < 5) visibilityClass = "hidden xl:flex"
+              else if (idx < 10) visibilityClass = "hidden lg:flex"
+              else if (idx < 15) visibilityClass = "hidden md:flex"
+              else if (idx < 20) visibilityClass = "hidden sm:flex"
 
-              <button
-                type="button"
-                onClick={() => toggleStreakDay(day.dateIso, day.studied)}
-                className={`w-6 h-6 sm:w-6 sm:h-6 rounded-md transition-all flex items-center justify-center ${
-                  day.studied
-                    ? "bg-[#2563EB] text-white shadow-2xs hover:scale-110"
-                    : "bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 hover:scale-105"
-                }`}
-              >
-                {day.studied ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                ) : (
-                  <XCircle className="h-3.5 w-3.5 text-rose-500" />
-                )}
-              </button>
-            </div>
-          ))}
+              return (
+                <div key={day.id} className={`relative group cursor-pointer flex-1 justify-center ${visibilityClass}`}>
+                  {/* Tooltip sem corte - Posicionado acima dos elementos */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none transition-all duration-200">
+                    <div className="bg-slate-900 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap">
+                      {day.dayOfWeek}, {day.formattedDate}
+                      {day.studied ? " (Estudado ✓)" : " (Não estudado)"}
+                    </div>
+                    <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 -mt-0.5" />
+                  </div>
+
+                  <button
+                    type="button"
+                    title={`${day.dayOfWeek}, ${day.formattedDate}: ${day.studied ? "Estudado ✓" : "Não estudado"}`}
+                    onClick={() => toggleStreakDay(day.dateIso, day.studied)}
+                    className={`w-6 h-6 sm:w-6 sm:h-6 rounded-md transition-all flex items-center justify-center ${
+                      day.studied
+                        ? "bg-[#2563EB] text-white shadow-2xs hover:scale-110"
+                        : "bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 hover:scale-105"
+                    }`}
+                  >
+                    {day.studied ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-rose-500" />
+                    )}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
+
+      {/* 3.B Visão Diária do Ciclo (Cronograma do Dia Destaque em cima do Painel) */}
+      {homeCycleBlocks.length > 0 && (
+        <div className="w-full rounded-2xl border bg-card p-4 sm:p-6 shadow-xs space-y-4">
+          <DailyPlanningView blocks={homeCycleBlocks} />
+        </div>
+      )}
 
       {/* 4. Grid Parte A (PAINEL + 3 WIDGETS - Fotos 1 e 2 100% Estudei) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

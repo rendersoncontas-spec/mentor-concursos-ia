@@ -25,14 +25,7 @@ interface EstudeiPainelCardProps {
   weeklyQuestionsCurrent?: number
 }
 
-const DEFAULT_DISCIPLINES_PAINEL: DisciplinePerformanceRow[] = [
-  { id: "d1", name: "Língua Portuguesa", timeFormatted: "4h30min", correctCount: 38, wrongCount: 7, questionsCount: 45, accuracyPercentage: 84 },
-  { id: "d2", name: "Direito Constitucional", timeFormatted: "6h15min", correctCount: 52, wrongCount: 8, questionsCount: 60, accuracyPercentage: 86 },
-  { id: "d3", name: "Direito Administrativo", timeFormatted: "5h00min", correctCount: 41, wrongCount: 9, questionsCount: 50, accuracyPercentage: 82 },
-  { id: "d4", name: "Informática", timeFormatted: "3h45min", correctCount: 28, wrongCount: 7, questionsCount: 35, accuracyPercentage: 80 },
-  { id: "d5", name: "Raciocínio Lógico", timeFormatted: "2h30min", correctCount: 20, wrongCount: 5, questionsCount: 25, accuracyPercentage: 80 },
-  { id: "d6", name: "Estatística", timeFormatted: "1h30min", correctCount: 12, wrongCount: 4, questionsCount: 16, accuracyPercentage: 75 },
-]
+const DEFAULT_DISCIPLINES_PAINEL: DisciplinePerformanceRow[] = []
 
 export function EstudeiPainelCard({
   disciplines = DEFAULT_DISCIPLINES_PAINEL,

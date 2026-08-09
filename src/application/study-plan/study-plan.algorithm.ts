@@ -75,25 +75,60 @@ function normalizeWeights(disciplines: any[]) {
 function generateWeeklySessions(disciplines: any[], weeklyMinutes: number): InternalSession[] {
   const sessions: InternalSession[] = []
   
-  disciplines.forEach(d => {
-    if (d.normalizedScore <= 0) return
-    const allocatedMinutes = Math.round(d.normalizedScore * weeklyMinutes)
-    let remainingMinutes = allocatedMinutes
+  // 1. Calcular fatias de tempo para cada disciplina atenta à soma total
+  const allocated = disciplines.map(d => {
+    if (d.normalizedScore <= 0) return { ...d, targetMins: 0 }
+    return {
+      ...d,
+      targetMins: Math.round(d.normalizedScore * weeklyMinutes)
+    }
+  })
 
-    while (remainingMinutes >= MIN_BLOCK_MINUTES) {
-      const blockDuration = Math.min(MAX_BLOCK_MINUTES, remainingMinutes)
-      
-      sessions.push({
-        type: "study",
-        disciplineId: d.disciplineId,
-        disciplineName: d.name,
-        disciplineArea: d.area,
-        durationMinutes: blockDuration,
-        priorityScore: d.priorityScore,
-        originalPriority: d.priorityScore
-      })
-      
-      remainingMinutes -= blockDuration
+  // Garantir que a soma alocada seja exatamente weeklyMinutes (sem perdas por arredondamento)
+  const currentTotal = allocated.reduce((acc, d) => acc + d.targetMins, 0)
+  const diff = weeklyMinutes - currentTotal
+  if (diff !== 0 && allocated.length > 0) {
+    const topDisc = allocated.filter(d => d.targetMins > 0).sort((a, b) => b.priorityScore - a.priorityScore)[0]
+    if (topDisc) topDisc.targetMins += diff
+  }
+
+  // 2. Fatiar em blocos garantindo que NENHUM minuto seja descartado
+  allocated.forEach(d => {
+    let remaining = d.targetMins
+    if (remaining <= 0) return
+
+    while (remaining > 0) {
+      if (remaining >= MIN_BLOCK_MINUTES) {
+        const blockDuration = Math.min(MAX_BLOCK_MINUTES, remaining)
+        sessions.push({
+          type: "study",
+          disciplineId: d.disciplineId,
+          disciplineName: d.name,
+          disciplineArea: d.area,
+          durationMinutes: blockDuration,
+          priorityScore: d.priorityScore,
+          originalPriority: d.priorityScore
+        })
+        remaining -= blockDuration
+      } else {
+        // Se sobrou um resto menor que 30 min (ex: 15 ou 20 min):
+        // Se a disciplina já tem blocos criados, adicionamos ao último bloco para não perder os minutos
+        const lastSession = sessions.filter(s => s.disciplineId === d.disciplineId).pop()
+        if (lastSession) {
+          lastSession.durationMinutes += remaining
+        } else {
+          sessions.push({
+            type: "study",
+            disciplineId: d.disciplineId,
+            disciplineName: d.name,
+            disciplineArea: d.area,
+            durationMinutes: remaining,
+            priorityScore: d.priorityScore,
+            originalPriority: d.priorityScore
+          })
+        }
+        remaining = 0
+      }
     }
   })
 
@@ -281,14 +316,8 @@ export function calculateWeeklyDistribution(input: AlgorithmInput): AlgorithmIte
     return []
   }
 
-  // Se houver risco de Burnout (SESSION_CAPACITY_CHANGE), reduzimos as horas originais
-  if (adaptiveDecisions) {
-    const burnoutDecision = adaptiveDecisions.find(d => d.recommendationType === 'SESSION_CAPACITY_CHANGE')
-    if (burnoutDecision && burnoutDecision.delta) {
-      // Ex: delta = -0.20 significa redução de 20%
-      weeklyMinutes = Math.round(weeklyMinutes * (1 + burnoutDecision.delta))
-    }
-  }
+  // Manter weeklyMinutes exatamente como configurado pelo usuário para garantir a meta de horas
+  const targetWeeklyMinutes = weeklyMinutes
 
   // Pipeline Inteligente: 
   // 1a. Priorização Base
@@ -321,8 +350,13 @@ export function calculateWeeklyDistribution(input: AlgorithmInput): AlgorithmIte
   // 2. Normalização
   const normalized = normalizeWeights(withPriorities)
 
-  // 3. Geração Semanal
-  const baseSessions = generateWeeklySessions(normalized, weeklyMinutes)
+  // 3. Geração Semanal com Reserva para Revisões (garante que soma final das aulas + revisões = weeklyMinutes)
+  const estimatedSessionsCount = Math.floor(weeklyMinutes / 60)
+  const estimatedReviewsCount = Math.floor(estimatedSessionsCount / 4)
+  const reviewMinutesReserve = estimatedReviewsCount * REVIEW_BLOCK_MINUTES
+  const studyMinutes = Math.max(MIN_BLOCK_MINUTES, weeklyMinutes - reviewMinutesReserve)
+
+  const baseSessions = generateWeeklySessions(normalized, studyMinutes)
 
   // 4. Balanceamento Anti-Repetição
   const balancedSessions = balanceSequence(baseSessions)
@@ -330,11 +364,22 @@ export function calculateWeeklyDistribution(input: AlgorithmInput): AlgorithmIte
   // 5. Injeção de Revisões
   const sessionsWithReviews = insertReviewBlocks(balancedSessions)
 
-  // 6. Distribuição Diária Limitada
+  // 6. Ajuste Milimétrico de Precisão (Garante que a soma total de aulas + revisões seja RIGOROSAMENTE igual a weeklyMinutes)
+  const currentTotalMins = sessionsWithReviews.reduce((acc, s) => acc + s.durationMinutes, 0)
+  const diffMins = weeklyMinutes - currentTotalMins
+  if (diffMins !== 0 && sessionsWithReviews.length > 0) {
+    const studySessions = sessionsWithReviews.filter(s => s.type === "study")
+    const targetSession = studySessions[studySessions.length - 1] || sessionsWithReviews[sessionsWithReviews.length - 1]
+    if (targetSession) {
+      targetSession.durationMinutes = Math.max(MIN_BLOCK_MINUTES, targetSession.durationMinutes + diffMins)
+    }
+  }
+
+  // 7. Distribuição Diária Limitada
   const maxDailyMinutes = Math.ceil(weeklyMinutes / availableDays.length)
   const dailyDistribution = distributeDaily(sessionsWithReviews, availableDays, maxDailyMinutes)
 
-  // 7. Saída Formatada
+  // 8. Saída Formatada
   return finalizeSchedule(dailyDistribution)
 }
 
@@ -413,34 +458,62 @@ export function calculateCycleDistribution(input: CycleAlgorithmInput): Algorith
   const totalScore = scored.reduce((acc, d) => acc + d.priorityScore, 0)
   if (totalScore <= 0) return []
 
-  // 2. Alocar minutos e gerar blocos
+  // 2. Alocar minutos proporcionais de forma exata (soma = totalCycleMinutes)
+  const allocated = scored.map(d => {
+    const fraction = d.priorityScore / totalScore
+    return {
+      ...d,
+      targetMins: Math.round(fraction * totalCycleMinutes)
+    }
+  })
+
+  const currentTotal = allocated.reduce((acc, d) => acc + d.targetMins, 0)
+  const diff = totalCycleMinutes - currentTotal
+  if (diff !== 0 && allocated.length > 0) {
+    const topDisc = allocated.filter(d => d.targetMins > 0).sort((a, b) => b.priorityScore - a.priorityScore)[0]
+    if (topDisc) topDisc.targetMins += diff
+  }
+
+  // 3. Fatiar em blocos sem descartar NENHUM minuto
   const rawSessions: InternalSession[] = []
 
-  scored.forEach(d => {
-    const fraction = d.priorityScore / totalScore
-    let allocatedMinutes = Math.round(fraction * totalCycleMinutes)
-    
-    // Garantir pelo menos 30 minutos por disciplina se tiver score > 0
-    if (allocatedMinutes < MIN_BLOCK_MINUTES && d.priorityScore > 0) {
-      allocatedMinutes = MIN_BLOCK_MINUTES
-    }
+  allocated.forEach(d => {
+    let remaining = d.targetMins
+    if (remaining <= 0) return
 
-    let remaining = allocatedMinutes
-    while (remaining >= MIN_BLOCK_MINUTES) {
-      // Bloco entre 30 e 90 minutos para boa digestão pedagógica
-      const blockDuration = remaining >= 120 ? 90 : Math.min(90, remaining)
+    while (remaining > 0) {
+      if (remaining >= MIN_BLOCK_MINUTES) {
+        const blockDuration = remaining >= 120 ? 90 : Math.min(90, remaining)
 
-      rawSessions.push({
-        type: "study",
-        disciplineId: d.disciplineId,
-        disciplineName: d.name,
-        disciplineArea: d.area,
-        durationMinutes: blockDuration,
-        priorityScore: d.priorityScore,
-        originalPriority: d.weight
-      })
+        rawSessions.push({
+          type: "study",
+          disciplineId: d.disciplineId,
+          disciplineName: d.name,
+          disciplineArea: d.area,
+          durationMinutes: blockDuration,
+          priorityScore: d.priorityScore,
+          originalPriority: d.weight
+        })
 
-      remaining -= blockDuration
+        remaining -= blockDuration
+      } else {
+        // Adiciona a sobra (ex: 15 ou 20 min) ao último bloco da mesma disciplina
+        const lastSession = rawSessions.filter(s => s.disciplineId === d.disciplineId).pop()
+        if (lastSession) {
+          lastSession.durationMinutes += remaining
+        } else {
+          rawSessions.push({
+            type: "study",
+            disciplineId: d.disciplineId,
+            disciplineName: d.name,
+            disciplineArea: d.area,
+            durationMinutes: remaining,
+            priorityScore: d.priorityScore,
+            originalPriority: d.weight
+          })
+        }
+        remaining = 0
+      }
     }
   })
 

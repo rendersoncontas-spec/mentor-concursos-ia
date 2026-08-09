@@ -12,6 +12,7 @@ export interface ConcursoData {
   exam_time: string | null
   exam_location: string | null
   exam_pdf_url: string | null
+  icon?: string | null
   is_active: boolean
   is_archived: boolean
   days_remaining: number | null
@@ -26,6 +27,7 @@ export interface CreateConcursoInput {
   exam_time?: string | undefined
   exam_location?: string | undefined
   exam_pdf_url?: string | undefined
+  icon?: string | null | undefined
 }
 
 // Typed meta object — avoids TS4111 index-signature errors
@@ -37,6 +39,7 @@ interface ConcursoMeta {
   examTime?: string | null | undefined
   examLocation?: string | null | undefined
   examPdfUrl?: string | null | undefined
+  icon?: string | null | undefined
   archived?: boolean | undefined
 }
 
@@ -47,11 +50,13 @@ interface ConcursoMeta {
 function buildMeta(data: Partial<CreateConcursoInput>): string {
   const meta: ConcursoMeta = {
     examName: data.name ?? null,
+    role: data.role ?? null,
     banca: data.banca ?? null,
     examDate: data.exam_date ?? null,
     examTime: data.exam_time ?? null,
     examLocation: data.exam_location ?? null,
     examPdfUrl: data.exam_pdf_url ?? null,
+    icon: data.icon ?? null,
     archived: false,
   }
   return JSON.stringify(meta)
@@ -76,6 +81,7 @@ function mapRow(row: any): ConcursoData {
   const exam_time = meta.examTime || (row.exam_time as string | null) || null
   const exam_location = meta.examLocation || (row.exam_location as string | null) || null
   const exam_pdf_url = meta.examPdfUrl || null
+  const icon = meta.icon || null
   const is_archived = Boolean(meta.archived)
 
   let days_remaining: number | null = null
@@ -95,6 +101,7 @@ function mapRow(row: any): ConcursoData {
     exam_time,
     exam_location,
     exam_pdf_url,
+    icon,
     is_active: Boolean(row.is_active),
     is_archived,
     days_remaining,
@@ -204,11 +211,13 @@ export async function updateConcursoAction(
     const mergedMeta: ConcursoMeta = {
       ...currentMeta,
       examName: input.name?.trim() ?? currentMeta.examName ?? (existing.target_exam as string | null),
+      role: input.role?.trim() ?? currentMeta.role ?? (existing.target_role as string | null),
       banca: input.banca ?? currentMeta.banca,
       examDate: input.exam_date ?? currentMeta.examDate,
       examTime: input.exam_time ?? currentMeta.examTime,
       examLocation: input.exam_location ?? currentMeta.examLocation,
       examPdfUrl: input.exam_pdf_url ?? currentMeta.examPdfUrl,
+      icon: input.icon !== undefined ? input.icon : currentMeta.icon,
       archived: currentMeta.archived ?? false,
     }
 

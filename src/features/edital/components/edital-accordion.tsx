@@ -90,20 +90,34 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [editingDiscipline, setEditingDiscipline] = useState<DisciplineData | null>(null)
 
-  // Carregar do localStorage
+  // Carregar do localStorage (escopado por concurso ativo)
   useEffect(() => {
-    const savedChecked = localStorage.getItem("mentor_edital_checked_topics")
+    if (typeof window === "undefined") return
+    // Remove legado não escopado com dados fake de teste para evitar que Raciocínio Lógico inicie em 14%
+    const legacyKey = "mentor_edital_checked_topics"
+    const legacyData = localStorage.getItem(legacyKey)
+    if (legacyData && activeTargetId) {
+      localStorage.removeItem(legacyKey)
+    }
+
+    const storageKey = activeTargetId ? `mentor_edital_checked_topics_${activeTargetId}` : legacyKey
+    const savedChecked = localStorage.getItem(storageKey)
     if (savedChecked) {
       try {
         setCompletedTopics(JSON.parse(savedChecked))
-      } catch (e) {}
+      } catch (e) {
+        setCompletedTopics({})
+      }
+    } else {
+      setCompletedTopics({})
     }
-  }, [])
+  }, [activeTargetId])
 
   const toggleCheck = (topicId: string) => {
     const updated = { ...completedTopics, [topicId]: !completedTopics[topicId] }
     setCompletedTopics(updated)
-    localStorage.setItem("mentor_edital_checked_topics", JSON.stringify(updated))
+    const storageKey = activeTargetId ? `mentor_edital_checked_topics_${activeTargetId}` : "mentor_edital_checked_topics"
+    localStorage.setItem(storageKey, JSON.stringify(updated))
   }
 
   const handleSaveLink = () => {

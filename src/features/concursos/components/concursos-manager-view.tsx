@@ -20,6 +20,16 @@ import {
   MapPin,
   Link2,
   X,
+  Target,
+  Shield,
+  Briefcase,
+  Scale,
+  Award,
+  Flame,
+  Sparkles,
+  Landmark,
+  Upload,
+  Image as ImageIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -37,6 +47,40 @@ import {
   type CreateConcursoInput,
 } from "@/application/concursos/concurso.action"
 
+// ─── Preset Icons ──────────────────────────────────────────────
+
+export const PRESET_ICONS = [
+  { id: "trophy", label: "Troféu", icon: Trophy },
+  { id: "graduation-cap", label: "Formatura", icon: GraduationCap },
+  { id: "target", label: "Alvo", icon: Target },
+  { id: "shield", label: "Polícia / Escudo", icon: Shield },
+  { id: "building", label: "Tribunal / Edifício", icon: Building2 },
+  { id: "book", label: "Estudos", icon: BookOpen },
+  { id: "briefcase", label: "Carreira", icon: Briefcase },
+  { id: "scale", label: "Direito / Justiça", icon: Scale },
+  { id: "award", label: "Medalha", icon: Award },
+  { id: "flame", label: "Fogo / Foco", icon: Flame },
+  { id: "sparkles", label: "Inteligência IA", icon: Sparkles },
+  { id: "star", label: "Estrela", icon: Star },
+  { id: "landmark", label: "Fiscal / Governo", icon: Landmark },
+]
+
+export function RenderConcursoIcon({ iconKey, className = "h-5 w-5" }: { iconKey?: string | null | undefined; className?: string }) {
+  if (!iconKey) return <Trophy className={className} />
+
+  if (iconKey.startsWith("data:image/") || iconKey.startsWith("http://") || iconKey.startsWith("https://")) {
+    return <img src={iconKey} alt="Ícone do concurso" className="w-full h-full object-cover" />
+  }
+
+  const found = PRESET_ICONS.find(p => p.id === iconKey)
+  if (found) {
+    const IconComponent = found.icon
+    return <IconComponent className={className} />
+  }
+
+  return <Trophy className={className} />
+}
+
 // ─── Types ───────────────────────────────────────────────────
 
 interface ConcursosManagerViewProps {
@@ -44,7 +88,7 @@ interface ConcursosManagerViewProps {
 }
 
 const PRE_REGISTERED_EXAMS = [
-  "Polícia Federal - Agente - policia",
+  "Polícia Federal - Agente",
   "Polícia Federal - Escrivão",
   "Polícia Rodoviária Federal (PRF)",
   "Receita Federal - Auditor Fiscal",
@@ -75,6 +119,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
   const [examTime, setExamTime] = useState(initial?.exam_time || "")
   const [examLocation, setExamLocation] = useState(initial?.exam_location || "")
   const [examPdfUrl, setExamPdfUrl] = useState(initial?.exam_pdf_url || "")
+  const [icon, setIcon] = useState(initial?.icon || "trophy")
 
   // Reset form when modal opens
   useEffect(() => {
@@ -86,8 +131,27 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
       setExamTime(initial?.exam_time || "")
       setExamLocation(initial?.exam_location || "")
       setExamPdfUrl(initial?.exam_pdf_url || "")
+      setIcon(initial?.icon || "trophy")
     }
   }, [open, initial])
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error("A imagem deve ser menor que 3MB.")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string
+      if (dataUrl) {
+        setIcon(dataUrl)
+        toast.success("Imagem do curso importada com sucesso!")
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,6 +162,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
       }
       await onSave({
         name: name.trim(),
+        icon,
         ...(role.trim() ? { role: role.trim() } : {}),
         ...(banca.trim() ? { banca: banca.trim() } : {}),
         ...(examDate ? { exam_date: examDate } : {}),
@@ -117,9 +182,9 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+      <div className="w-full max-w-xl bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <GraduationCap className="h-4 w-4 text-primary" />
@@ -137,12 +202,99 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-5 overflow-y-auto flex-1">
+          {/* Seção 1: Ícone / Logo do Curso ou Concurso */}
+          <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                Ícone ou Imagem do Curso / Concurso
+              </label>
+              {icon && icon !== "trophy" && (
+                <button
+                  type="button"
+                  onClick={() => setIcon("trophy")}
+                  className="text-xs text-rose-500 hover:underline font-semibold"
+                >
+                  Restaurar padrão
+                </button>
+              )}
+            </div>
+
+            {/* Visualização Atual do Ícone */}
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative group">
+                <RenderConcursoIcon iconKey={icon} className="h-7 w-7 text-primary" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Escolha um ícone predefinido ou importe a logo do curso/concurso do seu dispositivo.
+                </p>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="concurso-icon-file-input"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <label
+                    htmlFor="concurso-icon-file-input"
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary/90 transition-all"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Importar Imagem
+                  </label>
+
+                  <span className="text-xs text-muted-foreground">ou</span>
+
+                  <input
+                    type="url"
+                    placeholder="URL da imagem (http...)"
+                    value={icon?.startsWith("http") ? icon : ""}
+                    onChange={(e) => setIcon(e.target.value)}
+                    className="flex-1 min-w-[140px] px-2.5 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Presets de Ícones */}
+            <div className="pt-2 border-t border-border/60">
+              <p className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider mb-2">
+                Ícones Pré-definidos
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {PRESET_ICONS.map((p) => {
+                  const IconComp = p.icon
+                  const isSelected = icon === p.id
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      title={p.label}
+                      onClick={() => setIcon(p.id)}
+                      className={cn(
+                        "w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer",
+                        isSelected
+                          ? "border-primary bg-primary/15 text-primary ring-2 ring-primary/30 shadow-xs"
+                          : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <IconComp className="h-4 w-4" />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Nome */}
             <div className="sm:col-span-2 space-y-1.5">
               <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
-                Nome do Concurso *
+                Nome do Concurso / Curso *
               </label>
               <div className="relative">
                 <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -354,10 +506,10 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <div className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-            concurso.is_active ? "bg-primary/10" : "bg-muted"
+            "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border shadow-2xs transition-all",
+            concurso.is_active ? "bg-primary/10 border-primary/25 text-primary" : "bg-muted border-border text-muted-foreground"
           )}>
-            <Trophy className={cn("h-5 w-5", concurso.is_active ? "text-primary" : "text-muted-foreground")} />
+            <RenderConcursoIcon iconKey={concurso.icon} className={cn("h-5.5 w-5.5", concurso.is_active ? "text-primary" : "text-muted-foreground")} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
