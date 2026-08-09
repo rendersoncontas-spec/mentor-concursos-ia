@@ -1,12 +1,12 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
-
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2 } from "lucide-react"
+import { Loader2, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react"
 import { toast } from "sonner"
 
 import { loginAction } from "@/application/auth/login.action"
@@ -26,6 +26,7 @@ import { type LoginInput, loginSchema } from "@/domain/auth/auth.schemas"
 export function LoginForm() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [showPassword, setShowPassword] = useState(false)
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -80,9 +81,18 @@ export function LoginForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>E-mail</FormLabel>
+              <FormLabel className="text-sm font-medium">E-mail</FormLabel>
               <FormControl>
-                <Input placeholder="seu@email.com" type="email" disabled={isPending} {...field} />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="seu.email@exemplo.com"
+                    type="email"
+                    disabled={isPending}
+                    className="pl-9 h-11 bg-background"
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -93,19 +103,59 @@ export function LoginForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Senha</FormLabel>
+              <div className="flex items-center justify-between">
+                <FormLabel className="text-sm font-medium">Senha</FormLabel>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  Esqueceu sua senha?
+                </Link>
+              </div>
               <FormControl>
-                <Input placeholder="******" type="password" disabled={isPending} {...field} />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="••••••••"
+                    type={showPassword ? "text" : "password"}
+                    disabled={isPending}
+                    className="pl-9 pr-10 h-11 bg-background"
+                    {...field}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full" disabled={isPending}>
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Entrar
+        <Button
+          type="submit"
+          className="w-full h-11 font-semibold text-base gap-2 shadow-md hover:shadow-lg transition-all"
+          disabled={isPending}
+        >
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              Entrar na Plataforma
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
         </Button>
       </form>
     </Form>
   )
 }
+
