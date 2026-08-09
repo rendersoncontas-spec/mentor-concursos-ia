@@ -21,6 +21,8 @@ import {
   ChevronRight,
   LogOut,
   GraduationCap,
+  Menu,
+  X,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -46,9 +48,11 @@ const navItems = [
 interface AppSidebarProps {
   logoutAction: () => Promise<void>
   className?: string
+  isOpen?: boolean
+  onClose?: () => void
 }
 
-export function AppSidebar({ logoutAction, className }: AppSidebarProps) {
+export function AppSidebar({ logoutAction, className, isOpen, onClose }: AppSidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
@@ -64,8 +68,20 @@ export function AppSidebar({ logoutAction, className }: AppSidebarProps) {
           "relative flex flex-col h-screen bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))] transition-all duration-300 ease-in-out",
           collapsed ? "w-[72px]" : "w-[260px]",
           className,
+          // Responsivo mobile/tablet: fixed overlay quando isOpen for true ou lg para fixo
+          "fixed inset-y-0 left-0 z-[100] md:relative",
+          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0",
         )}
       >
+        {/* Botão fechar mobile */}
+        {isOpen && (
+          <button
+            onClick={onClose}
+            className="md:hidden absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
         {/* Logo */}
         <div
           className={cn(
@@ -109,6 +125,7 @@ export function AppSidebar({ logoutAction, className }: AppSidebarProps) {
             const linkContent = (
               <Link
                 href={item.href}
+                onClick={onClose as React.MouseEventHandler<HTMLAnchorElement>}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 group",
                   collapsed ? "justify-center" : "",

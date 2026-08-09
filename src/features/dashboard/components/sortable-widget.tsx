@@ -32,17 +32,15 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
   if (colSpan === 2) {
     colSpanClass = "col-span-1 md:col-span-2"
   } else if (colSpan === 3) {
-    colSpanClass = "col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-3"
-  } else if (colSpan > 3) {
     colSpanClass = "col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4"
   }
-
+  
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col min-h-[140px]",
+        "relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col h-full",
         isDragging && "shadow-xl opacity-80 ring-2 ring-[#2563EB] z-50",
         colSpanClass
       )}
@@ -57,7 +55,7 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
         <GripVertical className="w-4 h-4" />
       </div>
       
-      <div className="flex-1 w-full overflow-hidden">
+      <div className="flex-1 w-full overflow-hidden pr-8">
         {children}
       </div>
     </div>

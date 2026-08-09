@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
 import { DashboardDndContext } from "./dashboard-dnd-context"
 import { SortableWidget } from "./sortable-widget"
@@ -23,9 +23,14 @@ export interface DashboardLayoutProps {
 export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProps) {
   const [layout, setLayout] = useState<WidgetConfigItem[]>(initialLayout)
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
+  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [isExamModalOpen, setIsExamModalOpen] = useState(false)
-  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
+  useEffect(() => {
+    const handleOpenCustomization = () => setIsCustomizationOpen(true)
+    window.addEventListener("open-dashboard-customization", handleOpenCustomization)
+    return () => window.removeEventListener("open-dashboard-customization", handleOpenCustomization)
+  }, [])
 
   const examName = snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Minha Prova"
   const formattedTodayDate = new Intl.DateTimeFormat("pt-BR", {
@@ -68,7 +73,7 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
   return (
     <div className="flex flex-col min-h-full bg-background/50">
-      <div className="flex-1 p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full pb-24">
+      <div className="flex-1 p-4 md:p-6 space-y-6 w-full pb-24">
 
         {/* Header Dinâmico e Unificado */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -90,7 +95,6 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
           </div>
         </div>
 
-        {/* Grid de Widgets Modular Drag & Drop */}
         <DashboardDndContext items={visibleWidgets} onReorder={handleReorder}>
           {visibleWidgets.map((item) => {
             const widgetInfo = WIDGET_REGISTRY[item.widget_id]
@@ -98,7 +102,6 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
             const WidgetComponent = widgetInfo.component
 
-            // Garantir as propriedades necessárias para alguns widgets específicos funcionarem
             const cycleBlocks = snapshot?.cycleBlocks?.map((b: any) => ({
               id: b.id,
               disciplineName: b.disciplineName,
@@ -123,8 +126,6 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
           })}
         </DashboardDndContext>
       </div>
-
-      <DashboardFloatingButton onClick={() => setIsCustomizationOpen(true)} />
 
       <DashboardCustomizationModal
         isOpen={isCustomizationOpen}

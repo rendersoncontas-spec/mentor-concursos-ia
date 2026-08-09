@@ -14,6 +14,7 @@ import {
   FilePlus,
   Library,
   LogOut,
+  Settings,
 } from "lucide-react"
 import {
   Dialog,
@@ -118,6 +119,19 @@ export function AppHeader({ userEmail, userName = "Renders", logoutAction }: App
         >
           <Bell className="h-4 w-4" />
           <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#2563EB]" />
+        </button>
+
+        {/* Botão de Personalização do Home */}
+        <button
+          onClick={() => {
+            // Este botão deve abrir o modal de personalização.
+            // Precisamos disparar um evento ou ter um método centralizado.
+            window.dispatchEvent(new CustomEvent("open-dashboard-customization"))
+          }}
+          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Personalizar Home"
+        >
+          <Settings className="h-4 w-4" />
         </button>
 
         {/* Botão Modo Noturno / Tema */}

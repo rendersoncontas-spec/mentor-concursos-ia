@@ -6,11 +6,11 @@ import { type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
 // Separação de configuração e server actions
 function getDashboardLayoutConfig(): WidgetConfigItem[] {
   return [
-    { widget_id: "tempo_estudo", position_order: 1, col_span: 1, visible: true },
-    { widget_id: "desempenho", position_order: 2, col_span: 1, visible: true },
-    { widget_id: "progresso_edital", position_order: 3, col_span: 1, visible: true },
-    { widget_id: "estudos_hoje", position_order: 4, col_span: 3, visible: true },
-    { widget_id: "constancia", position_order: 5, col_span: 1, visible: true },
+    { widget_id: "tempo_estudo", position_order: 1, col_span: 2, visible: true },
+    { widget_id: "desempenho", position_order: 2, col_span: 2, visible: true },
+    { widget_id: "progresso_edital", position_order: 3, col_span: 2, visible: true },
+    { widget_id: "constancia", position_order: 4, col_span: 2, visible: true },
+    { widget_id: "estudos_hoje", position_order: 5, col_span: 3, visible: true },
     { widget_id: "questoes", position_order: 6, col_span: 1, visible: true },
     { widget_id: "revisoes", position_order: 7, col_span: 1, visible: true },
     { widget_id: "desempenho_materia", position_order: 8, col_span: 2, visible: true },
@@ -18,6 +18,9 @@ function getDashboardLayoutConfig(): WidgetConfigItem[] {
     { widget_id: "metas_estudo", position_order: 10, col_span: 1, visible: true },
     { widget_id: "ranking", position_order: 11, col_span: 1, visible: true },
     { widget_id: "conquistas", position_order: 12, col_span: 1, visible: true },
+    { widget_id: "data_prova", position_order: 13, col_span: 1, visible: true },
+    { widget_id: "lembretes", position_order: 14, col_span: 1, visible: true },
+    { widget_id: "mensagem_dia", position_order: 15, col_span: 1, visible: true },
   ]
 }
 

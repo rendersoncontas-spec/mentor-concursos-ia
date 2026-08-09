@@ -309,6 +309,7 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
 export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
   const streak = snapshot?.analytics?.stats?.consecutiveStreak ?? snapshot?.stats?.consecutiveStreak ?? 0
   const longest = snapshot?.analytics?.stats?.longestStreak ?? snapshot?.stats?.longestStreak ?? streak
+  const heatmap = snapshot?.analytics?.heatmap || []
 
   if (colSpan === 1) {
     return (
@@ -348,6 +349,26 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
           Maior Sequência: <span className="text-orange-500 font-black">{longest} dias</span>
         </div>
       </div>
+
+      {heatmap.length > 0 && (
+        <div className="pt-2 border-t">
+          <div className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider mb-2">REGISTRO DIÁRIO</div>
+          <div className="flex flex-wrap gap-1.5">
+            {heatmap.slice(-14).map((day: any, idx: number) => {
+              const studied = day.minutes > 0 || day.count > 0
+              return (
+                <div
+                  key={idx}
+                  className={`w-4 h-4 rounded-md transition-all ${
+                    studied ? "bg-emerald-500" : "bg-rose-500/80"
+                  }`}
+                  title={`${day.date}: ${studied ? `${day.minutes} min` : "Sem estudo"}`}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -696,6 +717,118 @@ export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 13. WIDGET: Data da Prova
+// ─────────────────────────────────────────────────────────────────────────────
+export function WidgetDataProva({ snapshot, colSpan }: DashboardWidgetProps) {
+  const targetDate = snapshot?.activeTarget?.exam_date
+  const examName = snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Prova"
+  const local = (snapshot?.activeTarget as any)?.exam_location || "Local não informado"
+  const time = (snapshot?.activeTarget as any)?.exam_time || "Horário não informado"
+
+  const getDaysUntil = (date: string) => {
+    const d = new Date(date)
+    const today = new Date()
+    const diff = d.getTime() - today.getTime()
+    return Math.ceil(diff / (1000 * 3600 * 24))
+  }
+
+  const daysUntil = targetDate ? getDaysUntil(targetDate) : null
+
+  return (
+    <div className="p-5 flex flex-col justify-between h-full space-y-3">
+      <div className="flex items-center justify-between border-b pb-2">
+        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+          <Calendar className="w-4 h-4 text-[#2563EB]" /> DATA DA PROVA
+        </span>
+      </div>
+      <div className="my-auto space-y-2">
+        {targetDate ? (
+          <>
+            <div className="text-sm font-black text-foreground">{examName}</div>
+            <div className="text-sm font-bold text-[#2563EB]">
+              {new Date(targetDate).toLocaleDateString("pt-BR")}
+              {daysUntil !== null && (
+                <span className="block text-xs text-muted-foreground font-medium">
+                  {daysUntil > 0 ? `Faltam ${daysUntil} dias` : "Prova hoje ou já realizada"}
+                </span>
+              )}
+            </div>
+            <div className="pt-2 text-xs text-muted-foreground grid gap-1">
+              <div className="flex items-center gap-1">
+                <span className="font-bold">📍</span> {local}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-bold">🕐</span> {time}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-xs text-muted-foreground font-medium text-center">Nenhuma prova cadastrada.</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 14. WIDGET: Lembretes
+// ─────────────────────────────────────────────────────────────────────────────
+export function WidgetLembretes({ snapshot, colSpan }: DashboardWidgetProps) {
+  const reminders = (snapshot as any)?.reminders || []
+
+  return (
+    <div className="p-5 flex flex-col justify-between h-full space-y-3">
+      <div className="flex items-center justify-between border-b pb-2">
+        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+          <Sparkles className="w-4 h-4 text-amber-500" /> LEMBRETES
+        </span>
+      </div>
+      <div className="space-y-2 my-auto">
+        {reminders.length === 0 ? (
+          <div className="text-xs text-muted-foreground font-medium text-center">Nenhum lembrete.</div>
+        ) : (
+          reminders.slice(0, 3).map((r: any) => (
+            <div key={r.id} className="text-xs font-bold text-foreground p-2 rounded bg-muted/30">{r.text}</div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 15. WIDGET: Mensagem do Dia
+// ─────────────────────────────────────────────────────────────────────────────
+export function WidgetMensagemDia({ snapshot, colSpan }: DashboardWidgetProps) {
+  const messages = [
+    { text: "A disciplina é a ponte entre seus objetivos e suas realizações.", author: "Jim Rohn" },
+    { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier" },
+    { text: "Estude enquanto eles dormem, trabalhe enquanto eles descansam, viva o que eles sonham.", author: "Provérbio" },
+    { text: "A persistência é o menor caminho para o êxito.", author: "Charles Chaplin" }
+  ]
+  const todayIndex = new Date().getDate() % messages.length
+  const msg = messages[todayIndex] as { text: string; author: string }
+
+  return (
+    <div className="p-5 flex flex-col justify-between h-full space-y-3">
+      <div className="flex items-center justify-between border-b pb-2">
+        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+          <Sparkles className="w-4 h-4 text-purple-500" /> MENSAGEM DO DIA
+        </span>
+      </div>
+      <div className="my-auto space-y-2 text-center py-2">
+        <p className="text-xs font-semibold italic text-foreground">
+          &ldquo;{msg.text}&rdquo;
+        </p>
+        <p className="text-[11px] font-bold text-muted-foreground">
+          — {msg.author}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REGISTRO MASTER DE WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 export const WIDGET_REGISTRY: Record<string, {
@@ -775,5 +908,23 @@ export const WIDGET_REGISTRY: Record<string, {
     description: "Medalhas e marcos de evolução desbloqueados.",
     defaultSpan: 1,
     component: WidgetConquistas
+  },
+  data_prova: {
+    name: "Data da Prova",
+    description: "Exibe a contagem ou data da prova cadastrada.",
+    defaultSpan: 1,
+    component: WidgetDataProva
+  },
+  lembretes: {
+    name: "Lembretes",
+    description: "Lista de lembretes e avisos importantes.",
+    defaultSpan: 1,
+    component: WidgetLembretes
+  },
+  mensagem_dia: {
+    name: "Mensagem do Dia",
+    description: "Uma mensagem motivacional para começar o dia.",
+    defaultSpan: 1,
+    component: WidgetMensagemDia
   }
 }
