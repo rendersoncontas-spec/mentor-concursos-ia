@@ -142,35 +142,62 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
   }
 
   const onSubmit = async (data: SessionFormValues) => {
+    console.log("[STUDY_SAVE_CLIENT] onSubmit iniciado", { 
+      phase, isManualMode, discipline: data.discipline_name, studyType: data.studyType 
+    })
+    
+    // Capturar dados da sessão ANTES de qualquer await (session pode mudar)
+    const sessionStartTime = session?.startTime ?? null
+    const sessionTotalPausedMs = session?.totalPausedMs ?? 0
+    const currentActiveSeconds = activeSeconds
+    const currentPausedSeconds = pausedSeconds
+    const currentFocusPercentage = focusPercentage
+    
     setIsSubmitting(true)
     try {
       const manualTotalMinutes = data.is_manual_mode
         ? Math.round((data.manual_hours || 0) * 60 + (data.manual_minutes_field || 0) + (data.manual_seconds || 0) / 60)
         : 0
+      
       const payload = {
         ...data,
         // Enviar SEGUNDOS brutos — o servidor calcula a duração final
-        activeSeconds: data.is_manual_mode ? 0 : activeSeconds,
-        pausedSeconds: data.is_manual_mode ? 0 : pausedSeconds,
-        activeMinutes: data.is_manual_mode ? manualTotalMinutes : Math.floor(activeSeconds / 60),
-        pausedMinutes: data.is_manual_mode ? 0 : Math.floor(pausedSeconds / 60),
-        focusPercentage: data.is_manual_mode ? 100 : focusPercentage,
+        activeSeconds: data.is_manual_mode ? 0 : currentActiveSeconds,
+        pausedSeconds: data.is_manual_mode ? 0 : currentPausedSeconds,
+        activeMinutes: data.is_manual_mode ? manualTotalMinutes : Math.floor(currentActiveSeconds / 60),
+        pausedMinutes: data.is_manual_mode ? 0 : Math.floor(currentPausedSeconds / 60),
+        focusPercentage: data.is_manual_mode ? 100 : currentFocusPercentage,
         completedCycles: 0,
         // Enviar timestamps da sessão para validação server-side
-        sessionStartTime: data.is_manual_mode ? null : (session?.startTime ?? null),
-        sessionTotalPausedMs: data.is_manual_mode ? 0 : (session?.totalPausedMs ?? 0),
+        sessionStartTime: data.is_manual_mode ? null : sessionStartTime,
+        sessionTotalPausedMs: data.is_manual_mode ? 0 : sessionTotalPausedMs,
       }
+      
+      console.log("[STUDY_SAVE_CLIENT] Payload a enviar:", payload)
+      
       const res = await saveStudySessionAction(payload)
-      if (!res.success) { toast.error(res.error || "Erro ao salvar a sessão."); return }
-      toast.success("Sessão salva com sucesso!")
+      
+      console.log("[STUDY_SAVE_CLIENT] Resposta do servidor:", res)
+      
+      if (!res || !res.success) {
+        const errMsg = res?.error || "Erro desconhecido ao salvar a sessão."
+        console.error("[STUDY_SAVE_CLIENT] Falha ao salvar:", errMsg, res)
+        toast.error(errMsg, { duration: 8000 })
+        // NÃO fechar a central — permitir tentar novamente
+        return
+      }
+      
+      toast.success("Estudo salvo com sucesso!")
       endSession()
       form.reset()
       onOpenChange(false)
       router.refresh()
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao salvar a sessão.")
+      console.error("[STUDY_SAVE_CLIENT] Exceção:", error)
+      toast.error(error?.message || "Erro ao salvar a sessão.", { duration: 8000 })
     } finally {
       setIsSubmitting(false)
+      console.log("[STUDY_SAVE_CLIENT] onSubmit finalizado, isSubmitting=false")
     }
   }
 

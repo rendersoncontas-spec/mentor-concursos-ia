@@ -1,20 +1,36 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export async function saveStudySessionAction(data: any) {
+  const log = (msg: string, payload?: any) => {
+    console.log(`[STUDY_SAVE] ${msg}`, payload !== undefined ? payload : "")
+  }
+
   try {
+    log("START", { 
+      is_manual_mode: data.is_manual_mode, 
+      discipline_id: data.discipline_id, 
+      discipline_name: data.discipline_name,
+      studyType: data.studyType,
+      technique: data.technique,
+      has_sessionStartTime: !!data.sessionStartTime,
+    })
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    log("USER", { userId: user?.id, authError: authError?.message })
 
     if (authError || !user) {
-      console.error("Auth error:", authError)
+      log("AUTH_ERROR", authError)
       return { success: false, error: "Usuário não autenticado. Faça login novamente." }
     }
 
     // 1. Busca ou cria Disciplina
     let disciplineId = data.discipline_id
     if (!disciplineId && data.discipline_name) {
+      log("DISCIPLINE_FIND", { name: data.discipline_name })
       const { data: existingDisc, error: findError } = await supabase
         .from("disciplines")
         .select("id")
@@ -22,12 +38,15 @@ export async function saveStudySessionAction(data: any) {
         .maybeSingle()
 
       if (findError) {
+        log("DISCIPLINE_FIND_ERROR", findError)
         console.error("Erro ao buscar disciplina:", findError)
       }
 
       if (existingDisc) {
         disciplineId = existingDisc.id
+        log("DISCIPLINE_FOUND", { id: disciplineId })
       } else {
+        log("DISCIPLINE_CREATE", { name: data.discipline_name })
         const { data: newDisc, error: discError } = await supabase
           .from("disciplines")
           .insert({ name: data.discipline_name, area: "Geral" })
@@ -35,14 +54,16 @@ export async function saveStudySessionAction(data: any) {
           .single()
           
         if (discError) {
-          console.error("Erro ao criar disciplina:", discError)
+          log("DISCIPLINE_CREATE_ERROR", discError)
           return { success: false, error: "Erro ao criar disciplina: " + discError.message }
         }
         disciplineId = newDisc.id
+        log("DISCIPLINE_CREATED", { id: disciplineId })
       }
     }
 
     if (!disciplineId) {
+      log("DISCIPLINE_MISSING")
       return { success: false, error: "Disciplina não encontrada e não foi possível criar." }
     }
 
@@ -61,62 +82,90 @@ export async function saveStudySessionAction(data: any) {
       topic_name: data.topic_name || null,
     }
 
-    // 3. Calcular duração real com precisão de segundos
-    //
-    // FONTE DE VERDADE: Se temos sessionStartTime (timestamp do frontend),
-    // calcular server-side: duration = (now - startTime - totalPausedMs) / 1000
-    // Se não temos (modo manual), usar activeMinutes do input.
-    //
+    // 3. Calcular duração real
     let activeMinutesFinal = 0
     let pausedMinutesFinal = 0
     let startedAtISO: string | null = null
+    let finishedAtISO: string | null = null
 
     if (!data.is_manual_mode && data.sessionStartTime) {
-      // === MODO CRONÔMETRO: calcular server-side a partir de timestamps ===
       const now = Date.now()
       const startTime = Number(data.sessionStartTime)
       const totalPausedMs = Number(data.sessionTotalPausedMs || 0)
 
-      // Duração ativa = tempo total decorrido - tempo pausado
-      const totalElapsedMs = now - startTime
+const totalElapsedMs = now - startTime
       const activeMs = Math.max(0, totalElapsedMs - totalPausedMs)
 
-      // Converter para minutos com precisão (arredondar para 1 decimal)
-      activeMinutesFinal = Math.round((activeMs / 60000) * 10) / 10
-      pausedMinutesFinal = Math.round((totalPausedMs / 60000) * 10) / 10
+      // Banco espera integer — arredondar para inteiro
+      activeMinutesFinal = Math.round(activeMs / 60000)
+      pausedMinutesFinal = Math.round(totalPausedMs / 60000)
 
-      // started_at para o banco = timestamp real de início
       startedAtISO = new Date(startTime).toISOString()
+      finishedAtISO = new Date().toISOString()
     } else {
-      // === MODO MANUAL: usar input do usuário ===
-      activeMinutesFinal = data.activeMinutes || 0
-      pausedMinutesFinal = data.pausedMinutes || 0
+      // Modo manual: garantir que sejam inteiros
+      activeMinutesFinal = Math.round(data.activeMinutes || 0)
+      pausedMinutesFinal = Math.round(data.pausedMinutes || 0)
     }
 
-    // 4. Monta o payload base do study_history
+    // 4. Mapear studyType → study_source (campo NOT NULL com CHECK constraint)
+    // Valores permitidos: 'PLAN', 'FREE', 'REVIEW', 'SIMULADO', 'QUESTOES', 'VIDEO', 'PDF'
+    const studySourceMap: Record<string, string> = {
+      TEORIA: 'FREE',
+      QUESTOES: 'QUESTOES',
+      REVISAO: 'REVIEW',
+      AUDIO: 'FREE',
+      VIDEOAULA: 'VIDEO',
+      SIMULADO: 'SIMULADO',
+      OUTRO: 'FREE',
+      RESUMO: 'FREE',
+      MAPA_MENTAL: 'FREE',
+      FLASHCARDS: 'FREE',
+      LEITURA: 'FREE',
+      LEI_SECA: 'FREE',
+      JURISPRUDENCIA: 'FREE',
+      INFORMATIVOS: 'FREE',
+      DOUTRINA: 'FREE',
+      MONITORIA: 'FREE',
+      ESTUDO_IA: 'FREE',
+      DISCUSSAO: 'FREE',
+    }
+    const studySource = studySourceMap[data.studyType] || 'FREE'
+
+    // 5. Monta o payload base do study_history
     const insertPayload: Record<string, any> = {
       user_id: user.id,
       discipline_id: disciplineId,
-      study_type: data.studyType,
-      technique: data.technique,
+      study_source: studySource,  // OBRIGATÓRIO com CHECK constraint
+      study_type: data.studyType || null,
+      technique: data.technique || null,
       active_minutes: activeMinutesFinal,
       paused_minutes: pausedMinutesFinal,
-      duration_minutes: activeMinutesFinal, // duração = tempo ativo
+      duration_minutes: activeMinutesFinal,
       completed: true,
+      interrupted: false,
       notes: data.notes || null,
       metadata: metadata,
     }
 
-    // 4a. Se for cronômetro, usar started_at real
+    // Se for cronômetro, usar timestamps reais
     if (startedAtISO) {
       insertPayload["started_at"] = startedAtISO
-      insertPayload["finished_at"] = new Date().toISOString()
+      insertPayload["finished_at"] = finishedAtISO
     } else if (data.study_date) {
-      // Se for lançamento manual com data retroativa
+      // Manual com data retroativa
       insertPayload["started_at"] = new Date(data.study_date + "T12:00:00").toISOString()
+      insertPayload["finished_at"] = insertPayload["started_at"]
+    } else {
+      // Manual sem data específica
+      const now = new Date().toISOString()
+      insertPayload["started_at"] = now
+      insertPayload["finished_at"] = now
     }
 
-    // 5. Salva no study_history
+    log("PAYLOAD", insertPayload)
+
+    // 6. Salva no study_history
     const { data: historyData, error: historyError } = await supabase
       .from("study_history")
       .insert(insertPayload)
@@ -124,13 +173,27 @@ export async function saveStudySessionAction(data: any) {
       .single()
 
     if (historyError) {
-      console.error("Erro ao inserir study_history:", historyError)
-      return { success: false, error: "Erro ao salvar: " + historyError.message }
+      log("DATABASE_ERROR", historyError)
+      console.error("[STUDY_SAVE] Erro ao inserir study_history:", historyError)
+      return { 
+        success: false, 
+        error: "Erro ao salvar sessão: " + (historyError.message || JSON.stringify(historyError)),
+        code: historyError.code
+      }
     }
+
+    log("SUCCESS", { id: historyData.id })
+
+    // Revalidar páginas que dependem de dados de sessão
+    revalidatePath("/dashboard")
+    revalidatePath("/historico")
+    revalidatePath("/estatisticas")
+    revalidatePath("/home")
 
     return { success: true, historyId: historyData.id }
 
   } catch (err: any) {
+    log("EXCEPTION", { message: err.message, stack: err.stack })
     console.error("[saveStudySession] Erro inesperado:", err)
     return { success: false, error: err.message || "Erro inesperado ao salvar." }
   }
