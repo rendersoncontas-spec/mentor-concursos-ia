@@ -1,3 +1,12 @@
+/**
+ * @deprecated Este hook usa contadores baseados em setInterval (+1 por tick),
+ * que causam imprecisão quando o navegador faz throttle de timers em abas
+ * inativas. Use `useGlobalStudy` (StudyProvider) ou `useSmartTimer` em vez disso,
+ * que calculam o tempo a partir de Date.now() timestamps.
+ *
+ * Mantido apenas para referência — não importado em nenhum componente ativo.
+ */
+
 import { useState, useEffect, useRef, useCallback } from "react"
 import { StudyTechnique } from "@/domain/study-history/study-history.types"
 

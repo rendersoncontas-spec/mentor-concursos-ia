@@ -307,6 +307,17 @@ export async function getDisciplinesPageData(
 
   const userDisciplines = await getUserDisciplines(supabase, userId, rawTarget?.id)
 
+  // Buscar tópicos reais do edital do usuário (se houver target ativo)
+  let topicsByDiscipline: Map<string, number> = new Map()
+  if (rawTarget?.exam_id) {
+    const edital = await getExamEdital(supabase, rawTarget.exam_id)
+    if (edital?.disciplines) {
+      edital.disciplines.forEach(d => {
+        topicsByDiscipline.set(d.id, d.subjects?.length || 0)
+      })
+    }
+  }
+
   const [questionAttemptsResult, studyHistoryResult] = await Promise.all([
     supabase
       .from("question_attempts")
@@ -351,8 +362,12 @@ export async function getDisciplinesPageData(
     grandTotalQuestions += totalCount
     grandTotalCorrect += correctCount
 
-    const topicsTotal = 20
-    const topicsStudied = ud.status === "COMPLETED" ? 20 : ud.status === "STUDYING" || ud.status === "REVISING" ? 5 : 0
+    // Tópicos reais do edital
+    const topicsTotal = topicsByDiscipline.get(discId) || 0
+    
+    // Tópicos estudados baseado no mastery_level (0-100) aplicado ao total
+    const mastery = ud.mastery_level ?? 0
+    const topicsStudied = topicsTotal > 0 ? Math.round((topicsTotal * mastery) / 100) : 0
 
     return {
       id: ud.id,

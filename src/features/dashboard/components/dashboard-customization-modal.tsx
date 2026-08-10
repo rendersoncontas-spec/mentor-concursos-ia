@@ -48,23 +48,23 @@ export function DashboardCustomizationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl flex flex-col max-h-[85vh] p-0">
+        <DialogHeader className="p-6 pb-0">
           <DialogTitle>Personalizar Home</DialogTitle>
           <DialogDescription>
             Ative ou desative widgets e ajuste o tamanho de cada um para moldar a página de acordo com a sua preferência.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 my-4">
+        <div className="flex-1 overflow-y-auto px-6 my-4">
           {editedLayout
-            .sort((a, b) => a.position_order - b.position_order)
+            .sort((a, b) => (WIDGET_REGISTRY[a.widget_id]?.name || "").localeCompare(WIDGET_REGISTRY[b.widget_id]?.name || ""))
             .map((item) => {
               const widgetInfo = WIDGET_REGISTRY[item.widget_id]
               if (!widgetInfo) return null
 
               return (
-                <div key={item.widget_id} className="flex items-center justify-between p-3 border rounded-xl bg-muted/10">
+                <div key={item.widget_id} className="flex items-center justify-between p-3 border rounded-xl bg-muted/10 mb-3">
                   <div className="flex-1">
                     <h4 className="font-bold text-sm text-foreground">{widgetInfo.name}</h4>
                     <p className="text-xs text-muted-foreground">{widgetInfo.description}</p>
@@ -105,7 +105,7 @@ export function DashboardCustomizationModal({
             })}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-6 pt-4 border-t bg-background">
           <Button variant="ghost" onClick={() => { onRestoreDefault(); onClose() }} className="text-muted-foreground w-full sm:w-auto">
             Restaurar Padrão
           </Button>

@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -92,9 +92,12 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
 
   const watchType = form.watch("studyType")
   const watchTechnique = form.watch("technique") as StudyTechnique
-  const watchTopic = form.watch("topic_name")
-  const watchDiscipline = form.watch("discipline_name")
   const isManualMode = form.watch("is_manual_mode")
+
+  const toggleManualMode = () => {
+    const newVal = !isManualMode
+    form.setValue("is_manual_mode", newVal, { shouldDirty: true, shouldValidate: true })
+  }
 
   const { session, startSession, pauseSession, resumeSession, endSession } = useGlobalStudy()
 
@@ -113,11 +116,18 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
     } catch (err) {
       console.error("Erro ao carregar disciplinas:", err)
     }
-  }, [disciplinesLoaded])
+  }, [])
 
   useEffect(() => {
-    if (open) loadDisciplines()
-  }, [open, loadDisciplines])
+    if (open) {
+      loadDisciplines()
+    }
+  }, [open])
+
+  // Também carrega na montagem caso o modal já venha aberto
+  useEffect(() => {
+    loadDisciplines()
+  }, [loadDisciplines])
 
   const handleMinimize = () => onOpenChange(false)
 
@@ -139,10 +149,16 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
         : 0
       const payload = {
         ...data,
-        activeMinutes: data.is_manual_mode ? manualTotalMinutes : Math.round(activeSeconds / 60),
-        pausedMinutes: data.is_manual_mode ? 0 : Math.round(pausedSeconds / 60),
+        // Enviar SEGUNDOS brutos — o servidor calcula a duração final
+        activeSeconds: data.is_manual_mode ? 0 : activeSeconds,
+        pausedSeconds: data.is_manual_mode ? 0 : pausedSeconds,
+        activeMinutes: data.is_manual_mode ? manualTotalMinutes : Math.floor(activeSeconds / 60),
+        pausedMinutes: data.is_manual_mode ? 0 : Math.floor(pausedSeconds / 60),
         focusPercentage: data.is_manual_mode ? 100 : focusPercentage,
-        completedCycles: 0
+        completedCycles: 0,
+        // Enviar timestamps da sessão para validação server-side
+        sessionStartTime: data.is_manual_mode ? null : (session?.startTime ?? null),
+        sessionTotalPausedMs: data.is_manual_mode ? 0 : (session?.totalPausedMs ?? 0),
       }
       const res = await saveStudySessionAction(payload)
       if (!res.success) { toast.error(res.error || "Erro ao salvar a sessão."); return }
@@ -210,7 +226,7 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[1000px] w-[95vw] h-[85vh] p-0 flex flex-col overflow-hidden bg-background border-border">
+      <DialogContent className="max-w-[1000px] w-[95vw] max-h-[90vh] h-[85vh] p-0 flex flex-col overflow-y-auto bg-background border-border z-[150]">
         {/* Header Simplificado */}
         <div className="flex items-center justify-between p-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base font-bold">
@@ -229,120 +245,113 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
 
         {/* Body */}
         <Form {...form}>
-        <div className="flex flex-col lg:flex-row p-4 gap-4 flex-1 overflow-hidden">
-          {/* Timer Left */}
-          <div className="lg:w-[280px] flex flex-col shrink-0">
-            <div className="rounded-xl border bg-muted/20 p-4 flex flex-col justify-between h-full shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  <Timer className="h-3.5 w-3.5 text-primary" />
-                  {isManualMode ? "Manual" : (phase === 'STUDYING' ? 'Estudando' : phase === 'PAUSED' ? 'Pausado' : 'Pronto')}
-                </div>
-              </div>
+          <form onSubmit={form.handleSubmit(onSubmit as any, (errors) => {
+            const messages = Object.entries(errors).map(([key, err]) => `${key}: ${(err as any)?.message}`).join(", ")
+            toast.error(`Campos obrigatórios: ${messages}`)
+          })} className="flex flex-col h-full gap-3 p-4 overflow-y-auto">
 
-              {isManualMode ? (
-                <div className="flex-1 flex flex-col justify-center gap-4">
-                  <FormField control={form.control as any} name="study_date" render={({field}) => (
-                    <FormItem><FormLabel className="text-xs">Data</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <div>
-                    <Label className="text-xs font-medium">Tempo</Label>
-                    <div className="grid grid-cols-3 gap-1.5 mt-1">
-                      <FormField control={form.control as any} name="manual_hours" render={({field}) => (
-                        <FormItem><FormControl><Input type="number" min={0} max={23} placeholder="0" className="pr-6 text-center text-sm" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                      )} />
-                      <FormField control={form.control as any} name="manual_minutes_field" render={({field}) => (
-                        <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0" className="pr-8 text-center text-sm" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                      )} />
-                      <FormField control={form.control as any} name="manual_seconds" render={({field}) => (
-                        <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0" className="pr-7 text-center text-sm" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                      )} />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center mb-3">
-                    <Button variant="outline" size="sm" onClick={() => form.setValue("is_manual_mode", !isManualMode)} className="text-xs h-9 px-3">
-                      {isManualMode ? "Cronômetro" : "Manual"}
-                    </Button>
-                    <FormField control={form.control as any} name="technique" render={({field}) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger className="h-9 text-xs w-[130px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="LIVRE">Livre</SelectItem>
-                          <SelectItem value="POMODORO_25_5">Pomodoro 25/5</SelectItem>
-                          <SelectItem value="POMODORO_50_10">Pomodoro 50/10</SelectItem>
-                          <SelectItem value="FLOWTIME">Flowtime</SelectItem>
-                          <SelectItem value="DEEP_WORK">Deep Work 90m</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )} />
-                  </div>
-
-                  <div className="flex flex-col items-center gap-4 flex-1 justify-center">
-                    <div className="text-4xl font-mono font-bold tracking-tight tabular-nums text-primary w-[120px] text-center">
-                      {formatTime(activeSeconds)}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {phase === 'IDLE' || phase === 'PAUSED' ? (
-                        <Button size="sm" onClick={() => {
-                          if (phase === 'IDLE') startSession({ disciplineName: form.getValues("discipline_name") || "Estudo", topicName: form.getValues("topic_name"), studyType: form.getValues("studyType"), technique: watchTechnique })
-                          else resumeSession()
-                        }} className="gap-1.5 w-24 bg-blue-600 hover:bg-blue-700 h-9">
-                          <Play className="h-4 w-4" /> {phase === 'PAUSED' ? 'Continuar' : 'Iniciar'}
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="secondary" onClick={pauseSession} className="gap-1.5 w-24 h-9">
-                          <Pause className="h-4 w-4" /> Pausar
-                        </Button>
-                      )}
-                      <Button variant="outline" size="sm" onClick={() => { endSession(); form.reset() }} className="gap-1.5 w-24 h-9">
-                        <RotateCcw className="h-3.5 w-3.5" /> Resetar
+            <div className="flex flex-col lg:flex-row gap-4 flex-1">
+              {/* Timer Left */}
+              <div className="lg:w-[280px] flex flex-col shrink-0">
+                <div className="rounded-xl border bg-muted/20 p-4 flex flex-col justify-between h-full shadow-sm">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-md">
+                        <Timer className="h-3.5 w-3.5" />
+                        {isManualMode ? "Modo Manual" : "Cronômetro"}
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        type="button" 
+                        onClick={toggleManualMode} 
+                        className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground"
+                      >
+                        {isManualMode ? "← Voltar ao Cronômetro" : "Alternar para Manual"}
                       </Button>
                     </div>
+
+                    {!isManualMode && (
+                      <div className="flex justify-center">
+                        <FormField control={form.control as any} name="technique" render={({field}) => (
+                          <Select onValueChange={(val) => { field.onChange(val); }} value={field.value}>
+                            <SelectTrigger className="h-8 text-xs w-full"><SelectValue /></SelectTrigger>
+                            <SelectContent className="z-[200]">
+                              <SelectItem value="LIVRE">Livre</SelectItem>
+                              <SelectItem value="POMODORO_25_5">Pomodoro 25/5</SelectItem>
+                              <SelectItem value="POMODORO_50_10">Pomodoro 50/10</SelectItem>
+                              <SelectItem value="FLOWTIME">Flowtime</SelectItem>
+                              <SelectItem value="DEEP_WORK">Deep Work 90m</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )} />
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex gap-4 text-xs text-center w-full justify-center pt-3 border-t mt-2">
-                    <div><p className="text-muted-foreground text-[9px] font-bold uppercase">Ativo</p><p className="font-semibold text-green-600 font-mono">{formatTime(activeSeconds)}</p></div>
-                    <div><p className="text-muted-foreground text-[9px] font-bold uppercase">Pausa</p><p className="font-semibold text-amber-600 font-mono">{formatTime(pausedSeconds)}</p></div>
-                    <div><p className="text-muted-foreground text-[9px] font-bold uppercase">Foco</p><p className="font-semibold text-blue-600 font-mono">{focusPercentage}%</p></div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Form */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-              <form onSubmit={form.handleSubmit(onSubmit as any, (errors) => {
-                const messages = Object.entries(errors).map(([key, err]) => `${key}: ${(err as any)?.message}`).join(", ")
-                toast.error(`Campos obrigatórios: ${messages}`)
-              })} className="flex flex-col h-full gap-3 overflow-y-auto">
-
-                {/* Manual mode fields - moved here to be inside FormProvider */}
-                {isManualMode && (
-                  <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
-                    <FormField control={form.control as any} name="study_date" render={({field}) => (
-                      <FormItem><FormLabel className="text-xs">Data</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <div>
-                      <Label className="text-xs font-medium">Tempo</Label>
-                      <div className="grid grid-cols-3 gap-1.5 mt-1">
-                        <FormField control={form.control as any} name="manual_hours" render={({field}) => (
-                          <FormItem><FormControl><Input type="number" min={0} max={23} placeholder="0h" className="text-center text-sm h-9" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control as any} name="manual_minutes_field" render={({field}) => (
-                          <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0m" className="text-center text-sm h-9" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control as any} name="manual_seconds" render={({field}) => (
-                          <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0s" className="text-center text-sm h-9" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
+                  {isManualMode ? (
+                    <div className="flex flex-col gap-3 justify-center my-auto bg-card p-3 rounded-xl border">
+                      <div className="text-xs font-bold text-foreground mb-1 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-primary inline-block"></span> Lançamento Manual
+                      </div>
+                      <div>
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">Tempo Estudado</Label>
+                        <div className="grid grid-cols-3 gap-1 mt-1">
+                          <FormField control={form.control as any} name="manual_hours" render={({field}) => (
+                            <FormItem><FormControl><Input type="number" min={0} max={23} placeholder="0h" className="text-center text-xs h-8 font-mono" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                          <FormField control={form.control as any} name="manual_minutes_field" render={({field}) => (
+                            <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0m" className="text-center text-xs h-8 font-mono" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                          <FormField control={form.control as any} name="manual_seconds" render={({field}) => (
+                            <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0s" className="text-center text-xs h-8 font-mono" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">Data</Label>
+                        <FormField control={form.control as any} name="study_date" render={({field}) => (
+                          <FormItem><FormControl><Input type="date" className="h-8 text-xs font-mono" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <>
+                      <div className="flex flex-col items-center gap-4 flex-1 justify-center">
+                        <div className="text-4xl font-mono font-bold tracking-tight tabular-nums text-primary w-[120px] text-center">
+                          {formatTime(activeSeconds)}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {phase === 'IDLE' || phase === 'PAUSED' ? (
+                            <Button size="sm" type="button" onClick={() => {
+                              if (phase === 'IDLE') startSession({ disciplineName: form.getValues("discipline_name") || "Estudo", topicName: form.getValues("topic_name"), studyType: form.getValues("studyType"), technique: watchTechnique })
+                              else resumeSession()
+                            }} className="gap-1.5 w-24 bg-blue-600 hover:bg-blue-700 h-9">
+                              <Play className="h-4 w-4" /> {phase === 'PAUSED' ? 'Continuar' : 'Iniciar'}
+                            </Button>
+                          ) : (
+                            <Button size="sm" type="button" variant="secondary" onClick={pauseSession} className="gap-1.5 w-24 h-9">
+                              <Pause className="h-4 w-4" /> Pausar
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" type="button" onClick={() => { endSession(); form.reset() }} className="gap-1.5 w-24 h-9">
+                            <RotateCcw className="h-3.5 w-3.5" /> Resetar
+                          </Button>
+                        </div>
+                      </div>
 
+                      <div className="flex gap-4 text-xs text-center w-full justify-center pt-3 border-t mt-2">
+                        <div><p className="text-muted-foreground text-[9px] font-bold uppercase">Ativo</p><p className="font-semibold text-green-600 font-mono">{formatTime(activeSeconds)}</p></div>
+                        <div><p className="text-muted-foreground text-[9px] font-bold uppercase">Pausa</p><p className="font-semibold text-amber-600 font-mono">{formatTime(pausedSeconds)}</p></div>
+                        <div><p className="text-muted-foreground text-[9px] font-bold uppercase">Foco</p><p className="font-semibold text-blue-600 font-mono">{focusPercentage}%</p></div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Form */}
+              <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
                   <FormField control={form.control as any} name="discipline_name" render={({field}) => (
                     <FormItem className="flex flex-col">
@@ -350,32 +359,66 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
                       <Popover open={disciplinePopoverOpen} onOpenChange={setDisciplinePopoverOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
-                              {field.value || "Selecionar..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between font-normal h-9 text-sm relative z-[160]",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value || "Selecionar..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 max-h-[250px] overflow-hidden flex flex-col" align="start">
-                          <Command className="w-full h-full flex flex-col">
-                            <CommandInput placeholder="Buscar..." onValueChange={(search) => { if (search) { form.setValue("discipline_name", search, { shouldValidate: true }); form.setValue("discipline_id", "") } }} />
-                            <CommandList className="max-h-[200px] overflow-y-auto">
-                              <CommandEmpty><p className="text-sm p-2">Nenhuma encontrada.</p></CommandEmpty>
+                        <PopoverContent 
+                          className="w-[400px] p-0 z-[200] pointer-events-auto" 
+                          align="start" 
+                          sideOffset={4}
+                          onWheel={(e) => e.stopPropagation()}
+                        >
+                          <Command className="w-full flex flex-col max-h-[300px] overflow-hidden rounded-md border shadow-md" shouldFilter={true}>
+                            <CommandInput 
+                              placeholder="Digite para buscar ou adicionar..." 
+                              value={field.value}
+                              onValueChange={(search) => {
+                                field.onChange(search);
+                                form.setValue("discipline_id", "");
+                              }}
+                            />
+                            <CommandList className="max-h-[300px] overflow-y-auto">
+                              <CommandEmpty>Pressione Enter para usar "{field.value}"</CommandEmpty>
                               {planDisciplines.length > 0 && (
-                                <CommandGroup heading="Plano">
+                                <CommandGroup heading="Sugestões do Plano">
                                   {planDisciplines.map((disc) => (
-                                    <CommandItem key={`plan-${disc.id}`} value={disc.name} onSelect={() => handleSelectDiscipline(disc)} className="cursor-pointer">
+                                    <CommandItem
+                                      key={`plan-${disc.id}`}
+                                      value={disc.name}
+                                      onSelect={() => {
+                                        handleSelectDiscipline(disc);
+                                      }}
+                                      className="cursor-pointer"
+                                    >
                                       <Check className={cn("mr-2 h-4 w-4", field.value === disc.name ? "opacity-100" : "opacity-0")} />
-                                      <span className="font-medium text-sm">{disc.name}</span>
+                                      {disc.name}
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
                               )}
                               {otherDisciplines.length > 0 && (
-                                <CommandGroup heading="Todas">
+                                <CommandGroup heading="Todas as Disciplinas">
                                   {otherDisciplines.map((disc) => (
-                                    <CommandItem key={`all-${disc.id}`} value={disc.name} onSelect={() => handleSelectDiscipline(disc)} className="cursor-pointer">
+                                    <CommandItem
+                                      key={`all-${disc.id}`}
+                                      value={disc.name}
+                                      onSelect={() => {
+                                        handleSelectDiscipline(disc);
+                                      }}
+                                      className="cursor-pointer"
+                                    >
                                       <Check className={cn("mr-2 h-4 w-4", field.value === disc.name ? "opacity-100" : "opacity-0")} />
-                                      <span className="text-sm">{disc.name}</span>
+                                      {disc.name}
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
@@ -388,16 +431,30 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
                     </FormItem>
                   )} />
                   <FormField control={form.control as any} name="topic_name" render={({field}) => (
-                    <FormItem><FormLabel className="text-xs">Tópico</FormLabel><FormControl><Input placeholder="Ex: Direitos Fundamentais" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                      <FormLabel className="text-xs">Tópico</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Ex: Direitos Fundamentais" 
+                          {...field} 
+                          className="relative z-[160]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )} />
                 </div>
 
                 <div className="p-3 border rounded-lg bg-card shrink-0">
                   <FormField control={form.control as any} name="studyType" render={({field}) => (
                     <FormItem>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <SelectTrigger className="font-medium h-9 text-sm"><SelectValue placeholder="Tipo..." /></SelectTrigger>
-                        <SelectContent className="max-h-[200px]">
+                      <Select onValueChange={(value) => { field.onChange(value); console.log("Tipo selecionado:", value); }} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="font-medium h-9 text-sm relative z-[160]">
+                            <SelectValue placeholder="Tipo..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="z-[200] max-h-[200px]">
                           <SelectItem value="TEORIA">📖 Teoria</SelectItem>
                           <SelectItem value="QUESTOES">✍️ Questões</SelectItem>
                           <SelectItem value="REVISAO">🔁 Revisão</SelectItem>
@@ -432,9 +489,9 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
                     {isSubmitting ? "Salvando..." : "Finalizar & Salvar"}
                   </Button>
                 </div>
-              </form>
-          </div>
-        </div>
+              </div>
+            </div>
+          </form>
         </Form>
       </DialogContent>
     </Dialog>

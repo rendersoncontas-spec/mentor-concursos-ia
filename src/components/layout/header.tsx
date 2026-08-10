@@ -31,10 +31,11 @@ import { AccountSettingsModal } from "@/features/profile/components/account-sett
 interface AppHeaderProps {
   userEmail?: string
   userName?: string
+  userId?: string
   logoutAction: () => Promise<void>
 }
 
-export function AppHeader({ userEmail, userName = "Renders", logoutAction }: AppHeaderProps) {
+export function AppHeader({ userEmail, userName = "Estudante", userId = "", logoutAction }: AppHeaderProps) {
   const router = useRouter()
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -46,18 +47,20 @@ export function AppHeader({ userEmail, userName = "Renders", logoutAction }: App
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Carregar foto inicial
-    const saved = localStorage.getItem("mentor_user_avatar")
+    // Carregar foto inicial (user-scoped)
+    const avatarKey = userId ? `mentor_user_avatar_${userId}` : "mentor_user_avatar"
+    const saved = localStorage.getItem(avatarKey)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved) setAvatarImg(saved)
 
-    // Escutar atualizações da foto
+    // Escutar atualizações de outros componentes
     const handleAvatarUpdate = () => {
-      const updated = localStorage.getItem("mentor_user_avatar")
+      const updated = localStorage.getItem(avatarKey)
       setAvatarImg(updated)
     }
     window.addEventListener("avatarUpdated", handleAvatarUpdate)
     return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
-  }, [])
+  }, [userId])
 
   // Fechar menu ao clicar fora
   useEffect(() => {
@@ -218,6 +221,14 @@ export function AppHeader({ userEmail, userName = "Renders", logoutAction }: App
               <button
                 onClick={async () => {
                   setIsUserMenuOpen(false)
+                  // Limpar dados user-scoped do localStorage antes do logout
+                  const keysToClean = Object.keys(localStorage).filter(k =>
+                    k.startsWith("mentor_user_avatar_") ||
+                    k === "mentor_user_avatar" ||
+                    k.startsWith("mentor_user_reminders_") ||
+                    k === "mentor_user_reminders"
+                  )
+                  keysToClean.forEach(k => localStorage.removeItem(k))
                   await logoutAction()
                   router.push("/login")
                   router.refresh()
@@ -236,8 +247,9 @@ export function AppHeader({ userEmail, userName = "Renders", logoutAction }: App
       <AccountSettingsModal
         open={isAccountModalOpen}
         onOpenChange={setIsAccountModalOpen}
-        userName={userName}
+        _userName={userName}
         userEmail={userEmail}
+        userId={userId}
         logoutAction={logoutAction}
       />
 

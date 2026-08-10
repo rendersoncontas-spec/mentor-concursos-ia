@@ -15,7 +15,6 @@ export async function saveStudySessionAction(data: any) {
     // 1. Busca ou cria Disciplina
     let disciplineId = data.discipline_id
     if (!disciplineId && data.discipline_name) {
-      // Buscar se existe a disciplina global pelo nome
       const { data: existingDisc, error: findError } = await supabase
         .from("disciplines")
         .select("id")
@@ -29,7 +28,6 @@ export async function saveStudySessionAction(data: any) {
       if (existingDisc) {
         disciplineId = existingDisc.id
       } else {
-        // Criar nova disciplina
         const { data: newDisc, error: discError } = await supabase
           .from("disciplines")
           .insert({ name: data.discipline_name, area: "Geral" })
@@ -63,28 +61,62 @@ export async function saveStudySessionAction(data: any) {
       topic_name: data.topic_name || null,
     }
 
-    // 3. Monta o payload base do study_history
+    // 3. Calcular duração real com precisão de segundos
+    //
+    // FONTE DE VERDADE: Se temos sessionStartTime (timestamp do frontend),
+    // calcular server-side: duration = (now - startTime - totalPausedMs) / 1000
+    // Se não temos (modo manual), usar activeMinutes do input.
+    //
+    let activeMinutesFinal = 0
+    let pausedMinutesFinal = 0
+    let startedAtISO: string | null = null
+
+    if (!data.is_manual_mode && data.sessionStartTime) {
+      // === MODO CRONÔMETRO: calcular server-side a partir de timestamps ===
+      const now = Date.now()
+      const startTime = Number(data.sessionStartTime)
+      const totalPausedMs = Number(data.sessionTotalPausedMs || 0)
+
+      // Duração ativa = tempo total decorrido - tempo pausado
+      const totalElapsedMs = now - startTime
+      const activeMs = Math.max(0, totalElapsedMs - totalPausedMs)
+
+      // Converter para minutos com precisão (arredondar para 1 decimal)
+      activeMinutesFinal = Math.round((activeMs / 60000) * 10) / 10
+      pausedMinutesFinal = Math.round((totalPausedMs / 60000) * 10) / 10
+
+      // started_at para o banco = timestamp real de início
+      startedAtISO = new Date(startTime).toISOString()
+    } else {
+      // === MODO MANUAL: usar input do usuário ===
+      activeMinutesFinal = data.activeMinutes || 0
+      pausedMinutesFinal = data.pausedMinutes || 0
+    }
+
+    // 4. Monta o payload base do study_history
     const insertPayload: Record<string, any> = {
       user_id: user.id,
       discipline_id: disciplineId,
       study_type: data.studyType,
       technique: data.technique,
-      active_minutes: data.activeMinutes || 0,
-      paused_minutes: data.pausedMinutes || 0,
-      duration_minutes: data.activeMinutes || 0,
+      active_minutes: activeMinutesFinal,
+      paused_minutes: pausedMinutesFinal,
+      duration_minutes: activeMinutesFinal, // duração = tempo ativo
       completed: true,
       notes: data.notes || null,
       metadata: metadata,
     }
 
-    // 3a. Se for lançamento manual com data retroativa, inclui started_at
-    if (data.study_date) {
+    // 4a. Se for cronômetro, usar started_at real
+    if (startedAtISO) {
+      insertPayload["started_at"] = startedAtISO
+      insertPayload["finished_at"] = new Date().toISOString()
+    } else if (data.study_date) {
+      // Se for lançamento manual com data retroativa
       insertPayload["started_at"] = new Date(data.study_date + "T12:00:00").toISOString()
     }
 
-    console.log("[saveStudySession] Inserindo:", JSON.stringify(insertPayload, null, 2))
-
-    // 4. Salva no study_history
+    // 5. Salva no study_history
     const { data: historyData, error: historyError } = await supabase
       .from("study_history")
       .insert(insertPayload)

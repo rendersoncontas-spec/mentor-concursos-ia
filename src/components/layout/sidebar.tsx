@@ -65,11 +65,11 @@ export function AppSidebar({ logoutAction, className, isOpen, onClose }: AppSide
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "relative flex flex-col h-screen bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))] transition-all duration-300 ease-in-out",
+          "flex flex-col h-screen bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))] transition-all duration-300 ease-in-out shrink-0",
           collapsed ? "w-[72px]" : "w-[260px]",
           className,
-          // Responsivo mobile/tablet: fixed overlay quando isOpen for true ou lg para fixo
-          "fixed inset-y-0 left-0 z-[100] md:relative",
+          // Responsivo mobile/tablet: fixed overlay
+          "fixed inset-y-0 left-0 z-50 md:relative",
           isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0",
         )}
       >

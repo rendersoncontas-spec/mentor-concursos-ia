@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useTransition } from "react"
+import { useState, useRef, useEffect, useTransition, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { GraduationCap, ChevronDown, Check, Plus, Calendar, BookOpen, Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -21,6 +21,56 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
   const [loadingTargets, setLoadingTargets] = useState(false)
   const [isPending, startTransition] = useTransition()
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
+
+  // Calcular posicionamento responsivo do dropdown
+  const updateDropdownPosition = useCallback(() => {
+    if (!dropdownRef.current || !buttonRef.current) return
+
+    const buttonRect = buttonRef.current.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    // Largura responsiva: full width no mobile, fixa no desktop
+    const isMobile = viewportWidth < 640 // sm breakpoint
+    const dropdownWidth = isMobile ? Math.min(viewportWidth - 32, 320) : 384 // w-96 = 384px
+
+    // Posicionamento horizontal: right-aligned mas não transborda
+    let left = buttonRect.right - dropdownWidth
+    if (left < 16) left = 16 // margem esquerda mínima
+    if (left + dropdownWidth > viewportWidth - 16) {
+      left = viewportWidth - dropdownWidth - 16
+    }
+
+    // Posicionamento vertical: abre para cima se não houver espaço embaixo
+    const spaceBelow = viewportHeight - buttonRect.bottom
+    const spaceAbove = buttonRect.top
+    const estimatedHeight = Math.min(400, spaceBelow - 16) // max-h-72 + padding
+    const openUpward = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+
+    setDropdownStyle({
+      position: "fixed",
+      left: `${left}px`,
+      top: openUpward ? `${buttonRect.top - estimatedHeight - 8}px` : `${buttonRect.bottom + 8}px`,
+      width: `${dropdownWidth}px`,
+      maxHeight: `${estimatedHeight}px`,
+      zIndex: 50,
+    })
+  }, [])
+
+  // Atualizar posição ao abrir/redimensionar
+  useEffect(() => {
+    if (isOpen) {
+      updateDropdownPosition()
+      window.addEventListener("resize", updateDropdownPosition)
+      window.addEventListener("scroll", updateDropdownPosition, true)
+    }
+    return () => {
+      window.removeEventListener("resize", updateDropdownPosition)
+      window.removeEventListener("scroll", updateDropdownPosition, true)
+    }
+  }, [isOpen, updateDropdownPosition])
 
   // Nome do concurso ativo exibido no botão
   const activeTarget = targets.find((t) => t.is_active)
@@ -107,6 +157,7 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
     <div className="relative inline-block text-left" ref={dropdownRef}>
       {/* Botão Trigger Principal */}
       <Button
+        ref={buttonRef}
         variant="outline"
         onClick={toggleDropdown}
         disabled={isPending}
@@ -129,7 +180,11 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
 
       {/* Menu Dropdown Inteligente */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div
+          ref={dropdownRef}
+          style={dropdownStyle}
+          className="rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200"
+        >
           {/* Cabeçalho do Dropdown */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border px-1">
             <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">

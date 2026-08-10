@@ -16,7 +16,7 @@ export interface TimerState {
 const STORAGE_KEY = "mentor:study_session_state"
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000 // 15 minutos
 
-export function useSmartTimer() {
+export function useSmartTimer(plannedMinutes: number = 0) {
   const [state, setState] = useState<TimerState>({
     planId: null,
     sessionId: null,
@@ -31,6 +31,9 @@ export function useSmartTimer() {
   const [elapsedMs, setElapsedMs] = useState(0)
   const [hasRecovered, setHasRecovered] = useState(false)
   const [inactivityWarning, setInactivityWarning] = useState(false)
+  
+  // Tempo restante para contagem regressiva (ms)
+  const remainingMs = plannedMinutes > 0 ? Math.max(0, plannedMinutes * 60 * 1000 - elapsedMs) : 0
   
   const lastActivityRef = useRef<number>(Date.now())
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -169,13 +172,23 @@ export function useSmartTimer() {
     return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
   }
 
+  // Contagem regressiva se plannedMinutes > 0, senão progressiva
+  const isCountdown = plannedMinutes > 0
+  const displayMs = isCountdown ? remainingMs : elapsedMs
+  
   return {
     state,
     elapsedMs,
-    formattedTime: formatTime(elapsedMs),
+    remainingMs,
+    formattedTime: formatTime(displayMs),
+    formattedElapsedTime: formatTime(elapsedMs),
+    formattedRemainingTime: formatTime(remainingMs),
     elapsedMinutes: Math.floor(elapsedMs / 60000),
+    remainingMinutes: Math.ceil(remainingMs / 60000),
     hasRecovered,
     inactivityWarning,
+    isCountdown,
+    isFinished: isCountdown && remainingMs <= 0,
     startTimer,
     pauseTimer,
     resumeTimer,

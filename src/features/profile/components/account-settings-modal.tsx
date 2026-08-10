@@ -9,63 +9,69 @@ import {
   Bell,
   Shield,
   LogOut,
-  Upload,
   Volume2,
-  Plus,
   Check,
-  X,
+  Loader2,
 } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import { getProfileAction, updateProfileAction } from "@/application/profile/profile.action"
 
 interface AccountSettingsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  userName?: string | undefined
+  _userName?: string | undefined
   userEmail?: string | undefined
+  userId?: string | undefined
   logoutAction: () => Promise<void>
 }
 
 export function AccountSettingsModal({
   open,
   onOpenChange,
-  userName = "Renderson Luan",
-  userEmail = "rendersonluan@gmail.com",
+  _userName,
+  userEmail = "",
+  userId = "",
   logoutAction,
 }: AccountSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<
     "DADOS" | "PREFERENCIAS" | "RANKING" | "CATEGORIAS" | "NOTIFICACOES" | "SEGURANCA"
   >("DADOS")
 
-  // Estado para a foto de perfil carregada localmente (agora sincronizado)
+  // Estado para a foto de perfil carregada localmente (user-scoped)
   const [avatarImg, setAvatarImg] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const avatarKey = userId ? `mentor_user_avatar_${userId}` : "mentor_user_avatar"
 
   useEffect(() => {
-    // Carregar foto inicial
-    const saved = localStorage.getItem("mentor_user_avatar")
+    // Carregar foto inicial do localStorage (user-scoped)
+    const saved = localStorage.getItem(avatarKey)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved) setAvatarImg(saved)
 
     // Escutar atualizações de outros componentes
     const handleAvatarUpdate = () => {
-      const updated = localStorage.getItem("mentor_user_avatar")
+      const updated = localStorage.getItem(avatarKey)
       setAvatarImg(updated)
     }
     window.addEventListener("avatarUpdated", handleAvatarUpdate)
     return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
-  }, [])
+  }, [avatarKey])
 
-  // Form States - Dados Pessoais
-  const [nome, setNome] = useState("Renderson")
-  const [sobrenome, setSobrenome] = useState("Luan")
-  const [apelido, setApelido] = useState("rendersonluan")
-  const [aniversario, setAniversario] = useState("2000-01-01")
+  // Form States - Dados Pessoais (carregados do banco via getProfileAction)
+  const [nome, setNome] = useState("")
+  const [sobrenome, setSobrenome] = useState("")
+  const [apelido, setApelido] = useState("")
+  const [aniversario, setAniversario] = useState("")
   const [genero, setGenero] = useState("Não Informado")
   const [cidade, setCidade] = useState("")
-  const [uf, setUf] = useState("ES")
+  const [uf, setUf] = useState("")
   const [email, setEmail] = useState(userEmail)
 
   // Form States - Preferencias
@@ -94,9 +100,25 @@ export function AccountSettingsModal({
   const [novaSenha, setNovaSenha] = useState("")
   const [confirmarSenha, setConfirmarSenha] = useState("")
 
-  const handleSave = () => {
-    toast.success("Alterações salvas com sucesso!")
-    onOpenChange(false)
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const fullName = [nome.trim(), sobrenome.trim()].filter(Boolean).join(" ")
+      const res = await updateProfileAction({
+        name: fullName || null,
+        full_name: fullName || null,
+      })
+      if (res.success) {
+        toast.success("Alterações salvas com sucesso!")
+        onOpenChange(false)
+      } else {
+        toast.error(res.error || "Erro ao salvar perfil.")
+      }
+    } catch {
+      toast.error("Erro inesperado ao salvar.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const toggleDia = (dia: string) => {
@@ -114,6 +136,34 @@ export function AccountSettingsModal({
     setShowAddCat(false)
     toast.success("Categoria personalizada adicionada!")
   }
+
+  // Carregar profile do banco ao abrir o modal
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLoadingProfile(true)
+    getProfileAction().then((res) => {
+      if (cancelled) return
+      if (res.success && res.data) {
+        const profile = res.data
+        const fullName = profile.name ?? profile.full_name ?? ""
+        const nameParts = fullName.trim().split(/\s+/)
+        const firstName = nameParts[0] || ""
+        const lastName = nameParts.slice(1).join(" ") || ""
+        setNome(firstName)
+        setSobrenome(lastName)
+        setEmail(profile.email ?? userEmail)
+        if (profile.avatar_url) {
+          setAvatarImg(profile.avatar_url)
+        }
+      }
+      setIsLoadingProfile(false)
+    }).catch(() => {
+      if (!cancelled) setIsLoadingProfile(false)
+    })
+    return () => { cancelled = true }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,7 +200,7 @@ export function AccountSettingsModal({
                         reader.onloadend = () => {
                           const base64String = reader.result as string
                           setAvatarImg(base64String)
-                          localStorage.setItem("mentor_user_avatar", base64String)
+                          localStorage.setItem(avatarKey, base64String)
                           window.dispatchEvent(new Event("avatarUpdated"))
                         }
                         reader.readAsDataURL(file)
@@ -245,6 +295,14 @@ export function AccountSettingsModal({
             {/* Botão Sair no Rodapé da Sidebar */}
             <button
               onClick={async () => {
+                // Limpar dados user-scoped do localStorage antes do logout
+                const keysToClean = Object.keys(localStorage).filter(k =>
+                  k.startsWith("mentor_user_avatar_") ||
+                  k === "mentor_user_avatar" ||
+                  k.startsWith("mentor_user_reminders_") ||
+                  k === "mentor_user_reminders"
+                )
+                keysToClean.forEach(k => localStorage.removeItem(k))
                 await logoutAction()
                 window.location.href = "/login"
               }}
@@ -483,7 +541,7 @@ export function AccountSettingsModal({
                         className="text-[#2563EB]"
                       />
                       <div className="w-7 h-7 rounded-full bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center">
-                        RL
+                        {(nome?.[0] || "?")}{(sobrenome?.[0] || "")}
                       </div>
                       <span>Usar minhas iniciais</span>
                     </label>
@@ -685,9 +743,17 @@ export function AccountSettingsModal({
 
               <Button
                 onClick={handleSave}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-9 shadow-xs"
+                disabled={isSaving || isLoadingProfile}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-9 shadow-xs gap-1.5"
               >
-                Salvar
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar"
+                )}
               </Button>
             </div>
           </div>

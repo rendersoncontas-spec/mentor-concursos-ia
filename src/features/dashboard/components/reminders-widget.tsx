@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { BellRing, Plus, CheckCircle2, Circle, Trash2, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 export interface ReminderItem {
   id: string
@@ -20,22 +21,25 @@ export interface ReminderItem {
   createdAt: string
 }
 
-export function RemindersWidget() {
-  const [reminders, setReminders] = useState<ReminderItem[]>(() => {
-    if (typeof window === "undefined") return []
-    const saved = localStorage.getItem("mentor_user_reminders")
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
+export function RemindersWidget({ className }: { className?: string }) {
+  const [reminders, setReminders] = useState<ReminderItem[]>([])
+  const [isMounted, setIsMounted] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newTitle, setNewTitle] = useState("")
   const [newDate, setNewDate] = useState("")
+
+  // Carregar do localStorage apenas no client (após hidratação)
+  useEffect(() => {
+    setIsMounted(true)
+    const saved = localStorage.getItem("mentor_user_reminders")
+    if (saved) {
+      try {
+        setReminders(JSON.parse(saved))
+      } catch {
+        setReminders([])
+      }
+    }
+  }, [])
 
   // Salvar no localStorage
   const saveReminders = (updated: ReminderItem[]) => {
@@ -74,7 +78,7 @@ export function RemindersWidget() {
   }
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between min-h-[300px]">
+    <div className={cn("rounded-xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between min-h-[300px] h-full", className)}>
       {/* Card Header */}
       <div className="flex items-center justify-between border-b pb-3">
         <div className="flex items-center gap-2">

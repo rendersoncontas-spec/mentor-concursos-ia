@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import * as React from "react"
 import {
   Clock,
   Target,
@@ -20,12 +21,16 @@ import {
   ChevronRight,
   Sparkles,
   PlayCircle,
-  BarChart3
+  BarChart3,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 import { DailyPlanningView } from "@/features/planejamento/components/daily-planning-view"
 import { type StudyCycleBlock } from "@/features/planejamento/components/estudei-planning-view"
+import { RemindersWidget } from "@/features/dashboard/components/reminders-widget"
 
 export interface DashboardWidgetProps {
   snapshot: DashboardSnapshot
@@ -773,27 +778,8 @@ export function WidgetDataProva({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 14. WIDGET: Lembretes
 // ─────────────────────────────────────────────────────────────────────────────
-export function WidgetLembretes({ snapshot, colSpan }: DashboardWidgetProps) {
-  const reminders = (snapshot as any)?.reminders || []
-
-  return (
-    <div className="p-5 flex flex-col justify-between h-full space-y-3">
-      <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-amber-500" /> LEMBRETES
-        </span>
-      </div>
-      <div className="space-y-2 my-auto">
-        {reminders.length === 0 ? (
-          <div className="text-xs text-muted-foreground font-medium text-center">Nenhum lembrete.</div>
-        ) : (
-          reminders.slice(0, 3).map((r: any) => (
-            <div key={r.id} className="text-xs font-bold text-foreground p-2 rounded bg-muted/30">{r.text}</div>
-          ))
-        )}
-      </div>
-    </div>
-  )
+export function WidgetLembretes({ snapshot: _snapshot, colSpan: _colSpan }: DashboardWidgetProps) {
+  return <RemindersWidget className="border-0 bg-transparent shadow-none" />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -829,6 +815,49 @@ export function WidgetMensagemDia({ snapshot, colSpan }: DashboardWidgetProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 16. WIDGET: Calendário
+// ─────────────────────────────────────────────────────────────────────────────
+export function WidgetCalendario({ colSpan }: DashboardWidgetProps) {
+  const [currentDate, setCurrentDate] = React.useState(new Date())
+  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay()
+
+  const changeMonth = (delta: number) => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1))
+  }
+
+  return (
+    <div className="p-3 flex flex-col h-full bg-card">
+      <div className="flex items-center justify-between mb-3 px-1">
+        <span className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
+          {currentDate.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase()}.
+        </span>
+        <div className="flex items-center gap-1">
+          <button onClick={() => changeMonth(-1)} className="p-0.5 hover:bg-muted rounded"><ChevronLeft className="w-3 h-3" /></button>
+          <button onClick={() => changeMonth(1)} className="p-0.5 hover:bg-muted rounded"><ChevronRightIcon className="w-3 h-3" /></button>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-7 gap-0.5 text-center">
+        {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => (
+          <div key={i} className="text-[9px] font-bold text-muted-foreground pb-1">{d}</div>
+        ))}
+        {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1
+          const isToday = day === new Date().getDate() && currentDate.getMonth() === new Date().getMonth() && currentDate.getFullYear() === new Date().getFullYear()
+          return (
+            <div key={i} className={`text-[10px] p-0.5 rounded font-medium flex items-center justify-center aspect-square ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
+              {day}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REGISTRO MASTER DE WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 export const WIDGET_REGISTRY: Record<string, {
@@ -837,6 +866,12 @@ export const WIDGET_REGISTRY: Record<string, {
   defaultSpan: 1 | 2 | 3
   component: React.ComponentType<DashboardWidgetProps>
 }> = {
+  calendario: {
+    name: "Calendário",
+    description: "Calendário mensal para visualizar datas e navegar entre os meses.",
+    defaultSpan: 2,
+    component: WidgetCalendario
+  },
   tempo_estudo: {
     name: "Tempo de Estudo",
     description: "Exibe horas estudadas no dia e semana em relação à sua meta.",

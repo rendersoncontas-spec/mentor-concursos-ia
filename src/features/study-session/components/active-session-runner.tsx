@@ -25,7 +25,12 @@ interface ActiveSessionRunnerProps {
 
 export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   const router = useRouter()
-  const timer = useSmartTimer()
+  
+  // Contexto do Mentor de Estudos - calcular antes do hook
+  const plannedTime = planItem?.duration_minutes || 60
+  const disciplineName = planItem?.discipline?.name || "Estudo Livre"
+  
+  const timer = useSmartTimer(plannedTime)
   
   const [phase, setPhase] = useState<SessionPhase>("SETUP")
   
@@ -44,7 +49,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
   const [progressMsg, setProgressMsg] = useState("Finalizando...")
-
+  
   // Recovery Intercept
   useEffect(() => {
     if (timer.hasRecovered && phase === "SETUP") {
@@ -52,10 +57,6 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       timer.setHasRecovered(false)
     }
   }, [timer.hasRecovered, phase, timer])
-
-  // Contexto do Mentor de Estudos
-  const disciplineName = planItem?.discipline?.name || "Estudo Livre"
-  const plannedTime = planItem?.duration_minutes || 60
 
   const handleStart = async () => {
     // Inicia no banco para marcar o momento exato
@@ -176,6 +177,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
 
   if (phase === "ACTIVE") {
     const progress = Math.min((timer.elapsedMinutes / plannedTime) * 100, 100)
+    const isFinished = timer.isFinished
     
     return (
       <div className="max-w-2xl mx-auto text-center space-y-8">
@@ -189,11 +191,11 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
 
         <div className="space-y-2">
           <h2 className="text-xl font-medium text-muted-foreground">{disciplineName}</h2>
-          <div className="text-7xl md:text-8xl font-black tracking-tighter tabular-nums text-foreground">
+          <div className={`text-7xl md:text-8xl font-black tracking-tighter tabular-nums text-foreground ${isFinished ? "text-rose-500 animate-pulse" : ""}`}>
             {timer.formattedTime}
           </div>
           <div className="text-muted-foreground font-medium">
-            de {plannedTime} min planejados
+            {isFinished ? "Tempo esgotado!" : `de ${plannedTime} min planejados`}
           </div>
         </div>
 
