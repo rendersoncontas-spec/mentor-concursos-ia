@@ -228,6 +228,7 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
         </div>
 
         {/* Body */}
+        <Form {...form}>
         <div className="flex flex-col lg:flex-row p-4 gap-4 flex-1 overflow-hidden">
           {/* Timer Left */}
           <div className="lg:w-[280px] flex flex-col shrink-0">
@@ -312,9 +313,8 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
             </div>
           </div>
 
-          {/* Right: Form with FormProvider */}
+          {/* Right: Form */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit as any, (errors) => {
                 const messages = Object.entries(errors).map(([key, err]) => `${key}: ${(err as any)?.message}`).join(", ")
                 toast.error(`Campos obrigatórios: ${messages}`)
@@ -433,9 +433,9 @@ export function StudyRegisterModal({ open, onOpenChange }: StudyRegisterModalPro
                   </Button>
                 </div>
               </form>
-            </Form>
           </div>
         </div>
+        </Form>
       </DialogContent>
     </Dialog>
   )
