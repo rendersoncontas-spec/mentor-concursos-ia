@@ -268,32 +268,72 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
         window.dispatchEvent(new CustomEvent("close-study-session-modal"))
         router.refresh()
       } else {
-        // Modo CRIAÇÃO: salvar nova sessão via cronômetro
-        const res = await finalizeAndSaveSession({
-          pages_read: data.pages_read,
-          questions_answered: data.questions_answered,
-          questions_correct: data.questions_correct,
-          flashcards_reviewed: data.flashcards_reviewed,
-          flashcards_correct: data.flashcards_correct,
-          audio_name: data.audio_name,
-          audio_author: data.audio_author,
-          audio_platform: data.audio_platform,
-          audio_speed: data.audio_speed,
-          audio_url: data.audio_url,
-          notes: data.notes,
-          topic_name: data.topic_name,
-          studyType: data.studyType,
-          technique: data.technique,
-          discipline_id: data.discipline_id,
-        })
+        // Modo CRIAÇÃO
         
-        console.log("[STUDY_SAVE_CLIENT] Resposta do servidor:", res)
-        
-        if (!res || !res.success) {
-          const errMsg = res?.error || "Erro desconhecido ao salvar a sessão."
-          console.error("[STUDY_SAVE_CLIENT] Falha ao salvar:", errMsg, res)
-          toast.error(errMsg, { duration: 8000 })
-          return
+        // Se há sessão ativa (cronômetro rodando ou pausado), usar finalizeAndSaveSession
+        // Se não há sessão (fase IDLE), usar saveStudySessionAction diretamente (modo manual)
+        if (session && session.isActive) {
+          const res = await finalizeAndSaveSession({
+            pages_read: data.pages_read,
+            questions_answered: data.questions_answered,
+            questions_correct: data.questions_correct,
+            flashcards_reviewed: data.flashcards_reviewed,
+            flashcards_correct: data.flashcards_correct,
+            audio_name: data.audio_name,
+            audio_author: data.audio_author,
+            audio_platform: data.audio_platform,
+            audio_speed: data.audio_speed,
+            audio_url: data.audio_url,
+            notes: data.notes,
+            topic_name: data.topic_name,
+            studyType: data.studyType,
+            technique: data.technique,
+            discipline_id: data.discipline_id,
+          })
+          
+          if (!res || !res.success) {
+            const errMsg = res?.error || "Erro desconhecido ao salvar a sessão."
+            console.error("[STUDY_SAVE_CLIENT] Falha ao salvar:", errMsg, res)
+            toast.error(errMsg, { duration: 8000 })
+            return
+          }
+        } else {
+          // Modo manual: salvar diretamente sem cronômetro ativo
+          const manualTotalMinutes = (Number(data.manual_hours) || 0) * 60 + (Number(data.manual_minutes_field) || 0) + Math.round((Number(data.manual_seconds) || 0) / 60)
+          
+          const directPayload = {
+            is_manual_mode: true,
+            discipline_id: data.discipline_id,
+            discipline_name: data.discipline_name,
+            topic_name: data.topic_name,
+            studyType: data.studyType,
+            technique: data.technique,
+            notes: data.notes,
+            pages_read: data.pages_read || 0,
+            questions_answered: data.questions_answered || 0,
+            questions_correct: data.questions_correct || 0,
+            flashcards_reviewed: data.flashcards_reviewed || 0,
+            flashcards_correct: data.flashcards_correct || 0,
+            audio_name: data.audio_name || null,
+            audio_author: data.audio_author || null,
+            audio_platform: data.audio_platform || null,
+            audio_speed: data.audio_speed || null,
+            audio_url: data.audio_url || null,
+            activeMinutes: manualTotalMinutes,
+            pausedMinutes: 0,
+            focusPercentage: 0,
+            completedCycles: 0,
+            study_date: data.study_date,
+          }
+          
+          const res = await saveStudySessionAction(directPayload)
+          
+          if (!res || !res.success) {
+            const errMsg = res?.error || "Erro desconhecido ao salvar a sessão."
+            console.error("[STUDY_SAVE_CLIENT] Falha ao salvar direto:", errMsg, res)
+            toast.error(errMsg, { duration: 8000 })
+            return
+          }
         }
         
         toast.success("Estudo salvo com sucesso!")
