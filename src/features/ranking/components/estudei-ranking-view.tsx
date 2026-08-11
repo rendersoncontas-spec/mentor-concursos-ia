@@ -49,13 +49,21 @@ export function EstudeiRankingView() {
   useEffect(() => {
     async function loadRanking() {
       setLoading(true)
-      const res = await getGlobalRankingAction(period)
-      if (res.error) {
-        toast.error("Erro ao carregar ranking: " + res.error)
-      } else {
-        setData(res.data as any)
+      try {
+        const res = await getGlobalRankingAction(period)
+        console.log("[RANKING DEBUG] res:", res)
+        if (res?.error) {
+          toast.error("Erro ao carregar ranking: " + res.error)
+        } else if (res?.data) {
+          console.log("[RANKING DEBUG] data recebido:", res.data)
+          setData(res.data as any)
+        }
+      } catch (err: any) {
+        console.error("[RANKING DEBUG] exceção:", err)
+        toast.error("Erro inesperado: " + err.message)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     loadRanking()
   }, [period])
@@ -240,7 +248,7 @@ export function EstudeiRankingView() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
               {/* Order: 2, 1, 3 for visual podium feel */}
               {[top3[1], top3[0], top3[2]].map((student, idx) => {
-                if (!student) return <div key={idx} className="hidden md:block" />
+                if (!student) return <div key={`empty-${idx}`} className="hidden md:block" />
                 const isFirst = student.rank === 1
                 return (
                   <div key={student.id} className={`flex flex-col items-center p-6 rounded-3xl border transition-all hover:scale-105 duration-300 ${isFirst ? 'bg-primary/5 border-primary/30 shadow-lg md:-mt-4' : 'bg-card border-border shadow-sm'} ${idx === 0 ? 'md:order-1' : idx === 1 ? 'md:order-2' : 'md:order-3'}`}>

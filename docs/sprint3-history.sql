@@ -1,68 +1,153 @@
--- ==============================================================================
--- Migration: Criação do Histórico Inteligente de Estudos (study_history)
--- Prepara as fundações para coleta de métricas de Inteligência Artificial
--- ==============================================================================
+-- ========================================================================================
+-- MIGRATION: Global Ranking RPC (FIXED v6)
+-- Corrige: ORDER BY fora de agregação em subquery com jsonb_agg
+-- ========================================================================================
 
--- 1. Criação do tipo Enum (Opcional no Postgres usar CHECK constraints ou ENUM real. Usaremos CHECK por maior portabilidade/flexibilidade)
+-- 1. Criar view pública com dados agregados (bypassa RLS)
+CREATE OR REPLACE VIEW public.public_study_stats AS
+SELECT
+  user_id,
+  SUM(COALESCE(active_minutes, duration_minutes, 0)) AS total_minutes,
+  COALESCE(SUM((metadata->>'questions_answered')::int), 0) AS questions_count,
+  COALESCE(SUM((metadata->>'pages_read')::int), 0) AS pages_count
+FROM public.study_history
+GROUP BY user_id;
 
-CREATE TABLE IF NOT EXISTS public.study_history (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  discipline_id uuid NOT NULL REFERENCES public.disciplines(id) ON DELETE CASCADE,
-  
-  -- Relaciona com um item do cronograma (NULL se for "Estudo Livre" ou Avulso)
-  study_plan_item_id uuid REFERENCES public.study_plan_items(id) ON DELETE SET NULL,
-  
-  -- Origem do estudo (Plano, Livre, Simulado, etc)
-  study_source text NOT NULL DEFAULT 'FREE' CHECK (study_source IN ('PLAN', 'FREE', 'REVIEW', 'SIMULADO', 'QUESTOES', 'VIDEO', 'PDF')),
-  
-  -- Tempo e Duração
-  started_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  finished_at timestamp with time zone,
-  duration_minutes integer, -- Preenchido automaticamente ao finalizar
-  planned_minutes integer,  -- Qual era a intenção inicial (se veio do plano)
-  
-  -- Status da Sessão
-  completed boolean DEFAULT false, -- Chegou até o fim do tempo planejado?
-  interrupted boolean DEFAULT false, -- O usuário clicou em 'Pausar' ou desistiu no meio?
-  
-  -- Métricas para IA (Valores de 1 a 5. NULL se o usuário pular o feedback inicial)
-  energy_level integer CHECK (energy_level >= 1 AND energy_level <= 5),
-  difficulty integer CHECK (difficulty >= 1 AND difficulty <= 5),
-  focus_score integer CHECK (focus_score >= 1 AND focus_score <= 5),
-  mood text, -- Aberto para sentimentos ou categorização posterior ('Tired', 'Motivated', etc)
-  
-  -- Anotações livres
-  notes text,
-  
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
-);
+-- 2. Permitir leitura
+GRANT SELECT ON public.public_study_stats TO authenticated;
+GRANT SELECT ON public.public_study_stats TO public;
 
--- 2. Índices de Performance Analítica
-CREATE INDEX IF NOT EXISTS idx_study_history_user_time ON public.study_history(user_id, started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_study_history_discipline ON public.study_history(discipline_id);
-CREATE INDEX IF NOT EXISTS idx_study_history_source ON public.study_history(study_source);
+-- 3. Função corrigida (agregação com ORDER BY interno)
+CREATE OR REPLACE FUNCTION public.get_global_ranking(
+  p_period TEXT DEFAULT 'this_week',
+  p_current_user_id UUID DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_start_date TIMESTAMPTZ;
+  v_end_date TIMESTAMPTZ;
+  result JSONB;
+BEGIN
+  v_start_date := CASE
+    WHEN p_period = 'this_week' THEN (SELECT date_trunc('week', now() AT TIME ZONE 'America/Sao_Paulo')::date)
+    WHEN p_period = 'last_week' THEN (SELECT date_trunc('week', now() AT TIME ZONE 'America/Sao_Paulo')::date - interval '7 days')
+    ELSE NULL
+  END;
 
--- 3. Habilitar RLS (Row Level Security)
-ALTER TABLE public.study_history ENABLE ROW LEVEL SECURITY;
+  v_end_date := CASE
+    WHEN p_period = 'last_week' THEN (SELECT date_trunc('week', now() AT TIME ZONE 'America/Sao_Paulo')::date - interval '1 millisecond')
+    ELSE NULL
+  END;
 
--- 4. Políticas RLS
-DROP POLICY IF EXISTS "Usuários podem ver seu próprio histórico" ON public.study_history;
-CREATE POLICY "Usuários podem ver seu próprio histórico"
-  ON public.study_history FOR SELECT
-  USING (auth.uid() = user_id);
+  WITH base AS (
+    SELECT
+      sh.user_id,
+      SUM(COALESCE(sh.active_minutes, sh.duration_minutes, 0))::bigint AS total_minutes,
+      COALESCE(SUM((sh.metadata->>'questions_answered')::int), 0)::bigint AS questions_count,
+      COALESCE(SUM((sh.metadata->>'pages_read')::int), 0)::bigint AS pages_count
+    FROM public.study_history sh
+    WHERE (v_start_date IS NULL OR sh.started_at >= v_start_date)
+      AND (v_end_date IS NULL OR sh.started_at <= v_end_date)
+    GROUP BY sh.user_id
+    HAVING SUM(COALESCE(sh.active_minutes, sh.duration_minutes, 0)) > 0
+  ),
+  ranked AS (
+    SELECT
+      b.user_id,
+      b.total_minutes,
+      b.questions_count,
+      b.pages_count,
+      COALESCE(p.name, 'Estudante') AS name,
+      NULL::text AS avatar_url,
+      CASE
+        WHEN p.name IS NOT NULL AND p.name LIKE '% %'
+          THEN upper(substring(p.name, 1, 1) || substring(p.name, position(' ' in p.name)+1, 1))
+        WHEN p.name IS NOT NULL AND length(p.name) >= 2
+          THEN upper(substring(p.name, 1, 2))
+        ELSE 'ES'
+      END AS initials,
+      CASE (hashtext(b.user_id::text) % 6)
+        WHEN 0 THEN 'bg-blue-600'
+        WHEN 1 THEN 'bg-emerald-600'
+        WHEN 2 THEN 'bg-purple-600'
+        WHEN 3 THEN 'bg-amber-600'
+        WHEN 4 THEN 'bg-rose-600'
+        ELSE 'bg-indigo-600'
+      END AS bg_color,
+      ROW_NUMBER() OVER (ORDER BY b.total_minutes DESC, b.questions_count DESC, b.pages_count DESC, b.user_id) AS rank_tempo,
+      ROW_NUMBER() OVER (ORDER BY b.questions_count DESC, b.total_minutes DESC, b.pages_count DESC, b.user_id) AS rank_questions,
+      ROW_NUMBER() OVER (ORDER BY b.pages_count DESC, b.total_minutes DESC, b.questions_count DESC, b.user_id) AS rank_pages,
+      CASE
+        WHEN COALESCE(b.total_minutes, 0) < 60 THEN COALESCE(b.total_minutes, 0) || 'min'
+        WHEN COALESCE(b.total_minutes, 0) % 60 = 0 THEN (COALESCE(b.total_minutes, 0) / 60) || 'h'
+        ELSE floor(COALESCE(b.total_minutes, 0) / 60) || 'h ' || (COALESCE(b.total_minutes, 0) % 60) || 'min'
+      END AS hours
+    FROM base b
+    LEFT JOIN public.profiles p ON p.id = b.user_id
+  )
+  SELECT jsonb_build_object(
+    'totalParticipants', (SELECT COUNT(*) FROM ranked),
+    'rankingTempo', (
+      SELECT COALESCE(jsonb_agg(to_jsonb(r) || jsonb_build_object('rank', r.rank_tempo, 'hasActivity', r.total_minutes > 0) ORDER BY r.rank_tempo), '[]'::jsonb)
+      FROM ranked r
+    ),
+    'rankingQuestions', (
+      SELECT COALESCE(jsonb_agg(to_jsonb(r) || jsonb_build_object('rank', r.rank_questions, 'hasActivity', r.questions_count > 0) ORDER BY r.rank_questions), '[]'::jsonb)
+      FROM ranked r
+    ),
+    'rankingPages', (
+      SELECT COALESCE(jsonb_agg(to_jsonb(r) || jsonb_build_object('rank', r.rank_pages, 'hasActivity', r.pages_count > 0) ORDER BY r.rank_pages), '[]'::jsonb)
+      FROM ranked r
+    ),
+    'userStats', jsonb_build_object(
+      'tempo', (
+        SELECT jsonb_build_object(
+          'rank', r.rank_tempo, 'id', r.user_id,
+          'name', CASE WHEN r.user_id = p_current_user_id THEN r.name || ' (Você)' ELSE r.name END,
+          'avatar', COALESCE(r.avatar_url, ''), 'targetContest', 'Global',
+          'hours', r.hours,
+          'questions', r.questions_count, 'pages', r.pages_count,
+          'initials', r.initials, 'bgColor', r.bg_color,
+          'hasActivity', r.total_minutes > 0
+        )
+        FROM ranked r WHERE r.user_id = p_current_user_id
+      ),
+      'questoes', (
+        SELECT jsonb_build_object(
+          'rank', r.rank_questions, 'id', r.user_id,
+          'name', CASE WHEN r.user_id = p_current_user_id THEN r.name || ' (Você)' ELSE r.name END,
+          'avatar', COALESCE(r.avatar_url, ''), 'targetContest', 'Global',
+          'hours', r.hours,
+          'questions', r.questions_count, 'pages', r.pages_count,
+          'initials', r.initials, 'bgColor', r.bg_color,
+          'hasActivity', r.questions_count > 0
+        )
+        FROM ranked r WHERE r.user_id = p_current_user_id
+      ),
+      'paginas', (
+        SELECT jsonb_build_object(
+          'rank', r.rank_pages, 'id', r.user_id,
+          'name', CASE WHEN r.user_id = p_current_user_id THEN r.name || ' (Você)' ELSE r.name END,
+          'avatar', COALESCE(r.avatar_url, ''), 'targetContest', 'Global',
+          'hours', r.hours,
+          'questions', r.questions_count, 'pages', r.pages_count,
+          'initials', r.initials, 'bgColor', r.bg_color,
+          'hasActivity', r.pages_count > 0
+        )
+        FROM ranked r WHERE r.user_id = p_current_user_id
+      )
+    )
+  ) INTO result;
 
-DROP POLICY IF EXISTS "Usuários podem registrar estudo" ON public.study_history;
-CREATE POLICY "Usuários podem registrar estudo"
-  ON public.study_history FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  RETURN result;
+END;
+$$;
 
-DROP POLICY IF EXISTS "Usuários podem atualizar sua própria sessão" ON public.study_history;
-CREATE POLICY "Usuários podem atualizar sua própria sessão"
-  ON public.study_history FOR UPDATE
-  USING (auth.uid() = user_id);
+GRANT EXECUTE ON FUNCTION public.get_global_ranking(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_global_ranking(text, uuid) TO anon;
 
-DROP POLICY IF EXISTS "Usuários podem apagar registros acidentais" ON public.study_history;
-CREATE POLICY "Usuários podem apagar registros acidentais"
-  ON public.study_history FOR DELETE
-  USING (auth.uid() = user_id);
+COMMENT ON FUNCTION public.get_global_ranking IS 'Ranking global que agrega dados de todos os usuários por período. v6 - corrige ORDER BY em agregação.';

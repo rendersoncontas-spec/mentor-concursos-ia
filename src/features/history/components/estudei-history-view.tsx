@@ -57,7 +57,40 @@ const TECHNIQUES = [
 ]
 
 function getStudyDate(session: any): string {
-  return session.started_at ? session.started_at.split("T")[0] : ""
+  return session.started_at ? String(session.started_at).split("T")[0] ?? "" : ""
+}
+
+// Formata a DATA DO ESTUDO de forma robusta, sem depender de concatenar strings
+function formatStudyDate(value: any): string {
+  if (value === null || value === undefined || value === "") return ""
+  const str = String(value)
+  // Se já é uma data pura YYYY-MM-DD, usar direto para evitar timezone shift
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split("-")
+    return `${d}/${m}/${y}`
+  }
+  // Se é ISO string (YYYY-MM-DDTHH:mm:ss), extrair a parte da data (dia local do estudo)
+  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(str)) {
+    const [y, m, d] = str.slice(0, 10).split("-")
+    return `${d}/${m}/${y}`
+  }
+  // Se é timestamp numérico ou Date
+  const date = new Date(value)
+  if (!isNaN(date.getTime())) {
+    const d = date.getDate()
+    const m = date.getMonth() + 1
+    const y = date.getFullYear()
+    return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`
+  }
+  return ""
+}
+
+// Formata o HORÁRIO DE SALVAMENTO de forma robusta (hora local)
+function formatSavedAt(value: any): string {
+  if (value === null || value === undefined || value === "") return ""
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return ""
+  return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
 function formatHoursMinutes(min: number) {
@@ -487,7 +520,7 @@ export function EstudeiHistoryView() {
                         {session.disciplines?.name || "Estudo Livre"}
                       </h3>
                       <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
-                        Data: {new Date(session.started_at + "T00:00:00").toLocaleDateString("pt-BR")}
+                        Data: {formatStudyDate(session.started_at) || "Não informada"}
                       </p>
                       {session.study_type && (
                         <p className="text-[11px] font-bold text-primary">
@@ -505,7 +538,7 @@ export function EstudeiHistoryView() {
                         </p>
                       )}
                       <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
-                        Salvo às: {new Date(session.created_at).toLocaleTimeString("pt-BR")}
+                        Salvo às: {formatSavedAt(session.created_at) || formatSavedAt(session.started_at) || "--:--"}
                       </p>
                     </div>
                   </div>
