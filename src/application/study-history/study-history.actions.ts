@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
-import { createStudySession, finishStudySession, getUserHistory } from "./study-history.service"
+import { createStudySession, finishStudySession, getUserHistory, updateStudySession, deleteStudySession } from "./study-history.service"
 import { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
@@ -65,6 +65,47 @@ export async function finishStudySessionAction(
     return { data: session, error: null }
   } catch (error: any) {
     return { data: null, error: error.message }
+  }
+}
+
+export async function updateStudySessionAction(
+  sessionId: string,
+  data: Partial<StudyHistoryInsert>
+) {
+  if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      throw new Error("Usuário não autenticado")
+    }
+
+    const session = await updateStudySession(supabase, user.id, sessionId, data)
+    
+    revalidatePath("/dashboard/history")
+    return { data: session, error: null }
+  } catch (error: any) {
+    return { data: null, error: error.message }
+  }
+}
+
+export async function deleteStudySessionAction(sessionId: string) {
+  if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      throw new Error("Usuário não autenticado")
+    }
+
+    await deleteStudySession(supabase, user.id, sessionId)
+
+    revalidatePath("/dashboard/history")
+    return { error: null }
+  } catch (error: any) {
+    return { error: error.message }
   }
 }
 

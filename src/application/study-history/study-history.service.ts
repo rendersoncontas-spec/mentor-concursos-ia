@@ -82,6 +82,78 @@ export async function finishStudySession(
 }
 
 /**
+ * Atualiza uma sessão de estudo existente.
+ */
+export async function updateStudySession(
+  supabase: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  data: Partial<StudyHistoryInsert>
+) {
+  // Build update object from allowed fields
+  const updateData: Record<string, any> = {}
+  const allowedFields = [
+    'discipline_id',
+    'study_plan_item_id',
+    'study_source',
+    'study_type',
+    'technique',
+    'started_at',
+    'finished_at',
+    'duration_minutes',
+    'active_minutes',
+    'paused_minutes',
+    'planned_minutes',
+    'completed',
+    'interrupted',
+    'energy_level',
+    'difficulty',
+    'focus_score',
+    'mood',
+    'notes',
+    'metadata'
+  ] as const
+
+  for (const key of allowedFields) {
+    if (data[key as keyof StudyHistoryInsert] !== undefined) {
+      updateData[key] = data[key as keyof StudyHistoryInsert]
+    }
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error("Nenhum campo para atualizar")
+  }
+
+  const { data: updated, error } = await supabase
+    .from("study_history")
+    .update(updateData)
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .select()
+    .single()
+
+  if (error) throw new Error("Erro ao atualizar sessão: " + error.message)
+  return updated
+}
+
+/**
+ * Remove uma sessão de estudo.
+ */
+export async function deleteStudySession(
+  supabase: SupabaseClient,
+  userId: string,
+  sessionId: string
+) {
+  const { error } = await supabase
+    .from("study_history")
+    .delete()
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+
+  if (error) throw new Error("Erro ao excluir sessão: " + error.message)
+}
+
+/**
  * Busca todo o histórico de um usuário
  */
 export async function getUserHistory(

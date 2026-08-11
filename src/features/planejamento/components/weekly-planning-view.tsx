@@ -178,7 +178,11 @@ export function WeeklyPlanningView({
     const dateStr = getDateStringForDay(dayIdx)
     const historyMinsForDayAndDisc = (discId: string) => {
       return history
-        .filter(h => h.date === dateStr && h.disciplineId === discId)
+        .filter(h => {
+          // Normalize dates to YYYY-MM-DD for comparison
+          const hDate = h.date.includes('T') ? h.date.split('T')[0] : h.date
+          return hDate === dateStr && h.disciplineId === discId
+        })
         .reduce((sum, h) => sum + h.minutes, 0)
     }
 

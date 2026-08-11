@@ -19,11 +19,12 @@ import { type StudyCycleBlock } from "./estudei-planning-view"
 
 interface DailyPlanningViewProps {
   blocks: StudyCycleBlock[]
+  history?: { date: string; disciplineId: string; minutes: number }[]
   onReplan?: () => void
   onSwitchToCiclo?: () => void
 }
 
-export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPlanningViewProps) {
+export function DailyPlanningView({ blocks, history = [], onReplan, onSwitchToCiclo }: DailyPlanningViewProps) {
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
@@ -92,7 +93,6 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
     setSelectedDate(new Date())
   }
 
-  // Checa se o dia é de plantão na escala de trabalho
   const isShiftDay = (dayNum: number) => {
     const dayDiff = dayNum - firstShiftDay
     if (scheduleMode === "12x36") return dayDiff >= 0 && dayDiff % 2 === 0
@@ -104,6 +104,25 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
     return false
   }
 
+  // Build date string for history filtering (YYYY-MM-DD)
+  const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+
+  // Filter history for the selected date ONLY
+  const historyForDay = history.filter(h => {
+    const hDate = h.date.includes('T') ? h.date.split('T')[0] : h.date
+    return hDate === selectedDateStr
+  })
+
+  // Calculate minutes studied per discipline on the selected day
+  const studiedMinutesByDiscipline = new Map<string, number>()
+  historyForDay.forEach(h => {
+    const current = studiedMinutesByDiscipline.get(h.disciplineId) || 0
+    studiedMinutesByDiscipline.set(h.disciplineId, current + h.minutes)
+  })
+
+  // Total studied minutes on the selected day
+  const completedMinutes = historyForDay.reduce((sum, h) => sum + h.minutes, 0)
+
   // Total cycle workload in minutes
   const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
   const activeDaysCount = Math.max(1, studyDays.length)
@@ -111,21 +130,21 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
     ? Math.max(30, Math.round(totalCycleMinutes / activeDaysCount)) 
     : 180
 
-  const dayOfWeek = selectedDate.getDay() // 0 = Dom, 1 = Seg...
+  const dayOfWeek = selectedDate.getDay()
   const dateNum = selectedDate.getDate()
   const daysMap = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"]
   const currentDayId = daysMap[dayOfWeek] || "dom"
 
+  // Select which blocks to show for this day
   const dayBlocks = (() => {
     if (blocks.length === 0) return []
 
-    // Verificar escala de trabalho ou dia de estudos
     if (scheduleMode !== "normal" && isShiftDay(dateNum)) {
-      return [] // Plantão de trabalho
+      return []
     }
 
     if (!studyDays.includes(currentDayId)) {
-      return [] // Dia de descanso não selecionado
+      return []
     }
 
     const blocksPerDay = Math.max(1, Math.round(blocks.length / activeDaysCount))
@@ -148,21 +167,25 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
     return selectedList
   })()
 
-  // Distribution of day-specific blocks across hours for the daily schedule
+  // Map blocks to scheduled tasks, marking completed based on REAL history for this date
   const scheduledTasks = dayBlocks.map((block, idx) => {
     const hourStart = 8 + idx * 2
     const startStr = `${hourStart.toString().padStart(2, "0")}:00`
     const endStr = `${(hourStart + Math.max(1, Math.round(block.durationMinutes / 60))).toString().padStart(2, "0")}:00`
 
+    const studiedMins = studiedMinutesByDiscipline.get(block.disciplineId) || 0
+    const isCompletedByHistory = studiedMins >= block.durationMinutes && studiedMins > 0
+
     return {
       ...block,
       timeSlot: `${startStr} - ${endStr}`,
-      status: block.completed ? "CONCLUIDO" : idx === 0 ? "EM_ANDAMENTO" : "PENDENTE"
+      completed: isCompletedByHistory,
+      studiedMinutes: studiedMins,
+      status: isCompletedByHistory ? "CONCLUIDO" : idx === 0 ? "EM_ANDAMENTO" : "PENDENTE"
     }
   })
 
   const totalMinutes = dayBlocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-  const completedMinutes = dayBlocks.filter(b => b.completed).reduce((acc, b) => acc + b.durationMinutes, 0)
   const tasksRemaining = scheduledTasks.filter(t => !t.completed).length
 
   return (
@@ -186,7 +209,7 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
             </div>
             <p className="text-xs text-muted-foreground font-medium mt-0.5">
               {scheduledTasks.length > 0
-                ? `${scheduledTasks.length} matérias programadas hoje • Total de ${Math.floor(totalMinutes / 60)}h${totalMinutes % 60}min`
+                ? `${scheduledTasks.length} matéria${scheduledTasks.length !== 1 ? "s" : ""} programada${scheduledTasks.length !== 1 ? "s" : ""} • Total de ${Math.floor(totalMinutes / 60)}h${totalMinutes % 60}min`
                 : "Nenhum planejamento ativo para esta data"}
             </p>
           </div>
@@ -207,7 +230,7 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
         </div>
       </div>
 
-      {/* Linha 2: Pílulas de Métricas Otimizadas */}
+      {/* Linha 2: Pílulas de Métricas */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 border-b pb-4">
         <div className="bg-muted/40 rounded-xl p-2.5 px-3.5 flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">Carga do Dia</span>
@@ -217,7 +240,7 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
         </div>
 
         <div className="bg-emerald-500/10 rounded-xl p-2.5 px-3.5 flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-emerald-600 tracking-wider">Estudado Hoje</span>
+          <span className="text-[10px] font-extrabold uppercase text-emerald-600 tracking-wider">Estudado</span>
           <span className="text-xs sm:text-sm font-black text-emerald-600 font-mono">
             {Math.floor(completedMinutes / 60)}h {completedMinutes % 60}min
           </span>
@@ -231,7 +254,7 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
         </div>
       </div>
 
-      {/* Linha 3: Seção Cronograma do Dia (No MESMO BALÃO!) */}
+      {/* Linha 3: Cronograma do Dia */}
       <div className="space-y-4 pt-1">
         <div className="flex items-center justify-between border-b pb-2">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
@@ -244,13 +267,12 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
 
         {scheduledTasks.length === 0 ? (
           blocks.length > 0 ? (
-            /* O usuário TEM planejamento criado, mas este dia específico é folga ou domingo livre */
             <div className="py-12 text-center space-y-4">
               <div className="w-14 h-14 bg-emerald-500/10 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
                 <Coffee className="w-7 h-7" />
               </div>
               <div className="space-y-1 max-w-sm mx-auto">
-                <h4 className="text-base font-extrabold text-foreground">🎉 Dia de Descanso Programado</h4>
+                <h4 className="text-base font-extrabold text-foreground">Dia de Descanso Programado</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   De acordo com seu planejamento, você não tem matérias agendadas para este dia. Aproveite para descansar ou fazer revisões livres!
                 </p>
@@ -262,7 +284,6 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
               )}
             </div>
           ) : (
-            /* O usuário NÃO TEM NENHUM planejamento criado */
             <div className="py-12 text-center space-y-3">
               <BookOpen className="w-10 h-10 mx-auto text-muted-foreground/50" />
               <p className="text-sm font-semibold text-muted-foreground">Nenhum planejamento criado ainda.</p>
@@ -294,7 +315,12 @@ export function DailyPlanningView({ blocks, onReplan, onSwitchToCiclo }: DailyPl
                     </div>
                     <h4 className="text-base font-bold text-foreground">{task.disciplineName}</h4>
                     <p className="text-xs text-muted-foreground">
-                      Foco do Dia: Resolução de questões e revisão teórica
+                      {task.completed 
+                        ? `Concluído — ${task.studiedMinutes || 0} min estudados`
+                        : task.studiedMinutes 
+                          ? `Em andamento — ${task.studiedMinutes} de ${task.durationMinutes} min`
+                          : "Aguardando início"
+                      }
                     </p>
                   </div>
                 </div>

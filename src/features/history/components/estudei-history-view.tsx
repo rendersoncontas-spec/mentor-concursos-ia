@@ -17,12 +17,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 import { toast } from "sonner"
-import { getUserHistoryAction } from "@/application/study-history/study-history.actions"
+import { getUserHistoryAction, deleteStudySessionAction } from "@/application/study-history/study-history.actions"
 
 export function EstudeiHistoryView() {
   const [sessions, setSessions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [editingSession, setEditingSession] = useState<any>(null)
 
   const loadHistory = async () => {
     setLoading(true)
@@ -39,20 +40,34 @@ export function EstudeiHistoryView() {
     loadHistory()
   }, [])
 
-  // Quando o modal fechar, recarregar o histórico
+  const handleEditSession = (session: any) => {
+    setEditingSession(session)
+    setIsRegisterOpen(true)
+  }
+
   const handleModalClose = (open: boolean) => {
     setIsRegisterOpen(open)
     if (!open) {
+      setEditingSession(null)
       loadHistory()
     }
   }
 
-  const handleRemoveSession = (id: string) => {
-    // Para simplificar a remoção, em produção real chamaria cancelStudySessionAction
-    // Por hora apaga local da view e no futuro liga na Action
-    const updated = sessions.filter((s) => s.id !== id)
-    setSessions(updated)
-    toast.info("Remoção de estudo no frontend.")
+  const handleDeleteSession = async (sessionId: string) => {
+    const confirmed = window.confirm("Excluir esta sessão de estudo?\nEsta ação não pode ser desfeita.")
+    if (!confirmed) return
+
+    try {
+      const { error } = await deleteStudySessionAction(sessionId)
+      if (error) {
+        toast.error("Erro ao excluir: " + error)
+      } else {
+        toast.success("Sessão excluída com sucesso")
+        setSessions(prev => prev.filter(s => s.id !== sessionId))
+      }
+    } catch (err) {
+      toast.error("Erro inesperado ao excluir")
+    }
   }
 
   // Cálculo de KPIs
@@ -189,6 +204,26 @@ export function EstudeiHistoryView() {
                       <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
                         Data: {new Date(session.started_at).toLocaleDateString()}
                       </p>
+                      {session.study_type && (
+                        <p className="text-[11px] font-bold text-primary">
+                          Tipo: {session.study_type}
+                        </p>
+                      )}
+                      {session.metadata?.flashcards_reviewed > 0 && (
+                        <p className="text-[11px] text-emerald-600 font-semibold">
+                          Flashcards: {session.metadata.flashcards_reviewed} revisados ({session.metadata.flashcards_correct || 0} acertos)
+                        </p>
+                      )}
+                      {session.metadata?.questions_answered > 0 && (
+                        <p className="text-[11px] text-blue-600 font-semibold">
+                          Questões: {session.metadata.questions_correct || 0}/{session.metadata.questions_answered} acertos
+                        </p>
+                      )}
+                      {session.created_at && (
+                        <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
+                          Salvo às: {new Date(session.created_at).toLocaleTimeString()}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -199,7 +234,7 @@ export function EstudeiHistoryView() {
                     </span>
 
                     <span className="px-4 py-1 rounded-md bg-[#2563EB] text-white font-extrabold text-[10px] tracking-wider uppercase shadow-xs">
-                      {session.study_source || "ESTUDO"}
+                      FOCO {session.metadata?.focus_percentage || "0"}%
                     </span>
 
                     <div className="flex items-center gap-2 text-muted-foreground/50">
@@ -214,7 +249,7 @@ export function EstudeiHistoryView() {
 
                       <button
                         type="button"
-                        onClick={() => setIsRegisterOpen(true)}
+                        onClick={() => handleEditSession(session)}
                         className="hover:text-foreground p-1 transition-colors"
                         title="Editar"
                       >
@@ -223,7 +258,7 @@ export function EstudeiHistoryView() {
 
                       <button
                         type="button"
-                        onClick={() => handleRemoveSession(session.id)}
+                        onClick={() => handleDeleteSession(session.id)}
                         className="hover:text-rose-500 p-1 transition-colors"
                         title="Excluir"
                       >
@@ -241,6 +276,8 @@ export function EstudeiHistoryView() {
       <StudyRegisterModal
         open={isRegisterOpen}
         onOpenChange={handleModalClose}
+        sessionToEdit={editingSession}
+        mode={editingSession ? "edit" : "create"}
       />
     </div>
   )

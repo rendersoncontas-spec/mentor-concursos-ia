@@ -27,7 +27,7 @@ export async function saveStudySessionAction(data: any) {
       return { success: false, error: "Usuário não autenticado. Faça login novamente." }
     }
 
-    // 1. Busca ou cria Disciplina
+    // 1. Busca Disciplina (não cria mais - RLS impede INSERT na tabela disciplines)
     let disciplineId = data.discipline_id
     if (!disciplineId && data.discipline_name) {
       log("DISCIPLINE_FIND", { name: data.discipline_name })
@@ -46,19 +46,12 @@ export async function saveStudySessionAction(data: any) {
         disciplineId = existingDisc.id
         log("DISCIPLINE_FOUND", { id: disciplineId })
       } else {
-        log("DISCIPLINE_CREATE", { name: data.discipline_name })
-        const { data: newDisc, error: discError } = await supabase
-          .from("disciplines")
-          .insert({ name: data.discipline_name, area: "Geral" })
-          .select("id")
-          .single()
-          
-        if (discError) {
-          log("DISCIPLINE_CREATE_ERROR", discError)
-          return { success: false, error: "Erro ao criar disciplina: " + discError.message }
+        // Não tentar criar — RLS impede INSERT na tabela disciplines
+        log("DISCIPLINE_NOT_FOUND", { name: data.discipline_name })
+        return { 
+          success: false, 
+          error: "Disciplina não encontrada no sistema. Selecione uma disciplina existente na lista." 
         }
-        disciplineId = newDisc.id
-        log("DISCIPLINE_CREATED", { id: disciplineId })
       }
     }
 
@@ -72,6 +65,8 @@ export async function saveStudySessionAction(data: any) {
       pages_read: data.pages_read || 0,
       questions_answered: data.questions_answered || 0,
       questions_correct: data.questions_correct || 0,
+      flashcards_reviewed: data.flashcards_reviewed || 0,
+      flashcards_correct: data.flashcards_correct || 0,
       audio_name: data.audio_name || null,
       audio_author: data.audio_author || null,
       audio_platform: data.audio_platform || null,
@@ -186,7 +181,7 @@ const totalElapsedMs = now - startTime
 
     // Revalidar páginas que dependem de dados de sessão
     revalidatePath("/dashboard")
-    revalidatePath("/historico")
+    revalidatePath("/dashboard/history")
     revalidatePath("/estatisticas")
     revalidatePath("/home")
 

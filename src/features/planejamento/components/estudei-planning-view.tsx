@@ -71,15 +71,16 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
   // Sync state with server-side props
   useEffect(() => {
     if (initialData?.blocks && initialData.blocks.length > 0) {
+      const historyData = initialData?.history || []
       setHasPlanning(true)
       setBlocks(initialData.blocks.map((b) => ({
         id: b.id,
         disciplineName: b.disciplineName,
         disciplineId: b.disciplineId,
         durationMinutes: b.durationMinutes,
-        studiedMinutes: (b as any).studiedMinutes || (b.status === "CONCLUIDO" ? b.durationMinutes : 0),
+        studiedMinutes: historyData.reduce((sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0), 0),
         color: b.color || "#2563EB",
-        completed: b.status === "CONCLUIDO",
+        completed: false, // Always start as pending, completed is calculated per-day by the view
       })))
       if (initialData.blocks[0]) {
         setActiveBlockId(initialData.blocks[0].id)
@@ -97,9 +98,9 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
         disciplineName: b.disciplineName,
         disciplineId: b.disciplineId,
         durationMinutes: b.durationMinutes,
-        studiedMinutes: (b as any).studiedMinutes || (b.status === "CONCLUIDO" ? b.durationMinutes : 0),
+        studiedMinutes: (initialData?.history || []).reduce((sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0), 0),
         color: b.color || "#2563EB",
-        completed: b.status === "CONCLUIDO",
+        completed: false, // Always start as pending, completed is calculated per-day by the view
       }))
     }
     return []
@@ -529,6 +530,7 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
       {planningType === "diario" && (
         <DailyPlanningView
           blocks={blocks}
+          history={initialData?.history || []}
           onSwitchToCiclo={() => setPlanningType("ciclo")}
           onReplan={() => {
             setWizardTitle("Editar Planejamento")

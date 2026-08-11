@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Timer, StickyNote } from "lucide-react"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 import { StickyNotesWidget } from "@/features/dashboard/components/sticky-notes-widget"
@@ -8,6 +8,24 @@ import { StickyNotesWidget } from "@/features/dashboard/components/sticky-notes-
 export function FloatingActionButton() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
+
+  // Escutar evento de reabrir a central (vem do balão flutuante)
+  useEffect(() => {
+    const handleOpenCentral = () => {
+      setIsRegisterOpen(true)
+    }
+    window.addEventListener("restore-study-session", handleOpenCentral)
+    window.addEventListener("open-study-session-modal", handleOpenCentral)
+    return () => {
+      window.removeEventListener("restore-study-session", handleOpenCentral)
+      window.removeEventListener("open-study-session-modal", handleOpenCentral)
+    }
+  }, [])
+
+  const handleOpenCentral = () => {
+    setIsRegisterOpen(true)
+    window.dispatchEvent(new CustomEvent("study-center-opened"))
+  }
 
   return (
     <>
@@ -39,7 +57,7 @@ export function FloatingActionButton() {
         {/* Botão 2 (Inferior): Registrar Estudo / Cronômetro — Círculo Verde-Água Sólido */}
         <button
           id="fab-register-study"
-          onClick={() => setIsRegisterOpen(true)}
+          onClick={handleOpenCentral}
           className="w-14 h-14 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xl hover:shadow-2xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
           title="Registrar Estudo"
           aria-label="Registrar estudo"

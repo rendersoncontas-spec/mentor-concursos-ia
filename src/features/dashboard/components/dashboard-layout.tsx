@@ -5,7 +5,6 @@ import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboar
 import { DashboardDndContext } from "./dashboard-dnd-context"
 import { SortableWidget } from "./sortable-widget"
 import { WIDGET_REGISTRY } from "./dashboard-widget-catalog"
-import { DashboardFloatingButton } from "./dashboard-floating-button"
 import { DashboardCustomizationModal } from "./dashboard-customization-modal"
 import { saveDashboardLayoutAction, resetDashboardLayoutAction } from "@/application/dashboard/dashboard-layout.action"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
@@ -29,7 +28,18 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
   useEffect(() => {
     const handleOpenCustomization = () => setIsCustomizationOpen(true)
     window.addEventListener("open-dashboard-customization", handleOpenCustomization)
-    return () => window.removeEventListener("open-dashboard-customization", handleOpenCustomization)
+    
+    const handleRestoreStudy = () => setIsRegisterModalOpen(true)
+    window.addEventListener("restore-study-session", handleRestoreStudy)
+    
+    const handleOpenStudySession = () => setIsRegisterModalOpen(true)
+    window.addEventListener("open-study-session-modal", handleOpenStudySession)
+    
+    return () => {
+      window.removeEventListener("open-dashboard-customization", handleOpenCustomization)
+      window.removeEventListener("restore-study-session", handleRestoreStudy)
+      window.removeEventListener("open-study-session-modal", handleOpenStudySession)
+    }
   }, [])
 
   const examName = snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Minha Prova"

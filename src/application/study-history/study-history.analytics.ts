@@ -32,7 +32,9 @@ export async function getStudyStats(supabase: SupabaseClient, userId: string): P
   const disciplineMap = new Map<string, number>()
 
   items.forEach(item => {
-    const startedAt = new Date(item.started_at).getTime()
+    // Treat started_at as calendar date (YYYY-MM-DD) to avoid timezone shifts
+    const datePart = item.started_at.split('T')[0]
+    const startedAt = new Date(datePart + 'T00:00:00').getTime()
     const duration = item.duration_minutes || 0
 
     totalMinutes += duration

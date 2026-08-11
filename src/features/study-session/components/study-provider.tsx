@@ -5,6 +5,8 @@ import type { StudyTechnique } from "@/domain/study-history/study-history.types"
 import { Play, Pause, Maximize2, Square, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { saveStudySessionAction } from "@/application/study-session/study-session.action"
+import { toast } from "sonner"
 
 type TimerPhase = 'IDLE' | 'STUDYING' | 'PAUSED' | 'SHORT_BREAK' | 'LONG_BREAK'
 
@@ -18,8 +20,8 @@ const TECHNIQUE_DURATIONS: Record<StudyTechnique, number> = {
 } as const
 
 const STORAGE_KEY = "mentor_active_study_session"
-const POSITION_KEY = "mentor-study-floating-timer-position"
-const SIDEBAR_WIDTH = 256
+const POSITION_KEY = "mentor-study-floating-timer-position-v2"
+const FLOATING_TIMER_PREF_KEY = "mentor-floating-timer-enabled"
 const MARGIN = 20
 
 interface StudySessionState {
@@ -50,6 +52,11 @@ interface StudyContextType {
   endSession: () => void
   updateNotes: (notes: string) => void
   formatTime: (seconds: number) => string
+  floatingTimerEnabled: boolean
+  toggleFloatingTimer: () => void
+  finalizeAndSaveSession: (formData?: Record<string, any>) => Promise<{ success: boolean; error?: string; historyId?: string }>
+  isCentralOpen: boolean
+  setIsCentralOpen: (open: boolean) => void
 }
 
 const StudyContext = createContext<StudyContextType | null>(null)
@@ -63,30 +70,52 @@ function calculateTimes(state: StudySessionState): { activeSeconds: number; paus
     pausedMs += (now - state.lastPauseStartTime)
   }
   const activeMs = Math.max(0, totalElapsedMs - pausedMs)
+  console.log('[CALCULATE_TIMES]', {
+    now,
+    startTime: state.startTime,
+    totalElapsedMs,
+    totalPausedMs: state.totalPausedMs,
+    lastPauseStartTime: state.lastPauseStartTime,
+    pausedMs,
+    activeMs,
+    activeSeconds: Math.floor(activeMs / 1000),
+    pausedSeconds: Math.floor(pausedMs / 1000)
+  })
   return {
     activeSeconds: Math.floor(activeMs / 1000),
     pausedSeconds: Math.floor(pausedMs / 1000),
   }
 }
 
-function getDefaultPosition(): { x: number; y: number } {
-  if (typeof window === "undefined") return { x: 200, y: 20 }
-  const sidebar = window.innerWidth >= 768 ? SIDEBAR_WIDTH : 0
-  const contentWidth = window.innerWidth - sidebar
-  const x = sidebar + (contentWidth / 2)
-  return { x: Math.max(x, sidebar + MARGIN), y: MARGIN }
+// Posição padrão do balão: centralizado horizontalmente no viewport
+interface Position {
+  x: number
+  y: number
 }
 
-function loadSavedPosition(): { x: number; y: number } | null {
+function getDefaultPosition(): Position {
+  if (typeof window === "undefined") return { x: 0, y: 10 }
+  const floatingWidth = 220
+  const x = Math.max(0, (window.innerWidth - floatingWidth) / 2)
+  const y = 10
+  return { x, y }
+}
+
+function loadSavedPosition(): Position | null {
   try {
     const saved = localStorage.getItem(POSITION_KEY)
     if (!saved) return null
     const pos = JSON.parse(saved) as { x: number; y: number }
-    const vw = typeof window !== "undefined" ? window.innerWidth : 1920
-    const vh = typeof window !== "undefined" ? window.innerHeight : 1080
-    pos.x = Math.max(0, Math.min(pos.x, vw - 50))
-    pos.y = Math.max(0, Math.min(pos.y, vh - 50))
-    return pos
+    if (typeof window !== "undefined") {
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const floatingWidth = 220
+      const floatingHeight = 60
+      // Garantir que a posição salva seja válida dentro da viewport
+      pos.x = Math.max(0, Math.min(pos.x, vw - floatingWidth))
+      pos.y = Math.max(0, Math.min(pos.y, vh - floatingHeight))
+    }
+    return { x: pos.x, y: pos.y }
   } catch {
     return null
   }
@@ -94,22 +123,58 @@ function loadSavedPosition(): { x: number; y: number } | null {
 
 export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<StudySessionState | null>(null)
+  const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(false)
+  const [isCentralOpen, setIsCentralOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Carregar preferência do balão flutuante do localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
+    if (saved !== null) {
+      setFloatingTimerEnabled(JSON.parse(saved))
+    } else {
+      // Default true se não houver preferência salva
+      setFloatingTimerEnabled(true)
+    }
+  }, [])
+
+  // Escutar eventos globais para abrir/fechar a Central
+  useEffect(() => {
+    const handleOpenCentral = () => setIsCentralOpen(true)
+    const handleCloseCentral = () => setIsCentralOpen(false)
+    const handleStudyCenterOpened = () => setIsCentralOpen(true)
+
+    window.addEventListener("open-study-session-modal", handleOpenCentral)
+    window.addEventListener("close-study-session-modal", handleCloseCentral)
+    window.addEventListener("study-center-opened", handleStudyCenterOpened)
+
+    return () => {
+      window.removeEventListener("open-study-session-modal", handleOpenCentral)
+      window.removeEventListener("close-study-session-modal", handleCloseCentral)
+      window.removeEventListener("study-center-opened", handleStudyCenterOpened)
+    }
+  }, [])
+
+  // Carregar sessão do localStorage no mount (client-only, para evitar hydration mismatch)
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
+    console.log('[STUDY_PROVIDER] Saved session:', saved)
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as StudySessionState
+        console.log('[STUDY_PROVIDER] Parsed session:', parsed)
         if (parsed && parsed.isActive && parsed.startTime) {
           const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
+          console.log('[STUDY_PROVIDER] Calculated times:', { activeSeconds, pausedSeconds })
           // eslint-disable-next-line react-hooks/set-state-in-effect
           setSession({ ...parsed, activeSeconds, pausedSeconds, isMinimized: true })
-}
-      } catch {
+        }
+      } catch (e) {
+        console.error('[STUDY_PROVIDER] Parse error:', e)
         localStorage.removeItem(STORAGE_KEY)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -170,6 +235,10 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
 
   const restoreSession = useCallback(() => {
     setSession(prev => prev ? { ...prev, isMinimized: false } : null)
+    // Dispara evento para reabrir a Central Inteligente
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("restore-study-session"))
+    }
   }, [])
 
   const pauseSession = useCallback(() => {
@@ -196,6 +265,70 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     setSession(prev => prev ? { ...prev, notes } : null)
   }, [])
 
+  const finalizeAndSaveSession = useCallback(async (formData?: Record<string, any>) => {
+    if (!session) return { success: false, error: "Nenhuma sessão ativa" }
+    
+    // Capturar snapshot ANTES de qualquer alteração
+    const snapshot = {
+      // Timestamps para cálculo server-side
+      sessionStartTime: session.startTime,
+      sessionTotalPausedMs: session.totalPausedMs,
+      is_manual_mode: false,
+      // Dados que o saveStudySessionAction espera
+      discipline_id: session.disciplineId,
+      discipline_name: session.disciplineName,
+      topic_name: session.topicName,
+      studyType: session.studyType,
+      technique: session.technique,
+      notes: session.notes,
+      // Form data fields
+      pages_read: formData?.["pages_read"] || 0,
+      questions_answered: formData?.["questions_answered"] || 0,
+      questions_correct: formData?.["questions_correct"] || 0,
+      flashcards_reviewed: formData?.["flashcards_reviewed"] || 0,
+      flashcards_correct: formData?.["flashcards_correct"] || 0,
+      audio_name: formData?.["audio_name"] || null,
+      audio_author: formData?.["audio_author"] || null,
+      audio_platform: formData?.["audio_platform"] || null,
+      audio_speed: formData?.["audio_speed"] || null,
+      audio_url: formData?.["audio_url"] || null,
+      // Tempo calculado
+      activeSeconds: session.activeSeconds,
+      pausedSeconds: session.pausedSeconds,
+      activeMinutes: Math.floor(session.activeSeconds / 60),
+      pausedMinutes: Math.floor(session.pausedSeconds / 60),
+      focusPercentage: session.activeSeconds + session.pausedSeconds > 0 
+        ? Math.round((session.activeSeconds / (session.activeSeconds + session.pausedSeconds)) * 100) 
+        : 0,
+      completedCycles: 0,
+    }
+
+    console.log("[FINALIZE] Snapshot capturado:", snapshot)
+
+    const res = await saveStudySessionAction(snapshot)
+
+    if (!res.success) {
+      console.error("[FINALIZE] Falha ao salvar:", res.error)
+      return { success: false, error: res.error || "Erro ao salvar sessão" }
+    }
+
+    console.log("[FINALIZE] Sessão salva com sucesso:", res.historyId)
+    
+    // Só limpar sessão APÓS sucesso confirmado
+    setSession(null)
+    localStorage.removeItem(STORAGE_KEY)
+    
+    return { success: true, historyId: res.historyId }
+  }, [session])
+
+  const toggleFloatingTimer = useCallback(() => {
+    setFloatingTimerEnabled(prev => {
+      const next = !prev
+      localStorage.setItem(FLOATING_TIMER_PREF_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
   function formatTime(seconds: number): string {
     const h = Math.floor(seconds / 3600)
     const m = Math.floor((seconds % 3600) / 60)
@@ -204,7 +337,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <StudyContext.Provider value={{ session, startSession, minimizeSession, restoreSession, pauseSession, resumeSession, endSession, updateNotes, formatTime }}>
+    <StudyContext.Provider value={{ session, startSession, minimizeSession, restoreSession, pauseSession, resumeSession, endSession, updateNotes, formatTime, floatingTimerEnabled, toggleFloatingTimer, finalizeAndSaveSession, isCentralOpen, setIsCentralOpen }}>
       {children}
       <FloatingStudyWidget />
     </StudyContext.Provider>
@@ -221,9 +354,10 @@ export function useGlobalStudy() {
    FLOATING STUDY WIDGET — Mini cronômetro arrastável e persistido
    ═══════════════════════════════════════════════════════════════ */
 function FloatingStudyWidget() {
-  const { session, restoreSession, pauseSession, resumeSession, endSession, formatTime } = useGlobalStudy()
+  const { session, restoreSession, pauseSession, resumeSession, endSession, formatTime, floatingTimerEnabled, isCentralOpen } = useGlobalStudy()
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const dragRef = useRef<{
     startX: number
     startY: number
@@ -235,27 +369,32 @@ function FloatingStudyWidget() {
 
   // Carregar posição salva no mount (client-only)
   useEffect(() => {
-    if (pos === null) {
+    if (pos === null && !isDragging) {
       const saved = loadSavedPosition()
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPos(saved || getDefaultPosition())
     }
-  }, [pos])
+  }, [pos, isDragging])
 
   // Handlers de arraste com Pointer Events
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (!pos) return
+    if (pos === null) return
     const target = e.target as HTMLElement
     // Não arrastar se clicou em um botão ou ícone
     if (target.closest("button")) return
     e.preventDefault()
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: pos.x, startPosY: pos.y, moved: false }
+    // Se ainda não foi arrastado, usar posição padrão como base
+    const startX = pos.x ?? e.clientX
+    const startY = pos.y ?? e.clientY
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: startX, startPosY: startY, moved: false }
+    setIsDragging(true)
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }, [pos])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return
     e.preventDefault()
+    setIsDragging(true)
     const dx = e.clientX - dragRef.current.startX
     const dy = e.clientY - dragRef.current.startY
     if (!dragRef.current.moved && Math.abs(dx) + Math.abs(dy) < 5) return
@@ -263,8 +402,10 @@ function FloatingStudyWidget() {
 
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const newX = Math.max(0, Math.min(dragRef.current.startPosX + dx, vw - 50))
-    const newY = Math.max(0, Math.min(dragRef.current.startPosY + dy, vh - 50))
+    const floatingWidth = 220
+    const floatingHeight = 60
+    const newX = Math.max(0, Math.min(dragRef.current.startPosX + dx, vw - floatingWidth))
+    const newY = Math.max(0, Math.min(dragRef.current.startPosY + dy, vh - floatingHeight))
     setPos({ x: newX, y: newY })
   }, [])
 
@@ -273,16 +414,16 @@ function FloatingStudyWidget() {
       localStorage.setItem(POSITION_KEY, JSON.stringify(pos))
     }
     dragRef.current = null
+    setIsDragging(false)
   }, [pos])
 
   const handleResetPosition = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    const def = getDefaultPosition()
-    setPos(def)
     localStorage.removeItem(POSITION_KEY)
+    setPos(null) // Isso forçará o uso da posição padrão (centralizada)
   }, [])
 
-  if (!session || !session.isMinimized) return null
+  if (!session || !session.isMinimized || !floatingTimerEnabled || isCentralOpen) return null
 
   const isStudying = session.phase === 'STUDYING'
 
@@ -292,30 +433,36 @@ function FloatingStudyWidget() {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      style={pos ? { left: pos.x, top: pos.y, position: "fixed" } : { left: 0, top: 0, position: "fixed", visibility: "hidden" }}
-      className={cn(
-        "z-[60] flex items-center gap-2 sm:gap-3 bg-card/95 backdrop-blur-md border shadow-2xl rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3",
-        "select-none touch-none cursor-grab active:cursor-grabbing",
-        "transition-opacity duration-200",
-        "animate-in fade-in zoom-in-95 duration-300"
-      )}
+      style={{
+        position: "fixed",
+        top: pos === null ? "10px" : `${pos.y}px`,
+        left: pos === null ? "50%" : `${pos.x}px`,
+        transform: pos === null ? "translateX(-50%)" : "none",
+        zIndex: 9999
+      }}
+className={cn(
+           "z-[60] flex items-center gap-1 bg-card/95 backdrop-blur-md border rounded-2xl px-2 sm:px-2 py-1 sm:py-1",
+           "select-none touch-none cursor-grab active:cursor-grabbing",
+           "transition-opacity duration-150",
+           "animate-in fade-in zoom-in-95 duration-300"
+         )}
     >
-      {/* Indicador de Status */}
-      <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-none">
-        <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
-          {isStudying && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
-          <span className={cn("relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3", isStudying ? "bg-emerald-500" : "bg-amber-500")} />
-        </span>
-        <div className="font-mono font-black text-sm sm:text-base tracking-tight tabular-nums text-foreground min-w-[65px]">
-          {formatTime(session.activeSeconds)}
-        </div>
-        <span className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider hidden sm:inline">
-          {isStudying ? "Estudando" : "Pausado"}
-        </span>
-      </div>
+{/* Indicador de Status */}
+       <div className="flex items-center gap-1 pointer-events-none">
+         <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
+           {isStudying && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
+           <span className={cn("relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3", isStudying ? "bg-emerald-500" : "bg-amber-500")} />
+         </span>
+         <div className="font-mono font-black text-sm sm:text-base text-foreground">
+           {formatTime(session.activeSeconds)}
+         </div>
+         <span className="text-[10px] sm:text-xs font-bold text-muted-foreground">
+           {isStudying ? "Estudando" : "Pausado"}
+         </span>
+       </div>
 
-      {/* Botões de Ação */}
-      <div className="flex items-center gap-0.5 sm:gap-1 border-l pl-1.5 sm:pl-2">
+{/* Botões de Ação */}
+       <div className="flex items-center gap-0.5 border-l pl-1">
         {isStudying ? (
           <Button size="icon" variant="ghost" onClick={pauseSession} className="w-7 h-7 sm:w-8 sm:h-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10">
             <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -334,7 +481,11 @@ function FloatingStudyWidget() {
           <RotateCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
         </Button>
 
-        <Button size="icon" variant="ghost" onClick={endSession} className="w-7 h-7 sm:w-8 sm:h-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10" title="Finalizar Sessão">
+        <Button size="icon" variant="ghost" onClick={() => {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("open-study-session-modal"))
+          }
+        }} className="w-7 h-7 sm:w-8 sm:h-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10" title="Abrir Central Inteligente">
           <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />
         </Button>
       </div>

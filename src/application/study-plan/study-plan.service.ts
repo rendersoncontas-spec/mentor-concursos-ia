@@ -560,15 +560,16 @@ export async function getCycleOverviewData(
   const planDate = plan.generated_at || plan.created_at
   const { data: historyData } = await supabase
     .from("study_history")
-    .select("discipline_id, duration_minutes, started_at, created_at")
+    .select("discipline_id, duration_minutes, started_at")
     .eq("user_id", userId)
-    .gte("created_at", planDate)
+    .gte("started_at", planDate)
 
   const studiedMap = new Map<string, number>()
   const history = historyData?.map((h: any) => ({
     disciplineId: h.discipline_id,
     minutes: h.duration_minutes || 0,
-    date: (h.started_at || h.created_at).split("T")[0] // YYYY-MM-DD
+    // Use started_at split as YYYY-MM-DD (calendar date, not timezone-converted)
+    date: h.started_at ? h.started_at.split("T")[0] : null
   })) || []
 
   if (historyData) {
@@ -586,19 +587,11 @@ export async function getCycleOverviewData(
     }
 
     const requiredMins = item.duration_minutes
-    const availableMins = studiedMap.get(discId) || 0
-    let studied = 0
-    let status: BlockStatus = "PENDENTE"
-
-    if (availableMins >= requiredMins) {
-      studied = requiredMins
-      status = "CONCLUIDO"
-      studiedMap.set(discId, availableMins - requiredMins) // Deduct used mins for next blocks
-    } else if (availableMins > 0) {
-      studied = availableMins
-      status = "EM_ANDAMENTO"
-      studiedMap.set(discId, 0)
-    }
+    // Note: We do NOT set status to "CONCLUIDO" here based on global history.
+    // Status per day is calculated by DailyPlanningView / WeeklyPlanningView
+    // using history filtered by the selected date.
+    const status: BlockStatus = "PENDENTE"
+    const studied = 0
 
     return {
       id: item.id,
