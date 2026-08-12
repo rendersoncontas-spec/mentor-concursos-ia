@@ -1,21 +1,22 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import {
   History as HistoryIcon,
   Clock,
-  MessageSquare,
   Edit2,
   Trash2,
   GraduationCap,
   Loader2,
   Filter,
-  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 import { toast } from "sonner"
 import { getUserHistoryAction, deleteStudySessionAction } from "@/application/study-history/study-history.actions"
+import type { StudyHistory } from "@/domain/study-history/study-history.types"
+
+type HistorySession = StudyHistory & { disciplines?: { name?: string } | null }
 
 interface Filters {
   dateStart: string
@@ -56,12 +57,12 @@ const TECHNIQUES = [
   { value: "PERSONALIZADO", label: "Personalizado" },
 ]
 
-function getStudyDate(session: any): string {
+function getStudyDate(session: HistorySession): string {
   return session.started_at ? String(session.started_at).split("T")[0] ?? "" : ""
 }
 
 // Formata a DATA DO ESTUDO de forma robusta, sem depender de concatenar strings
-function formatStudyDate(value: any): string {
+function formatStudyDate(value: unknown): string {
   if (value === null || value === undefined || value === "") return ""
   const str = String(value)
   // Se já é uma data pura YYYY-MM-DD, usar direto para evitar timezone shift
@@ -75,7 +76,7 @@ function formatStudyDate(value: any): string {
     return `${d}/${m}/${y}`
   }
   // Se é timestamp numérico ou Date
-  const date = new Date(value)
+  const date = new Date(value as string | number | Date)
   if (!isNaN(date.getTime())) {
     const d = date.getDate()
     const m = date.getMonth() + 1
@@ -86,9 +87,9 @@ function formatStudyDate(value: any): string {
 }
 
 // Formata o HORÁRIO DE SALVAMENTO de forma robusta (hora local)
-function formatSavedAt(value: any): string {
+function formatSavedAt(value: unknown): string {
   if (value === null || value === undefined || value === "") return ""
-  const date = new Date(value)
+  const date = new Date(value as string | number | Date)
   if (isNaN(date.getTime())) return ""
   return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
@@ -118,10 +119,10 @@ function countActiveFilters(f: Filters): number {
 }
 
 export function EstudeiHistoryView() {
-  const [sessions, setSessions] = useState<any[]>([])
+  const [sessions, setSessions] = useState<HistorySession[]>([])
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
-  const [editingSession, setEditingSession] = useState<any>(null)
+  const [editingSession, setEditingSession] = useState<HistorySession | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -139,7 +140,10 @@ export function EstudeiHistoryView() {
   }
 
   useEffect(() => {
-    loadHistory()
+    const timer = setTimeout(() => {
+      void loadHistory()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   // Close filter panel on outside click or ESC
@@ -175,16 +179,6 @@ export function EstudeiHistoryView() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
   }, [sessions])
 
-  // Unique study dates
-  const studyDates = useMemo(() => {
-    const set = new Set<string>()
-    sessions.forEach(s => {
-      const d = getStudyDate(s)
-      if (d) set.add(d)
-    })
-    return Array.from(set).sort()
-  }, [sessions])
-
   // Apply filters
   const filteredSessions = useMemo(() => {
     let result = [...sessions]
@@ -218,7 +212,7 @@ export function EstudeiHistoryView() {
     }
     if (filters.focusRange) {
       result = result.filter(s => {
-        const focus = s.metadata?.focus_percentage || 0
+        const focus = Number(s.metadata?.["focus_percentage"] || 0)
         switch (filters.focusRange) {
           case "0-49": return focus >= 0 && focus < 50
           case "50-69": return focus >= 50 && focus < 70
@@ -234,14 +228,14 @@ export function EstudeiHistoryView() {
 
   // KPIs from filtered
   const totalMinutes = filteredSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)
-  const totalCorrect = filteredSessions.reduce((acc, s) => acc + (s.metadata?.questions_correct || 0), 0)
-  const totalAnswered = filteredSessions.reduce((acc, s) => acc + (s.metadata?.questions_answered || 0), 0)
+  const totalCorrect = filteredSessions.reduce((acc, s) => acc + Number(s.metadata?.["questions_correct"] || 0), 0)
+  const totalAnswered = filteredSessions.reduce((acc, s) => acc + Number(s.metadata?.["questions_answered"] || 0), 0)
   const totalWrong = totalAnswered - totalCorrect
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0
-  const totalPages = filteredSessions.reduce((acc, s) => acc + (s.metadata?.pages_read || 0), 0)
+  const totalPages = filteredSessions.reduce((acc, s) => acc + Number(s.metadata?.["pages_read"] || 0), 0)
   const activeFilterCount = countActiveFilters(filters)
 
-  const handleEditSession = (session: any) => {
+  const handleEditSession = (session: HistorySession) => {
     setEditingSession(session)
     setIsRegisterOpen(true)
   }
@@ -474,11 +468,13 @@ export function EstudeiHistoryView() {
 
       {/* Registros */}
       <div className="space-y-4 pt-2">
-        {loading ? (
+        {(() => {
+          if (loading) return (
           <div className="flex items-center justify-center p-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : filteredSessions.length === 0 ? (
+          )
+          if (filteredSessions.length === 0) return (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 border rounded-xl bg-card/50">
             <HistoryIcon className="h-10 w-10 text-muted-foreground/30" />
             <h3 className="text-base font-extrabold text-foreground">
@@ -497,7 +493,8 @@ export function EstudeiHistoryView() {
               </Button>
             )}
           </div>
-        ) : (
+          )
+          return (
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
@@ -527,14 +524,14 @@ export function EstudeiHistoryView() {
                           Tipo: {STUDY_TYPES.find(t => t.value === session.study_type)?.label || session.study_type}
                         </p>
                       )}
-                      {session.metadata?.flashcards_reviewed > 0 && (
+                      {Number(session.metadata?.["flashcards_reviewed"] || 0) > 0 && (
                         <p className="text-[11px] text-emerald-600 font-semibold">
-                          Flashcards: {session.metadata.flashcards_reviewed} revisados ({session.metadata.flashcards_correct || 0} acertos)
+                          Flashcards: {Number(session.metadata?.["flashcards_reviewed"] || 0)} revisados ({Number(session.metadata?.["flashcards_correct"] || 0)} acertos)
                         </p>
                       )}
-                      {session.metadata?.questions_answered > 0 && (
+                      {Number(session.metadata?.["questions_answered"] || 0) > 0 && (
                         <p className="text-[11px] text-blue-600 font-semibold">
-                          Questões: {session.metadata.questions_correct || 0}/{session.metadata.questions_answered} acertos
+                          Questões: {Number(session.metadata?.["questions_correct"] || 0)}/{Number(session.metadata?.["questions_answered"] || 0)} acertos
                         </p>
                       )}
                       <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
@@ -550,7 +547,7 @@ export function EstudeiHistoryView() {
                     </span>
 
                     <span className="px-4 py-1 rounded-md bg-[#2563EB] text-white font-extrabold text-[10px] tracking-wider uppercase shadow-xs">
-                      FOCO {session.metadata?.focus_percentage || "0"}%
+                      FOCO {String(session.metadata?.["focus_percentage"] ?? "0")}%
                     </span>
 
                     <div className="flex items-center gap-2 text-muted-foreground/50">
@@ -577,14 +574,15 @@ export function EstudeiHistoryView() {
               ))}
             </div>
           </div>
-        )}
+          )
+        })()}
       </div>
 
       <StudyRegisterModal
         open={isRegisterOpen}
         onOpenChange={handleModalClose}
-        sessionToEdit={editingSession}
         mode={editingSession ? "edit" : "create"}
+        {...(editingSession ? { sessionToEdit: editingSession } : {})}
       />
     </div>
   )

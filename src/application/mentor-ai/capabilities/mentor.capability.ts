@@ -1,4 +1,4 @@
-import { Insight, IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
+import type { Insight, IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
 
 export interface CapabilityMetadata {
   id: string

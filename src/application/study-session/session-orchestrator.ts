@@ -1,5 +1,5 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { SessionCompletionPayload, SessionSummary } from "./study-session.models"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { SessionCompletionPayload, SessionSummary } from "./study-session.models"
 import { finishStudySession } from "@/application/study-history/study-history.service"
 import { MentorAIService } from "@/application/mentor-ai/mentor-ai.service"
 
@@ -56,9 +56,8 @@ export class SessionOrchestrator {
       reviewsCompleted: payload.reviewsCompleted,
       igaBefore: 0, // Placeholder se não tivermos histórico anterior imediato
       igaAfter: mentorResponse.globalScore.score,
-      mentorResponse: mentorResponse.feed.now.length > 0 
-        ? mentorResponse.feed.now[0].message 
-        : "Sessão concluída com sucesso! Seu IGA foi atualizado."
+      mentorResponse: mentorResponse.feed.now[0]?.message
+        ?? "Sessão concluída com sucesso! Seu IGA foi atualizado."
     }
   }
 
@@ -77,7 +76,7 @@ export class SessionOrchestrator {
     // Em um cenário real, estas questões viriam de uma prova gerada no sistema.
     // Para cumprir o fluxo sem quebrar constraint, delegamos ao Analytics ou 
     // registramos como tentativas "Livre" num serviço dedicado.
-    console.log(`[QuestionEngine] Logando ${payload.questionsAnswered} questões...`)
+    console.warn(`[QuestionEngine] Logando ${payload.questionsAnswered} questões...`)
   }
 
   /**
@@ -89,6 +88,6 @@ export class SessionOrchestrator {
     payload: SessionCompletionPayload
   ) {
     if (!payload.disciplineId) return
-    console.log(`[ReviewEngine] Concluindo ${payload.reviewsCompleted} revisões para disciplina ${payload.disciplineId}...`)
+    console.warn(`[ReviewEngine] Concluindo ${payload.reviewsCompleted} revisões para disciplina ${payload.disciplineId}...`)
   }
 }

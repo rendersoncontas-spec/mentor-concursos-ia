@@ -1,15 +1,9 @@
 ﻿"use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   Library,
-  Plus,
   ChevronDown,
-  FileText,
-  BookOpen,
-  Link as LinkIcon,
-  Video,
-  Download,
   ExternalLink,
   Trash2,
 } from "lucide-react"
@@ -246,7 +240,7 @@ export function EstudeiBibliotecaView() {
               <label className="text-xs font-semibold text-muted-foreground">Tipo</label>
               <select
                 value={typeInput}
-                onChange={(e) => setTypeInput(e.target.value as any)}
+                onChange={(e) => setTypeInput(e.target.value as MaterialItem["type"])}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-2xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="PDF">PDF / Apostila</option>

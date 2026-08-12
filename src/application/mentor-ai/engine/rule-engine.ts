@@ -1,4 +1,4 @@
-import { GlobalScore, Insight, IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
+import type { GlobalScore, Insight, IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
 import { CapabilityRegistry } from "./capability-registry"
 
 export class RuleEngine {

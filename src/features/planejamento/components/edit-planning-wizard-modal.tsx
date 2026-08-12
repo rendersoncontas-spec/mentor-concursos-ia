@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import {
   RotateCcw,
   Calendar,
   HelpCircle,
-  Loader2,
   Sparkles,
   Search,
   X
@@ -25,6 +24,8 @@ export interface EditPlanningWizardModalProps {
   initialBlocks?: StudyCycleBlock[]
   onComplete?: () => void
 }
+
+type PrioritizedStudyCycleBlock = StudyCycleBlock & { priorityScore?: number }
 
 const ALL_DISCIPLINES = [
   "Administração Geral",
@@ -51,7 +52,6 @@ export function EditPlanningWizardModal({
   onComplete,
 }: EditPlanningWizardModalProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
-  const [isSaving, setIsSaving] = useState(false)
   const [allDbDisciplines, setAllDbDisciplines] = useState<string[]>(ALL_DISCIPLINES)
   const [searchTerm, setSearchTerm] = useState("")
   const [showAutocomplete, setShowAutocomplete] = useState(false)
@@ -116,6 +116,7 @@ export function EditPlanningWizardModal({
   // Pre-fill state when modal opens or initialBlocks change
   useEffect(() => {
     if (open) {
+      const timer = setTimeout(() => {
       if (initialBlocks && initialBlocks.length > 0) {
         const uniqueNames = Array.from(new Set(initialBlocks.map(b => b.disciplineName)))
         setSelectedDisciplines(uniqueNames)
@@ -125,7 +126,8 @@ export function EditPlanningWizardModal({
 
         initialBlocks.forEach(b => {
           if (!impMap[b.disciplineName]) {
-            impMap[b.disciplineName] = Math.min(5, Math.max(1, Math.round((b as any).priorityScore || 3)))
+            const priorityScore = (b as PrioritizedStudyCycleBlock).priorityScore ?? 3
+            impMap[b.disciplineName] = Math.min(5, Math.max(1, Math.round(priorityScore)))
             knowMap[b.disciplineName] = 2.5
           }
         })
@@ -147,7 +149,10 @@ export function EditPlanningWizardModal({
           }
         })
         .catch(() => {})
+      }, 0)
+      return () => clearTimeout(timer)
     }
+    return undefined
   }, [open, initialBlocks])
 
   const filteredDbDisciplines = useMemo(() => {
@@ -196,8 +201,7 @@ export function EditPlanningWizardModal({
     else if (currentStep === 2) setCurrentStep(3)
     else if (currentStep === 3) setCurrentStep(4)
     else if (currentStep === 4) {
-      setIsSaving(true)
-      try {
+        try {
         if (typeof window !== "undefined") {
           if (dayConfigMode === "escala") {
             localStorage.setItem("mentor_user_work_scale", escalaTrabalho)
@@ -243,10 +247,8 @@ export function EditPlanningWizardModal({
         } else {
           toast.error(res.error || "Erro ao atualizar o planejamento.")
         }
-      } catch (err) {
+      } catch {
         toast.error("Erro interno ao atualizar o planejamento.")
-      } finally {
-        setIsSaving(false)
       }
     }
   }
@@ -257,15 +259,21 @@ export function EditPlanningWizardModal({
     else if (currentStep === 4) setCurrentStep(3)
   }
 
-  const calculateDisciplineScore = (disc: string) => {
+  const calculateDisciplineScore = useCallback((disc: string) => {
     const imp = importanceMap[disc] ?? 2.5
     const know = knowledgeMap[disc] ?? 2.5
     return imp * (6 - know)
-  }
+  }, [importanceMap, knowledgeMap])
 
   const totalCalculatedScore = useMemo(() => {
     return selectedDisciplines.reduce((sum, d) => sum + calculateDisciplineScore(d), 0)
-  }, [selectedDisciplines, importanceMap, knowledgeMap])
+  }, [selectedDisciplines, calculateDisciplineScore])
+
+  const getStepClass = (step: number) => {
+    if (currentStep === step) return "bg-[#2563EB] text-white border-[#2563EB] shadow-md scale-110"
+    if (currentStep > step) return "bg-[#2563EB] text-white border-[#2563EB]"
+    return "bg-card text-muted-foreground border-muted"
+  }
 
   const getDisciplinePercentage = (disc: string) => {
     if (totalCalculatedScore <= 0) return 0
@@ -289,11 +297,7 @@ export function EditPlanningWizardModal({
               <div className="flex flex-col items-center relative z-10 space-y-1">
                 <div
                   className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${
-                    currentStep === 1
-                      ? "bg-[#2563EB] text-white border-[#2563EB] shadow-md scale-110"
-                      : currentStep > 1
-                      ? "bg-[#2563EB] text-white border-[#2563EB]"
-                      : "bg-card text-muted-foreground border-muted"
+                    getStepClass(1)
                   }`}
                 >
                   01
@@ -305,11 +309,7 @@ export function EditPlanningWizardModal({
               <div className="flex flex-col items-center relative z-10 space-y-1">
                 <div
                   className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${
-                    currentStep === 2
-                      ? "bg-[#2563EB] text-white border-[#2563EB] shadow-md scale-110"
-                      : currentStep > 2
-                      ? "bg-[#2563EB] text-white border-[#2563EB]"
-                      : "bg-card text-muted-foreground border-muted"
+                    getStepClass(2)
                   }`}
                 >
                   02
@@ -321,11 +321,7 @@ export function EditPlanningWizardModal({
               <div className="flex flex-col items-center relative z-10 space-y-1">
                 <div
                   className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${
-                    currentStep === 3
-                      ? "bg-[#2563EB] text-white border-[#2563EB] shadow-md scale-110"
-                      : currentStep > 3
-                      ? "bg-[#2563EB] text-white border-[#2563EB]"
-                      : "bg-card text-muted-foreground border-muted"
+                    getStepClass(3)
                   }`}
                 >
                   03
@@ -490,7 +486,7 @@ export function EditPlanningWizardModal({
 
                       {filteredDbDisciplines.length === 0 ? (
                         <div className="p-3 text-xs text-muted-foreground text-center">
-                          Nenhuma matéria exata no banco. Pressione <strong>+ Adicionar</strong> para criar "{searchTerm}"!
+                          Nenhuma matéria exata no banco. Pressione <strong>+ Adicionar</strong> para criar &quot;{searchTerm}&quot;!
                         </div>
                       ) : (
                         filteredDbDisciplines.map((item) => {

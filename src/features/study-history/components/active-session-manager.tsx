@@ -16,7 +16,7 @@ export function ActiveSessionManager({
   disciplines 
 }: { 
   items: StudyPlanItemWithDetails[],
-  disciplines: any[] // Lista completa para estudo livre
+  disciplines: { id: string; name: string }[] // Lista completa para estudo livre
 }) {
   const router = useRouter()
   const [freeStudyModalOpen, setFreeStudyModalOpen] = useState(false)

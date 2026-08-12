@@ -1,5 +1,5 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { StudyHistory, StudyHistoryInsert } from "@/domain/study-history/study-history.types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types";
 
 /**
  * Cria ou inicia uma sessão de estudo.
@@ -91,7 +91,7 @@ export async function updateStudySession(
   data: Partial<StudyHistoryInsert>
 ) {
   // Build update object from allowed fields
-  const updateData: Record<string, any> = {}
+  const updateData: Record<string, unknown> = {}
   const allowedFields = [
     'discipline_id',
     'study_plan_item_id',
@@ -201,13 +201,15 @@ export async function getRecentActivities(
 
   if (error || !data) return []
 
-  return data.map((item: any) => ({
+  return data.map((item) => {
+    const disc = Array.isArray(item.disciplines) ? item.disciplines[0] : item.disciplines
+    return {
     id: item.id,
-    discipline_name: item.disciplines?.name || "Estudo Livre",
+    discipline_name: disc?.name || "Estudo Livre",
     duration_minutes: item.duration_minutes || 0,
     study_source: item.study_source || "FREE",
     started_at: item.started_at,
     completed: item.completed ?? false
-  }))
+  }})
 }
 

@@ -18,6 +18,29 @@ interface CycleVisualizerProps {
   onCompleteBlock?: (blockId: string) => void
 }
 
+function getBlockClass(isCurrent: boolean, isCompleted: boolean): string {
+  if (isCurrent) return "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
+  if (isCompleted) return "border-emerald-500/30 bg-emerald-500/5 opacity-80"
+  return "border-border bg-card hover:border-primary/40 hover:shadow-sm"
+}
+
+function getNumberClass(isCurrent: boolean, isCompleted: boolean): string {
+  if (isCurrent) return "bg-primary text-white"
+  if (isCompleted) return "bg-emerald-500 text-white"
+  return "bg-muted text-muted-foreground"
+}
+
+function renderStatusBadge(isCurrent: boolean, isCompleted: boolean) {
+  if (isCompleted) return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] font-semibold gap-1"><CheckCircle2 className="h-3 w-3" /> Concluído</Badge>
+  if (isCurrent) return <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-semibold gap-1 animate-pulse"><Sparkles className="h-3 w-3" /> Atual</Badge>
+  return <Badge variant="outline" className="text-[10px] font-medium text-muted-foreground">Pendente</Badge>
+}
+
+function renderInactiveAction(block: CycleBlock, isCompleted: boolean) {
+  if (isCompleted) return <div className="w-full flex items-center justify-between text-xs text-emerald-600 font-medium py-1"><span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Bloco finalizado</span><Button asChild variant="ghost" size="sm" className="h-7 text-[11px] hover:text-emerald-700 p-0"><Link href={`/sessao-estudo?discipline=${block.disciplineId}`}>Revisar</Link></Button></div>
+  return <Button asChild variant="secondary" size="sm" className="w-full gap-1.5 text-xs font-medium"><Link href={`/sessao-estudo?discipline=${block.disciplineId}`}><span>Iniciar Bloco</span><ChevronRight className="h-3.5 w-3.5" /></Link></Button>
+}
+
 export function CycleVisualizer({ blocks, onCompleteBlock }: CycleVisualizerProps) {
   if (blocks.length === 0) {
     return (
@@ -60,11 +83,7 @@ export function CycleVisualizer({ blocks, onCompleteBlock }: CycleVisualizerProp
               key={block.id}
               className={cn(
                 "group relative rounded-xl border p-4 transition-all duration-200 flex flex-col justify-between space-y-4",
-                isCurrent
-                  ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
-                  : isCompleted
-                  ? "border-emerald-500/30 bg-emerald-500/5 opacity-80"
-                  : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
+                getBlockClass(isCurrent, isCompleted)
               )}
             >
               {/* Top Header */}
@@ -74,11 +93,7 @@ export function CycleVisualizer({ blocks, onCompleteBlock }: CycleVisualizerProp
                     <span
                       className={cn(
                         "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
-                        isCurrent
-                          ? "bg-primary text-white"
-                          : isCompleted
-                          ? "bg-emerald-500 text-white"
-                          : "bg-muted text-muted-foreground"
+                        getNumberClass(isCurrent, isCompleted)
                       )}
                     >
                       #{block.executionOrder}
@@ -92,19 +107,7 @@ export function CycleVisualizer({ blocks, onCompleteBlock }: CycleVisualizerProp
                   </div>
 
                   {/* Status Badge */}
-                  {isCompleted ? (
-                    <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] font-semibold gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Concluído
-                    </Badge>
-                  ) : isCurrent ? (
-                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-semibold gap-1 animate-pulse">
-                      <Sparkles className="h-3 w-3" /> Atual
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[10px] font-medium text-muted-foreground">
-                      Pendente
-                    </Badge>
-                  )}
+                  {renderStatusBadge(isCurrent, isCompleted)}
                 </div>
 
                 {/* Discipline Name & Duration */}
@@ -148,35 +151,7 @@ export function CycleVisualizer({ blocks, onCompleteBlock }: CycleVisualizerProp
                       </Button>
                     )}
                   </>
-                ) : isCompleted ? (
-                  <div className="w-full flex items-center justify-between text-xs text-emerald-600 font-medium py-1">
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Bloco finalizado
-                    </span>
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-[11px] hover:text-emerald-700 p-0"
-                    >
-                      <Link href={`/sessao-estudo?discipline=${block.disciplineId}`}>
-                        Revisar
-                      </Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    asChild
-                    variant="secondary"
-                    size="sm"
-                    className="w-full gap-1.5 text-xs font-medium"
-                  >
-                    <Link href={`/sessao-estudo?discipline=${block.disciplineId}`}>
-                      <span>Iniciar Bloco</span>
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
-                )}
+                ) : renderInactiveAction(block, isCompleted)}
               </div>
             </div>
           )

@@ -100,7 +100,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     let correctQuestions = attempts.filter((a: { correct: boolean }) => a.correct).length
 
     // Add manual questions from study history metadata
-    rawHistory.forEach((session: any) => {
+    rawHistory.forEach((session) => {
       const meta = session.metadata || {}
       if (meta.questions_answered) {
         totalQuestions += Number(meta.questions_answered)
@@ -135,12 +135,12 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     // Calcular metas adicionais não presentes na base
     const startOfWeekMs = getStartOfWeek(new Date(), profile?.week_start_day ?? 1).getTime()
     
-    let weeklyQuestions = attempts.filter((a: any) => {
+    let weeklyQuestions = attempts.filter((a) => {
       const d = new Date(a.answered_at || a.created_at)
       return d.getTime() >= startOfWeekMs
     }).length
 
-    rawHistory.forEach((session: any) => {
+    rawHistory.forEach((session) => {
       const d = new Date(session.started_at)
       if (d.getTime() >= startOfWeekMs) {
         const meta = session.metadata || {}
@@ -152,16 +152,16 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
     // Revisions (Apenas mock para UI inicial ou calcular se tivermos dados de reviews completas)
     // Para simplificar, consideramos "revisões concluídas na semana" a partir das sessões de revisão no histórico
-    const weeklyRevisions = rawHistory.filter((h: any) => {
+    const weeklyRevisions = rawHistory.filter((h) => {
       const d = new Date(h.started_at)
-      return h.completed && d.getTime() >= startOfWeekMs && h.is_review // is_review pode não existir, fallback 0
+      return h.completed && d.getTime() >= startOfWeekMs && (h as { is_review?: boolean }).is_review // is_review pode não existir, fallback 0
     }).length || 0
     
     // Dias ativos na semana
     const uniqueDaysThisWeek = new Set(
       rawHistory
-        .filter((h: any) => new Date(h.started_at).getTime() >= startOfWeekMs)
-        .map((h: any) => h.started_at.split("T")[0])
+        .filter((h) => new Date(h.started_at).getTime() >= startOfWeekMs)
+        .map((h) => h.started_at.split("T")[0])
     )
     const weeklyStudyDays = uniqueDaysThisWeek.size
 
@@ -189,13 +189,13 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       disciplinesStats,
       todayPlanItems,
       cycleBlocks: cycleOverview?.blocks || [],
-      rawDisciplines: (disciplines || []).map((ud: any) => {
+      rawDisciplines: (disciplines || []).map((ud) => {
         const discId = ud.discipline?.id
-        const discAttempts = attempts.filter((a: any) => a.discipline_id === discId)
-        let correctCount = discAttempts.filter((a: any) => a.correct).length
+        const discAttempts = attempts.filter((a) => a.discipline_id === discId)
+        let correctCount = discAttempts.filter((a) => a.correct).length
         let totalCount = discAttempts.length
 
-        const discHistory = (rawHistory as any[]).filter((h: any) => h.discipline_id === discId && h.completed)
+        const discHistory = rawHistory.filter((h) => h.discipline_id === discId && h.completed)
         
         discHistory.forEach(h => {
           const meta = h.metadata || {}
@@ -205,7 +205,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
         const wrongCount = totalCount - correctCount
         const accuracyPercentage = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0
-        const totalMinutes = discHistory.reduce((acc: number, h: any) => acc + (h.duration_minutes || 0), 0)
+        const totalMinutes = discHistory.reduce((acc: number, h) => acc + (h.duration_minutes || 0), 0)
         
         const h = Math.floor(totalMinutes / 60)
         const m = totalMinutes % 60
@@ -252,7 +252,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         insights: AnalyticsEngine.ai.getInsights(ctx)
       },
       userLayout: (userLayoutResult?.data && userLayoutResult.data.length > 0)
-        ? userLayoutResult.data.map((item: any) => ({
+        ? userLayoutResult.data.map((item) => ({
             widget_id: item.widget_id,
             position_order: item.position_order,
             col_span: Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3,

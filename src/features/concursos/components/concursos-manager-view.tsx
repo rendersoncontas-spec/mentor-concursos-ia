@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useTransition, useCallback, useEffect } from "react"
+import { useState, useTransition, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import {
   Plus,
   Trophy,
@@ -33,7 +34,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
   getConcursosAction,
@@ -69,7 +69,7 @@ export function RenderConcursoIcon({ iconKey, className = "h-5 w-5" }: { iconKey
   if (!iconKey) return <Trophy className={className} />
 
   if (iconKey.startsWith("data:image/") || iconKey.startsWith("http://") || iconKey.startsWith("https://")) {
-    return <img src={iconKey} alt="Ícone do concurso" className="w-full h-full object-cover" />
+    return <Image src={iconKey} alt="Ícone do concurso" fill unoptimized className="object-cover" />
   }
 
   const found = PRESET_ICONS.find(p => p.id === iconKey)
@@ -122,7 +122,11 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
   const [icon, setIcon] = useState(initial?.icon || "trophy")
 
   // Reset form when modal opens
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open)
+  const [prevInitialId, setPrevInitialId] = useState(initial?.id)
+  if (open !== prevOpen || initial?.id !== prevInitialId) {
+    setPrevOpen(open)
+    setPrevInitialId(initial?.id)
     if (open) {
       setName(initial?.name || "")
       setRole(initial?.role || "")
@@ -133,7 +137,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
       setExamPdfUrl(initial?.exam_pdf_url || "")
       setIcon(initial?.icon || "trophy")
     }
-  }, [open, initial])
+  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -176,6 +180,13 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
   }
 
   if (!open) return null
+
+  let submitLabel = "Criar Concurso"
+  if (isSaving) {
+    submitLabel = "Salvando..."
+  } else if (initial?.id) {
+    submitLabel = "Salvar Alterações"
+  }
 
   return (
     <div
@@ -223,7 +234,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Visualização Atual do Ícone */}
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative group">
+              <div className="relative w-14 h-14 rounded-2xl bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm group">
                 <RenderConcursoIcon iconKey={icon} className="h-7 w-7 text-primary" />
               </div>
               <div className="flex-1 space-y-2">
@@ -405,7 +416,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
               className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl py-2.5 h-auto gap-2"
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {isSaving ? "Salvando..." : (initial?.id ? "Salvar Alterações" : "Criar Concurso")}
+              {submitLabel}
             </Button>
           </div>
         </form>
@@ -480,19 +491,25 @@ interface ConcursoCardProps {
 function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, onDelete, onViewEdital }: ConcursoCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const statusBadge = concurso.is_active
-    ? { label: "Ativo", className: "bg-primary text-white" }
-    : concurso.is_archived
-      ? { label: "Arquivado", className: "bg-muted text-muted-foreground" }
-      : { label: "Inativo", className: "bg-muted text-muted-foreground/70" }
+  let statusBadge: { label: string; className: string }
+  if (concurso.is_active) {
+    statusBadge = { label: "Ativo", className: "bg-primary text-white" }
+  } else if (concurso.is_archived) {
+    statusBadge = { label: "Arquivado", className: "bg-muted text-muted-foreground" }
+  } else {
+    statusBadge = { label: "Inativo", className: "bg-muted text-muted-foreground/70" }
+  }
 
-  const daysStr = concurso.days_remaining !== null
-    ? concurso.days_remaining > 0
-      ? `Faltam ${concurso.days_remaining} dias`
-      : concurso.days_remaining === 0
-        ? "Hoje é o dia! 🎯"
-        : `Prova realizada`
-    : "Data não definida"
+  let daysStr = "Data não definida"
+  if (concurso.days_remaining !== null) {
+    if (concurso.days_remaining > 0) {
+      daysStr = `Faltam ${concurso.days_remaining} dias`
+    } else if (concurso.days_remaining === 0) {
+      daysStr = "Hoje é o dia! 🎯"
+    } else {
+      daysStr = "Prova realizada"
+    }
+  }
 
   return (
     <div className={cn(
@@ -506,7 +523,7 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <div className={cn(
-            "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border shadow-2xs transition-all",
+            "relative w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border shadow-2xs transition-all",
             concurso.is_active ? "bg-primary/10 border-primary/25 text-primary" : "bg-muted border-border text-muted-foreground"
           )}>
             <RenderConcursoIcon iconKey={concurso.icon} className={cn("h-5.5 w-5.5", concurso.is_active ? "text-primary" : "text-muted-foreground")} />

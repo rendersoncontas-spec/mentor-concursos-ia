@@ -21,9 +21,9 @@ import { WeeklyPlanningView } from "./weekly-planning-view"
 import { DailyPlanningView } from "./daily-planning-view"
 import { StudyCalendarView } from "./study-calendar-view"
 import { AiPlanningWizard } from "./ai-planning-wizard"
-import { Sparkles, Settings2, BrainCircuit, Bot, Calendar, LayoutGrid, Target } from "lucide-react"
+import { Sparkles, Settings2, BrainCircuit, Bot, Calendar, Target } from "lucide-react"
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
-import { deactivateStudyPlanAction, generateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
+import { deactivateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
 
 export interface StudyCycleBlock {
   id: string
@@ -34,26 +34,6 @@ export interface StudyCycleBlock {
   color: string
   completed: boolean
 }
-
-const DISCIPLINES_OPTIONS = [
-  "Direito Tributário",
-  "Raciocínio Lógico",
-  "Língua Portuguesa",
-  "Direito Administrativo",
-  "Direito Constitucional",
-  "Contabilidade Geral",
-  "Fluência em Dados",
-  "Legislação Aduaneira",
-  "Legislação Tributária",
-  "Estatística",
-  "Administração Geral",
-  "Administração Pública",
-]
-
-const COLOR_PALETTE = [
-  "#a78bfa", "#4ade80", "#f87171", "#fb923c", "#60a5fa",
-  "#c084fc", "#38bdf8", "#facc15", "#dbeafe", "#fce7f3",
-]
 
 interface EstudeiPlanningViewProps {
   initialData?: CycleOverviewData | null
@@ -66,30 +46,6 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
   const [hasPlanning, setHasPlanning] = useState(() => Boolean(initialData && initialData.blocks && initialData.blocks.length > 0))
   const [planningType, setPlanningType] = useState<"ciclo" | "diario" | "semanal" | "mensal" | "metas">("ciclo")
   const [isManualCreation, setIsManualCreation] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
-
-  // Sync state with server-side props
-  useEffect(() => {
-    if (initialData?.blocks && initialData.blocks.length > 0) {
-      const historyData = initialData?.history || []
-      setHasPlanning(true)
-      setBlocks(initialData.blocks.map((b) => ({
-        id: b.id,
-        disciplineName: b.disciplineName,
-        disciplineId: b.disciplineId,
-        durationMinutes: b.durationMinutes,
-        studiedMinutes: historyData.reduce((sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0), 0),
-        color: b.color || "#2563EB",
-        completed: false, // Always start as pending, completed is calculated per-day by the view
-      })))
-      if (initialData.blocks[0]) {
-        setActiveBlockId(initialData.blocks[0].id)
-      }
-    } else {
-      setHasPlanning(false)
-      setBlocks([])
-    }
-  }, [initialData])
 
   const [blocks, setBlocks] = useState<StudyCycleBlock[]>(() => {
     if (initialData?.blocks && initialData.blocks.length > 0) {
@@ -107,7 +63,33 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
   })
   const [completedCyclesCount] = useState(0)
   const [showCompletedOnly, setShowCompletedOnly] = useState(false)
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(() => (blocks[0]?.id ? blocks[0].id : null))
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(() => blocks[0]?.id ?? null)
+
+  // Sync state with server-side props
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (initialData?.blocks && initialData.blocks.length > 0) {
+        const historyData = initialData.history || []
+        const nextBlocks = initialData.blocks.map((b) => ({
+          id: b.id,
+          disciplineName: b.disciplineName,
+          disciplineId: b.disciplineId,
+          durationMinutes: b.durationMinutes,
+          studiedMinutes: historyData.reduce((sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0), 0),
+          color: b.color || "#2563EB",
+          completed: false,
+        }))
+        setHasPlanning(true)
+        setBlocks(nextBlocks)
+        setActiveBlockId(nextBlocks[0]?.id ?? null)
+      } else {
+        setHasPlanning(false)
+        setBlocks([])
+        setActiveBlockId(null)
+      }
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [initialData])
 
   // Modais
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
@@ -158,43 +140,6 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
   const handleStartStudy = (block: StudyCycleBlock) => {
     toast.success(`Iniciando sessão de estudo para ${block.disciplineName}!`)
     router.push(`/dashboard/study-session?planId=${block.id}`)
-  }
-
-  const handleUpdateBlockDiscipline = (id: string, newDiscipline: string) => {
-    const colorIndex = DISCIPLINES_OPTIONS.indexOf(newDiscipline) % COLOR_PALETTE.length
-    const newColor = COLOR_PALETTE[colorIndex >= 0 ? colorIndex : 0] || "#2563EB"
-    setBlocks(
-      blocks.map((b) => (b.id === id ? { ...b, disciplineName: newDiscipline, color: newColor } : b))
-    )
-  }
-
-  const handleUpdateBlockMinutes = (id: string, newMinutes: number) => {
-    setBlocks(
-      blocks.map((b) => (b.id === id ? { ...b, durationMinutes: Math.max(5, newMinutes) } : b))
-    )
-  }
-
-  const handleDuplicateBlock = (index: number) => {
-    const target = blocks[index]
-    if (!target) return
-    const duplicatedBlock: StudyCycleBlock = {
-      id: `cb-${Math.random().toString(36).substring(2, 9)}`,
-      disciplineName: target.disciplineName,
-      disciplineId: target.disciplineId,
-      durationMinutes: target.durationMinutes,
-      studiedMinutes: 0,
-      color: target.color,
-      completed: false,
-    }
-    const updated = [...blocks]
-    updated.splice(index + 1, 0, duplicatedBlock)
-    setBlocks(updated)
-    toast.success(`Disciplina "${target.disciplineName}" duplicada.`)
-  }
-
-  const handleRemoveBlock = (id: string) => {
-    setBlocks(blocks.filter((b) => b.id !== id))
-    toast.success("Disciplina removida do ciclo.")
   }
 
   const handleAddDisciplineRow = () => {

@@ -1,9 +1,6 @@
 ﻿"use client"
 
-import { useState } from "react"
-import { CreditCard, CheckCircle2, ShieldCheck, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 
 export function EstudeiSubscriptionView() {

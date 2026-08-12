@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import * as React from "react"
 import {
@@ -10,19 +9,15 @@ import {
   Flame,
   HelpCircle,
   RotateCcw,
-  Search,
   Trophy,
   Activity,
   Award,
   Calendar,
   CheckCircle2,
-  XCircle,
   Edit2,
   ChevronRight,
   Sparkles,
-  PlayCircle,
   BarChart3,
-  CalendarDays,
   ChevronLeft,
   ChevronRight as ChevronRightIcon
 } from "lucide-react"
@@ -244,7 +239,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
         <div className="mt-4 space-y-2">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">MELHORES DESEMPENHOS POR MATÉRIA</span>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {disciplineRanking.slice(0, 4).map((item: any, idx: number) => (
+            {disciplineRanking.slice(0, 4).map((item: { name?: string; disciplineName?: string; accuracy?: number; percentage?: number }, idx: number) => (
               <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-[11px] font-bold">
                 <span className="truncate pr-2">{item.name || item.disciplineName}</span>
                 <span className="text-emerald-600 font-mono">{item.accuracy || item.percentage || 0}%</span>
@@ -359,8 +354,8 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
         <div className="pt-2 border-t">
           <div className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider mb-2">REGISTRO DIÁRIO</div>
           <div className="flex flex-wrap gap-1.5">
-            {heatmap.slice(-14).map((day: any, idx: number) => {
-              const studied = day.minutes > 0 || day.count > 0
+            {heatmap.slice(-14).map((day: { date?: string; minutes?: number; count?: number }, idx: number) => {
+              const studied = (day.minutes ?? 0) > 0 || (day.count ?? 0) > 0
               return (
                 <div
                   key={idx}
@@ -394,7 +389,6 @@ export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
   const total = snapshot?.stats?.totalQuestions ?? 0
-  const correct = snapshot?.stats?.correctQuestions ?? 0
   const target = snapshot?.analytics?.goals?.questions?.target ?? 100
   const achieved = snapshot?.analytics?.goals?.questions?.achieved ?? total
   const pct = snapshot?.analytics?.goals?.questions?.percentage ?? (target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0)
@@ -493,7 +487,7 @@ export function WidgetRevisoes({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 8. WIDGET: Metas de Estudo
 // ─────────────────────────────────────────────────────────────────────────────
-export function WidgetMetasEstudo({ snapshot, colSpan, onOpenGoalsModal }: DashboardWidgetProps) {
+export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidgetProps) {
   const goals = snapshot?.analytics?.goals
   const hoursPct = goals?.weekly?.percentage ?? 0
   const qPct = goals?.questions?.percentage ?? 0
@@ -584,7 +578,7 @@ export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetPr
                 </td>
               </tr>
             ) : (
-              rows.slice(0, colSpan === 3 ? 8 : 4).map((disc: any, idx: number) => (
+              rows.slice(0, colSpan === 3 ? 8 : 4).map((disc, idx: number) => (
                 <tr key={disc.id || idx} className="hover:bg-muted/30 transition-colors">
                   <td className="py-2 px-2 font-bold text-foreground truncate max-w-[150px]">{disc.name}</td>
                   <td className="py-2 px-2 text-center font-mono text-muted-foreground">{disc.tempoFormatted}</td>
@@ -621,7 +615,7 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
             Sem dados suficientes para o ranking.
           </div>
         ) : (
-          ranking.slice(0, colSpan === 3 ? 5 : 3).map((item: any, idx: number) => (
+          ranking.slice(0, colSpan === 3 ? 5 : 3).map((item: { name?: string; disciplineName?: string; score?: number; points?: number }, idx: number) => (
             <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 text-xs font-bold">
               <div className="flex items-center gap-2 truncate">
                 <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 flex items-center justify-center text-[10px] font-black shrink-0">
@@ -662,7 +656,7 @@ export function WidgetUltimasAtividades({ snapshot, colSpan }: DashboardWidgetPr
             Nenhuma atividade registrada recentemente.
           </div>
         ) : (
-          activities.slice(0, colSpan === 3 ? 5 : 3).map((act: any) => (
+          activities.slice(0, colSpan === 3 ? 5 : 3).map((act) => (
             <div key={act.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-card text-xs">
               <div className="space-y-0.5 truncate">
                 <div className="font-bold text-foreground truncate">{act.discipline_name}</div>
@@ -724,11 +718,11 @@ export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 13. WIDGET: Data da Prova
 // ─────────────────────────────────────────────────────────────────────────────
-export function WidgetDataProva({ snapshot, colSpan }: DashboardWidgetProps) {
+export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
   const targetDate = snapshot?.activeTarget?.exam_date
   const examName = snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Prova"
-  const local = (snapshot?.activeTarget as any)?.exam_location || "Local não informado"
-  const time = (snapshot?.activeTarget as any)?.exam_time || "Horário não informado"
+  const local = snapshot?.activeTarget?.exam_location || "Local não informado"
+  const time = snapshot?.activeTarget?.exam_time || "Horário não informado"
 
   const getDaysUntil = (date: string) => {
     const d = new Date(date)
@@ -785,7 +779,7 @@ export function WidgetLembretes({ snapshot: _snapshot, colSpan: _colSpan }: Dash
 // ─────────────────────────────────────────────────────────────────────────────
 // 15. WIDGET: Mensagem do Dia
 // ─────────────────────────────────────────────────────────────────────────────
-export function WidgetMensagemDia({ snapshot, colSpan }: DashboardWidgetProps) {
+export function WidgetMensagemDia(_props: DashboardWidgetProps) {
   const messages = [
     { text: "A disciplina é a ponte entre seus objetivos e suas realizações.", author: "Jim Rohn" },
     { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier" },
@@ -817,7 +811,7 @@ export function WidgetMensagemDia({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 16. WIDGET: Calendário
 // ─────────────────────────────────────────────────────────────────────────────
-export function WidgetCalendario({ colSpan }: DashboardWidgetProps) {
+export function WidgetCalendario({ colSpan: _colSpan }: DashboardWidgetProps) {
   const [currentDate, setCurrentDate] = React.useState(new Date())
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay()

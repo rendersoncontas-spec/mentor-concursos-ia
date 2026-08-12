@@ -1,4 +1,6 @@
 // Dias da semana (0 = Domingo, 1 = Segunda ... 6 = Sábado)
+import type { AdaptiveDecision } from "@/domain/adaptive-learning/models"
+
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 export const DAY_LABELS: Record<DayOfWeek, string> = {
@@ -133,7 +135,7 @@ export interface AlgorithmInput {
   weeklyMinutes: number
   availableDays: DayOfWeek[]    // Futuro: dias disponíveis do aluno
   disciplines: AlgorithmDisciplineInput[]
-  adaptiveDecisions?: any[]     // Decisões do Adaptive Learning Engine (ALE)
+  adaptiveDecisions?: AdaptiveDecision[]     // Decisões do Adaptive Learning Engine (ALE)
 }
 
 export interface AlgorithmDisciplineInput {

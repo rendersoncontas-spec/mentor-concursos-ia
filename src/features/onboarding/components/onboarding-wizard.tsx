@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition, useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { Loader2, BookOpen, Clock, CheckCircle2, Check, ChevronsUpDown, Search, GraduationCap, Plus } from "lucide-react"
@@ -41,7 +41,6 @@ import {
 } from "@/components/ui/popover"
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -82,8 +81,8 @@ export function OnboardingWizard() {
   const [newExamOrganizer, setNewExamOrganizer] = useState("")
   const [isCreatingExam, setIsCreatingExam] = useState(false)
 
-  const form = useForm<OnboardingInput>({
-    resolver: zodResolver(onboardingSchema) as any,
+  const form = useForm<OnboardingInput, unknown, OnboardingInput>({
+    resolver: zodResolver(onboardingSchema) as Resolver<OnboardingInput, unknown, OnboardingInput>,
     defaultValues: {
       examId: "",
       targetRole: "",
@@ -97,7 +96,7 @@ export function OnboardingWizard() {
 
   useEffect(() => {
     let active = true
-    setIsSearching(true)
+    const searchTimer = setTimeout(() => setIsSearching(true), 0)
     searchExamsAction(debouncedSearch).then((results) => {
       if (active) {
         setExams(results)
@@ -106,6 +105,7 @@ export function OnboardingWizard() {
     })
     return () => {
       active = false
+      clearTimeout(searchTimer)
     }
   }, [debouncedSearch])
 
@@ -128,8 +128,10 @@ export function OnboardingWizard() {
       return
     }
 
+    const createdExam = res.data
+
     toast.success("Concurso adicionado com sucesso!")
-    setExams((prev) => [res.data!, ...prev])
+    setExams((prev) => [createdExam, ...prev])
     form.setValue("examId", res.data.id, { shouldValidate: true })
     form.setValue("targetRole", newExamRole, { shouldValidate: true })
     setIsNewExamModalOpen(false)
@@ -181,12 +183,13 @@ export function OnboardingWizard() {
     toast.error("Preencha todos os campos corretamente.")
   }
 
-  const selectedExamId = form.watch("examId")
-  const selectedTargetRole = form.watch("targetRole")
+  const selectedExamId = useWatch({ control: form.control, name: "examId" })
+  const selectedTargetRole = useWatch({ control: form.control, name: "targetRole" })
+  const mainStudySource = useWatch({ control: form.control, name: "mainStudySource" })
   const selectedExam = exams.find((e) => e.id === selectedExamId)
   
   // Habilita/Desabilita o botão próximo baseado no Step 1
-  const isStep1Valid = selectedExamId && selectedTargetRole && form.watch("mainStudySource")
+  const isStep1Valid = selectedExamId && selectedTargetRole && mainStudySource
 
   return (
     <div className="w-full">
@@ -286,7 +289,7 @@ export function OnboardingWizard() {
           {currentStep === 0 && (
             <div className="space-y-4">
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="examId"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
@@ -397,7 +400,7 @@ export function OnboardingWizard() {
               />
               
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="targetRole"
                 render={({ field }) => (
                   <FormItem className={cn(selectedTargetRole && selectedExamId ? "hidden" : "block")}>
@@ -411,7 +414,7 @@ export function OnboardingWizard() {
               />
 
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="mainStudySource"
                 render={({ field }) => (
                   <FormItem>
@@ -430,7 +433,7 @@ export function OnboardingWizard() {
           {currentStep === 1 && (
             <div className="space-y-6">
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="weeklyStudyHours"
                 render={({ field }) => (
                   <FormItem>
@@ -454,7 +457,7 @@ export function OnboardingWizard() {
               />
 
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="workRegime"
                 render={({ field }) => (
                   <FormItem>
@@ -478,7 +481,7 @@ export function OnboardingWizard() {
               />
 
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="experienceLevel"
                 render={({ field }) => (
                   <FormItem>

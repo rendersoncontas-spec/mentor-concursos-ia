@@ -1,5 +1,5 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { QuestionAttempt, MistakeType } from "@/domain/questions/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { QuestionAttempt, MistakeType } from "@/domain/questions/types"
 
 type RegisterAttemptInput = {
   questionId: string
@@ -15,14 +15,6 @@ export async function registerAttempt(
   userId: string,
   input: RegisterAttemptInput
 ) {
-  // 1. Busca histórico anterior desta questão para este usuário
-  const { data: previousAttempts } = await supabase
-    .from('question_attempts')
-    .select('id, correct')
-    .eq('user_id', userId)
-    .eq('question_id', input.questionId)
-    .order('answered_at', { ascending: false })
-  
   // Lógica Heurística de Revisão Automática (IA Prep)
   let reviewRequired = false
   let mistakeType: MistakeType | null = null

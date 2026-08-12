@@ -4,18 +4,10 @@ import { useState } from "react"
 import {
   ArrowLeft,
   ChevronDown,
-  ClipboardList,
-  Plus,
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
-  ExternalLink,
-  BookOpen,
   MessageSquare,
   GraduationCap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
@@ -39,7 +31,7 @@ export interface DisciplineDetailProps {
 
 export function EstudeiDisciplineDetailView({
   disciplineName,
-  topicsTotal = 0,
+  topicsTotal: _topicsTotal = 0,
   topics = [],
   onBack,
 }: DisciplineDetailProps) {
@@ -53,8 +45,6 @@ export function EstudeiDisciplineDetailView({
     setCheckedTopics((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
-  const completedCount = Object.values(checkedTopics).filter(Boolean).length
-  const progressPercentage = topicList.length > 0 ? Math.round((completedCount / topicList.length) * 100) : 0
 
   return (
     <div className="space-y-6 pb-12">
@@ -242,7 +232,7 @@ export function EstudeiDisciplineDetailView({
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="border-b bg-muted/30 text-muted-foreground font-extrabold text-[11px]">
-                <th className="px-3 py-2.5 w-10 text-center"></th>
+                <th className="px-3 py-2.5 w-10 text-center" />
                 <th className="px-4 py-2.5">Tópicos</th>
                 <th className="px-3 py-2.5 text-center text-emerald-600">✔</th>
                 <th className="px-3 py-2.5 text-center text-rose-500">✖</th>

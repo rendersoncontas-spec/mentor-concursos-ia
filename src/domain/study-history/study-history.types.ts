@@ -50,7 +50,7 @@ export type StudyHistory = {
   focus_score: number | null
   mood: string | null
   notes: string | null
-  metadata: Record<string, any> | null
+  metadata: Record<string, unknown> | null
   created_at: string
 }
 

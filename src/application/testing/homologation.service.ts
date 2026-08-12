@@ -1,13 +1,12 @@
-import { SupabaseClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { SessionOrchestrator } from "@/application/study-session/session-orchestrator"
-import { MentorAIService } from "@/application/mentor-ai/mentor-ai.service"
 import { generateStudyPlan } from "@/application/study-plan/study-plan.service"
 
 export interface HomologationResult {
   step: string
   status: "SUCCESS" | "FAILED" | "PENDING"
   message: string
-  details?: any
+  details?: unknown
 }
 
 /**
@@ -52,8 +51,8 @@ export class HomologationService {
       if (!sessionResult.mentorResponse) throw new Error("Mentor não gerou resposta após a sessão.")
       logs[logs.length - 1] = { step: "Validar Mentor", status: "SUCCESS", message: "Mentor respondeu com sucesso", details: { iga: sessionResult.igaAfter, msg: sessionResult.mentorResponse } }
 
-    } catch (e: any) {
-      logs.push({ step: "Falha Crítica", status: "FAILED", message: e.message || "Erro desconhecido" })
+    } catch (e: unknown) {
+      logs.push({ step: "Falha Crítica", status: "FAILED", message: e instanceof Error ? e.message : "Erro desconhecido" })
     }
     
     return logs
@@ -109,11 +108,14 @@ export class HomologationService {
       }
       logs[logs.length - 1] = { step: "Comparação de Respostas", status: "SUCCESS", message: "Mentor reconheceu a diferença de energia/foco e gerou textos distintos." }
 
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (logs.length > 0) {
-        logs[logs.length - 1] = { step: logs[logs.length - 1]!.step, status: "FAILED", message: e.message || "Erro desconhecido" }
+        const lastLog = logs[logs.length - 1]
+        if (lastLog) {
+          logs[logs.length - 1] = { step: lastLog.step, status: "FAILED", message: e instanceof Error ? e.message : "Erro desconhecido" }
+        }
       } else {
-        logs.push({ step: "Início do Teste", status: "FAILED", message: e.message || "Erro desconhecido" })
+        logs.push({ step: "Início do Teste", status: "FAILED", message: e instanceof Error ? e.message : "Erro desconhecido" })
       }
     }
     

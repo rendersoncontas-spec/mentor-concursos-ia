@@ -9,7 +9,6 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Tag,
-  RefreshCw,
   Briefcase,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,6 +17,28 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { toast } from "sonner"
 
 import { type StudyCycleBlock } from "./estudei-planning-view"
+
+type ScheduleMode = "normal" | "12x36" | "24x72" | "24x48" | "5x1" | "6x1" | "4x2"
+
+const SCHEDULE_MODES: readonly ScheduleMode[] = ["normal", "12x36", "24x72", "24x48", "5x1", "6x1", "4x2"]
+const WEEKDAY_KEYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const
+
+function isScheduleMode(value: string | null): value is ScheduleMode {
+  return value !== null && SCHEDULE_MODES.includes(value as ScheduleMode)
+}
+
+function getStudyDaysCount(scheduleMode: ScheduleMode, studyDays: string[]): number {
+  if (scheduleMode === "normal") return studyDays.length || 6
+  if (scheduleMode === "24x72") return 5
+  if (scheduleMode === "12x36") return 3.5
+  return 6
+}
+
+function getEventCardClass(isDone: boolean, isPastOrToday: boolean): string {
+  if (isDone) return "bg-emerald-500/10 border-emerald-500/50 hover:border-emerald-600"
+  if (isPastOrToday) return "bg-rose-500/10 border-rose-500/40 hover:border-rose-600"
+  return "bg-muted/30 border-muted hover:border-[#2563EB]"
+}
 
 export interface WeeklyStudyEvent {
   id: string
@@ -34,8 +55,8 @@ export interface WeeklyStudyEvent {
 export function WeeklyPlanningView({ 
   blocks = [], 
   history = [],
-  onReplan, 
-  onRemove 
+  onReplan: _onReplan,
+  onRemove: _onRemove 
 }: { 
   blocks?: StudyCycleBlock[]
   history?: { date: string; disciplineId: string; minutes: number }[]
@@ -70,10 +91,10 @@ export function WeeklyPlanningView({
   })
 
   // Escala de Trabalho
-  const [scheduleMode, setScheduleMode] = useState<"normal" | "12x36" | "24x72" | "24x48" | "5x1" | "6x1" | "4x2">(() => {
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("mentor_user_work_scale")
-      if (saved) return saved as any
+      if (isScheduleMode(saved)) return saved
     }
     return "normal"
   })
@@ -97,7 +118,7 @@ export function WeeklyPlanningView({
   useEffect(() => {
     const handleUpdate = () => {
       const savedScale = localStorage.getItem("mentor_user_work_scale")
-      if (savedScale) setScheduleMode(savedScale as any)
+      if (isScheduleMode(savedScale)) setScheduleMode(savedScale)
       const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
       if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay))
       const savedStudyDays = localStorage.getItem("mentor_user_study_days")
@@ -134,7 +155,7 @@ export function WeeklyPlanningView({
 
   // Total cycle workload in minutes
   const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-  const studyDaysCount = scheduleMode === "normal" ? (studyDays.length || 6) : scheduleMode === "24x72" ? 5 : scheduleMode === "12x36" ? 3.5 : 6
+  const studyDaysCount = getStudyDaysCount(scheduleMode, studyDays)
   const targetDailyMinutes = totalCycleMinutes > 0 
     ? Math.max(30, Math.round(totalCycleMinutes / studyDaysCount)) 
     : 180
@@ -155,8 +176,7 @@ export function WeeklyPlanningView({
     if (onShift && scheduleMode !== "normal") return [] // Sem estudos no dia de plantão/escala
 
     if (scheduleMode === "normal") {
-      const daysMap = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"]
-      if (!studyDays.includes(daysMap[dayIdx]!)) return []
+      if (!studyDays.includes(WEEKDAY_KEYS[dayIdx] ?? "")) return []
     }
 
     const blocksPerDay = Math.max(1, Math.round(blocks.length / studyDaysCount))
@@ -310,11 +330,11 @@ export function WeeklyPlanningView({
         <span className="text-muted-foreground">Status da Meta Diária de Estudo:</span>
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
             🟢 Meta Batida
           </span>
           <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
             🔴 Meta Incompleta / Pendente
           </span>
         </div>
@@ -415,19 +435,21 @@ export function WeeklyPlanningView({
 
                   {/* Corpo do Dia com Botão + e Cards de Estudo */}
                   <div className="p-2 flex-1 space-y-2">
-                    {scheduleMode !== "normal" && isShiftDay(d.dateNum) ? (
+                    {scheduleMode !== "normal" && isShiftDay(d.dateNum) && (
                       <div className="text-center py-8">
                         <p className="text-[10px] font-bold text-rose-500/80 bg-rose-500/10 p-2 rounded-md">
                           Sem estudos (Plantão)
                         </p>
                       </div>
-                    ) : scheduleMode === "normal" && !studyDays.includes(["dom", "seg", "ter", "qua", "qui", "sex", "sab"][d.dayIdx]!) ? (
+                    )}
+                    {scheduleMode === "normal" && !studyDays.includes(WEEKDAY_KEYS[d.dayIdx] ?? "") && (
                       <div className="text-center py-8">
                         <p className="text-[10px] font-bold text-muted-foreground bg-muted p-2 rounded-md">
                           Folga Programada
                         </p>
                       </div>
-                    ) : (
+                    )}
+                    {!(scheduleMode !== "normal" && isShiftDay(d.dateNum)) && !(scheduleMode === "normal" && !studyDays.includes(WEEKDAY_KEYS[d.dayIdx] ?? "")) && (
                       <>
                         {/* Botão Escuro de Adicionar Evento no Dia (+ button) */}
                         <button
@@ -446,13 +468,7 @@ export function WeeklyPlanningView({
                         <div
                           key={evt.id}
                           onClick={() => handleOpenEditModal(evt)}
-                          className={`p-2 rounded-lg border cursor-pointer transition-all space-y-1.5 text-left relative group ${
-                            isDone 
-                              ? "bg-emerald-500/10 border-emerald-500/50 hover:border-emerald-600" 
-                              : isPastOrToday 
-                              ? "bg-rose-500/10 border-rose-500/40 hover:border-rose-600" 
-                              : "bg-muted/30 border-muted hover:border-[#2563EB]"
-                          }`}
+                          className={`p-2 rounded-lg border cursor-pointer transition-all space-y-1.5 text-left relative group ${getEventCardClass(isDone, isPastOrToday)}`}
                         >
                           <div className="flex items-start justify-between gap-1">
                             <h4 className={`text-[11px] font-extrabold leading-tight truncate ${

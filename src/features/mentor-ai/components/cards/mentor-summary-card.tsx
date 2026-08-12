@@ -3,7 +3,7 @@ import { ArrowRight, Brain, Play } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
+import type { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
 
 interface MentorSummaryCardProps {
   response: MentorResponse
@@ -13,7 +13,12 @@ export function MentorSummaryCard({ response }: MentorSummaryCardProps) {
   const { globalScore, feed } = response
   
   // A ação mais crítica
-  const topAction = feed.now.length > 0 ? feed.now[0] : (feed.today.length > 0 ? feed.today[0] : null)
+  let topAction = null
+  if (feed.now.length > 0) {
+    topAction = feed.now[0]
+  } else if (feed.today.length > 0) {
+    topAction = feed.today[0]
+  }
 
   return (
     <Card className="bg-gradient-to-r from-blue-600/10 to-indigo-700/10 border-blue-200 shadow-sm overflow-hidden relative">

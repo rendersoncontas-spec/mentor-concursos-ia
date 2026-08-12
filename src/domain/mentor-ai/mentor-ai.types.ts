@@ -1,4 +1,4 @@
-import { GlobalScore, Insight, IntelligenceContext } from "./mentor-ai.models"
+import type { GlobalScore, Insight, IntelligenceContext } from "./mentor-ai.models"
 
 export interface MentorResponse {
   globalScore: GlobalScore

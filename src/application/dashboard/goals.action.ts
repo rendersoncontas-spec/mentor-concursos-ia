@@ -1,7 +1,6 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { z } from "zod"
 import { createClient } from "@/infrastructure/supabase/server"
 import { weeklyGoalsSchema, type WeeklyGoalsInput } from "./goals.schema"
 

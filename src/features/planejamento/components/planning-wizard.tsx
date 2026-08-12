@@ -468,17 +468,17 @@ export function PlanningWizard({ initialDisciplines, onCompletePlan }: PlanningW
           const isActive = i === step
           const isDone = i < step
 
+          let stepClass = "bg-muted text-muted-foreground"
+          if (isActive) stepClass = "bg-primary text-white"
+          else if (isDone) stepClass = "bg-green-500 text-white"
+
           return (
             <div key={s.label} className="flex items-center gap-2 flex-1">
               <div className="flex items-center gap-2">
                 <div
                   className={cn(
                     "flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all",
-                    isActive
-                      ? "bg-primary text-white"
-                      : isDone
-                      ? "bg-green-500 text-white"
-                      : "bg-muted text-muted-foreground",
+                    stepClass,
                   )}
                 >
                   {isDone ? <CheckCircle2 className="h-4 w-4" /> : i + 1}

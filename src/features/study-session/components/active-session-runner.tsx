@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Play, Pause, Square, CheckCircle, Brain, Target, AlertCircle, RefreshCw } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input"
 import { useSmartTimer } from "../hooks/use-smart-timer"
 import { startStudySessionAction } from "@/application/study-history/study-history.actions"
 import { finalizeSmartSessionAction } from "@/application/study-session/study-session.actions"
-import { SessionSummary } from "@/application/study-session/study-session.models"
-import { StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
+import type { SessionCompletionPayload, SessionSummary } from "@/application/study-session/study-session.models"
+import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
+import type { StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
 
 type SessionPhase = "SETUP" | "ACTIVE" | "EVALUATION" | "SUMMARY"
 
@@ -50,22 +51,33 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   const [summary, setSummary] = useState<SessionSummary | null>(null)
   const [progressMsg, setProgressMsg] = useState("Finalizando...")
   
-  // Recovery Intercept
-  useEffect(() => {
-    if (timer.hasRecovered && phase === "SETUP") {
-      setPhase("ACTIVE")
-      timer.setHasRecovered(false)
-    }
-  }, [timer.hasRecovered, phase, timer])
+  const isRecoveredSession = timer.hasRecovered && phase === "SETUP"
+  const currentPhase = isRecoveredSession ? "ACTIVE" : phase
 
   const handleStart = async () => {
     // Inicia no banco para marcar o momento exato
-    const result = await startStudySessionAction({
-      discipline_id: planItem?.discipline_id || null,
-      study_plan_item_id: planItem?.id || null,
+    const sessionData: Omit<StudyHistoryInsert, "user_id"> = {
+      discipline_id: planItem?.discipline_id ?? "",
+      study_plan_item_id: planItem?.id ?? null,
       study_source: planItem ? "PLAN" : "FREE",
-      planned_minutes: plannedTime
-    } as any)
+      study_type: null,
+      technique: null,
+      started_at: new Date().toISOString(),
+      finished_at: null,
+      duration_minutes: null,
+      active_minutes: null,
+      paused_minutes: null,
+      planned_minutes: plannedTime,
+      completed: false,
+      interrupted: false,
+      energy_level: null,
+      difficulty: null,
+      focus_score: null,
+      mood: null,
+      notes: null,
+      metadata: null,
+    }
+    const result = await startStudySessionAction(sessionData)
     
     if (result.data) {
       timer.startTimer(result.data.id, planItem?.id || null, focusInit, energyInit)
@@ -88,10 +100,17 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     setTimeout(() => setProgressMsg("Atualizando Question Engine..."), 800)
     setTimeout(() => setProgressMsg("Recalculando seu IGA..."), 1600)
     
-    const payload = {
-      sessionId: timer.state.sessionId!,
-      planId: timer.state.planId || undefined,
-      disciplineId: planItem?.discipline_id,
+    const sessionId = timer.state.sessionId
+    if (!sessionId) {
+      toast.error("Não foi possível identificar a sessão ativa.")
+      setIsSubmitting(false)
+      return
+    }
+
+    const payload: SessionCompletionPayload = {
+      sessionId,
+      ...(timer.state.planId ? { planId: timer.state.planId } : {}),
+      ...(planItem?.discipline_id ? { disciplineId: planItem.discipline_id } : {}),
       durationMinutes: timer.elapsedMinutes,
       energyInitial: timer.state.energyInitial,
       energyFinal: energyFin,
@@ -104,7 +123,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       reviewsCompleted: reviews
     }
     
-    const res = await finalizeSmartSessionAction(payload as any)
+    const res = await finalizeSmartSessionAction(payload)
     
     setIsSubmitting(false)
     if (res.data) {
@@ -122,7 +141,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   }
 
   // Renderers por Fase
-  if (phase === "SETUP") {
+  if (currentPhase === "SETUP") {
     return (
       <div className="max-w-xl mx-auto space-y-6">
         <div className="bg-primary/10 border border-primary/20 p-6 rounded-xl flex gap-4 items-start">
@@ -175,7 +194,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     )
   }
 
-  if (phase === "ACTIVE") {
+  if (currentPhase === "ACTIVE") {
     const progress = Math.min((timer.elapsedMinutes / plannedTime) * 100, 100)
     const isFinished = timer.isFinished
     

@@ -1,5 +1,5 @@
-import { StudyHistory } from "@/domain/study-history/study-history.types"
-import { AnalyticsContext } from "./types"
+import type { StudyHistory } from "@/domain/study-history/study-history.types"
+import type { AnalyticsContext } from "./types"
 
 /**
  * Cria a instância do Analytics Engine que viverá durante o ciclo de vida do request.
@@ -18,7 +18,7 @@ export function createAnalyticsContext(
   // Somente garantimos que há um duration_minutes.
   const validHistory = history.filter(h => h.duration_minutes !== null && h.started_at)
 
-  const cache = new Map<string, any>()
+  const cache = new Map<string, unknown>()
 
   return {
     history: validHistory,

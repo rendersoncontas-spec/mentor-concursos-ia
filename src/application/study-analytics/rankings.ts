@@ -1,4 +1,9 @@
-import { AnalyticsContext, RankingItem } from "./types"
+import type { AnalyticsContext, RankingItem } from "./types"
+import type { StudyHistory } from "@/domain/study-history/study-history.types"
+
+type SessionWithDiscipline = StudyHistory & {
+  disciplines: { name: string; area: string | null } | null
+}
 
 export function getDisciplineRanking(ctx: AnalyticsContext): RankingItem[] {
   return ctx.getCache('discipline_ranking', () => {
@@ -18,10 +23,11 @@ export function getDisciplineRanking(ctx: AnalyticsContext): RankingItem[] {
 
     ctx.history.forEach(session => {
       // Ignora sessões sem disciplina mapeada (ex: estuda avulso sem disciplina ID)
-      if (!session.discipline_id || !(session as any).disciplines?.name) return
+      const withDiscipline = session as SessionWithDiscipline
+      if (!session.discipline_id || !withDiscipline.disciplines?.name) return
       
       const id = session.discipline_id
-      const name = (session as any).disciplines.name
+      const name = withDiscipline.disciplines.name
       const duration = session.duration_minutes || 0
       const startedAt = new Date(session.started_at).getTime()
 
@@ -77,7 +83,7 @@ export function getAreaRanking(ctx: AnalyticsContext): RankingItem[] {
     const map = new Map<string, { totalMinutes: number, sessions: number }>()
 
     ctx.history.forEach(session => {
-      const area = (session as any).disciplines?.area
+      const area = (session as SessionWithDiscipline).disciplines?.area
       if (!area) return
 
       const duration = session.duration_minutes || 0

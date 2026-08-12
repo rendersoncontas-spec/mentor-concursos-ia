@@ -1,5 +1,5 @@
-import { type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
-import { HeatmapDay, Insight, RankingItem, TimeSeriesDataPoint, GoalProgress } from "@/application/study-analytics/types"
+import { type CycleBlock, type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
+import type { HeatmapDay, Insight, RankingItem, TimeSeriesDataPoint, GoalProgress } from "@/application/study-analytics/types"
 
 export interface DashboardProfile {
   name: string | null
@@ -89,6 +89,17 @@ export interface WidgetConfigItem {
   visible: boolean
 }
 
+export interface DashboardRawDiscipline {
+  id: string
+  discipline_id: string | undefined
+  name: string
+  tempoFormatted: string
+  correctCount: number
+  wrongCount: number
+  notebookCount: number
+  accuracyPercentage: number
+}
+
 export interface DashboardSnapshot {
   user: DashboardProfile | null
   activeTarget: DashboardTarget | null
@@ -103,8 +114,8 @@ export interface DashboardSnapshot {
   }
   disciplinesStats: DashboardDisciplinesStats
   todayPlanItems: StudyPlanItemWithDetails[]
-  cycleBlocks?: any[] | null
-  rawDisciplines: any[]
+  cycleBlocks?: CycleBlock[] | null
+  rawDisciplines: DashboardRawDiscipline[]
   reviews: PendingReviewsSummary
   recentActivities: RecentActivityItem[]
   analytics: DashboardAnalytics

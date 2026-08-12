@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { StudyTechnique } from "@/domain/study-history/study-history.types"
+import type { StudyTechnique } from "@/domain/study-history/study-history.types"
 
 type TimerPhase = 'IDLE' | 'STUDYING' | 'PAUSED' | 'SHORT_BREAK' | 'LONG_BREAK'
 
@@ -129,14 +129,6 @@ export function useStudyTimer({ technique, onPhaseChange, onCycleComplete }: Use
       if (pausedIntervalRef.current) clearInterval(pausedIntervalRef.current)
     }
   }, [phase, technique, completedCycles, getTechniqueSettings, onPhaseChange, onCycleComplete])
-
-  // Mudar técnica limpa o countdown se estava rodando
-  useEffect(() => {
-    if (phase === 'IDLE') {
-      const settings = getTechniqueSettings(technique)
-      setTechniqueCountdown(settings ? settings.study : null)
-    }
-  }, [technique, phase, getTechniqueSettings])
 
   const focusPercentage = activeSeconds + pausedSeconds > 0 
     ? Math.round((activeSeconds / (activeSeconds + pausedSeconds)) * 100) 

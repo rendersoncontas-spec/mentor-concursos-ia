@@ -1,7 +1,7 @@
 export interface DomainEvent {
   eventName: string
   timestamp: Date
-  payload: any
+  payload: unknown
 }
 
 type EventHandler = (event: DomainEvent) => Promise<void> | void
@@ -13,7 +13,10 @@ class EventBus {
     if (!this.handlers.has(eventName)) {
       this.handlers.set(eventName, [])
     }
-    this.handlers.get(eventName)!.push(handler)
+    const handlers = this.handlers.get(eventName)
+    if (handlers) {
+      handlers.push(handler)
+    }
   }
 
   async publish(event: DomainEvent) {

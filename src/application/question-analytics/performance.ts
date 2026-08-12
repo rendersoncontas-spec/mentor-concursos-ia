@@ -1,4 +1,4 @@
-import { QuestionAttempt } from "@/domain/questions/types"
+import type { QuestionAttempt } from "@/domain/questions/types"
 
 /**
  * Motor Heurístico de Performance Score

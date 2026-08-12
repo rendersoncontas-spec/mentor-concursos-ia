@@ -1,5 +1,5 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { QuestionProvider, QuestionFetchOptions, Question, QuestionTopic } from "@/domain/questions/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { QuestionProvider, QuestionFetchOptions, Question, QuestionTopic } from "@/domain/questions/types"
 
 export class InternalDatabaseProvider implements QuestionProvider {
   providerId = 'INTERNAL_DB'

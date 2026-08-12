@@ -1,14 +1,16 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useSyncExternalStore } from "react"
+import type {
+  DragEndEvent
+} from "@dnd-kit/core";
 import {
   DndContext,
   closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
-  useSensors,
-  DragEndEvent
+  useSensors
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -24,11 +26,11 @@ interface DashboardDndContextProps {
 }
 
 export function DashboardDndContext({ items, onReorder, children }: DashboardDndContextProps) {
-  const [isMounted, setIsMounted] = useState(false)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

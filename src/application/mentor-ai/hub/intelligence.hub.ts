@@ -1,5 +1,5 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
 import { getStudyHistoryForAnalytics } from "@/application/study-analytics/study-analytics.service"
 
 /**

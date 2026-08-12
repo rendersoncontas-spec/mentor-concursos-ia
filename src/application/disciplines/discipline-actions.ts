@@ -52,8 +52,9 @@ export async function addUserDisciplineAction(name: string) {
     revalidatePath("/planejamento")
 
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro desconhecido." }
+  } catch (err) {
+    const message = (err as { message?: string }).message || "Erro desconhecido."
+    return { success: false, error: message }
   }
 }
 
@@ -77,7 +78,8 @@ export async function removeUserDisciplineAction(id: string) {
     revalidatePath("/planejamento")
 
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao remover." }
+  } catch (err) {
+    const message = (err as { message?: string }).message || "Erro ao remover."
+    return { success: false, error: message }
   }
 }

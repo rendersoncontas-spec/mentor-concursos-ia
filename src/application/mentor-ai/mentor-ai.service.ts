@@ -1,7 +1,8 @@
-import { SupabaseClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
 import { IntelligenceHub } from "./hub/intelligence.hub"
 import { IntelligenceConfig } from "./config/intelligence.config"
-import { MentorHistoryService } from "./history/mentor-history.service"
+import { MentorHistoryService, type LogHistoryParams } from "./history/mentor-history.service"
 import { PromptBuilder } from "./engine/prompt-builder"
 import { CapabilityRegistry } from "./engine/capability-registry"
 import { BurnoutCapability } from "./capabilities/burnout.capability"
@@ -15,7 +16,7 @@ CapabilityRegistry.register(
 )
 
 export class MentorAIService {
-  private static memoryCache = new Map<string, { data: any; timestamp: number }>()
+  private static memoryCache = new Map<string, { data: MentorResponse; timestamp: number }>()
 
   static async generateMentorSession(
     supabase: SupabaseClient, 
@@ -56,7 +57,7 @@ export class MentorAIService {
 
     // 4. Salva Histórico
     if (logSession && IntelligenceConfig.saveHistory) {
-      const params: any = {
+      const params: LogHistoryParams = {
         userId,
         provider: IntelligenceConfig.provider.toUpperCase(),
         response,

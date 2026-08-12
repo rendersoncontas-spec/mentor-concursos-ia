@@ -7,6 +7,7 @@
  */
 
 import {
+  type AlgorithmDisciplineInput,
   type AlgorithmInput,
   type AlgorithmItem,
   type DayOfWeek,
@@ -59,7 +60,7 @@ function calculatePriority(weight: number, status: string, daysSinceLastStudy: n
 /**
  * Normaliza os scores para descobrir a fatia percentual que cada disciplina merece da semana.
  */
-function normalizeWeights(disciplines: any[]) {
+function normalizeWeights<T extends { priorityScore: number }>(disciplines: T[]): Array<T & { normalizedScore: number }> {
   const totalScore = disciplines.reduce((sum, d) => sum + d.priorityScore, 0)
   if (totalScore === 0) return disciplines.map(d => ({ ...d, normalizedScore: 0 }))
   
@@ -72,7 +73,7 @@ function normalizeWeights(disciplines: any[]) {
 /**
  * Fatiar as horas da semana em sessões de blocos ideais (ex: 30 a 60 min).
  */
-function generateWeeklySessions(disciplines: any[], weeklyMinutes: number): InternalSession[] {
+function generateWeeklySessions(disciplines: Array<AlgorithmDisciplineInput & { priorityScore: number; normalizedScore: number }>, weeklyMinutes: number): InternalSession[] {
   const sessions: InternalSession[] = []
   
   // 1. Calcular fatias de tempo para cada disciplina atenta à soma total
@@ -240,7 +241,8 @@ function distributeDaily(
   for (const session of sessions) {
     let day = availableDays[currentDayIndex]
     if (day === undefined) continue
-    let dayItems = dailyDistribution.get(day)!
+    let dayItems = dailyDistribution.get(day)
+    if (!dayItems) continue
     
     let currentDayMinutes = dayItems.reduce((acc, curr) => acc + curr.durationMinutes, 0)
     
@@ -250,7 +252,9 @@ function distributeDaily(
       currentDayIndex = (currentDayIndex + 1) % availableDays.length
       day = availableDays[currentDayIndex]
       if (!day) continue
-      dayItems = dailyDistribution.get(day)!
+      const nextDayItems = dailyDistribution.get(day)
+      if (!nextDayItems) continue
+      dayItems = nextDayItems
       currentDayMinutes = dayItems.reduce((acc, curr) => acc + curr.durationMinutes, 0)
       attempts++
     }
@@ -260,13 +264,18 @@ function distributeDaily(
       let leastBusyDay = day
       let leastMinutes = Infinity
       availableDays.forEach(d => {
-        const mins = dailyDistribution.get(d)!.reduce((acc, curr) => acc + curr.durationMinutes, 0)
+        const items = dailyDistribution.get(d)
+        if (!items) return
+        const mins = items.reduce((acc, curr) => acc + curr.durationMinutes, 0)
         if (mins < leastMinutes) {
           leastMinutes = mins
           leastBusyDay = d
         }
       })
-      dayItems = dailyDistribution.get(leastBusyDay as DayOfWeek)!
+      if (leastBusyDay === undefined) continue
+      const leastBusyDayItems = dailyDistribution.get(leastBusyDay)
+      if (!leastBusyDayItems) continue
+      dayItems = leastBusyDayItems
     }
 
     dayItems.push(session)
@@ -310,14 +319,13 @@ function finalizeSchedule(dailyDistribution: Map<DayOfWeek, InternalSession[]>):
 // ==============================================================================
 
 export function calculateWeeklyDistribution(input: AlgorithmInput): AlgorithmItem[] {
-  let { weeklyMinutes, availableDays, disciplines, adaptiveDecisions } = input
+  const { weeklyMinutes, availableDays, disciplines, adaptiveDecisions } = input
 
   if (disciplines.length === 0 || weeklyMinutes <= 0 || availableDays.length === 0) {
     return []
   }
 
   // Manter weeklyMinutes exatamente como configurado pelo usuário para garantir a meta de horas
-  const targetWeeklyMinutes = weeklyMinutes
 
   // Pipeline Inteligente: 
   // 1a. Priorização Base
@@ -449,7 +457,9 @@ export function calculateCycleDistribution(input: CycleAlgorithmInput): Algorith
   const scored = disciplines.map(d => {
     const w = Math.max(1, Math.min(5, d.weight || 1))
     const diff = Math.max(1, Math.min(5, d.difficulty || 1))
-    const statusMult = d.status === "COMPLETED" ? 0.5 : d.status === "REVISING" ? 0.8 : 1.0
+    let statusMult = 1.0
+    if (d.status === "COMPLETED") statusMult = 0.5
+    else if (d.status === "REVISING") statusMult = 0.8
     const priorityScore = parseFloat((w * diff * statusMult).toFixed(2))
 
     return { ...d, priorityScore }

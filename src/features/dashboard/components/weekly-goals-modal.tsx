@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { Target, Clock, BookOpen, Calendar as CalendarIcon, RotateCcw } from "lucide-react"
@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { saveWeeklyGoalsAction } from "@/application/dashboard/goals.action"
 import { weeklyGoalsSchema, type WeeklyGoalsInput } from "@/application/dashboard/goals.schema"
-import { DashboardProfile } from "@/domain/dashboard/dashboard.types"
+import type { DashboardProfile } from "@/domain/dashboard/dashboard.types"
 
 interface WeeklyGoalsModalProps {
   open: boolean
@@ -43,8 +43,8 @@ interface WeeklyGoalsModalProps {
 export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const form = useForm<WeeklyGoalsInput>({
-    resolver: zodResolver(weeklyGoalsSchema) as any,
+  const form = useForm<WeeklyGoalsInput, unknown, WeeklyGoalsInput>({
+    resolver: zodResolver(weeklyGoalsSchema) as Resolver<WeeklyGoalsInput, unknown, WeeklyGoalsInput>,
     defaultValues: {
       weekly_study_hours: profile?.weekly_study_hours ?? 20,
       weekly_questions_goal: profile?.weekly_questions_goal ?? 100,
@@ -64,7 +64,7 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
       } else {
         toast.error(res.error || "Erro ao salvar metas.")
       }
-    } catch (err) {
+    } catch {
       toast.error("Ocorreu um erro inesperado.")
     } finally {
       setIsSubmitting(false)
@@ -86,13 +86,13 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
 
         <Form {...form}>
           <form 
-            onSubmit={form.handleSubmit(onSubmit as any)} 
+            onSubmit={form.handleSubmit(onSubmit)} 
             className="space-y-4 pt-4"
           >
             
             <div className="grid grid-cols-2 gap-4">
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="weekly_study_hours"
                 render={({ field }) => (
                   <FormItem>
@@ -115,7 +115,7 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
               />
 
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="weekly_questions_goal"
                 render={({ field }) => (
                   <FormItem>
@@ -137,7 +137,7 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
               />
 
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="weekly_revisions_goal"
                 render={({ field }) => (
                   <FormItem>
@@ -159,7 +159,7 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
               />
 
               <FormField
-                control={form.control as any}
+                control={form.control}
                 name="weekly_study_days_goal"
                 render={({ field }) => (
                   <FormItem>
@@ -183,7 +183,7 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
             </div>
 
             <FormField
-              control={form.control as any}
+              control={form.control}
               name="week_start_day"
               render={({ field }) => (
                 <FormItem>

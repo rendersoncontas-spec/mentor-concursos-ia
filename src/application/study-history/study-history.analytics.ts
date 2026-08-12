@@ -1,5 +1,5 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { StudyStats, DisciplineTrend } from "@/domain/study-history/study-history.types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { StudyStats, DisciplineTrend } from "@/domain/study-history/study-history.types"
 
 // ==============================================================================
 // 1. Agregadores Base (Dashboard UI)
@@ -86,7 +86,7 @@ export async function getDailyMinutes(supabase: SupabaseClient, userId: string) 
 export async function getWeeklyMinutes(supabase: SupabaseClient, userId: string) { return (await getStudyStats(supabase, userId)).weeklyMinutes }
 export async function getMonthlyMinutes(supabase: SupabaseClient, userId: string) { return (await getStudyStats(supabase, userId)).monthlyMinutes }
 
-export async function getStudyHeatmap(supabase: SupabaseClient, userId: string) {
+export async function getStudyHeatmap(_supabase: SupabaseClient, _userId: string) {
   // TODO: Retornar estrutura para os quadrados de atividade (GitHub calendar)
   return []
 }
@@ -98,7 +98,7 @@ export async function getStudyHeatmap(supabase: SupabaseClient, userId: string) 
 /**
  * MOCK: Futura IA que analisará dificuldade vs performance
  */
-export async function calculateDisciplineTrend(supabase: SupabaseClient, disciplineId: string): Promise<DisciplineTrend> {
+export async function calculateDisciplineTrend(_supabase: SupabaseClient, disciplineId: string): Promise<DisciplineTrend> {
   return {
     disciplineId,
     trend: 'STABLE',
@@ -107,26 +107,26 @@ export async function calculateDisciplineTrend(supabase: SupabaseClient, discipl
   }
 }
 
-export async function predictNextWeakness(supabase: SupabaseClient, userId: string): Promise<string | null> {
+export async function predictNextWeakness(_supabase: SupabaseClient, _userId: string): Promise<string | null> {
   // Retornará a disciplina que a IA acha que o aluno vai esquecer
   return null
 }
 
-export async function recommendStudyTime(supabase: SupabaseClient, userId: string, disciplineId: string): Promise<number> {
+export async function recommendStudyTime(_supabase: SupabaseClient, _userId: string, _disciplineId: string): Promise<number> {
   // Ex: IA recomenda 45 min baseado na última sessão
   return 60
 }
 
-export async function estimateBurnout(supabase: SupabaseClient, userId: string): Promise<number> {
+export async function estimateBurnout(_supabase: SupabaseClient, _userId: string): Promise<number> {
   // 0 a 100%
   return 10
 }
 
-export async function estimateRetention(supabase: SupabaseClient, userId: string, disciplineId: string): Promise<number> {
+export async function estimateRetention(_supabase: SupabaseClient, _userId: string, _disciplineId: string): Promise<number> {
   // Curva de esquecimento de Ebbinghaus
   return 85
 }
 
-export async function estimateRevisionNeed(supabase: SupabaseClient, userId: string, disciplineId: string): Promise<boolean> {
+export async function estimateRevisionNeed(_supabase: SupabaseClient, _userId: string, _disciplineId: string): Promise<boolean> {
   return false
 }

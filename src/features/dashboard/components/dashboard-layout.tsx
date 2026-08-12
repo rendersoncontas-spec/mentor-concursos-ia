@@ -112,12 +112,12 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
             const WidgetComponent = widgetInfo.component
 
-            const cycleBlocks = snapshot?.cycleBlocks?.map((b: any) => ({
+            const cycleBlocks = snapshot?.cycleBlocks?.map((b) => ({
               id: b.id,
               disciplineName: b.disciplineName,
               disciplineId: b.disciplineId,
               durationMinutes: b.durationMinutes,
-              studiedMinutes: b.studiedMinutes || 0,
+              studiedMinutes: 0,
               color: b.color || "#2563EB",
               completed: b.status === "CONCLUIDO",
             })) || []

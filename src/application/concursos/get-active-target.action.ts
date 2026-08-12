@@ -21,7 +21,7 @@ export async function getActiveTargetNameAction(): Promise<{ success: boolean; n
     }
     
     return { success: true, name: "Concurso", role: "" }
-  } catch (error) {
+  } catch {
     return { success: false, error: "Erro interno." }
   }
 }

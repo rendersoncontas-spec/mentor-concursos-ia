@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { Toaster } from "sonner"
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { StudyProvider } from "@/features/study-session/components/study-provider"
@@ -28,6 +29,7 @@ export function Providers({ children, ...props }: React.ComponentProps<typeof Ne
           {children}
         </StudyProvider>
       </QueryClientProvider>
+      <Toaster position="top-center" richColors />
     </NextThemesProvider>
   )
 }

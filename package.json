@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "tsx --test src/application/simulados/simulado-engine.test.ts src/application/review-engine/fsrs-engine.test.ts src/application/review-engine/queue-engine.test.ts",
     "lint": "eslint",
     "format": "prettier --write .",
     "prepare": "husky"
@@ -69,6 +70,7 @@
     "lint-staged": "^17.0.8",
     "prettier": "^3.9.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "typescript-eslint": "^8.64.0"
   }

@@ -156,7 +156,7 @@ export async function seedDisciplinesAction() {
     const supabase = await createClient()
     
     // Check if user is authenticated (might be required for RLS)
-    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.auth.getUser()
     
     const toInsert = DISCIPLINES.map(name => ({
       name,
@@ -172,7 +172,7 @@ export async function seedDisciplinesAction() {
     }
 
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Unknown error" }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" }
   }
 }

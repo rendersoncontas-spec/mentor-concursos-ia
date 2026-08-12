@@ -6,7 +6,6 @@ import {
   Cell,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts"
 
 const CATEGORY_DATA = [
@@ -17,9 +16,19 @@ const CATEGORY_DATA = [
   { name: "Simulado", value: 4, color: "#ec4899", icon: "🏆" },
 ]
 
-function CustomTooltip({ active, payload }: any) {
+type TooltipData = { name: string; value: number; color: string; icon: string }
+
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: { payload: TooltipData }[]
+}) {
   if (!active || !payload?.length) return null
-  const d = payload[0].payload
+  const raw = payload[0]
+  if (!raw) return null
+  const d = raw.payload
   return (
     <div className="rounded-lg border bg-card p-3 shadow-lg text-xs">
       <p className="font-semibold">

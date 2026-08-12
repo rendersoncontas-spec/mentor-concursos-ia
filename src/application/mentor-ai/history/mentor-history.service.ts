@@ -1,7 +1,7 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
 
-interface LogHistoryParams {
+export interface LogHistoryParams {
   userId: string
   provider: string
   model?: string
@@ -24,7 +24,7 @@ export class MentorHistoryService {
         provider: params.provider,
         model: params.model,
         prompt: params.prompt,
-        response: params.response as any,
+        response: params.response,
         context_hash: params.contextHash,
         snapshot_id: params.snapshotId,
         tokens_input: params.tokensInput,

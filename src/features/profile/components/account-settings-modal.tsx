@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import Image from "next/image"
 import { getProfileAction, updateProfileAction } from "@/application/profile/profile.action"
 
 interface AccountSettingsModalProps {
@@ -177,9 +178,9 @@ export function AccountSettingsModal({
 
               {/* Avatar + Carregar Foto */}
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
+                <div className="relative w-14 h-14 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
                   {avatarImg ? (
-                    <img src={avatarImg} alt="Avatar" className="w-full h-full object-cover" />
+                    <Image src={avatarImg} alt="Avatar" fill sizes="56px" className="object-cover" />
                   ) : (
                     <User className="h-8 w-8 stroke-[2]" />
                   )}

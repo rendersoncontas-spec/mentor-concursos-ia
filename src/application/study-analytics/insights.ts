@@ -1,4 +1,4 @@
-import { AnalyticsContext, Insight } from "./types"
+import type { AnalyticsContext, Insight } from "./types"
 import { getBaseAggregations } from "./aggregations"
 import { getDisciplineRanking } from "./rankings"
 

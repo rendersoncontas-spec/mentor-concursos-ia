@@ -39,7 +39,7 @@ export function KpiCards({ analytics }: KpiCardsProps) {
 
   const currentQuote = MOTIVATIONAL_QUOTES[quoteIndex] || MOTIVATIONAL_QUOTES[0] || { quote: "Mantenha a constância.", author: "Mentor Concursos" }
 
-  const totalMinutes = (analytics.goals?.weekly as any)?.achievedMinutes ?? 0
+  const totalMinutes = (analytics.goals?.weekly as { achievedMinutes?: number } | undefined)?.achievedMinutes ?? 0
   const stats = analytics.stats as Record<string, number | null | undefined>
   const totalQuestions = stats["totalQuestions"] ?? 0
   const correctQuestions = stats["correctQuestions"] ?? 0

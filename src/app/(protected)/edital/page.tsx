@@ -100,10 +100,10 @@ async function getActiveConcursoData() {
       .maybeSingle()
 
     let name = targetData?.target_exam || "Concurso Alvo"
-    let customEdital: any = {}
+    let customEdital: Record<string, TopicItem[]> = {}
     try {
       if (targetData?.main_study_source) {
-        let meta: any = {}
+        let meta: { examName?: string; customEdital?: Record<string, TopicItem[]> } = {}
         if (typeof targetData.main_study_source === "object") {
           meta = targetData.main_study_source
         } else if (typeof targetData.main_study_source === "string" && targetData.main_study_source.startsWith("{")) {

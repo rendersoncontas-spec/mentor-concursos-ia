@@ -1,11 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { PlayCircle, CheckCircle, XCircle, RefreshCw, AlertTriangle } from "lucide-react"
+import { PlayCircle, CheckCircle, XCircle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { HomologationResult } from "@/application/testing/homologation.service"
+import type { HomologationResult } from "@/application/testing/homologation.service"
 import { runHomologationFlow1Action, runHomologationMentorAction } from "@/application/testing/homologation.actions"
+
+function getLogStatusClass(status: HomologationResult["status"]): string | undefined {
+  if (status === "FAILED") return "text-red-400"
+  if (status === "PENDING") return "text-blue-300"
+  return undefined
+}
 
 export function HomologationPanel() {
   const [logs, setLogs] = useState<HomologationResult[]>([])
@@ -90,15 +96,15 @@ export function HomologationPanel() {
                 <div className="space-y-1 w-full">
                   <div className="flex gap-2">
                     <span className="font-bold text-white">[{log.step}]</span>
-                    <span className={log.status === "FAILED" ? "text-red-400" : log.status === "PENDING" ? "text-blue-300" : ""}>
+                    <span className={getLogStatusClass(log.status)}>
                       {log.message}
                     </span>
                   </div>
-                  {log.details && (
+                  {log.details ? (
                     <div className="bg-gray-900 p-2 rounded text-gray-300 mt-2 text-xs overflow-x-auto whitespace-pre-wrap break-all">
                       {JSON.stringify(log.details, null, 2)}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}

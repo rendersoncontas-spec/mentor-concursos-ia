@@ -1,4 +1,4 @@
-import { MentorCapability } from "../capabilities/mentor.capability"
+import type { MentorCapability } from "../capabilities/mentor.capability"
 
 export class CapabilityRegistry {
   private static capabilities: MentorCapability[] = []

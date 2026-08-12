@@ -1,4 +1,4 @@
-import { AdaptiveDecision, LearningHealthScore } from "@/domain/adaptive-learning/models"
+import type { AdaptiveDecision, LearningHealthScore } from "@/domain/adaptive-learning/models"
 import { GlobalEventBus, EVENTS } from "@/infrastructure/events/event-bus"
 
 /**

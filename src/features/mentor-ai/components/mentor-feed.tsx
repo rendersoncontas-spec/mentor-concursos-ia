@@ -1,5 +1,5 @@
-import { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
-import { Brain, Flame, Target, TrendingUp, AlertCircle, Clock } from "lucide-react"
+import type { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
+import { Brain, Target, TrendingUp, AlertCircle, Clock } from "lucide-react"
 
 interface MentorFeedProps {
   response: MentorResponse
@@ -7,6 +7,13 @@ interface MentorFeedProps {
 
 export function MentorFeed({ response }: MentorFeedProps) {
   const { globalScore, feed } = response
+
+  let trendLabel = "➖ Estável"
+  if (globalScore.trend === "UP") {
+    trendLabel = "↑ Melhorando"
+  } else if (globalScore.trend === "DOWN") {
+    trendLabel = "↓ Caindo"
+  }
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
@@ -21,7 +28,7 @@ export function MentorFeed({ response }: MentorFeedProps) {
           <p className="text-muted-foreground text-lg mt-1 flex items-center gap-2">
             Índice Geral de Aprendizado: <strong className="text-foreground">{globalScore.score}</strong>
             <span className="text-sm font-medium bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
-              {globalScore.trend === "UP" ? "↑ Melhorando" : globalScore.trend === "DOWN" ? "↓ Caindo" : "➖ Estável"}
+              {trendLabel}
             </span>
           </p>
         </div>

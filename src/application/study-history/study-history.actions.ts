@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
 import { createStudySession, finishStudySession, getUserHistory, updateStudySession, deleteStudySession } from "./study-history.service"
-import { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
+import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
 export async function getUserHistoryAction(limit = 50) {
@@ -14,8 +14,8 @@ export async function getUserHistoryAction(limit = 50) {
 
     const history = await getUserHistory(supabase, user.id, limit)
     return { data: history, error: null }
-  } catch (error: any) {
-    return { data: null, error: error.message }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message }
   }
 }
 
@@ -34,8 +34,8 @@ export async function startStudySessionAction(data: Omit<StudyHistoryInsert, "us
     
     revalidatePath("/dashboard")
     return { data: session, error: null }
-  } catch (error: any) {
-    return { data: null, error: error.message }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message }
   }
 }
 
@@ -63,8 +63,8 @@ export async function finishStudySessionAction(
     
     revalidatePath("/dashboard")
     return { data: session, error: null }
-  } catch (error: any) {
-    return { data: null, error: error.message }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message }
   }
 }
 
@@ -85,8 +85,8 @@ export async function updateStudySessionAction(
     
     revalidatePath("/dashboard/history")
     return { data: session, error: null }
-  } catch (error: any) {
-    return { data: null, error: error.message }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message }
   }
 }
 
@@ -104,8 +104,8 @@ export async function deleteStudySessionAction(sessionId: string) {
 
     revalidatePath("/dashboard/history")
     return { error: null }
-  } catch (error: any) {
-    return { error: error.message }
+  } catch (error) {
+    return { error: (error as { message?: string }).message }
   }
 }
 
@@ -130,7 +130,7 @@ export async function cancelStudySessionAction(sessionId: string) {
 
     revalidatePath("/dashboard")
     return { error: null }
-  } catch (error: any) {
-    return { error: error.message }
+  } catch (error) {
+    return { error: (error as { message?: string }).message }
   }
 }

@@ -1,6 +1,6 @@
-import { Insight, IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
+import type { Insight, IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
 import { MentorThresholds } from "@/domain/mentor-ai/mentor-ai.thresholds"
-import { CapabilityMetadata, MentorCapability } from "./mentor.capability"
+import type { CapabilityMetadata, MentorCapability } from "./mentor.capability"
 
 export class BurnoutCapability implements MentorCapability {
   metadata: CapabilityMetadata = {

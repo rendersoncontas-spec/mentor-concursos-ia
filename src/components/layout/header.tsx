@@ -154,7 +154,7 @@ export function AppHeader({ userEmail, userName = "Estudante", userId = "", logo
             title="Menu do Usuário"
           >
             {avatarImg ? (
-              <img src={avatarImg} alt="User" className="w-full h-full object-cover" />
+              <Image src={avatarImg} alt="User" width={36} height={36} unoptimized className="w-full h-full object-cover" />
             ) : (
               <User className="h-5 w-5 stroke-[2.2]" />
             )}

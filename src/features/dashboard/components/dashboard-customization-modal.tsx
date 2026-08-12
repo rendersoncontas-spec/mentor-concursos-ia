@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
@@ -23,11 +23,15 @@ export function DashboardCustomizationModal({
 }: DashboardCustomizationModalProps) {
   const [editedLayout, setEditedLayout] = useState<WidgetConfigItem[]>(layout)
 
-  React.useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const [prevLayout, setPrevLayout] = useState(layout)
+  if (isOpen !== prevOpen || layout !== prevLayout) {
+    setPrevOpen(isOpen)
+    setPrevLayout(layout)
     if (isOpen) {
       setEditedLayout(layout)
     }
-  }, [isOpen, layout])
+  }
 
   const handleToggleVisibility = (widgetId: string, visible: boolean) => {
     setEditedLayout((prev) =>

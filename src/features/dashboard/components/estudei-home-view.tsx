@@ -43,8 +43,6 @@ export interface HomeDisciplineRow {
   accuracyPercentage: number
 }
 
-const DEFAULT_PAINEL_DISCIPLINES: HomeDisciplineRow[] = []
-
 import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 
 interface EstudeiHomeViewProps {
@@ -178,16 +176,17 @@ export function EstudeiHomeView({ userName = "Estudante", snapshot }: EstudeiHom
         studied,
       }
     })
-  }, [startDate, snapshot, customStudiedDates, streakOffset])
+  }, [startDate, snapshot, customStudiedDates])
 
   const homeCycleBlocks: StudyCycleBlock[] = useMemo(() => {
-    if (snapshot?.cycleBlocks && snapshot.cycleBlocks.length > 0) {
-      return snapshot.cycleBlocks.map((b: any) => ({
+    const cycleBlocks = snapshot?.cycleBlocks ?? []
+    if (cycleBlocks.length > 0) {
+      return cycleBlocks.map((b) => ({
         id: b.id,
         disciplineName: b.disciplineName,
         disciplineId: b.disciplineId,
         durationMinutes: b.durationMinutes,
-        studiedMinutes: b.studiedMinutes || 0,
+        studiedMinutes: 0,
         color: b.color || "#2563EB",
         completed: b.status === "CONCLUIDO",
       }))
@@ -465,7 +464,7 @@ export function EstudeiHomeView({ userName = "Estudante", snapshot }: EstudeiHom
                     </td>
                   </tr>
                 ) : (
-                  snapshot.rawDisciplines.map((disc: any, idx: number) => (
+                  snapshot.rawDisciplines.map((disc, idx: number) => (
                   <tr
                     key={disc.id}
                     className={`hover:bg-muted/30 transition-colors cursor-pointer ${

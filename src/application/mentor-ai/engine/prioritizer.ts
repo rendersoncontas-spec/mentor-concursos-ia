@@ -1,4 +1,4 @@
-import { Insight } from "@/domain/mentor-ai/mentor-ai.models"
+import type { Insight } from "@/domain/mentor-ai/mentor-ai.models"
 
 export class Prioritizer {
   /**

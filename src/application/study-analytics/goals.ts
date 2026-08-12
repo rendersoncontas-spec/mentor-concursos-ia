@@ -1,4 +1,4 @@
-import { AnalyticsContext, GoalProgress } from "./types"
+import type { AnalyticsContext, GoalProgress } from "./types"
 import { getBaseAggregations } from "./aggregations"
 
 /**

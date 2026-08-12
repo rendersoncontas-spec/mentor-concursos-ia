@@ -1,24 +1,10 @@
 ﻿"use client"
 
-import { useState } from "react"
+
 import {
-  Trophy,
-  Flame,
-  Brain,
-  Clock,
-  Scroll,
-  BookOpen,
-  Compass,
-  Star,
-  Target,
-  Zap,
-  Moon,
-  Sun,
-  ShieldCheck,
   Award,
   Lock,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 
 export interface AchievementItem {
   id: string

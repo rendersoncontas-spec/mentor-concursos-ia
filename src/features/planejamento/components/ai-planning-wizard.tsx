@@ -1,18 +1,16 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Bot, Sparkles, BrainCircuit, Loader2, ArrowRight, ArrowLeft, Calendar, Clock, BookOpen, GraduationCap, Settings2, CheckCircle2, Plus, Search, X } from "lucide-react"
+import { Bot, Sparkles, BrainCircuit, Loader2, ArrowRight, ArrowLeft, Calendar, BookOpen, GraduationCap, CheckCircle2, Search, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { generateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
 import { getActiveTargetNameAction } from "@/application/concursos/get-active-target.action"
 import { getDisciplinesForAutocomplete } from "@/application/study-session/get-disciplines.action"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 interface AiPlanningWizardProps {
@@ -20,17 +18,6 @@ interface AiPlanningWizardProps {
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
 }
-
-const CONCURSOS_POPULARES = [
-  "Receita Federal",
-  "Polícia Federal",
-  "Polícia Rodoviária Federal",
-  "TCU",
-  "Banco do Brasil",
-  "INSS",
-  "Tribunais (TRT/TRE/TJ)",
-  "Outro",
-]
 
 const DIAS_SEMANA = [
   { id: "seg", label: "Segunda" },
@@ -50,6 +37,12 @@ const LOADING_STEPS = [
   "Programando algoritmo de revisões espaçadas...",
   "Finalizando metas semanais..."
 ]
+
+function getInitialKnowledge(nivel: string): number {
+  if (nivel === "iniciante") return 1
+  if (nivel === "intermediario") return 3
+  return 4
+}
 
 const MASTER_DISCIPLINES_DATABASE = [
   "Administração Geral",
@@ -113,7 +106,6 @@ const MASTER_DISCIPLINES_DATABASE = [
 ]
 
 export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWizardProps) {
-  const router = useRouter()
   const [step, setStep] = useState(1)
   const [isGenerating, setIsGenerating] = useState(false)
   const [loadingTextIndex, setLoadingTextIndex] = useState(0)
@@ -121,8 +113,6 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
   // Form State
   const [concurso, setConcurso] = useState("Concurso")
   const [cargo, setCargo] = useState("")
-  const [customConcurso, setCustomConcurso] = useState("")
-  const [dataProva, setDataProva] = useState("")
   const [horasSemana, setHorasSemana] = useState([25])
   const [tipoDias, setTipoDias] = useState<"semana" | "escala">("semana")
   const [diasDisponiveis, setDiasDisponiveis] = useState<string[]>(["seg", "ter", "qua", "qui", "sex"])
@@ -173,14 +163,14 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
   // Reseta o wizard ao fechar
   useEffect(() => {
     if (!open) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setStep(1)
         setIsGenerating(false)
         setLoadingTextIndex(0)
       }, 500)
-    } else {
-      setStep(1)
+      return () => clearTimeout(timer)
     }
+    return undefined
   }, [open])
 
   // Animação de textos de loading
@@ -194,15 +184,15 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
     return undefined
   }, [isGenerating, loadingTextIndex])
 
-  const calculateDisciplineScore = (disc: string) => {
+  const calculateDisciplineScore = useCallback((disc: string) => {
     const imp = importanceMap[disc] ?? 3
     const know = knowledgeMap[disc] ?? 3
     return imp * (6 - know)
-  }
+  }, [importanceMap, knowledgeMap])
 
   const totalCalculatedScore = useMemo(() => {
     return selectedDisciplines.reduce((sum, d) => sum + calculateDisciplineScore(d), 0)
-  }, [selectedDisciplines, importanceMap, knowledgeMap])
+  }, [selectedDisciplines, calculateDisciplineScore])
 
   const getDisciplinePercentage = (disc: string) => {
     if (totalCalculatedScore <= 0) return 0
@@ -237,7 +227,7 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
       const know: Record<string, number> = {}
       discNames.forEach(d => {
         imp[d] = 3
-        know[d] = nivel === "iniciante" ? 1 : nivel === "intermediario" ? 3 : 4
+        know[d] = getInitialKnowledge(nivel)
       })
       setImportanceMap(imp)
       setKnowledgeMap(know)
@@ -271,7 +261,7 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
         setImportanceMap(prev => ({ ...prev, [disc]: 3 }))
       }
       if (!knowledgeMap[disc]) {
-        setKnowledgeMap(prev => ({ ...prev, [disc]: nivel === "iniciante" ? 1 : nivel === "intermediario" ? 3 : 4 }))
+        setKnowledgeMap(prev => ({ ...prev, [disc]: getInitialKnowledge(nivel) }))
       }
     }
   }
@@ -288,7 +278,7 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
     }
     setSelectedDisciplines(prev => [trimmed, ...prev])
     setImportanceMap(prev => ({ ...prev, [trimmed]: 3 }))
-    setKnowledgeMap(prev => ({ ...prev, [trimmed]: nivel === "iniciante" ? 1 : nivel === "intermediario" ? 3 : 4 }))
+    setKnowledgeMap(prev => ({ ...prev, [trimmed]: getInitialKnowledge(nivel) }))
     toast.success(`Matéria "${trimmed}" adicionada com sucesso!`)
   }
 
@@ -303,7 +293,8 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
     if (typeof window !== "undefined") {
       let mappedScale = "normal"
       if (tipoDias === "escala") {
-        mappedScale = (escalaTrabalho || "").split(" ")[0]!
+        const parts = (escalaTrabalho || "").split(" ")
+        mappedScale = parts[0] ?? "normal"
       }
       localStorage.setItem("mentor_user_work_scale", mappedScale)
       localStorage.setItem("mentor_user_study_days", JSON.stringify(tipoDias === "semana" ? diasDisponiveis : ["seg", "ter", "qua", "qui", "sex", "sab"]))
@@ -324,12 +315,7 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
 
       const [res] = await Promise.all([
         generateStudyPlanAction("ai_wizard", {
-          concurso: concurso,
-          cargo: cargo,
-          dataProva: "",
-          horasSemana: horasSemana[0],
-          diasDisponiveis: tipoDias === "semana" ? diasDisponiveis : [escalaTrabalho],
-          metodo,
+          horasSemana: horasSemana[0] ?? 25,
           nivel,
           importanceMap: finalImportanceMap,
           knowledgeMap: finalKnowledgeMap
@@ -342,7 +328,7 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
       } else {
         setStep(7)
       }
-    } catch (err) {
+    } catch {
       toast.error("Erro inesperado ao gerar planejamento.")
     } finally {
       setIsGenerating(false)
@@ -623,7 +609,7 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
                           max={5}
                           min={1}
                           step={0.5}
-                          onValueChange={(val) => setImportanceMap({ ...importanceMap, [disc]: val[0]! })}
+                          onValueChange={(val) => setImportanceMap({ ...importanceMap, [disc]: val[0] ?? 3 })}
                         />
                       </div>
 
@@ -637,7 +623,7 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
                           max={5}
                           min={1}
                           step={0.5}
-                          onValueChange={(val) => setKnowledgeMap({ ...knowledgeMap, [disc]: val[0]! })}
+                          onValueChange={(val) => setKnowledgeMap({ ...knowledgeMap, [disc]: val[0] ?? 3 })}
                         />
                       </div>
                     </div>
@@ -701,15 +687,25 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
     <Dialog open={open} onOpenChange={(val) => { if (isGenerating) return; onOpenChange(val) }}>
       <DialogContent className="sm:max-w-[660px] p-0 overflow-hidden rounded-3xl border-0 shadow-2xl bg-background max-h-[90vh] flex flex-col">
         <DialogTitle className="sr-only">Assistente de Planejamento com IA</DialogTitle>
-        {isGenerating ? (
-          <div className="h-[500px] flex flex-col items-center justify-center p-8 text-center space-y-8 bg-gradient-to-b from-background to-[#2563EB]/5">
-            <Bot className="w-20 h-20 text-[#2563EB] animate-bounce" />
-            <div className="space-y-4 w-full max-w-sm">
-              <h2 className="text-2xl font-black text-foreground">Gerando Planejamento...</h2>
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden"><motion.div className="h-full bg-[#2563EB]" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 8, ease: "linear" }} /></div>
-            </div>
+        {renderDialogBody()}
+      </DialogContent>
+    </Dialog>
+  )
+
+  function renderDialogBody() {
+    if (isGenerating) {
+      return (
+        <div className="h-[500px] flex flex-col items-center justify-center p-8 text-center space-y-8 bg-gradient-to-b from-background to-[#2563EB]/5">
+          <Bot className="w-20 h-20 text-[#2563EB] animate-bounce" />
+          <div className="space-y-4 w-full max-w-sm">
+            <h2 className="text-2xl font-black text-foreground">Gerando Planejamento...</h2>
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden"><motion.div className="h-full bg-[#2563EB]" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 8, ease: "linear" }} /></div>
           </div>
-        ) : step <= 6 ? (
+        </div>
+      )
+    }
+    if (step <= 6) {
+      return (
           <div className="flex flex-col h-auto max-h-[85vh]">
             <div className="p-6 pb-2 shrink-0 border-b border-border/40">
               <div className="flex items-center justify-between mb-3">
@@ -746,10 +742,10 @@ export function AiPlanningWizard({ open, onOpenChange, onSuccess }: AiPlanningWi
               )}
             </div>
           </div>
-        ) : (
-          <div className="p-6">{renderStepContent()}</div>
-        )}
-      </DialogContent>
-    </Dialog>
-  )
+      )
+    }
+    return (
+      <div className="p-6">{renderStepContent()}</div>
+    )
+  }
 }

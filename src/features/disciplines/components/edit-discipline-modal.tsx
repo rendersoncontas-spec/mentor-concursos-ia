@@ -13,7 +13,6 @@ import {
 } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 
@@ -75,9 +74,13 @@ export function EditDisciplineModal({
   const [showAddTopicInput, setShowAddTopicInput] = useState(false)
 
   useEffect(() => {
-    setName(disciplineName)
-    setColor(disciplineColor)
-    setTopics(initialTopics && initialTopics.length > 0 ? initialTopics : DEFAULT_TOPICS_LIST)
+    if (!open) return
+    const timer = setTimeout(() => {
+      setName(disciplineName)
+      setColor(disciplineColor)
+      setTopics(initialTopics && initialTopics.length > 0 ? initialTopics : DEFAULT_TOPICS_LIST)
+    }, 0)
+    return () => clearTimeout(timer)
   }, [disciplineName, disciplineColor, initialTopics, open])
 
   const handleSave = () => {
@@ -118,18 +121,22 @@ export function EditDisciplineModal({
   const handleMoveUp = (index: number) => {
     if (index === 0) return
     const updated = [...topics]
-    const temp = updated[index - 1]!
-    updated[index - 1] = updated[index]!
-    updated[index] = temp
+    const currentTopic = updated[index]
+    const previousTopic = updated[index - 1]
+    if (!currentTopic || !previousTopic) return
+    updated[index - 1] = currentTopic
+    updated[index] = previousTopic
     setTopics(updated)
   }
 
   const handleMoveDown = (index: number) => {
     if (index === topics.length - 1) return
     const updated = [...topics]
-    const temp = updated[index + 1]!
-    updated[index + 1] = updated[index]!
-    updated[index] = temp
+    const currentTopic = updated[index]
+    const nextTopic = updated[index + 1]
+    if (!currentTopic || !nextTopic) return
+    updated[index + 1] = currentTopic
+    updated[index] = nextTopic
     setTopics(updated)
   }
 

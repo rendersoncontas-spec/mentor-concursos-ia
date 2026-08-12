@@ -3,7 +3,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 import { getDashboardData } from "@/application/dashboard/dashboard.service"
 import { DashboardLayout } from "@/features/dashboard/components/dashboard-layout"
 import { getDashboardLayoutAction } from "@/application/dashboard/dashboard-layout.action"
-import { Metadata } from "next"
+import type { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: "Home - Mentor Concursos IA",

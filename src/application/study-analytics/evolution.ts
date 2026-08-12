@@ -1,4 +1,4 @@
-import { AnalyticsContext, TimeSeriesDataPoint } from "./types"
+import type { AnalyticsContext, TimeSeriesDataPoint } from "./types"
 import { formatDateToYYYYMMDD, getDaysAgoDate } from "./utils"
 
 /**

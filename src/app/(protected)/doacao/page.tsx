@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import { useState } from "react"
-import { Heart, Copy, Check, Coffee, Sparkles, ShieldCheck, Gift } from "lucide-react"
+import { Heart, Copy, Check, Sparkles, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"

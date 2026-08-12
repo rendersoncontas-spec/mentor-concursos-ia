@@ -1,4 +1,4 @@
-import { SupabaseClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 export type AccuracyMetric = {
   id: string
@@ -32,9 +32,12 @@ export async function getAccuracyByDiscipline(
 
   const map = new Map<string, { name: string, total: number, correct: number }>()
 
-  data.forEach((attempt: any) => {
-    const disciplineId = attempt.questions?.discipline_id
-    const disciplineName = attempt.questions?.disciplines?.name
+  data.forEach((attempt) => {
+    const questions = Array.isArray(attempt.questions) ? attempt.questions[0] : attempt.questions
+    if (!questions) return
+    const disciplines = Array.isArray(questions.disciplines) ? questions.disciplines[0] : questions.disciplines
+    const disciplineId = questions.discipline_id
+    const disciplineName = disciplines?.name
     if (!disciplineId) return
 
     const current = map.get(disciplineId) || { name: disciplineName, total: 0, correct: 0 }

@@ -11,14 +11,11 @@ import {
   CalendarDays,
   Sparkles,
   BrainCircuit,
-  ArrowRight
 } from "lucide-react"
 
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { type DashboardData } from "@/domain/dashboard/dashboard.types"
 import { type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
 
@@ -164,7 +161,7 @@ export function TodayPlanCard({
   rawDisciplines 
 }: { 
   items: StudyPlanItemWithDetails[],
-  rawDisciplines: any[]
+  rawDisciplines: DashboardData["rawDisciplines"]
 }) {
   return (
     <Card className="h-full">

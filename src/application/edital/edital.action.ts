@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
 
-export async function addCustomDisciplineAction(name: string, targetId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function addCustomDisciplineAction(name: string, targetId: string): Promise<{ success: boolean; data?: { id: string; name: string }; error?: string }> {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -40,12 +40,12 @@ export async function addCustomDisciplineAction(name: string, targetId: string):
     revalidatePath("/planejamento")
     
     return { success: true, data: d }
-  } catch (error) {
+  } catch {
     return { success: false, error: "Erro interno." }
   }
 }
 
-export async function saveCustomTopicsAction(targetId: string, disciplineId: string, topics: any[]): Promise<{ success: boolean; error?: string }> {
+export async function saveCustomTopicsAction(targetId: string, disciplineId: string, topics: { id: string }[]): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -62,14 +62,14 @@ export async function saveCustomTopicsAction(targetId: string, disciplineId: str
     if (!targetData) return { success: false, error: "Concurso não encontrado." }
 
     // 2. Fazer o parser do JSON e injetar as novas topics
-    let meta: any = {}
+    let meta: { customEdital?: Record<string, { id: string }[]> } = {}
     if (targetData.main_study_source) {
       if (typeof targetData.main_study_source === "object") {
         meta = { ...targetData.main_study_source }
       } else if (typeof targetData.main_study_source === "string" && targetData.main_study_source.startsWith("{")) {
         try {
           meta = JSON.parse(targetData.main_study_source)
-        } catch (e) {
+        } catch {
           meta = {}
         }
       }
@@ -89,7 +89,7 @@ export async function saveCustomTopicsAction(targetId: string, disciplineId: str
 
     revalidatePath("/edital")
     return { success: true }
-  } catch (error) {
+  } catch {
     return { success: false, error: "Erro interno." }
   }
 }
@@ -104,7 +104,7 @@ export async function searchDisciplinesAction(query: string) {
       .limit(10)
     
     return { success: true, data: data?.map(d => d.name) || [] }
-  } catch (error) {
+  } catch {
     return { success: false, data: [] }
   }
 }
@@ -129,7 +129,7 @@ export async function removeDisciplineAction(disciplineId: string, targetId: str
     revalidatePath("/planejamento")
     
     return { success: true }
-  } catch (error) {
+  } catch {
     return { success: false, error: "Erro interno." }
   }
 }
@@ -149,14 +149,14 @@ export async function removeCustomTopicAction(targetId: string, disciplineId: st
 
     if (!targetData) return { success: false, error: "Concurso não encontrado." }
 
-    let meta: any = {}
+    let meta: { customEdital?: Record<string, { id: string }[]> } = {}
     if (targetData.main_study_source) {
       if (typeof targetData.main_study_source === "object") {
         meta = { ...targetData.main_study_source }
       } else if (typeof targetData.main_study_source === "string" && targetData.main_study_source.startsWith("{")) {
         try {
           meta = JSON.parse(targetData.main_study_source)
-        } catch (e) {
+        } catch {
           meta = {}
         }
       }
@@ -167,7 +167,7 @@ export async function removeCustomTopicAction(targetId: string, disciplineId: st
     }
 
     // Filtra o tópico fora da lista
-    meta.customEdital[disciplineId] = meta.customEdital[disciplineId].filter((t: any) => t.id !== topicId)
+    meta.customEdital[disciplineId] = meta.customEdital[disciplineId].filter((t) => t.id !== topicId)
 
     const { error } = await supabase
       .from("user_targets")
@@ -179,7 +179,7 @@ export async function removeCustomTopicAction(targetId: string, disciplineId: st
 
     revalidatePath("/edital")
     return { success: true }
-  } catch (error) {
+  } catch {
     return { success: false, error: "Erro interno." }
   }
 }

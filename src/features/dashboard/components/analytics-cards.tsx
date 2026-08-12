@@ -14,9 +14,13 @@ import {
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { DashboardAnalytics } from "@/domain/dashboard/dashboard.types"
+import type { DashboardAnalytics } from "@/domain/dashboard/dashboard.types"
+
+function getTrendColor(direction: string) {
+  if (direction === "UP") return "text-green-500"
+  if (direction === "DOWN") return "text-red-500"
+  return "text-muted-foreground"
+}
 
 // --- Heatmap Card ---
 export function HeatmapCard({ heatmap }: { heatmap: DashboardAnalytics["heatmap"] }) {
@@ -92,10 +96,7 @@ export function RankingsCard({ rankings }: { rankings: DashboardAnalytics["ranki
                 </div>
               </div>
               {item.trend && (
-                <div className={`flex items-center gap-1 text-xs font-medium
-                  ${item.trend.direction === 'UP' ? 'text-green-500' : 
-                    item.trend.direction === 'DOWN' ? 'text-red-500' : 'text-muted-foreground'}
-                `}>
+                <div className={`flex items-center gap-1 text-xs font-medium ${getTrendColor(item.trend.direction)}`}>
                   {item.trend.direction === 'UP' && <TrendingUp className="h-3 w-3" />}
                   {item.trend.direction === 'DOWN' && <TrendingDown className="h-3 w-3" />}
                   {item.trend.direction === 'STABLE' && <Minus className="h-3 w-3" />}

@@ -3,17 +3,17 @@
 import { useRouter } from "next/navigation"
 
 import { useState, useEffect, useCallback } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Minimize2, X, Timer, Play, Pause, RotateCcw, CheckCircle2, Square, ChevronsUpDown, Check, Circle, ToggleLeft } from "lucide-react"
+import { Minimize2, X, Timer, Play, Pause, RotateCcw, CheckCircle2, Square, ChevronsUpDown, Check, ToggleLeft } from "lucide-react"
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -21,7 +21,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 
 import { useGlobalStudy } from "./study-provider"
-import { StudyTechnique } from "@/domain/study-history/study-history.types"
+import type { StudyHistory, StudyTechnique } from "@/domain/study-history/study-history.types"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { updateStudySessionAction } from "@/application/study-history/study-history.actions"
 import { getDisciplinesForAutocomplete, type DisciplineOption } from "@/application/study-session/get-disciplines.action"
@@ -70,7 +70,7 @@ type SessionFormValues = z.infer<typeof sessionSchema>
 interface StudyRegisterModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  sessionToEdit?: any
+  sessionToEdit?: StudyHistory & { disciplines?: { name?: string } | null }
   mode?: "create" | "edit"
 }
 
@@ -91,7 +91,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
   const [disciplinesLoaded, setDisciplinesLoaded] = useState(false)
 
   const form = useForm<SessionFormValues>({
-    resolver: zodResolver(sessionSchema) as any,
+    resolver: zodResolver(sessionSchema) as Resolver<SessionFormValues>,
     defaultValues: {
       studyType: "TEORIA", technique: "LIVRE", discipline_name: "", discipline_id: "",
       topic_name: "", pages_read: 0, questions_answered: 0, questions_correct: 0,
@@ -101,37 +101,37 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     }
   })
 
-  const watchType = form.watch("studyType")
-  const watchTechnique = form.watch("technique") as StudyTechnique
-  const isManualMode = form.watch("is_manual_mode")
+  const watchType = useWatch({ control: form.control, name: "studyType" })
+  const watchTechnique = useWatch({ control: form.control, name: "technique" }) as StudyTechnique
+  const isManualMode = useWatch({ control: form.control, name: "is_manual_mode" })
 
   // Pre-fill form when entering edit mode
   useEffect(() => {
     if (isEditMode && sessionToEdit && open) {
       const metadata = sessionToEdit.metadata || {}
-      form.reset({
-        studyType: sessionToEdit.study_type || "TEORIA",
-        technique: sessionToEdit.technique || "LIVRE",
-        discipline_name: sessionToEdit.disciplines?.name || "",
-        discipline_id: sessionToEdit.discipline_id || "",
-        topic_name: metadata.topic_name || "",
-        pages_read: metadata.pages_read ?? 0,
-        questions_answered: metadata.questions_answered ?? 0,
-        questions_correct: metadata.questions_correct ?? 0,
-        audio_name: metadata.audio_name || "",
-        audio_author: metadata.audio_author || "",
-        audio_platform: metadata.audio_platform || "",
-        audio_speed: metadata.audio_speed || "1x",
-        audio_url: metadata.audio_url || "",
-        flashcards_reviewed: metadata.flashcards_reviewed ?? 0,
-        flashcards_correct: metadata.flashcards_correct ?? 0,
-        notes: sessionToEdit.notes || "",
-        is_manual_mode: true,
-        manual_hours: Math.floor((sessionToEdit.duration_minutes || 0) / 60),
-        manual_minutes_field: (sessionToEdit.duration_minutes || 0) % 60,
-        manual_seconds: 0,
-        study_date: sessionToEdit.started_at ? new Date(sessionToEdit.started_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
-      })
+        form.reset({
+          studyType: sessionToEdit.study_type ?? "TEORIA",
+          technique: sessionToEdit.technique ?? "LIVRE",
+          discipline_name: sessionToEdit.disciplines?.name ?? "",
+          discipline_id: sessionToEdit.discipline_id,
+          topic_name: typeof metadata["topic_name"] === "string" ? metadata["topic_name"] : "",
+          pages_read: Number(metadata["pages_read"]) || 0,
+          questions_answered: Number(metadata["questions_answered"]) || 0,
+          questions_correct: Number(metadata["questions_correct"]) || 0,
+          audio_name: typeof metadata["audio_name"] === "string" ? metadata["audio_name"] : "",
+          audio_author: typeof metadata["audio_author"] === "string" ? metadata["audio_author"] : "",
+          audio_platform: typeof metadata["audio_platform"] === "string" ? metadata["audio_platform"] : "",
+          audio_speed: typeof metadata["audio_speed"] === "string" ? metadata["audio_speed"] : "1x",
+          audio_url: typeof metadata["audio_url"] === "string" ? metadata["audio_url"] : "",
+          flashcards_reviewed: Number(metadata["flashcards_reviewed"]) || 0,
+          flashcards_correct: Number(metadata["flashcards_correct"]) || 0,
+          notes: sessionToEdit.notes || "",
+          is_manual_mode: true,
+          manual_hours: Math.floor((sessionToEdit.duration_minutes || 0) / 60),
+          manual_minutes_field: (sessionToEdit.duration_minutes || 0) % 60,
+          manual_seconds: 0,
+          study_date: sessionToEdit.started_at ? new Date(sessionToEdit.started_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
+        })
     } else if (open && !isEditMode) {
       form.reset({
         studyType: "TEORIA", technique: "LIVRE", discipline_name: "", discipline_id: "",
@@ -142,7 +142,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
         manual_seconds: 0, study_date: new Date().toISOString().split("T")[0]
       })
     }
-  }, [open, isEditMode, sessionToEdit])
+  }, [form, open, isEditMode, sessionToEdit])
 
   const toggleManualMode = () => {
     const newVal = !isManualMode
@@ -166,18 +166,13 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     } catch (err) {
       console.error("Erro ao carregar disciplinas:", err)
     }
-  }, [])
+  }, [disciplinesLoaded])
 
   useEffect(() => {
-    if (open) {
-      loadDisciplines()
-    }
-  }, [open])
-
-  // Também carrega na montagem caso o modal já venha aberto
-  useEffect(() => {
-    loadDisciplines()
-  }, [loadDisciplines])
+    if (!open) return
+    const timeoutId = window.setTimeout(() => { void loadDisciplines() }, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [loadDisciplines, open])
 
   const handleMinimize = () => {
     minimizeSession()
@@ -197,15 +192,11 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
   }
 
   const onSubmit = async (data: SessionFormValues) => {
-    console.log("[STUDY_SAVE_CLIENT] onSubmit iniciado", { 
-      isEditMode, discipline: data.discipline_name, studyType: data.studyType 
-    })
-    
     setIsSubmitting(true)
     try {
       if (isEditMode && sessionToEdit) {
         // Modo EDIÇÃO: atualizar sessão existente
-        const metadata: Record<string, any> = {
+        const metadata: Record<string, unknown> = {
           ...(sessionToEdit.metadata || {}),
           topic_name: data.topic_name || null,
           pages_read: data.pages_read || 0,
@@ -220,7 +211,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
           audio_url: data.audio_url || null,
         }
 
-        const updatePayload: Record<string, any> = {
+        const updatePayload: Record<string, unknown> = {
           discipline_id: data.discipline_id || sessionToEdit.discipline_id,
           study_type: data.studyType,
           technique: data.technique,
@@ -243,15 +234,15 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
         const startDateStr = updatePayload["started_at"] || sessionToEdit.started_at
         if (startDateStr) {
           updatePayload["finished_at"] = new Date(
-            new Date(startDateStr).getTime() + (totalMinutes * 60 * 1000)
+            new Date(String(startDateStr)).getTime() + (totalMinutes * 60 * 1000)
           ).toISOString()
         }
 
         // Preserve focus_score if it was in original metadata
-        if (sessionToEdit.metadata?.focus_percentage !== undefined) {
+        if (sessionToEdit.metadata?.["focus_percentage"] !== undefined) {
           updatePayload["metadata"] = {
             ...metadata,
-            focus_percentage: sessionToEdit.metadata.focus_percentage,
+            focus_percentage: sessionToEdit.metadata["focus_percentage"],
           }
         }
 
@@ -342,9 +333,9 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
         window.dispatchEvent(new CustomEvent("close-study-session-modal"))
         router.refresh()
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[STUDY_SAVE_CLIENT] Exceção:", error)
-      toast.error(error?.message || "Erro ao salvar a sessão.", { duration: 8000 })
+      toast.error(error instanceof Error ? error.message : "Erro ao salvar a sessão.", { duration: 8000 })
     } finally {
       setIsSubmitting(false)
     }
@@ -363,10 +354,10 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     if (watchType === 'QUESTOES' || watchType === 'SIMULADO' || watchType === 'VIDEOAULA' || watchType === 'RESUMO') {
       return (
         <>
-          <FormField control={form.control as any} name="questions_answered" render={({field}) => (
+          <FormField control={form.control} name="questions_answered" render={({field}) => (
             <FormItem><FormLabel>Questões Respondidas</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="questions_correct" render={({field}) => (
+          <FormField control={form.control} name="questions_correct" render={({field}) => (
             <FormItem><FormLabel>Acertos</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
         </>
@@ -375,10 +366,10 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     if (watchType === 'FLASHCARDS') {
       return (
         <>
-          <FormField control={form.control as any} name="flashcards_reviewed" render={({field}) => (
+          <FormField control={form.control} name="flashcards_reviewed" render={({field}) => (
             <FormItem><FormLabel>Flashcards Revisados</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="flashcards_correct" render={({field}) => (
+          <FormField control={form.control} name="flashcards_correct" render={({field}) => (
             <FormItem><FormLabel>Flashcards Acertados</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
         </>
@@ -387,16 +378,16 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     if (watchType === 'AUDIO') {
       return (
         <>
-          <FormField control={form.control as any} name="audio_name" render={({field}) => (
+          <FormField control={form.control} name="audio_name" render={({field}) => (
             <FormItem><FormLabel>Nome do Áudio/Podcast</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="audio_author" render={({field}) => (
+          <FormField control={form.control} name="audio_author" render={({field}) => (
             <FormItem><FormLabel>Autor / Professor</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="audio_platform" render={({field}) => (
+          <FormField control={form.control} name="audio_platform" render={({field}) => (
             <FormItem><FormLabel>Plataforma (ex: Spotify)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="audio_url" render={({field}) => (
+          <FormField control={form.control} name="audio_url" render={({field}) => (
             <FormItem><FormLabel>Link (Opcional)</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
         </>
@@ -404,7 +395,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     }
     if (watchType === 'TEORIA' || watchType === 'LEITURA' || watchType === 'RESUMO') {
       return (
-        <FormField control={form.control as any} name="pages_read" render={({field}) => (
+        <FormField control={form.control} name="pages_read" render={({field}) => (
           <FormItem><FormLabel>Páginas Estudadas</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
       )
@@ -412,31 +403,31 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     if (watchType === 'OUTRO') {
       return (
         <>
-          <FormField control={form.control as any} name="pages_read" render={({field}) => (
+          <FormField control={form.control} name="pages_read" render={({field}) => (
             <FormItem><FormLabel>Páginas Estudadas</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="questions_answered" render={({field}) => (
+          <FormField control={form.control} name="questions_answered" render={({field}) => (
             <FormItem><FormLabel>Questões Respondidas</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="questions_correct" render={({field}) => (
+          <FormField control={form.control} name="questions_correct" render={({field}) => (
             <FormItem><FormLabel>Acertos</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="flashcards_reviewed" render={({field}) => (
+          <FormField control={form.control} name="flashcards_reviewed" render={({field}) => (
             <FormItem><FormLabel>Flashcards Revisados</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="flashcards_correct" render={({field}) => (
+          <FormField control={form.control} name="flashcards_correct" render={({field}) => (
             <FormItem><FormLabel>Flashcards Acertados</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="audio_name" render={({field}) => (
+          <FormField control={form.control} name="audio_name" render={({field}) => (
             <FormItem><FormLabel>Nome do Áudio/Podcast</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="audio_author" render={({field}) => (
+          <FormField control={form.control} name="audio_author" render={({field}) => (
             <FormItem><FormLabel>Autor / Professor</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="audio_platform" render={({field}) => (
+          <FormField control={form.control} name="audio_platform" render={({field}) => (
             <FormItem><FormLabel>Plataforma (ex: Spotify)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
           )} />
-          <FormField control={form.control as any} name="audio_url" render={({field}) => (
+          <FormField control={form.control} name="audio_url" render={({field}) => (
             <FormItem><FormLabel>Link (Opcional)</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
         </>
@@ -461,7 +452,6 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
             <Button
               size="icon"
               onClick={() => {
-                console.log("[TOGGLE_BTN] clicked, floatingTimerEnabled:", floatingTimerEnabled);
                 toggleFloatingTimer();
               }}
               className={cn(
@@ -482,8 +472,8 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
 
         {/* Body */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit as any, (errors) => {
-            const messages = Object.entries(errors).map(([key, err]) => `${key}: ${(err as any)?.message}`).join(", ")
+          <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+            const messages = Object.entries(errors).map(([key, err]) => `${key}: ${(err as { message?: string })?.message}`).join(", ")
             toast.error(`Campos obrigatórios: ${messages}`)
           })} className="flex flex-col h-full gap-3 p-4 overflow-y-auto">
 
@@ -510,7 +500,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
 
                     {!isManualMode && (
                       <div className="flex justify-center">
-                        <FormField control={form.control as any} name="technique" render={({field}) => (
+                        <FormField control={form.control} name="technique" render={({field}) => (
                           <Select onValueChange={(val) => { field.onChange(val); }} value={field.value}>
                             <SelectTrigger className="h-8 text-xs w-full"><SelectValue /></SelectTrigger>
                             <SelectContent className="z-[200]">
@@ -529,25 +519,25 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                   {isManualMode ? (
                     <div className="flex flex-col gap-3 justify-center my-auto bg-card p-3 rounded-xl border">
                       <div className="text-xs font-bold text-foreground mb-1 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-primary inline-block"></span> Lançamento Manual
+                        <span className="w-2 h-2 rounded-full bg-primary inline-block" /> Lançamento Manual
                       </div>
                       <div>
                         <Label className="text-[10px] font-bold text-muted-foreground uppercase">Tempo Estudado</Label>
                         <div className="grid grid-cols-3 gap-1 mt-1">
-                          <FormField control={form.control as any} name="manual_hours" render={({field}) => (
+                          <FormField control={form.control} name="manual_hours" render={({field}) => (
                             <FormItem><FormControl><Input type="number" min={0} max={23} placeholder="0h" className="text-center text-xs h-8 font-mono" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
                           )} />
-                          <FormField control={form.control as any} name="manual_minutes_field" render={({field}) => (
+                          <FormField control={form.control} name="manual_minutes_field" render={({field}) => (
                             <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0m" className="text-center text-xs h-8 font-mono" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
                           )} />
-                          <FormField control={form.control as any} name="manual_seconds" render={({field}) => (
+                          <FormField control={form.control} name="manual_seconds" render={({field}) => (
                             <FormItem><FormControl><Input type="number" min={0} max={59} placeholder="0s" className="text-center text-xs h-8 font-mono" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
                           )} />
                         </div>
                       </div>
                       <div>
                         <Label className="text-[10px] font-bold text-muted-foreground uppercase">Data</Label>
-                        <FormField control={form.control as any} name="study_date" render={({field}) => (
+                        <FormField control={form.control} name="study_date" render={({field}) => (
                           <FormItem><FormControl><Input type="date" className="h-8 text-xs font-mono" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                       </div>
@@ -590,7 +580,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
               {/* Right: Form */}
               <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
-                  <FormField control={form.control as any} name="discipline_name" render={({field}) => (
+                  <FormField control={form.control} name="discipline_name" render={({field}) => (
                     <FormItem className="flex flex-col">
                       <FormLabel className="text-xs">Disciplina</FormLabel>
                       <Popover open={disciplinePopoverOpen} onOpenChange={setDisciplinePopoverOpen}>
@@ -625,7 +615,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                               }}
                             />
                             <CommandList className="max-h-[300px] overflow-y-auto">
-                              <CommandEmpty>Pressione Enter para usar "{field.value}"</CommandEmpty>
+                              <CommandEmpty>Pressione Enter para usar &quot;{field.value}&quot;</CommandEmpty>
                               {planDisciplines.length > 0 && (
                                 <CommandGroup heading="Sugestões do Plano">
                                   {planDisciplines.map((disc) => (
@@ -667,7 +657,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control as any} name="topic_name" render={({field}) => (
+                  <FormField control={form.control} name="topic_name" render={({field}) => (
                     <FormItem>
                       <FormLabel className="text-xs">Tópico</FormLabel>
                       <FormControl>
@@ -683,9 +673,9 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                 </div>
 
                 <div className="p-3 border rounded-lg bg-card shrink-0">
-                  <FormField control={form.control as any} name="studyType" render={({field}) => (
+                  <FormField control={form.control} name="studyType" render={({field}) => (
                     <FormItem>
-                      <Select onValueChange={(value) => { field.onChange(value); console.log("Tipo selecionado:", value); }} value={field.value}>
+                      <Select onValueChange={(value) => field.onChange(value)} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="font-medium h-9 text-sm relative z-[160]">
                             <SelectValue placeholder="Tipo..." />
@@ -710,7 +700,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                   )}
                 </div>
 
-                <FormField control={form.control as any} name="notes" render={({field}) => (
+                <FormField control={form.control} name="notes" render={({field}) => (
                   <FormItem className="flex-1 flex flex-col min-h-[80px]">
                     <FormLabel className="text-xs shrink-0">Anotações</FormLabel>
                     <FormControl className="flex-1">

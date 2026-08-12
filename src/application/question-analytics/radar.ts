@@ -1,4 +1,4 @@
-import { SupabaseClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 export type RadarMetric = {
   subject: string
@@ -37,9 +37,15 @@ export async function getPerformanceRadar(
 
   const map = new Map<string, { correct: number, total: number }>()
 
-  data.forEach((attempt: any) => {
+  data.forEach((attempt) => {
     // Tratamento de navegação no objeto aninhado
-    const disciplineName = attempt.questions?.disciplines?.name
+    const questions = Array.isArray(attempt.questions) ? attempt.questions[0] : attempt.questions
+    let disciplineName: string | undefined
+    if (questions) {
+      const raw = questions.disciplines
+      const node = Array.isArray(raw) ? raw[0] : raw
+      disciplineName = node?.name
+    }
     if (!disciplineName) return
 
     const current = map.get(disciplineName) || { correct: 0, total: 0 }

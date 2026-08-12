@@ -9,9 +9,16 @@ export type GeneratePlanResult =
   | { success: true; planId: string; version: number }
   | { success: false; error: string }
 
+type GeneratePlanConfig = {
+  horasSemana?: number | string | Array<number | string>
+  nivel?: string
+  importanceMap?: Record<string, unknown>
+  knowledgeMap?: Record<string, unknown>
+}
+
 export async function generateStudyPlanAction(
   reason: string = "manual",
-  config?: any
+  config?: GeneratePlanConfig
 ): Promise<GeneratePlanResult> {
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
@@ -40,7 +47,7 @@ export async function generateStudyPlanAction(
 
     if (config) {
       const rawHours = Array.isArray(config.horasSemana) ? config.horasSemana[0] : config.horasSemana
-      targetWeeklyHours = typeof rawHours === "number" ? rawHours : parseInt(rawHours) || 25
+      targetWeeklyHours = typeof rawHours === "number" ? rawHours : parseInt(String(rawHours ?? "")) || 25
 
       // 1. Atualizar perfil com os dados do Wizard (nível, horas/semana)
       await supabase.from("profiles").update({

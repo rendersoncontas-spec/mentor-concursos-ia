@@ -100,7 +100,7 @@ export default async function PerformancePage() {
               ⚠️ Assunto Crítico Detectado
             </h3>
             <p className="text-sm mt-2 text-amber-800/80">
-              Você errou as últimas 5 questões de "Remédios Constitucionais" mesmo marcando Nível de Confiança Alto. 
+              Você errou as últimas 5 questões de &quot;Remédios Constitucionais&quot; mesmo marcando Nível de Confiança Alto. 
               Sugerimos revisar este tópico imediatamente, pois o Performance Score dele caiu para 25/100.
             </p>
           </div>

@@ -1,5 +1,5 @@
-import { IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
-import { MentorAIProvider, MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
+import type { IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
+import type { MentorAIProvider, MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
 import { RuleEngine } from "../engine/rule-engine"
 import { Prioritizer } from "../engine/prioritizer"
 import { ExplanationEngine } from "../engine/explanation-engine"

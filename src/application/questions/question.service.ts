@@ -1,5 +1,5 @@
-import { SupabaseClient } from "@supabase/supabase-js"
-import { Question } from "@/domain/questions/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Question } from "@/domain/questions/types"
 
 /**
  * Ponto de entrada que decidirá futuramente qual provider chamar

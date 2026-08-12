@@ -25,6 +25,21 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
     ? new Date(nextReview).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
     : null
 
+  let priorityContent = <div className="text-muted-foreground text-right">Fila em dia</div>
+  if (formattedNextReview) {
+    priorityContent = <div className="flex items-center gap-1.5 text-muted-foreground"><Clock className="h-3 w-3" aria-hidden="true" /><span>Próx: {formattedNextReview}</span></div>
+  }
+  if (highPriority > 0) {
+    priorityContent = <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium"><span>⚡ {highPriority} alta prioridade</span></div>
+  }
+
+  let actionVariant: "outline" | "destructive" | "default" = "default"
+  if (isZero) {
+    actionVariant = "outline"
+  } else if (isCritical) {
+    actionVariant = "destructive"
+  }
+
   return (
     <Card
       className={cn(
@@ -98,18 +113,7 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
                 </div>
               )}
 
-              {highPriority > 0 ? (
-                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
-                  <span>⚡ {highPriority} alta prioridade</span>
-                </div>
-              ) : formattedNextReview ? (
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Clock className="h-3 w-3" aria-hidden="true" />
-                  <span>Próx: {formattedNextReview}</span>
-                </div>
-              ) : (
-                <div className="text-muted-foreground text-right">Fila em dia</div>
-              )}
+              {priorityContent}
             </div>
           </div>
         )}
@@ -118,7 +122,7 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
       <CardFooter className="pt-0">
         <Button
           asChild
-          variant={isZero ? "outline" : isCritical ? "destructive" : "default"}
+          variant={actionVariant}
           className="w-full text-xs font-semibold gap-1.5"
           size="sm"
         >

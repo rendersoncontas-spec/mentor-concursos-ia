@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Bot, Sparkles, BookOpen, BrainCircuit, RefreshCw, X } from "lucide-react"
+import type { SVGProps } from "react"
+import { Bot, Sparkles, BookOpen, BrainCircuit, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -95,7 +96,7 @@ export function StudyAIAssistant({ topicName, disciplineName }: StudyAIAssistant
   )
 }
 
-function CheckCircle2Icon(props: any) {
+function CheckCircle2Icon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}

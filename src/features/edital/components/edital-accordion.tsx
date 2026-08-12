@@ -8,17 +8,10 @@ import {
   Plus,
   Edit,
   ExternalLink,
-  PlusCircle,
-  Download,
-  Search,
   Check,
-  CalendarDays,
-  Calculator,
-  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -74,8 +67,8 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
   // Pesquisar disciplinas
   useEffect(() => {
     if (!newDisciplineName || newDisciplineName.length < 2) {
-      setDisciplineSuggestions([])
-      return
+      const timer = setTimeout(() => setDisciplineSuggestions([]), 0)
+      return () => clearTimeout(timer)
     }
     const timer = setTimeout(async () => {
       const res = await searchDisciplinesAction(newDisciplineName)
@@ -104,12 +97,13 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     const savedChecked = localStorage.getItem(storageKey)
     if (savedChecked) {
       try {
-        setCompletedTopics(JSON.parse(savedChecked))
-      } catch (e) {
-        setCompletedTopics({})
+        const parsedTopics = JSON.parse(savedChecked) as Record<string, boolean>
+        setTimeout(() => setCompletedTopics(parsedTopics), 0)
+      } catch {
+        setTimeout(() => setCompletedTopics({}), 0)
       }
     } else {
-      setCompletedTopics({})
+      setTimeout(() => setCompletedTopics({}), 0)
     }
   }, [activeTargetId])
 
@@ -147,11 +141,12 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
       setIsSaving(true)
       const res = await addCustomDisciplineAction(newDisciplineName, activeTargetId)
     if (res.success && res.data) {
+      const addedDiscipline = res.data
       setData((prev) => [
         ...prev,
         {
-          id: res.data.id,
-          name: res.data.name,
+          id: addedDiscipline.id,
+          name: addedDiscipline.name,
           color: "#2563EB",
           topics: []
         }

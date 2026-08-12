@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { BellRing, Plus, CheckCircle2, Circle, Trash2, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,25 +21,23 @@ export interface ReminderItem {
   createdAt: string
 }
 
+function getSavedReminders(): ReminderItem[] {
+  if (typeof window === "undefined") return []
+  const saved = localStorage.getItem("mentor_user_reminders")
+  if (!saved) return []
+  try {
+    return JSON.parse(saved) as ReminderItem[]
+  } catch {
+    return []
+  }
+}
+
 export function RemindersWidget({ className }: { className?: string }) {
-  const [reminders, setReminders] = useState<ReminderItem[]>([])
-  const [isMounted, setIsMounted] = useState(false)
+  const [reminders, setReminders] = useState<ReminderItem[]>(getSavedReminders)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newTitle, setNewTitle] = useState("")
   const [newDate, setNewDate] = useState("")
 
-  // Carregar do localStorage apenas no client (após hidratação)
-  useEffect(() => {
-    setIsMounted(true)
-    const saved = localStorage.getItem("mentor_user_reminders")
-    if (saved) {
-      try {
-        setReminders(JSON.parse(saved))
-      } catch {
-        setReminders([])
-      }
-    }
-  }, [])
 
   // Salvar no localStorage
   const saveReminders = (updated: ReminderItem[]) => {

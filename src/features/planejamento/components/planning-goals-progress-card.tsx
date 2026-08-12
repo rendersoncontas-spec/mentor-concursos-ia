@@ -1,15 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Play, 
-  Target, 
-  Clock, 
-  CheckCircle2,
-  Calendar,
-  Sparkles
+import {
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Target,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -21,6 +17,20 @@ interface PlanningGoalsProgressCardProps {
 }
 
 type PeriodFilter = "semana" | "mes" | "ano" | "total" | "custom"
+
+const PERIOD_LABELS: Record<PeriodFilter, string> = {
+  semana: "Semana",
+  mes: "Mês",
+  ano: "Ano",
+  total: "Total",
+  custom: "Personalizado",
+}
+
+function getProgressBarClass(isCompleted: boolean, percentage: number): string {
+  if (isCompleted) return "bg-emerald-500 shadow-sm"
+  if (percentage >= 50) return "bg-[#2563EB]"
+  return "bg-amber-500"
+}
 
 export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGoalsProgressCardProps) {
   const [period, setPeriod] = useState<PeriodFilter>("semana")
@@ -157,7 +167,7 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {f === "semana" ? "Semana" : f === "mes" ? "Mês" : f === "ano" ? "Ano" : "Total"}
+                {PERIOD_LABELS[f]}
               </button>
             ))}
           </div>
@@ -216,13 +226,7 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
               <div className="flex-1 w-full md:max-w-md flex items-center gap-3">
                 <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden border">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      isCompleted 
-                        ? "bg-emerald-500 shadow-sm" 
-                        : d.percentage >= 50 
-                        ? "bg-[#2563EB]" 
-                        : "bg-amber-500"
-                    }`}
+                    className={`h-full rounded-full transition-all duration-700 ${getProgressBarClass(isCompleted, d.percentage)}`}
                     style={{ width: `${d.percentage}%` }}
                   />
                 </div>

@@ -1,5 +1,5 @@
-import { QuestionRecommendation } from "@/domain/questions/types"
-import { SupabaseClient } from "@supabase/supabase-js"
+import type { QuestionRecommendation } from "@/domain/questions/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 /**
  * Motor Heurístico Preparatório para IA

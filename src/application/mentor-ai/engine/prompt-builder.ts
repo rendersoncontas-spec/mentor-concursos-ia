@@ -1,4 +1,4 @@
-import { IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
+import type { IntelligenceContext } from "@/domain/mentor-ai/mentor-ai.models"
 
 export class PromptBuilder {
   /**

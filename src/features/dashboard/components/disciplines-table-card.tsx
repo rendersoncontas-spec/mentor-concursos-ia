@@ -1,8 +1,17 @@
-import { TrendingUp, TrendingDown, Minus, BookOpen, Clock, CheckCircle2 } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, BookOpen, Clock } from "lucide-react"
 import { type RankingItem } from "@/application/study-analytics/types"
 
 interface DisciplinesTableCardProps {
   rankings: RankingItem[]
+}
+
+type DisciplineWithExtras = RankingItem & {
+  score?: number
+  questions?: number
+}
+
+function getFallbackScore(_key: string) {
+  return Math.round(50 + Math.random() * 40)
 }
 
 function getPerformanceBadge(score: number) {
@@ -57,9 +66,10 @@ export function DisciplinesTableCard({ rankings }: DisciplinesTableCardProps) {
             </thead>
             <tbody>
               {top.map((item, idx) => {
+                const extra = item as DisciplineWithExtras
                 const hours = Math.round(item.value / 60)
-                const score = (item as any).score ?? Math.round(50 + Math.random() * 40)
-                const questions = (item as any).questions ?? Math.round(item.value / 3)
+                const score = extra.score ?? getFallbackScore(item.id)
+                const questions = extra.questions ?? Math.round(item.value / 3)
                 const badge = getPerformanceBadge(score)
 
                 return (

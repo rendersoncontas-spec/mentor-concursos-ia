@@ -5,8 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  BarChart3,
-  Calendar,
   GraduationCap,
   Loader2,
 } from "lucide-react"
@@ -16,9 +14,17 @@ import { HoursDistributionChart } from "@/features/analytics/components/hours-di
 import { getUserStatisticsAction } from "@/application/study-analytics/study-analytics.actions"
 import { toast } from "sonner"
 
+type StatisticsData = {
+  totalMinutes: number
+  totalSessions: number
+  disciplineRanking: { disciplineId: string; name: string; totalMinutes: number }[]
+  totalCorrect: number
+  totalWrong: number
+}
+
 export function EstudeiStatisticsView() {
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<any>(null)
+  const [stats, setStats] = useState<StatisticsData | null>(null)
 
   useEffect(() => {
     async function loadStats() {
@@ -27,7 +33,7 @@ export function EstudeiStatisticsView() {
       if (error) {
         toast.error("Erro ao carregar estatísticas: " + error)
       } else {
-        setStats(data)
+        setStats(data as unknown as StatisticsData)
       }
       setLoading(false)
     }
@@ -208,8 +214,8 @@ export function EstudeiStatisticsView() {
                 Você ainda não tem horas registradas em nenhuma disciplina.
               </div>
             ) : (
-              disciplineRanking.map((disc: any) => {
-                const maxVal = Math.max(...disciplineRanking.map((d: any) => d.totalMinutes))
+              disciplineRanking.map((disc) => {
+                const maxVal = Math.max(...disciplineRanking.map((d) => d.totalMinutes))
                 const pct = maxVal > 0 ? (disc.totalMinutes / maxVal) * 100 : 0
                 return (
                   <div key={disc.disciplineId} className="flex items-center gap-3 text-xs">
@@ -258,8 +264,7 @@ export function EstudeiStatisticsView() {
                   Sem dados suficientes.
                 </div>
              ) : (
-               <>
-                  <div className="relative w-72 h-64 flex items-center justify-center">
+               <div className="relative w-72 h-64 flex items-center justify-center">
                     <svg className="w-full h-full" viewBox="0 0 200 180">
                       <polygon points="100,20 180,150 20,150" fill="none" stroke="#e2e8f0" strokeWidth="1" />
                       <polygon points="100,50 155,130 45,130" fill="none" stroke="#e2e8f0" strokeWidth="1" />
@@ -290,7 +295,6 @@ export function EstudeiStatisticsView() {
                       <span className="text-[10px] font-bold text-muted-foreground">Questões</span>
                     </div>
                   </div>
-               </>
              )}
           </div>
         </div>

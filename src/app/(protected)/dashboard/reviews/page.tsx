@@ -6,7 +6,6 @@ import {
   getReviewBacklog,
   getMemoryStages,
   getAverageRetention,
-  getCriticalTopics,
 } from "@/application/review-engine/review-analytics.service"
 import { ReviewTabs } from "@/features/reviews/components/review-tabs"
 

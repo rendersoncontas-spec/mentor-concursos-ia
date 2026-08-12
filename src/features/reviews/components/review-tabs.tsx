@@ -47,6 +47,12 @@ const TABS: { id: ReviewStatus; label: string; icon: React.ElementType }[] = [
   { id: "completed", label: "Concluídas", icon: CheckCircle2 },
 ]
 
+function badgeStyle(isActive: boolean, tabId: ReviewStatus, count: number): string {
+  if (isActive) return "bg-primary text-white"
+  if (tabId === "overdue" && count > 0) return "bg-red-500/10 text-red-600 dark:text-red-400"
+  return "bg-muted text-muted-foreground"
+}
+
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 function ReviewCard({ item }: { item: ReviewItem }) {
@@ -148,11 +154,7 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: ReviewIte
               <span className="hidden sm:inline">{tab.label}</span>
               <span className={cn(
                 "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold",
-                isActive
-                  ? "bg-primary text-white"
-                  : tab.id === "overdue" && count > 0
-                  ? "bg-red-500/10 text-red-600 dark:text-red-400"
-                  : "bg-muted text-muted-foreground",
+                badgeStyle(isActive, tab.id, count),
               )}>
                 {count}
               </span>

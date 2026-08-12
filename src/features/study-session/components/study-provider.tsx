@@ -6,7 +6,6 @@ import { Play, Pause, Maximize2, Square, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
-import { toast } from "sonner"
 
 type TimerPhase = 'IDLE' | 'STUDYING' | 'PAUSED' | 'SHORT_BREAK' | 'LONG_BREAK'
 
@@ -22,7 +21,6 @@ const TECHNIQUE_DURATIONS: Record<StudyTechnique, number> = {
 const STORAGE_KEY = "mentor_active_study_session"
 const POSITION_KEY = "mentor-study-floating-timer-position-v2"
 const FLOATING_TIMER_PREF_KEY = "mentor-floating-timer-enabled"
-const MARGIN = 20
 
 interface StudySessionState {
   isActive: boolean
@@ -54,7 +52,7 @@ interface StudyContextType {
   formatTime: (seconds: number) => string
   floatingTimerEnabled: boolean
   toggleFloatingTimer: () => void
-  finalizeAndSaveSession: (formData?: Record<string, any>) => Promise<{ success: boolean; error?: string; historyId?: string }>
+  finalizeAndSaveSession: (formData?: Record<string, unknown>) => Promise<{ success: boolean; error?: string; historyId?: string }>
   isCentralOpen: boolean
   setIsCentralOpen: (open: boolean) => void
 }
@@ -70,17 +68,6 @@ function calculateTimes(state: StudySessionState): { activeSeconds: number; paus
     pausedMs += (now - state.lastPauseStartTime)
   }
   const activeMs = Math.max(0, totalElapsedMs - pausedMs)
-  console.log('[CALCULATE_TIMES]', {
-    now,
-    startTime: state.startTime,
-    totalElapsedMs,
-    totalPausedMs: state.totalPausedMs,
-    lastPauseStartTime: state.lastPauseStartTime,
-    pausedMs,
-    activeMs,
-    activeSeconds: Math.floor(activeMs / 1000),
-    pausedSeconds: Math.floor(pausedMs / 1000)
-  })
   return {
     activeSeconds: Math.floor(activeMs / 1000),
     pausedSeconds: Math.floor(pausedMs / 1000),
@@ -122,21 +109,28 @@ function loadSavedPosition(): Position | null {
 }
 
 export function StudyProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<StudySessionState | null>(null)
-  const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(false)
+  const [session, setSession] = useState<StudySessionState | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (!saved) return null
+      const parsed = JSON.parse(saved) as StudySessionState
+      if (!parsed.isActive || !parsed.startTime) return null
+      const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
+      return { ...parsed, activeSeconds, pausedSeconds, isMinimized: true }
+    } catch (error) {
+      console.error("[STUDY_PROVIDER] Parse error:", error)
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+  })
+  const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(() => {
+    if (typeof window === "undefined") return false
+    const saved = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
+    return saved === null ? true : JSON.parse(saved) as boolean
+  })
   const [isCentralOpen, setIsCentralOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // Carregar preferência do balão flutuante do localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
-    if (saved !== null) {
-      setFloatingTimerEnabled(JSON.parse(saved))
-    } else {
-      // Default true se não houver preferência salva
-      setFloatingTimerEnabled(true)
-    }
-  }, [])
 
   // Escutar eventos globais para abrir/fechar a Central
   useEffect(() => {
@@ -153,28 +147,6 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("close-study-session-modal", handleCloseCentral)
       window.removeEventListener("study-center-opened", handleStudyCenterOpened)
     }
-  }, [])
-
-  // Carregar sessão do localStorage no mount (client-only, para evitar hydration mismatch)
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    console.log('[STUDY_PROVIDER] Saved session:', saved)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as StudySessionState
-        console.log('[STUDY_PROVIDER] Parsed session:', parsed)
-        if (parsed && parsed.isActive && parsed.startTime) {
-          const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
-          console.log('[STUDY_PROVIDER] Calculated times:', { activeSeconds, pausedSeconds })
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setSession({ ...parsed, activeSeconds, pausedSeconds, isMinimized: true })
-        }
-      } catch (e) {
-        console.error('[STUDY_PROVIDER] Parse error:', e)
-        localStorage.removeItem(STORAGE_KEY)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -265,7 +237,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     setSession(prev => prev ? { ...prev, notes } : null)
   }, [])
 
-  const finalizeAndSaveSession = useCallback(async (formData?: Record<string, any>) => {
+  const finalizeAndSaveSession = useCallback(async (formData?: Record<string, unknown>) => {
     if (!session) return { success: false, error: "Nenhuma sessão ativa" }
     
     // Capturar snapshot ANTES de qualquer alteração
@@ -303,8 +275,6 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       completedCycles: 0,
     }
 
-    console.log("[FINALIZE] Snapshot capturado:", snapshot)
-
     const res = await saveStudySessionAction(snapshot)
 
     if (!res.success) {
@@ -312,8 +282,6 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: res.error || "Erro ao salvar sessão" }
     }
 
-    console.log("[FINALIZE] Sessão salva com sucesso:", res.historyId)
-    
     // Só limpar sessão APÓS sucesso confirmado
     setSession(null)
     localStorage.removeItem(STORAGE_KEY)
@@ -354,7 +322,7 @@ export function useGlobalStudy() {
    FLOATING STUDY WIDGET — Mini cronômetro arrastável e persistido
    ═══════════════════════════════════════════════════════════════ */
 function FloatingStudyWidget() {
-  const { session, restoreSession, pauseSession, resumeSession, endSession, formatTime, floatingTimerEnabled, isCentralOpen } = useGlobalStudy()
+  const { session, restoreSession, pauseSession, resumeSession, formatTime, floatingTimerEnabled, isCentralOpen } = useGlobalStudy()
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)

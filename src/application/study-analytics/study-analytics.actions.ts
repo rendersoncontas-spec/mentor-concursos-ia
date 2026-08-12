@@ -3,15 +3,82 @@
 import { createClient } from "@/infrastructure/supabase/server"
 import { getStudyHistoryForAnalytics, AnalyticsEngine } from "./study-analytics.service"
 import { isMaintenanceMode } from "@/lib/maintenance"
-import { StudyHistory } from "@/domain/study-history/study-history.types"
+import type { StudyHistory } from "@/domain/study-history/study-history.types"
 
-// Tipo parcial retornado pela query otimizada
-interface AnalyticsHistoryItem {
-  user_id: string
-  duration_minutes: number
-  active_minutes: number | null
-  started_at: string
-  metadata: Record<string, any> | null
+type Supabase = Awaited<ReturnType<typeof createClient>>
+
+interface RankingEntry {
+  rank: number
+  id: string
+  name: string
+  avatar: string
+  targetContest: string
+  hours: string
+  questions: number
+  pages: number
+  initials: string
+  bgColor: string
+  hasActivity: boolean
+}
+
+type RankingRowLike = Record<string, unknown>
+
+const bgColors = ['bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-amber-600', 'bg-rose-600', 'bg-indigo-600']
+
+function toNumber(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value) return value
+  }
+  return ''
+}
+
+function formatHours(mins: number): string {
+  const h = Math.floor(mins / 60)
+  const m = Math.round(mins % 60)
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}min`
+}
+
+function initialsFor(name: string): string {
+  const nameParts = name.trim().split(/\s+/)
+  if (nameParts.length > 1) {
+    return `${nameParts[0]?.[0] ?? ''}${nameParts[nameParts.length - 1]?.[0] ?? ''}`.toUpperCase()
+  }
+  return (nameParts[0]?.substring(0, 2) || 'ES').toUpperCase()
+}
+
+// Normaliza o retorno da RPC para o shape esperado pelo cliente (RankingStudent).
+// A RPC devolve snake_case (user_id, avatar_url, bg_color, questions_count,
+// pages_count, hours_formatted) e versões antigas omitem hasActivity.
+function normalizeRankingList(rows: unknown): RankingEntry[] {
+  if (!Array.isArray(rows)) return []
+  return rows
+    .filter((row): row is RankingRowLike => !!row && typeof row === 'object')
+    .map((row, idx) => {
+      const name = firstString(row['name'], row['display_name']) || 'Estudante'
+      const totalMinutes = toNumber(row['total_minutes'])
+      const rawHours = row['hours'] ?? row['hours_formatted']
+
+      return {
+        rank: toNumber(row['rank'] ?? row['rank_tempo']),
+        id: firstString(row['id'], row['user_id']),
+        name,
+        avatar: firstString(row['avatar'], row['avatar_url']),
+        targetContest: firstString(row['targetContest']) || 'Global',
+        hours: typeof rawHours === 'string' ? rawHours : formatHours(totalMinutes),
+        questions: toNumber(row['questions'] ?? row['questions_count']),
+        pages: toNumber(row['pages'] ?? row['pages_count']),
+        initials: firstString(row['initials']) || initialsFor(name),
+        bgColor: firstString(row['bgColor'], row['bg_color']) || bgColors[idx % bgColors.length] || 'bg-blue-600',
+        hasActivity: typeof row['hasActivity'] === 'boolean' ? row['hasActivity'] : totalMinutes > 0,
+      }
+    })
 }
 
 export async function getUserStatisticsAction(periodDays: number = 365) {
@@ -48,8 +115,8 @@ export async function getUserStatisticsAction(periodDays: number = 365) {
       },
       error: null
     }
-  } catch (error: any) {
-    return { data: null, error: error.message }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message }
   }
 }
 
@@ -66,48 +133,71 @@ export async function getGlobalRankingAction(period: 'this_week' | 'last_week' |
 
     if (rpcError) {
       console.error("Erro ao chamar RPC get_global_ranking:", rpcError)
-      // Fallback: tentar query direta (funciona se RLS não bloquear)
+      // Fallback: tentar query direta (caso a RPC não esteja disponível)
       return await getRankingViaDirectQuery(supabase, period, currentUser?.id)
     }
 
-    // Log da resposta bruta para debug
-    console.log("[RANKING DEBUG] RPC response:", rpcData)
-    if (rpcData && typeof rpcData === 'object') {
-      const dataToUse = rpcData.result || rpcData
-      
-      if (dataToUse && dataToUse.totalParticipants !== undefined) {
-        return { data: dataToUse, error: null }
+    // Normaliza a resposta da RPC para o shape esperado pelo cliente:
+    // aceita objeto direto, { result } ou array de linhas e converte
+    // snake_case (user_id, avatar_url, bg_color, questions_count...) em
+    // camelCase (id, avatar, bgColor, questions...).
+    const rawPayload = Array.isArray(rpcData) ? rpcData[0] : rpcData
+    const nestedPayload =
+      rawPayload && typeof rawPayload === 'object' && 'result' in rawPayload
+        ? (rawPayload as RankingRowLike)['result']
+        : rawPayload
+    const payload = Array.isArray(nestedPayload) ? nestedPayload[0] : nestedPayload
+
+    if (payload && typeof payload === 'object') {
+      const typedPayload = payload as RankingRowLike
+      const hasRankingData =
+        typedPayload['totalParticipants'] !== undefined ||
+        Array.isArray(typedPayload['rankingTempo']) ||
+        Array.isArray(typedPayload['rankingQuestions']) ||
+        Array.isArray(typedPayload['rankingPages'])
+
+      if (hasRankingData) {
+        const rankingTempo = normalizeRankingList(typedPayload['rankingTempo'])
+        const rawUserStats =
+          typedPayload['userStats'] && typeof typedPayload['userStats'] === 'object'
+            ? (typedPayload['userStats'] as RankingRowLike)
+            : {}
+
+        return {
+          data: {
+            totalParticipants: toNumber(typedPayload['totalParticipants']) || rankingTempo.length,
+            rankingTempo,
+            rankingQuestions: normalizeRankingList(typedPayload['rankingQuestions']),
+            rankingPages: normalizeRankingList(typedPayload['rankingPages']),
+            userStats: {
+              tempo: normalizeRankingList(rawUserStats['tempo'] ? [rawUserStats['tempo']] : [])[0] ?? null,
+              questoes: normalizeRankingList(rawUserStats['questoes'] ? [rawUserStats['questoes']] : [])[0] ?? null,
+              paginas: normalizeRankingList(rawUserStats['paginas'] ? [rawUserStats['paginas']] : [])[0] ?? null,
+            },
+          },
+          error: null,
+        }
       }
     }
-    
+
     // Se RPC não retornou dados válidos, usar fallback
     console.warn("RPC retornou dados, mas não no formato esperado:", rpcData)
     return await getRankingViaDirectQuery(supabase, period, currentUser?.id)
-  } catch (error: any) {
+  } catch (error) {
     console.error("Erro em getGlobalRankingAction:", error)
-    return { data: null, error: error.message }
+    return { data: null, error: (error as { message?: string }).message }
   }
 }
 
-// Helper para converter "2h 30min" em minutos
-function parseHoursToMinutes(hoursStr: string): number {
-  const hMatch = hoursStr.match(/(\d+)h/)
-  const mMatch = hoursStr.match(/(\d+)\s*min/)
-  return (hMatch ? parseInt(hMatch[1] || '0') * 60 : 0) + (mMatch ? parseInt(mMatch[1] || '0') : 0)
-}
-
-const bgColors = ['bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-amber-600', 'bg-rose-600', 'bg-indigo-600']
-
-function formatHours(mins: number): string {
-  const h = Math.floor(mins / 60)
-  const m = Math.round(mins % 60)
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
-}
-
-// Fallback: query direta (caso RPC não esteja disponível)
-async function getRankingViaDirectQuery(supabase: any, period: string, currentUserId?: string) {
+// Fallback: query direta (caso a RPC não esteja disponível no banco).
+// ATENÇÃO: study_history e profiles têm RLS por usuário (auth.uid() = user_id);
+// quando a leitura direta só retorna o próprio usuário, complementamos com a
+// view pública public_study_stats, que agrega dados de TODOS os usuários e
+// foi criada justamente para o ranking global sem RLS (sprint3-history.sql).
+// A view também devolve display_name (docs/fix-ranking-names.sql):
+// sem isso o nome dos demais usuários nunca chega, pois profiles tem RLS por
+// usuário e o SELECT direto só retorna o perfil de quem está logado.
+async function getRankingViaDirectQuery(supabase: Supabase, period: string, currentUserId?: string) {
   const now = new Date()
   const getMonday = (d: Date) => {
     const date = new Date(d)
@@ -143,22 +233,89 @@ async function getRankingViaDirectQuery(supabase: any, period: string, currentUs
   const { data: historyData } = await query
 
   const activeUserIds = new Set<string>()
-  historyData?.forEach((h: any) => { if (h.user_id) activeUserIds.add(h.user_id) })
+  historyData?.forEach((h) => { if (h.user_id) activeUserIds.add(h.user_id) })
   if (currentUserId) activeUserIds.add(currentUserId)
+
+  const totalsByUser = new Map<string, { totalMinutes: number; questionsCount: number; pagesCount: number }>()
+
+  // Acumula totais do período lendo as linhas que o RLS permite enxergar
+  // (todas quando permissivo; apenas o próprio usuário quando restrito).
+  const periodTotals = new Map<string, { totalMinutes: number; questionsCount: number; pagesCount: number }>()
+  historyData?.forEach((h) => {
+    const entry = periodTotals.get(h.user_id) || { totalMinutes: 0, questionsCount: 0, pagesCount: 0 }
+    entry.totalMinutes += h.active_minutes ?? h.duration_minutes ?? 0
+    const meta = h.metadata || {}
+    if (meta['pages_read']) entry.pagesCount += Number(meta['pages_read'])
+    if (meta['questions_answered']) entry.questionsCount += Number(meta['questions_answered'])
+    periodTotals.set(h.user_id, entry)
+  })
+
+  // Se a leitura direta só trouxe o próprio usuário, o RLS está filtrando os
+  // demais: usamos a view pública agregada (que consulta todos os usuários e
+  // também devolve o nome/avatar real de cada um, sem passar pelo RLS).
+  const rlsLimited = activeUserIds.size <= 1
+  const publicInfoMap = new Map<string, { name: string }>()
+  if (rlsLimited) {
+    interface PublicStudyStatsRow {
+      user_id: string
+      display_name: string | null
+      total_minutes: number
+      questions_count: number
+      pages_count: number
+    }
+    const { data: statsRows } = await supabase
+      .from('public_study_stats')
+      .select('user_id, display_name, total_minutes, questions_count, pages_count')
+      .returns<PublicStudyStatsRow[]>()
+
+    statsRows?.forEach((row) => {
+      totalsByUser.set(row.user_id, {
+        totalMinutes: row.total_minutes || 0,
+        questionsCount: row.questions_count || 0,
+        pagesCount: row.pages_count || 0,
+      })
+      if (row.user_id) {
+        publicInfoMap.set(row.user_id, {
+          name: row.display_name || '',
+        })
+      }
+      activeUserIds.add(row.user_id)
+    })
+    if (currentUserId) activeUserIds.add(currentUserId)
+  }
+
+  // Garante entrada para todos os usuários ativos (inclusive os que não têm
+  // sessão no período, para o usuário atual ficar na lista final).
+  activeUserIds.forEach((uid) => {
+    if (!totalsByUser.has(uid)) {
+      totalsByUser.set(uid, { totalMinutes: 0, questionsCount: 0, pagesCount: 0 })
+    }
+  })
+
+  // Totais do período: com RLS permissivo valem para todos; com RLS restrito
+  // substituem a agregação da view apenas para o próprio usuário (sem somar
+  // duas vezes os mesmos minutos).
+  if (!rlsLimited) {
+    periodTotals.forEach((totals, uid) => {
+      if (totalsByUser.has(uid)) totalsByUser.set(uid, totals)
+    })
+  } else if (currentUserId) {
+    const ownTotals = periodTotals.get(currentUserId)
+    if (ownTotals) totalsByUser.set(currentUserId, ownTotals)
+  }
 
   const userIdsArray = Array.from(activeUserIds)
 
-  let profilesMap = new Map<string, { name: string; avatar_url: string | null }>()
+  const profilesMap = new Map<string, { name: string }>()
   if (userIdsArray.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name, full_name, avatar_url')
+      .select('id, name')
       .in('id', userIdsArray)
 
-    profiles?.forEach((p: any) => {
+    profiles?.forEach((p) => {
       profilesMap.set(p.id, {
-        name: p.name || p.full_name || 'Estudante',
-        avatar_url: p.avatar_url || null
+        name: p.name || 'Estudante',
       })
     })
   }
@@ -170,43 +327,24 @@ async function getRankingViaDirectQuery(supabase: any, period: string, currentUs
 
   userIdsArray.forEach((uid, idx) => {
     const profile = profilesMap.get(uid)
-    const rawName = profile?.name || (currentUserId && uid === currentUserId ? 'Você' : `Estudante #${uid.substring(0, 4)}`)
-    const nameParts = rawName.trim().split(/\s+/)
-    const initials = nameParts.length > 1
-      ? `${nameParts[0]?.[0] || ''}${nameParts[nameParts.length - 1]?.[0] || ''}`.toUpperCase()
-      : (nameParts[0]?.substring(0, 2) || 'ES').toUpperCase()
+    const publicInfo = publicInfoMap.get(uid)
+    const rawName = profile?.name || publicInfo?.name || (currentUserId && uid === currentUserId ? 'Você' : `Estudante #${uid.substring(0, 4)}`)
+    const initials = initialsFor(rawName)
+    const totals = totalsByUser.get(uid) || { totalMinutes: 0, questionsCount: 0, pagesCount: 0 }
 
     userMap.set(uid, {
-      id: uid, name: rawName, avatar: profile?.avatar_url || '', initials,
+      id: uid, name: rawName, avatar: '', initials,
       bgColor: bgColors[idx % bgColors.length] || 'bg-blue-600',
-      totalMinutes: 0, questionsCount: 0, pagesCount: 0,
+      ...totals,
     })
   })
 
-  historyData?.forEach((h: any) => {
-    const entry = userMap.get(h.user_id)
-    if (entry) {
-      entry.totalMinutes += h.active_minutes ?? h.duration_minutes ?? 0
-      const meta = h.metadata || {}
-      if (meta['pages_read']) entry.pagesCount += Number(meta['pages_read'])
-      if (meta['questions_answered']) entry.questionsCount += Number(meta['questions_answered'])
-    }
-  })
-
   const allUsers = Array.from(userMap.values())
-  const formatHours = (mins: number) => {
-    const h = Math.floor(mins / 60)
-    const m = Math.round(mins % 60)
-    if (h === 0) return `${m}min`
-    if (m === 0) return `${h}h`
-    return `${h}h ${m}min`
-  }
-
   const sortByTempo = [...allUsers].sort((a, b) => b.totalMinutes - a.totalMinutes || b.questionsCount - a.questionsCount || b.pagesCount - a.pagesCount)
   const sortByQuestions = [...allUsers].sort((a, b) => b.questionsCount - a.questionsCount || b.totalMinutes - a.totalMinutes)
   const sortByPages = [...allUsers].sort((a, b) => b.pagesCount - a.pagesCount || b.totalMinutes - a.totalMinutes)
 
-  const mapToList = (list: typeof allUsers) => list.map((item, idx) => ({
+  const mapToList = (list: typeof allUsers): RankingEntry[] => list.map((item, idx) => ({
     rank: idx + 1, id: item.id,
     name: item.id === currentUserId ? `${item.name} (Você)` : item.name,
     avatar: item.avatar, targetContest: 'Global',
@@ -219,7 +357,7 @@ async function getRankingViaDirectQuery(supabase: any, period: string, currentUs
   const rankingQuestions = mapToList(sortByQuestions)
   const rankingPages = mapToList(sortByPages)
 
-  const findUserStats = (ranking: any[]) => {
+  const findUserStats = (ranking: RankingEntry[]) => {
     if (!currentUserId) return null
     const found = ranking.find(r => r.id === currentUserId)
     return found || {
@@ -245,42 +383,33 @@ export async function testGlobalRankingRpc() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     
-    console.log("[TEST RPC] Testando RPC...")
-    const { data, error } = await supabase.rpc('get_global_ranking', {
+    await supabase.rpc('get_global_ranking', {
       p_period: 'this_week',
       p_current_user_id: user?.id || null
     })
     
-    console.log("[TEST RPC] Resultado:", { data: !!data, error, dataSample: data })
-    
     // Verificar dados na tabela study_history
-    const { data: hist, error: histError } = await supabase
+    await supabase
       .from('study_history')
       .select('user_id, active_minutes, duration_minutes, started_at, completed, metadata')
       .limit(10)
     
-    console.log("[TEST RPC] study_history sample:", { data: hist, error: histError })
-    
     // Verificar se question_attempts existe
-    const { data: attempts, error: attError } = await supabase
+    await supabase
       .from('question_attempts')
       .select('user_id, correct, answered_at')
       .limit(10)
     
-    console.log("[TEST RPC] question_attempts sample:", { data: attempts, error: attError })
-    
     // Verificar perfis (apenas coluna name)
-    const { data: profiles, error: profError } = await supabase
+    await supabase
       .from('profiles')
       .select('id, name')
       .limit(10)
     
-    console.log("[TEST RPC] profiles sample:", { data: profiles, error: profError })
-    
     return { success: true, debug: "Verifique o console do servidor" }
-  } catch (err: any) {
+  } catch (err) {
     console.error("[TEST RPC] Error:", err)
-    return { success: false, error: err.message }
+    return { success: false, error: (err as { message?: string }).message }
   }
 }
 

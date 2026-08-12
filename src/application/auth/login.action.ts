@@ -10,7 +10,6 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
 
   try {
     const validatedData = loginSchema.parse(data)
-    console.log("LOGIN_ATTEMPT:", { email: validatedData.email })
 
     try {
       const supabase = await createClient()
@@ -19,7 +18,6 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
         email: validatedData.email,
         password: validatedData.password,
       })
-      console.log("SUPABASE_AUTH_RESULT:", { error, session: authData.session ? "present" : "missing" })
 
       if (error || !authData.session) {
         return { 
@@ -30,8 +28,9 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
       }
 
       return { success: true }
-    } catch (supabaseError: any) {
-      console.warn("Supabase auth unreachable:", supabaseError?.message || supabaseError)
+    } catch (supabaseError) {
+      const err = supabaseError as { message?: string } | null | undefined
+      console.warn("Supabase auth unreachable:", err?.message || err)
 
       return {
         success: false,

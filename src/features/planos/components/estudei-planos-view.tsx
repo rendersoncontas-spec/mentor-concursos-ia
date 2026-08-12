@@ -8,21 +8,13 @@ import {
   ArrowLeft,
   Archive,
   Edit,
-  Trash2,
-  Folder,
-  Edit3,
-  HelpCircle,
   RotateCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
 
 import { EstudeiDisciplineDetailView } from "@/features/disciplines/components/estudei-discipline-detail-view"
-import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
 
 export interface StudyPlanSummary {
   id: string
@@ -70,11 +62,10 @@ const DEFAULT_DISCIPLINES: DisciplineCardData[] = [
 ]
 
 export function EstudeiPlanosView() {
-  const router = useRouter()
   const [activePlans, setActivePlans] = useState<StudyPlanSummary[]>(DEFAULT_PLANS)
   const [archivedPlans, setArchivedPlans] = useState<StudyPlanSummary[]>([])
   const [selectedPlan, setSelectedPlan] = useState<StudyPlanSummary | null>(null)
-  const [disciplines, setDisciplines] = useState<DisciplineCardData[]>(DEFAULT_DISCIPLINES)
+  const [disciplines] = useState<DisciplineCardData[]>(DEFAULT_DISCIPLINES)
   const [viewingDiscipline, setViewingDiscipline] = useState<DisciplineCardData | null>(null)
 
   // Modal Arquivar Plano (Sua Foto 2)
@@ -83,12 +74,11 @@ export function EstudeiPlanosView() {
 
   // Modais de Criação / Edição
   const [isNewPlanModalOpen, setIsNewPlanModalOpen] = useState(false)
-  const [isNewDiscModalOpen, setIsNewDiscModalOpen] = useState(false)
+  const [, setIsNewDiscModalOpen] = useState(false)
 
   // Form State
   const [newPlanTitle, setNewPlanTitle] = useState("")
   const [newPlanEdital, setNewPlanEdital] = useState("")
-  const [discNameInput, setDiscNameInput] = useState("")
 
   const handleOpenArchiveModal = (plan: StudyPlanSummary, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
@@ -134,24 +124,6 @@ export function EstudeiPlanosView() {
     setNewPlanTitle("")
     setNewPlanEdital("")
     setIsNewPlanModalOpen(false)
-  }
-
-  const handleCreateDiscipline = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!discNameInput.trim()) return
-
-    const newDisc: DisciplineCardData = {
-      id: `disc-${Date.now()}`,
-      name: discNameInput.trim(),
-      topicsStudied: 0,
-      topicsTotal: 15,
-      questionsSolved: 0,
-      color: "#fef08a",
-    }
-    setDisciplines([...disciplines, newDisc])
-    toast.success("Nova disciplina adicionada ao plano!")
-    setDiscNameInput("")
-    setIsNewDiscModalOpen(false)
   }
 
   const totalTopics = disciplines.reduce((acc, d) => acc + d.topicsTotal, 0)

@@ -2,8 +2,8 @@ import { Trophy } from "lucide-react"
 import { EstudeiRankingView } from "@/features/ranking/components/estudei-ranking-view"
 
 export const metadata = {
-  title: "Ranking de Concurseiros - Mentor Concursos IA",
-  description: "Leaderboard e classificação dos estudantes por horas e questões.",
+  title: "Ranking Global - Mentor Concursos IA",
+  description: "Compare seu desempenho com todos os estudantes do Mentor IA.",
 }
 
 export default function RankingPage() {
@@ -13,8 +13,8 @@ export default function RankingPage() {
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-3">
         <Trophy className="h-5 w-5 text-amber-500" />
         <div>
-          <h1 className="text-lg font-bold leading-none">Ranking de Concurseiros</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Classificação semanal e geral dos estudantes</p>
+          <h1 className="text-lg font-bold leading-none">Ranking Global</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Compare seu desempenho com todos os estudantes do Mentor IA</p>
         </div>
       </div>
 

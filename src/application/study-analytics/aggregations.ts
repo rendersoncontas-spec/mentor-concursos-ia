@@ -1,4 +1,4 @@
-import { AnalyticsContext } from "./types"
+import type { AnalyticsContext } from "./types"
 import { getStartOfWeek, getStartOfMonth, formatDateToYYYYMMDD } from "./utils"
 
 type BaseAggregations = {
@@ -117,7 +117,9 @@ function calculateStreaks(uniqueDaysSet: Set<string>): { currentStreak: number, 
   let currentEvalStreak = 1
   
   for (let i = 0; i < sortedDays.length - 1; i++) {
-    const parts = sortedDays[i]!.split("-")
+    const day = sortedDays[i]
+    if (!day) continue
+    const parts = day.split("-")
     const dObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
     dObj.setDate(dObj.getDate() - 1)
     const expectedPrevStr = formatDateToYYYYMMDD(dObj)

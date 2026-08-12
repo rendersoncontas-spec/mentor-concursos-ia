@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
 import { SessionOrchestrator } from "./session-orchestrator"
-import { SessionCompletionPayload } from "./study-session.models"
+import type { SessionCompletionPayload } from "./study-session.models"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
 export async function finalizeSmartSessionAction(payload: SessionCompletionPayload) {
@@ -23,8 +23,8 @@ export async function finalizeSmartSessionAction(payload: SessionCompletionPaylo
     revalidatePath("/dashboard")
     
     return { data: summary, error: null }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[finalizeSmartSessionAction] Error:", error)
-    return { data: null, error: error.message }
+    return { data: null, error: error instanceof Error ? error.message : "Erro inesperado" }
   }
 }

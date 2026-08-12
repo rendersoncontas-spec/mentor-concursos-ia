@@ -53,8 +53,10 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
 
   useEffect(() => {
     if (initialData?.disciplines && initialData.disciplines.length > 0) {
-      setDisciplines(initialData.disciplines)
+      const timer = setTimeout(() => setDisciplines(initialData.disciplines), 0)
+      return () => clearTimeout(timer)
     }
+    return undefined
   }, [initialData])
 
   const targetInfo = initialData?.target || {
@@ -77,21 +79,18 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   const [disciplineNameInput, setDisciplineNameInput] = useState("")
 
   useEffect(() => {
-    if (nameParam) {
-      const found = disciplines.find((d) => d.name.toLowerCase() === nameParam.toLowerCase())
-      if (found) {
-        setViewingDiscipline(found)
-      } else {
-        setViewingDiscipline({
-          id: "custom",
-          name: nameParam,
-          topicsStudied: 0,
-          topicsTotal: 34,
-          questionsSolved: 0,
-          color: "#fef08a",
-        })
-      }
+    if (!nameParam) return
+    const found = disciplines.find((d) => d.name.toLowerCase() === nameParam.toLowerCase())
+    const discipline = found ?? {
+      id: "custom",
+      name: nameParam,
+      topicsStudied: 0,
+      topicsTotal: 34,
+      questionsSolved: 0,
+      color: "#fef08a",
     }
+    const timer = setTimeout(() => setViewingDiscipline(discipline), 0)
+    return () => clearTimeout(timer)
   }, [nameParam, disciplines])
 
   const handleAddOrEditDiscipline = async (e: React.FormEvent) => {
@@ -238,7 +237,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
           <div className="space-y-1">
             <h3 className="font-bold text-lg text-foreground">Nenhuma disciplina cadastrada</h3>
             <p className="text-sm text-muted-foreground max-w-sm">
-              Você ainda não adicionou disciplinas ao seu concurso. Clique em "Nova Disciplina" para começar.
+              Você ainda não adicionou disciplinas ao seu concurso. Clique em &quot;Nova Disciplina&quot; para começar.
             </p>
           </div>
           <Button

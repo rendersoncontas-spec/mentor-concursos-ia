@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import {
   LayoutDashboard,
-  Folder,
   BookOpen,
   FileText,
   CalendarDays,
@@ -21,7 +20,6 @@ import {
   ChevronRight,
   LogOut,
   GraduationCap,
-  Menu,
   X,
 } from "lucide-react"
 

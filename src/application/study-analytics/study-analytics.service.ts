@@ -1,4 +1,4 @@
-import { SupabaseClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { createAnalyticsContext } from "./context"
 import { getBaseAggregations } from "./aggregations"
 import { getHeatmap } from "./heatmap"

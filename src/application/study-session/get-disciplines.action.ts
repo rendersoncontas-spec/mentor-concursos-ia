@@ -9,6 +9,9 @@ export type DisciplineOption = {
   fromPlan: boolean
 }
 
+type DisciplineRecord = Omit<DisciplineOption, "fromPlan">
+type UserDisciplineRecord = { discipline: DisciplineRecord | DisciplineRecord[] | null }
+
 /**
  * Busca disciplinas para o autocomplete do modal de estudo.
  * Retorna disciplinas do plano ativo do usuário + todas as disciplinas do banco.
@@ -17,14 +20,14 @@ export async function getDisciplinesForAutocomplete(): Promise<{
   planDisciplines: DisciplineOption[]
   allDisciplines: DisciplineOption[]
 }> {
-  console.log("[getDisciplinesForAutocomplete] Iniciando busca...")
+  console.warn("[getDisciplinesForAutocomplete] Iniciando busca...")
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  console.log("[getDisciplinesForAutocomplete] User:", user?.id, "AuthError:", authError)
+  console.warn("[getDisciplinesForAutocomplete] User:", user?.id, "AuthError:", authError)
 
   if (authError || !user) {
-    console.log("[getDisciplinesForAutocomplete] Sem usuário autenticado, retornando vazio")
+    console.warn("[getDisciplinesForAutocomplete] Sem usuário autenticado, retornando vazio")
     return { planDisciplines: [], allDisciplines: [] }
   }
 
@@ -42,19 +45,20 @@ export async function getDisciplinesForAutocomplete(): Promise<{
     .eq("user_id", user.id)
     .limit(50)
 
-  console.log("[getDisciplinesForAutocomplete] userDiscs:", userDiscs, "Error:", userDiscsError)
+  console.warn("[getDisciplinesForAutocomplete] userDiscs:", userDiscs, "Error:", userDiscsError)
 
-  const planDisciplines: DisciplineOption[] = (userDiscs || [])
-    .filter((ud: any) => ud.discipline)
-    .map((ud: any) => {
-      const disc = Array.isArray(ud.discipline) ? ud.discipline[0] : ud.discipline
+  const planDisciplines: DisciplineOption[] = ((userDiscs || []) as unknown as UserDisciplineRecord[])
+    .map((ud) => {
+      const rawDisc = Array.isArray(ud.discipline) ? ud.discipline[0] : ud.discipline
+      if (!rawDisc) return null
       return {
-        id: disc.id,
-        name: disc.name,
-        area: disc.area,
+        id: rawDisc.id,
+        name: rawDisc.name,
+        area: rawDisc.area,
         fromPlan: true,
       }
     })
+    .filter((d): d is DisciplineOption => d !== null)
     // Remover duplicatas
     .filter((d: DisciplineOption, i: number, arr: DisciplineOption[]) => 
       arr.findIndex(x => x.id === d.id) === i
@@ -67,15 +71,15 @@ export async function getDisciplinesForAutocomplete(): Promise<{
     .order("name")
     .limit(200)
 
-  console.log("[getDisciplinesForAutocomplete] allDiscs:", allDiscs, "Error:", allDiscsError)
+  console.warn("[getDisciplinesForAutocomplete] allDiscs:", allDiscs, "Error:", allDiscsError)
 
-  const allDisciplines: DisciplineOption[] = (allDiscs || []).map((d: any) => ({
+  const allDisciplines: DisciplineOption[] = (allDiscs || []).map((d) => ({
     id: d.id,
     name: d.name,
     area: d.area,
     fromPlan: false,
   }))
 
-  console.log("[getDisciplinesForAutocomplete] Retornando:", { planDisciplines, allDisciplines })
+  console.warn("[getDisciplinesForAutocomplete] Retornando:", { planDisciplines, allDisciplines })
   return { planDisciplines, allDisciplines }
 }

@@ -1,4 +1,4 @@
-import { StudyHistory } from "@/domain/study-history/study-history.types"
+import type { StudyHistory } from "@/domain/study-history/study-history.types"
 
 export type DateRange = {
   start: Date
@@ -16,7 +16,7 @@ export interface AnalyticsContext {
   weekStartDay?: number
   
   // Instância de cache interno para evitar recálculos
-  cache: Map<string, any>
+  cache: Map<string, unknown>
   
   // Métodos de utilidade que o contexto expõe
   getCache<T>(key: string, computeFn: () => T): T

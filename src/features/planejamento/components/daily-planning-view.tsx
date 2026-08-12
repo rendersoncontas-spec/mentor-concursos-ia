@@ -31,7 +31,8 @@ export function DailyPlanningView({ blocks, history = [], onReplan, onSwitchToCi
   const [mounted, setMounted] = useState(false)
   
   useEffect(() => {
-    setMounted(true)
+    const timer = setTimeout(() => setMounted(true), 0)
+    return () => clearTimeout(timer)
   }, [])
 
   // Escala de Trabalho e Dias de Estudo salvos
@@ -40,14 +41,15 @@ export function DailyPlanningView({ blocks, history = [], onReplan, onSwitchToCi
   const [studyDays, setStudyDays] = useState<string[]>(["seg", "ter", "qua", "qui", "sex", "sab", "dom"])
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    const timer = setTimeout(() => {
       const savedScale = localStorage.getItem("mentor_user_work_scale")
       if (savedScale) setScheduleMode(savedScale)
       const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
-      if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay))
+      if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay, 10))
       const savedStudyDays = localStorage.getItem("mentor_user_study_days")
-      if (savedStudyDays) setStudyDays(JSON.parse(savedStudyDays))
-    }
+      if (savedStudyDays) setStudyDays(JSON.parse(savedStudyDays) as string[])
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   useEffect(() => {
@@ -168,6 +170,18 @@ export function DailyPlanningView({ blocks, history = [], onReplan, onSwitchToCi
   })()
 
   // Map blocks to scheduled tasks, marking completed based on REAL history for this date
+  const getTaskStatus = (completed: boolean, index: number) => {
+    if (completed) return "CONCLUIDO"
+    if (index === 0) return "EM_ANDAMENTO"
+    return "PENDENTE"
+  }
+
+  const getTaskProgressText = (completed: boolean, studied: number, duration: number) => {
+    if (completed) return `Concluído — ${studied || 0} min estudados`
+    if (studied) return `Em andamento — ${studied} de ${duration} min`
+    return "Aguardando início"
+  }
+
   const scheduledTasks = dayBlocks.map((block, idx) => {
     const hourStart = 8 + idx * 2
     const startStr = `${hourStart.toString().padStart(2, "0")}:00`
@@ -181,12 +195,27 @@ export function DailyPlanningView({ blocks, history = [], onReplan, onSwitchToCi
       timeSlot: `${startStr} - ${endStr}`,
       completed: isCompletedByHistory,
       studiedMinutes: studiedMins,
-      status: isCompletedByHistory ? "CONCLUIDO" : idx === 0 ? "EM_ANDAMENTO" : "PENDENTE"
+      status: getTaskStatus(isCompletedByHistory, idx)
     }
   })
 
   const totalMinutes = dayBlocks.reduce((acc, b) => acc + b.durationMinutes, 0)
   const tasksRemaining = scheduledTasks.filter(t => !t.completed).length
+
+  const renderEmptyState = () => {
+    if (blocks.length > 0) {
+      return (
+        <div className="py-12 text-center space-y-4">
+          <div className="w-14 h-14 bg-emerald-500/10 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto"><Coffee className="w-7 h-7" /></div>
+          <div className="space-y-1 max-w-sm mx-auto"><h4 className="text-base font-extrabold text-foreground">Dia de Descanso Programado</h4><p className="text-xs text-muted-foreground leading-relaxed">De acordo com seu planejamento, você não tem matérias agendadas para este dia. Aproveite para descansar ou fazer revisões livres!</p></div>
+          {onSwitchToCiclo && <Button onClick={onSwitchToCiclo} variant="outline" size="sm" className="font-bold text-xs gap-1.5 rounded-xl border-primary/30 text-primary hover:bg-primary/5 cursor-pointer"><Sparkles className="w-3.5 h-3.5" /> Ver Sequência do Ciclo</Button>}
+        </div>
+      )
+    }
+    return (
+      <div className="py-12 text-center space-y-3"><BookOpen className="w-10 h-10 mx-auto text-muted-foreground/50" /><p className="text-sm font-semibold text-muted-foreground">Nenhum planejamento criado ainda.</p>{onReplan && <Button onClick={onReplan} size="sm" className="font-bold text-xs bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer">Gerar Planejamento com IA</Button>}</div>
+    )
+  }
 
   return (
     <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-xs space-y-5">
@@ -265,36 +294,7 @@ export function DailyPlanningView({ blocks, history = [], onReplan, onSwitchToCi
           </span>
         </div>
 
-        {scheduledTasks.length === 0 ? (
-          blocks.length > 0 ? (
-            <div className="py-12 text-center space-y-4">
-              <div className="w-14 h-14 bg-emerald-500/10 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
-                <Coffee className="w-7 h-7" />
-              </div>
-              <div className="space-y-1 max-w-sm mx-auto">
-                <h4 className="text-base font-extrabold text-foreground">Dia de Descanso Programado</h4>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  De acordo com seu planejamento, você não tem matérias agendadas para este dia. Aproveite para descansar ou fazer revisões livres!
-                </p>
-              </div>
-              {onSwitchToCiclo && (
-                <Button onClick={onSwitchToCiclo} variant="outline" size="sm" className="font-bold text-xs gap-1.5 rounded-xl border-primary/30 text-primary hover:bg-primary/5 cursor-pointer">
-                  <Sparkles className="w-3.5 h-3.5" /> Ver Sequência do Ciclo
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="py-12 text-center space-y-3">
-              <BookOpen className="w-10 h-10 mx-auto text-muted-foreground/50" />
-              <p className="text-sm font-semibold text-muted-foreground">Nenhum planejamento criado ainda.</p>
-              {onReplan && (
-                <Button onClick={onReplan} size="sm" className="font-bold text-xs bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer">
-                  Gerar Planejamento com IA
-                </Button>
-              )}
-            </div>
-          )
-        ) : (
+        {scheduledTasks.length === 0 ? renderEmptyState() : (
           <div className="space-y-4">
             {scheduledTasks.map((task) => (
               <div 
@@ -315,12 +315,7 @@ export function DailyPlanningView({ blocks, history = [], onReplan, onSwitchToCi
                     </div>
                     <h4 className="text-base font-bold text-foreground">{task.disciplineName}</h4>
                     <p className="text-xs text-muted-foreground">
-                      {task.completed 
-                        ? `Concluído — ${task.studiedMinutes || 0} min estudados`
-                        : task.studiedMinutes 
-                          ? `Em andamento — ${task.studiedMinutes} de ${task.durationMinutes} min`
-                          : "Aguardando início"
-                      }
+                      {getTaskProgressText(task.completed, task.studiedMinutes, task.durationMinutes)}
                     </p>
                   </div>
                 </div>

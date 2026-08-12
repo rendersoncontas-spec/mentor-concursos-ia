@@ -1,25 +1,12 @@
 ﻿"use client"
 
-import { useState, useEffect } from "react"
-import {
-  FilePlus,
-  Plus,
-  ChevronDown,
-  Upload,
-  FileText,
-  Clock,
-  CheckCircle,
-  X,
-  Trash2,
-} from "lucide-react"
+import { useState } from "react"
+import { Upload, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 
@@ -34,8 +21,19 @@ export interface EditalRequestItem {
   status: "Pendente" | "Em Análise" | "Concluído"
 }
 
+function getSavedRequests(): EditalRequestItem[] {
+  if (typeof window === "undefined") return []
+  const saved = localStorage.getItem("mentor_edital_requests")
+  if (!saved) return []
+  try {
+    return JSON.parse(saved) as EditalRequestItem[]
+  } catch {
+    return []
+  }
+}
+
 export function EstudeiPedirEditalView() {
-  const [requests, setRequests] = useState<EditalRequestItem[]>([])
+  const [requests, setRequests] = useState<EditalRequestItem[]>(getSavedRequests)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState("Todos")
 
@@ -46,14 +44,6 @@ export function EstudeiPedirEditalView() {
   const [description, setDescription] = useState("")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
 
-  useEffect(() => {
-    const saved = localStorage.getItem("mentor_edital_requests")
-    if (saved) {
-      try {
-        setRequests(JSON.parse(saved))
-      } catch (e) {}
-    }
-  }, [])
 
   const handleSendRequest = (e: React.FormEvent) => {
     e.preventDefault()

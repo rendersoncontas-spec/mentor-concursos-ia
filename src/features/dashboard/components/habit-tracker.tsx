@@ -46,25 +46,34 @@ export function HabitTracker({ heatmap, streak }: HabitTrackerProps) {
           const status = getDayStatus(day.minutes)
           const isToday = i === last30.length - 1
 
+          let cellContent
+          if (status === "studied") {
+            cellContent = (
+              <div className="w-7 h-7 rounded-md bg-green-500/15 border border-green-500/30 flex items-center justify-center hover:bg-green-500/25 transition-colors">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+              </div>
+            )
+          } else if (isToday) {
+            cellContent = (
+              <div className="w-7 h-7 rounded-md bg-primary/15 border border-primary/40 flex items-center justify-center animate-pulse">
+                <Minus className="h-3.5 w-3.5 text-primary" />
+              </div>
+            )
+          } else {
+            cellContent = (
+              <div className="w-7 h-7 rounded-md bg-muted border border-border flex items-center justify-center hover:bg-muted/70 transition-colors">
+                <XCircle className="h-3.5 w-3.5 text-muted-foreground/30" />
+              </div>
+            )
+          }
+
           return (
             <div
               key={day.date}
               title={`${day.date}: ${day.minutes > 0 ? `${day.minutes}min estudados` : "Sem estudo"}`}
               className="relative group cursor-help"
             >
-              {status === "studied" ? (
-                <div className="w-7 h-7 rounded-md bg-green-500/15 border border-green-500/30 flex items-center justify-center hover:bg-green-500/25 transition-colors">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                </div>
-              ) : isToday ? (
-                <div className="w-7 h-7 rounded-md bg-primary/15 border border-primary/40 flex items-center justify-center animate-pulse">
-                  <Minus className="h-3.5 w-3.5 text-primary" />
-                </div>
-              ) : (
-                <div className="w-7 h-7 rounded-md bg-muted border border-border flex items-center justify-center hover:bg-muted/70 transition-colors">
-                  <XCircle className="h-3.5 w-3.5 text-muted-foreground/30" />
-                </div>
-              )}
+              {cellContent}
             </div>
           )
         })}

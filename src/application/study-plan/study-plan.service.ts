@@ -440,6 +440,21 @@ const DISCIPLINE_COLORS = [
   "#06b6d4", "#ef4444", "#6366f1", "#2563EB", "#f97316"
 ]
 
+type StudyHistoryRecord = {
+  discipline_id: string
+  duration_minutes: number | null
+  started_at: string | null
+}
+
+type CyclePlanItemRecord = {
+  id: string
+  study_plan_id: string
+  discipline_id: string
+  duration_minutes: number
+  priority_score: number
+  disciplines: { id?: string; name: string; area: string | null }[] | { id?: string; name: string; area: string | null } | null
+}
+
 /**
  * Cria e persiste um novo Ciclo Rotativo Contínuo para o usuário.
  */
@@ -501,7 +516,7 @@ export async function createCycleStudyPlan(
   }
 
   // 4. Inserir itens/blocos do ciclo
-  const itemsToInsert = algorithmItems.map((item: any, idx: number) => ({
+  const itemsToInsert = algorithmItems.map((item, idx: number) => ({
     study_plan_id: newPlan.id,
     discipline_id: item.disciplineId,
     day_of_week: 0,
@@ -565,27 +580,29 @@ export async function getCycleOverviewData(
     .gte("started_at", planDate)
 
   const studiedMap = new Map<string, number>()
-  const history = historyData?.map((h: any) => ({
+  const history = ((historyData as StudyHistoryRecord[] | null)?.map((h) => ({
     disciplineId: h.discipline_id,
     minutes: h.duration_minutes || 0,
     // Use started_at split as YYYY-MM-DD (calendar date, not timezone-converted)
     date: h.started_at ? h.started_at.split("T")[0] : null
-  })) || []
+  })) || []).filter((h): h is { disciplineId: string; minutes: number; date: string } => h.date !== null)
 
   if (historyData) {
-    historyData.forEach((h: any) => {
+    (historyData as StudyHistoryRecord[]).forEach((h) => {
       const current = studiedMap.get(h.discipline_id) || 0
       studiedMap.set(h.discipline_id, current + (h.duration_minutes || 0))
     })
   }
 
-  const blocks: CycleBlock[] = rawItems.map((item: any, idx: number) => {
+  const blocks: CycleBlock[] = (rawItems as unknown as CyclePlanItemRecord[]).map((item, idx: number) => {
     const discId = item.discipline_id
     if (!disciplineColorMap.has(discId)) {
-      disciplineColorMap.set(discId, DISCIPLINE_COLORS[colorIndex % DISCIPLINE_COLORS.length]!)
+      const color = DISCIPLINE_COLORS[colorIndex % DISCIPLINE_COLORS.length]
+      if (color) disciplineColorMap.set(discId, color)
       colorIndex++
     }
 
+    const disc = Array.isArray(item.disciplines) ? item.disciplines[0] : item.disciplines
     const requiredMins = item.duration_minutes
     // Note: We do NOT set status to "CONCLUIDO" here based on global history.
     // Status per day is calculated by DailyPlanningView / WeeklyPlanningView
@@ -597,8 +614,8 @@ export async function getCycleOverviewData(
       id: item.id,
       studyPlanId: item.study_plan_id,
       disciplineId: item.discipline_id,
-      disciplineName: item.disciplines?.name || "Disciplina",
-      disciplineArea: item.disciplines?.area || null,
+      disciplineName: disc?.name || "Disciplina",
+      disciplineArea: disc?.area || null,
       color: disciplineColorMap.get(discId) || "#3b82f6",
       executionOrder: idx + 1,
       durationMinutes: requiredMins,
@@ -613,8 +630,9 @@ export async function getCycleOverviewData(
   const currentBlockIndex = firstIncompleteIndex >= 0 ? firstIncompleteIndex : blocks.length - 1
 
   // If the very first incomplete block is still PENDENTE and hasn't received any studied minutes, it's EM_ANDAMENTO implicitly for UI purposes
-  if (firstIncompleteIndex >= 0 && blocks[firstIncompleteIndex]?.status === "PENDENTE") {
-    blocks[firstIncompleteIndex]!.status = "EM_ANDAMENTO"
+  const firstIncompleteBlock = firstIncompleteIndex >= 0 ? blocks[firstIncompleteIndex] : undefined
+  if (firstIncompleteBlock?.status === "PENDENTE") {
+    firstIncompleteBlock.status = "EM_ANDAMENTO"
   }
 
   const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)

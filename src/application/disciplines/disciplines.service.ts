@@ -101,6 +101,7 @@ export async function getUserDisciplines(
     id: string
     user_id: string
     discipline_id: string
+    target_id: string | null
     status: DisciplineStatus
     mastery_level: number
     created_at: string
@@ -111,7 +112,7 @@ export async function getUserDisciplines(
     id: row.id,
     user_id: row.user_id,
     discipline_id: row.discipline_id,
-    target_id: (row as any).target_id,
+    target_id: row.target_id,
     status: row.status,
     mastery_level: row.mastery_level ?? 0,
     created_at: row.created_at,
@@ -308,7 +309,7 @@ export async function getDisciplinesPageData(
   const userDisciplines = await getUserDisciplines(supabase, userId, rawTarget?.id)
 
   // Buscar tópicos reais do edital do usuário (se houver target ativo)
-  let topicsByDiscipline: Map<string, number> = new Map()
+  const topicsByDiscipline: Map<string, number> = new Map()
   if (rawTarget?.exam_id) {
     const edital = await getExamEdital(supabase, rawTarget.exam_id)
     if (edital?.disciplines) {
@@ -351,7 +352,7 @@ export async function getDisciplinesPageData(
 
     const discHistory = history.filter((h) => h.discipline_id === discId && h.completed)
     discHistory.forEach((h) => {
-      const meta = (h.metadata || {}) as any
+      const meta = h.metadata || {}
       if (meta.questions_answered) totalCount += Number(meta.questions_answered)
       if (meta.questions_correct) correctCount += Number(meta.questions_correct)
     })

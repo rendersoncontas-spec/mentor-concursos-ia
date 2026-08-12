@@ -1,4 +1,4 @@
-import { AnalyticsContext, HeatmapDay } from "./types"
+import type { AnalyticsContext, HeatmapDay } from "./types"
 import { formatDateToYYYYMMDD, getDaysAgoDate } from "./utils"
 
 export function getHeatmap(ctx: AnalyticsContext): HeatmapDay[] {

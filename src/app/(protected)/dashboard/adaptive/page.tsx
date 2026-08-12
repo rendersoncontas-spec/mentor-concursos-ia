@@ -4,13 +4,11 @@ import { createClient } from "@/infrastructure/supabase/server"
 import { Logo } from "@/components/ui/logo"
 import { 
   Activity,
-  Zap,
-  TrendingUp,
   History,
-  ShieldAlert,
-  ArrowRight
+  ShieldAlert
 } from "lucide-react"
-import { calculateLearningHealthScore, AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
+import { calculateLearningHealthScore } from "@/application/adaptive-learning/adaptive-learning.service"
+import type { AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
 
 export const metadata = {
   title: "Aprendizado Adaptativo (ALE) - Mentor Concursos IA",
@@ -37,15 +35,18 @@ export default async function AdaptiveDashboardPage() {
     `)
     .eq("user_id", user.id)
 
-  const realDisciplines = (userDisciplines || []).map((ud) => ({
-    id: ud.discipline_id,
-    name: (ud.disciplines as any)?.name || "Disciplina",
-    weight: 2,
-    performanceScore: 70,
-    retentionRate: 75,
-    lapsesCount: 0,
-    daysSinceLastStudy: 0
-  }))
+  const realDisciplines = (userDisciplines || []).map((ud) => {
+    const joined = ud.disciplines as unknown as { name?: string } | null
+    return {
+      id: ud.discipline_id,
+      name: joined?.name || "Disciplina",
+      weight: 2,
+      performanceScore: 70,
+      retentionRate: 75,
+      lapsesCount: 0,
+      daysSinceLastStudy: 0
+    }
+  })
 
   const realContext: AnalyticsContext = {
     userId: user.id,
@@ -59,6 +60,12 @@ export default async function AdaptiveDashboardPage() {
   }
 
   const lhs = calculateLearningHealthScore(realContext)
+
+  function scoreColor(score: number): string {
+    if (score >= 80) return "text-green-500"
+    if (score >= 50) return "text-amber-500"
+    return "text-red-500"
+  }
 
   // Busca o histórico real da tabela adaptive_history
   const { data: history } = await supabase
@@ -112,7 +119,7 @@ export default async function AdaptiveDashboardPage() {
             
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-baseline gap-3">
-                <p className={`text-6xl font-black ${lhs.score >= 80 ? 'text-green-500' : lhs.score >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                <p className={`text-6xl font-black ${scoreColor(lhs.score)}`}>
                   {lhs.score}
                 </p>
                 <p className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full uppercase tracking-wider">
@@ -189,7 +196,7 @@ export default async function AdaptiveDashboardPage() {
                     </td>
                   </tr>
                 ) : (
-                  displayHistory.map((log: any, i) => (
+                  displayHistory.map((log, i) => (
                     <tr key={i} className="hover:bg-muted/30 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-muted-foreground">
                         {log.engine}

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/infrastructure/supabase/server"
 import { ActiveSessionRunner } from "@/features/study-session/components/active-session-runner"
+import { type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
 
 export const metadata = {
   title: "Sessão Inteligente | Mentor Concursos IA",
@@ -20,7 +21,7 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
     redirect("/login")
   }
 
-  let planItem = undefined
+  let planItem: StudyPlanItemWithDetails | undefined
 
   if (planId) {
     const { data: item } = await supabase
@@ -34,10 +35,13 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
       .single()
       
     if (item) {
-      planItem = {
-        ...item,
-        discipline: Array.isArray(item.disciplines) ? item.disciplines[0] : item.disciplines
-      } as any
+      const discipline = Array.isArray(item.disciplines) ? item.disciplines[0] : item.disciplines
+      if (discipline) {
+        planItem = {
+          ...item,
+          discipline,
+        }
+      }
     }
   } else if (disciplineId) {
     const { data: disc } = await supabase
@@ -49,16 +53,27 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
     if (disc) {
       // Item de planejamento temporário por disciplina selecionada
       planItem = {
+        id: "",
+        study_plan_id: "",
         discipline_id: disc.id,
+        day_of_week: 0,
         duration_minutes: 60, // Padrão
+        priority: 0,
+        priority_score: 0,
+        recommended_sessions: 0,
+        created_at: "",
         discipline: disc
-      } as any
+      }
     }
   }
 
   return (
     <div className="min-h-[80vh] flex flex-col justify-center py-10 px-4 md:px-8">
-      <ActiveSessionRunner planItem={planItem} />
+      {planItem ? (
+        <ActiveSessionRunner planItem={planItem} />
+      ) : (
+        <ActiveSessionRunner />
+      )}
     </div>
   )
 }

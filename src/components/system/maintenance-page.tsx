@@ -3,11 +3,9 @@
 import { RefreshCw, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/ui/logo"
-import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 export function MaintenancePage() {
-  const router = useRouter()
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const handleRefresh = () => {

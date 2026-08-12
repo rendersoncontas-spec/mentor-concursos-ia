@@ -1,5 +1,5 @@
 import { ListCheck } from "lucide-react"
-import { EstudeiSimuladosView } from "@/features/simulados/components/estudei-simulados-view"
+import { SimuladosView } from "@/features/simulados/components/simulados-view"
 
 export const metadata = {
   title: "Simulados - Mentor Concursos IA",
@@ -19,7 +19,7 @@ export default function SimuladosPage() {
       </div>
 
       <div className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
-        <EstudeiSimuladosView />
+        <SimuladosView />
       </div>
     </div>
   )

@@ -40,9 +40,9 @@ export interface LearningHealthScore {
 
 // Interfaces IA-Ready para o futuro
 export interface RecommendationEngine {
-  generateRecommendations(context: any): Promise<AdaptiveDecision[]>
+  generateRecommendations(context: unknown): Promise<AdaptiveDecision[]>
 }
 
 export interface PriorityEngine {
-  calculateDisciplinePriority(disciplineId: string, context: any): number
+  calculateDisciplinePriority(disciplineId: string, context: unknown): number
 }
