@@ -182,7 +182,8 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
 
   const handleClose = () => {
     if (phase !== 'IDLE') {
-      onOpenChange(false)
+      // Timer ativo/pausado: minimizar em vez de sumir, para a barra flutuante continuar visível
+      handleMinimize()
       return
     }
     endSession()
@@ -600,7 +601,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent 
-                          className="w-[400px] p-0 z-[200] pointer-events-auto" 
+                          className="w-[min(400px,calc(100vw-2rem))] p-0 z-[200] pointer-events-auto" 
                           align="start" 
                           sideOffset={4}
                           onWheel={(e) => e.stopPropagation()}

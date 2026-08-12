@@ -1,15 +1,24 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Heart, Copy, Check, Sparkles, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { LogoutButton } from "@/features/auth/components/logout-button"
+import { createClient } from "@/infrastructure/supabase/client"
 
 export default function DoacaoPage() {
   const [copied, setCopied] = useState(false)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const pixKey = "rendersonluan@gmail.com"
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data?.user?.email ?? null)
+    })
+  }, [])
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText(pixKey)
@@ -103,7 +112,7 @@ export default function DoacaoPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-t pt-4">
             <div>
               <p className="text-xs text-muted-foreground font-semibold">Conta Ativa</p>
-              <p className="text-sm font-bold text-foreground">rendersonluan@gmail.com</p>
+              <p className="text-sm font-bold text-foreground">{userEmail ?? "Carregando..."}</p>
             </div>
 
             <LogoutButton />

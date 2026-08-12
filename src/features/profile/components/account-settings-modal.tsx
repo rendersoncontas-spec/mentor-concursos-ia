@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import {
   User,
   Settings,
@@ -12,6 +13,7 @@ import {
   Volume2,
   Check,
   Loader2,
+  Trash2,
 } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -20,6 +22,8 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import Image from "next/image"
 import { getProfileAction, updateProfileAction } from "@/application/profile/profile.action"
+import { createClient } from "@/infrastructure/supabase/client"
+import { clearUserLocalData } from "@/utils/user-data"
 
 interface AccountSettingsModalProps {
   open: boolean
@@ -30,6 +34,59 @@ interface AccountSettingsModalProps {
   logoutAction: () => Promise<void>
 }
 
+type Preferences = Record<string, unknown>
+
+const DEFAULT_PREFERENCES: Preferences = {
+  studyDays: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
+  firstDayOfWeek: "Domingo",
+  timerSound: "Melodia 1",
+  timezone: "(UTC-03:00) Brasília",
+  publicProfile: true,
+  avatarType: "foto",
+  nameType: "nome",
+  notifyConstancia: true,
+  notifyRevisao: true,
+  notifyFeedback: true,
+  customCategories: [],
+}
+
+function prefsValue<T>(prefs: Preferences | null, key: string, fallback: T): T {
+  const value = prefs?.[key]
+  return value === undefined || value === null ? fallback : (value as T)
+}
+
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new window.Image()
+      img.onload = () => {
+        const maxSize = 256
+        let { width, height } = img
+        if (width > maxSize || height > maxSize) {
+          const ratio = Math.min(maxSize / width, maxSize / height)
+          width = Math.round(width * ratio)
+          height = Math.round(height * ratio)
+        }
+        const canvas = document.createElement("canvas")
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")
+        if (!ctx) {
+          reject(new Error("Canvas não suportado neste navegador."))
+          return
+        }
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", 0.82))
+      }
+      img.onerror = () => reject(new Error("Arquivo de imagem inválido."))
+      img.src = reader.result as string
+    }
+    reader.onerror = () => reject(new Error("Falha ao ler o arquivo."))
+    reader.readAsDataURL(file)
+  })
+}
+
 export function AccountSettingsModal({
   open,
   onOpenChange,
@@ -38,34 +95,21 @@ export function AccountSettingsModal({
   userId = "",
   logoutAction,
 }: AccountSettingsModalProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<
     "DADOS" | "PREFERENCIAS" | "RANKING" | "CATEGORIAS" | "NOTIFICACOES" | "SEGURANCA"
   >("DADOS")
 
-  // Estado para a foto de perfil carregada localmente (user-scoped)
   const [avatarImg, setAvatarImg] = useState<string | null>(null)
+  const [avatarDirty, setAvatarDirty] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const avatarKey = userId ? `mentor_user_avatar_${userId}` : "mentor_user_avatar"
 
-  useEffect(() => {
-    // Carregar foto inicial do localStorage (user-scoped)
-    const saved = localStorage.getItem(avatarKey)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (saved) setAvatarImg(saved)
-
-    // Escutar atualizações de outros componentes
-    const handleAvatarUpdate = () => {
-      const updated = localStorage.getItem(avatarKey)
-      setAvatarImg(updated)
-    }
-    window.addEventListener("avatarUpdated", handleAvatarUpdate)
-    return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
-  }, [avatarKey])
-
-  // Form States - Dados Pessoais (carregados do banco via getProfileAction)
+  // Form States - Dados Pessoais
   const [nome, setNome] = useState("")
   const [sobrenome, setSobrenome] = useState("")
   const [apelido, setApelido] = useState("")
@@ -76,7 +120,7 @@ export function AccountSettingsModal({
   const [email, setEmail] = useState(userEmail)
 
   // Form States - Preferencias
-  const [diasEstudo, setDiasEstudo] = useState<string[]>(["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"])
+  const [diasEstudo, setDiasEstudo] = useState<string[]>(DEFAULT_PREFERENCES["studyDays"] as string[])
   const [primeiroDia, setPrimeiroDia] = useState("Domingo")
   const [somTimer, setSomTimer] = useState("Melodia 1")
   const [fusoHorario, setFusoHorario] = useState("(UTC-03:00) Brasília")
@@ -100,21 +144,173 @@ export function AccountSettingsModal({
   const [senhaAtual, setSenhaAtual] = useState("")
   const [novaSenha, setNovaSenha] = useState("")
   const [confirmarSenha, setConfirmarSenha] = useState("")
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+
+  // Carregar profile do banco ao abrir o modal
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLoadingProfile(true)
+    getProfileAction().then((res) => {
+      if (cancelled) return
+      if (res.success && res.data) {
+        const profile = res.data
+        const fullName = profile.name ?? profile.full_name ?? ""
+        const nameParts = fullName.trim().split(/\s+/)
+        const firstName = nameParts[0] || ""
+        const lastName = nameParts.slice(1).join(" ") || ""
+        setNome(firstName)
+        setSobrenome(lastName)
+        setApelido(profile.nickname ?? "")
+        setAniversario(profile.birthday ?? "")
+        setGenero(profile.gender ?? "Não Informado")
+        setCidade(profile.city ?? "")
+        setUf(profile.uf ?? "")
+        setEmail(profile.email ?? userEmail)
+        if (profile.avatar_url) {
+          setAvatarImg(profile.avatar_url)
+          setAvatarDirty(false)
+        }
+        const prefs = profile.preferences
+        setDiasEstudo(prefsValue<string[]>(prefs, "studyDays", DEFAULT_PREFERENCES["studyDays"] as string[]))
+        setPrimeiroDia(prefsValue<string>(prefs, "firstDayOfWeek", "Domingo"))
+        setSomTimer(prefsValue<string>(prefs, "timerSound", "Melodia 1"))
+        setFusoHorario(prefsValue<string>(prefs, "timezone", "(UTC-03:00) Brasília"))
+        setPerfilPublico(prefsValue<boolean>(prefs, "publicProfile", true))
+        setTipoFoto(prefsValue<"foto" | "iniciais">(prefs, "avatarType", "foto"))
+        setTipoNome(prefsValue<"nome" | "apelido">(prefs, "nameType", "nome"))
+        setNotifConstancia(prefsValue<boolean>(prefs, "notifyConstancia", true))
+        setNotifRevisao(prefsValue<boolean>(prefs, "notifyRevisao", true))
+        setNotifFeedback(prefsValue<boolean>(prefs, "notifyFeedback", true))
+        setCustomCategories(prefsValue<string[]>(prefs, "customCategories", []))
+      } else if (res.error) {
+        toast.error(res.error)
+      }
+      setIsLoadingProfile(false)
+    }).catch(() => {
+      if (!cancelled) setIsLoadingProfile(false)
+    })
+    return () => { cancelled = true }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChangePassword = async () => {
+    if (!novaSenha) {
+      toast.error("Informe a nova senha.")
+      return
+    }
+    if (novaSenha.length < 6) {
+      toast.error("A nova senha deve ter pelo menos 6 caracteres.")
+      return
+    }
+    if (novaSenha !== confirmarSenha) {
+      toast.error("As senhas não conferem.")
+      return
+    }
+    setIsChangingPassword(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({ password: novaSenha })
+      if (error) {
+        toast.error("Erro ao alterar senha: " + error.message)
+        return
+      }
+      toast.success("Senha alterada com sucesso!")
+      setSenhaAtual("")
+      setNovaSenha("")
+      setConfirmarSenha("")
+    } catch {
+      toast.error("Erro inesperado ao alterar a senha.")
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  const handleAvatarSelected = async (file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast.error("Formato de imagem inválido. Use JPG, PNG ou WebP.")
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 5MB.")
+      return
+    }
+    setIsUploadingAvatar(true)
+    try {
+      const dataUrl = await compressImage(file)
+      setAvatarImg(dataUrl)
+      setAvatarDirty(true)
+    } catch {
+      toast.error("Não foi possível processar a imagem. Tente outra.")
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  const handleRemoveAvatar = () => {
+    setAvatarImg(null)
+    setAvatarDirty(true)
+  }
 
   const handleSave = async () => {
+    if (isLoadingProfile || isUploadingAvatar) {
+      toast.error("Aguarde o carregamento terminar antes de salvar.")
+      return
+    }
     setIsSaving(true)
     try {
       const fullName = [nome.trim(), sobrenome.trim()].filter(Boolean).join(" ")
-      const res = await updateProfileAction({
+      const preferences: Preferences = {
+        studyDays: diasEstudo,
+        firstDayOfWeek: primeiroDia,
+        timerSound: somTimer,
+        timezone: fusoHorario,
+        publicProfile: perfilPublico,
+        avatarType: tipoFoto,
+        nameType: tipoNome,
+        notifyConstancia: notifConstancia,
+        notifyRevisao: notifRevisao,
+        notifyFeedback: notifFeedback,
+        customCategories,
+      }
+
+      const update: Parameters<typeof updateProfileAction>[0] = {
         name: fullName || null,
         full_name: fullName || null,
-      })
-      if (res.success) {
-        toast.success("Alterações salvas com sucesso!")
-        onOpenChange(false)
-      } else {
-        toast.error(res.error || "Erro ao salvar perfil.")
+        nickname: apelido.trim() || null,
+        birthday: aniversario || null,
+        gender: genero,
+        city: cidade.trim() || null,
+        uf: uf || null,
+        preferences,
       }
+      if (avatarDirty) update.avatar_url = avatarImg
+      if (email.trim()) update.email = email.trim()
+
+      const res = await updateProfileAction(update)
+
+      if (!res.success) {
+        toast.error(res.error || "Erro ao salvar perfil.")
+        return
+      }
+
+      if (avatarDirty) {
+        if (avatarImg) {
+          localStorage.setItem(avatarKey, avatarImg)
+        } else {
+          localStorage.removeItem(avatarKey)
+        }
+        window.dispatchEvent(new Event("avatarUpdated"))
+      }
+
+      if (res.emailPending) {
+        toast.success("Alterações salvas. Confirme o novo e-mail pelo link enviado.")
+      } else {
+        toast.success("Alterações salvas com sucesso!")
+      }
+      router.refresh()
+      onOpenChange(false)
     } catch {
       toast.error("Erro inesperado ao salvar.")
     } finally {
@@ -138,34 +334,6 @@ export function AccountSettingsModal({
     toast.success("Categoria personalizada adicionada!")
   }
 
-  // Carregar profile do banco ao abrir o modal
-  useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsLoadingProfile(true)
-    getProfileAction().then((res) => {
-      if (cancelled) return
-      if (res.success && res.data) {
-        const profile = res.data
-        const fullName = profile.name ?? profile.full_name ?? ""
-        const nameParts = fullName.trim().split(/\s+/)
-        const firstName = nameParts[0] || ""
-        const lastName = nameParts.slice(1).join(" ") || ""
-        setNome(firstName)
-        setSobrenome(lastName)
-        setEmail(profile.email ?? userEmail)
-        if (profile.avatar_url) {
-          setAvatarImg(profile.avatar_url)
-        }
-      }
-      setIsLoadingProfile(false)
-    }).catch(() => {
-      if (!cancelled) setIsLoadingProfile(false)
-    })
-    return () => { cancelled = true }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
@@ -180,40 +348,43 @@ export function AccountSettingsModal({
               <div className="flex items-center gap-3">
                 <div className="relative w-14 h-14 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
                   {avatarImg ? (
-                    <Image src={avatarImg} alt="Avatar" fill sizes="56px" className="object-cover" />
+                    <Image src={avatarImg} alt="Avatar" fill sizes="56px" className="object-cover" unoptimized />
                   ) : (
                     <User className="h-8 w-8 stroke-[2]" />
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <span className="text-[10px] font-bold uppercase text-muted-foreground block">
                     FOTO DE PERFIL
                   </span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     className="hidden"
                     ref={fileInputRef}
                     onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        const reader = new FileReader()
-                        reader.onloadend = () => {
-                          const base64String = reader.result as string
-                          setAvatarImg(base64String)
-                          localStorage.setItem(avatarKey, base64String)
-                          window.dispatchEvent(new Event("avatarUpdated"))
-                        }
-                        reader.readAsDataURL(file)
-                      }
+                      handleAvatarSelected(e.target.files?.[0])
+                      e.target.value = ""
                     }}
                   />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="mt-1 px-3 py-1 bg-slate-700 hover:bg-slate-800 text-white font-bold text-[11px] rounded-md transition-colors"
-                  >
-                    Carregar Foto
-                  </button>
+                  <div className="flex items-center gap-1 mt-1">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="px-3 py-1 bg-slate-700 hover:bg-slate-800 text-white font-bold text-[11px] rounded-md transition-colors disabled:opacity-50"
+                    >
+                      {isUploadingAvatar ? "Processando..." : "Carregar Foto"}
+                    </button>
+                    {avatarImg && (
+                      <button
+                        onClick={handleRemoveAvatar}
+                        className="p-1 text-muted-foreground hover:text-rose-500 transition-colors"
+                        title="Remover foto"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -296,16 +467,9 @@ export function AccountSettingsModal({
             {/* Botão Sair no Rodapé da Sidebar */}
             <button
               onClick={async () => {
-                // Limpar dados user-scoped do localStorage antes do logout
-                const keysToClean = Object.keys(localStorage).filter(k =>
-                  k.startsWith("mentor_user_avatar_") ||
-                  k === "mentor_user_avatar" ||
-                  k.startsWith("mentor_user_reminders_") ||
-                  k === "mentor_user_reminders"
-                )
-                keysToClean.forEach(k => localStorage.removeItem(k))
+                clearUserLocalData()
                 await logoutAction()
-                window.location.href = "/login"
+                window.location.replace("/login")
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-muted-foreground hover:text-rose-600 transition-colors"
             >
@@ -316,420 +480,441 @@ export function AccountSettingsModal({
 
           {/* Painel Direito (Conteúdo das Tabs + Botões Cancelar/Salvar) */}
           <div className="flex-1 p-6 flex flex-col justify-between space-y-6 overflow-y-auto">
-            {/* CONTEÚDO TAB 1: Dados Pessoais */}
-            {activeTab === "DADOS" && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">NOME</label>
-                    <Input value={nome} onChange={(e) => setNome(e.target.value)} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">SOBRENOME</label>
-                    <Input value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">APELIDO</label>
-                    <Input value={apelido} onChange={(e) => setApelido(e.target.value)} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">ANIVERSÁRIO</label>
-                    <Input type="date" value={aniversario} onChange={(e) => setAniversario(e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1 col-span-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">GÊNERO</label>
-                    <select
-                      value={genero}
-                      onChange={(e) => setGenero(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                    >
-                      <option value="Não Informado">Não Informado</option>
-                      <option value="Masculino">Masculino</option>
-                      <option value="Feminino">Feminino</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1 col-span-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">CIDADE</label>
-                    <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex: Vitória" />
-                  </div>
-
-                  <div className="space-y-1 col-span-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">UF</label>
-                    <select
-                      value={uf}
-                      onChange={(e) => setUf(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                    >
-                      <option value="ES">ES</option>
-                      <option value="SP">SP</option>
-                      <option value="RJ">RJ</option>
-                      <option value="MG">MG</option>
-                      <option value="PR">PR</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground">E-MAIL</label>
-                  <Input value={email} onChange={(e) => setEmail(e.target.value)} />
-                </div>
+            {isLoadingProfile ? (
+              <div className="flex flex-1 items-center justify-center py-20">
+                <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
               </div>
-            )}
+            ) : (
+              <>
+                {/* CONTEÚDO TAB 1: Dados Pessoais */}
+                {activeTab === "DADOS" && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">NOME</label>
+                        <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+                      </div>
 
-            {/* CONTEÚDO TAB 2: Preferências */}
-            {activeTab === "PREFERENCIAS" && (
-              <div className="space-y-5">
-                {/* Dias de Estudo */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    DIAS DE ESTUDO
-                  </label>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d, idx) => {
-                      const isSelected = diasEstudo.includes(d)
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => toggleDia(d)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                            isSelected
-                              ? "bg-[#2563EB] text-white border-[#2563EB]"
-                              : "border-muted text-muted-foreground hover:border-[#2563EB]"
-                          }`}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">SOBRENOME</label>
+                        <Input value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">APELIDO</label>
+                        <Input value={apelido} onChange={(e) => setApelido(e.target.value)} />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">ANIVERSÁRIO</label>
+                        <Input type="date" value={aniversario} onChange={(e) => setAniversario(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-1 col-span-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">GÊNERO</label>
+                        <select
+                          value={genero}
+                          onChange={(e) => setGenero(e.target.value)}
+                          className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
                         >
-                          {d}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
+                          <option value="Não Informado">Não Informado</option>
+                          <option value="Masculino">Masculino</option>
+                          <option value="Feminino">Feminino</option>
+                        </select>
+                      </div>
 
-                {/* Espectro de Classificação de Desempenho */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    CLASSIFICAÇÃO DE DESEMPENHO
-                  </label>
-                  <div className="flex h-5 rounded-md overflow-hidden font-bold text-[10px] text-white text-center">
-                    <div className="w-[65%] bg-rose-500 flex items-center justify-center">Ruim</div>
-                    <div className="w-[10%] bg-amber-400 text-amber-950 flex items-center justify-center">Regular</div>
-                    <div className="w-[25%] bg-emerald-500 flex items-center justify-center">Bom</div>
-                  </div>
-                  <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
-                    <span>0%</span>
-                    <span>65%</span>
-                    <span>75%</span>
-                    <span>100%</span>
-                  </div>
-                </div>
+                      <div className="space-y-1 col-span-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">CIDADE</label>
+                        <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex: Vitória" />
+                      </div>
 
-                {/* Período das Revisões */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    PERÍODO DAS REVISÕES
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {["1d", "7d", "30d", "60d", "120d"].map((r) => (
-                      <span key={r} className="px-3 py-1 rounded-md border text-xs font-bold text-muted-foreground bg-muted/20">
-                        {r}
-                      </span>
-                    ))}
-                    <button className="p-1 rounded-md border text-xs font-bold hover:text-[#2563EB]">+</button>
-                  </div>
-                </div>
+                      <div className="space-y-1 col-span-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">UF</label>
+                        <select
+                          value={uf}
+                          onChange={(e) => setUf(e.target.value)}
+                          className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        >
+                          <option value="">—</option>
+                          <option value="ES">ES</option>
+                          <option value="SP">SP</option>
+                          <option value="RJ">RJ</option>
+                          <option value="MG">MG</option>
+                          <option value="PR">PR</option>
+                        </select>
+                      </div>
+                    </div>
 
-                {/* Primeiro dia da semana & Som do Timer */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">PRIMEIRO DIA DA SEMANA</label>
-                    <select
-                      value={primeiroDia}
-                      onChange={(e) => setPrimeiroDia(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                    >
-                      <option value="Domingo">Domingo</option>
-                      <option value="Segunda-feira">Segunda-feira</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold uppercase text-muted-foreground">SOM DO TIMER</label>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={somTimer}
-                        onChange={(e) => setSomTimer(e.target.value)}
-                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                      >
-                        <option value="Melodia 1">Melodia 1</option>
-                        <option value="Sino">Sino</option>
-                        <option value="Silencioso">Silencioso</option>
-                      </select>
-                      <button className="p-2 text-muted-foreground hover:text-foreground">
-                        <Volume2 className="h-4 w-4" />
-                      </button>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">E-MAIL</label>
+                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                      <p className="text-[10px] text-muted-foreground">
+                        Ao alterar, você receberá um link de confirmação no novo e-mail.
+                      </p>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Fuso Horário */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground">FUSO HORÁRIO</label>
-                  <select
-                    value={fusoHorario}
-                    onChange={(e) => setFusoHorario(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                  >
-                    <option value="(UTC-03:00) Brasília">(UTC-03:00) Brasília</option>
-                    <option value="(UTC-04:00) Manaus">(UTC-04:00) Manaus</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* CONTEÚDO TAB 3: Ranking */}
-            {activeTab === "RANKING" && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    TORNAR MEU PERFIL PÚBLICO
-                  </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={perfilPublico}
-                      onChange={(e) => setPerfilPublico(e.target.checked)}
-                      className="rounded text-[#2563EB] focus:ring-[#2563EB]"
-                    />
-                    <span>PERMITE QUE OUTRAS PESSOAS VEJAM O SEU PERFIL NOS RANKINGS</span>
-                  </label>
-                </div>
-
-                {/* Minha Foto */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    MINHA FOTO
-                  </label>
-                  <div className="space-y-2 text-xs font-semibold">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="foto"
-                        checked={tipoFoto === "foto"}
-                        onChange={() => setTipoFoto("foto")}
-                        className="text-[#2563EB]"
-                      />
-                      <div className="w-7 h-7 rounded-full border-2 border-[#2563EB] text-[#2563EB] flex items-center justify-center">
-                        <User className="h-4 w-4" />
+                {/* CONTEÚDO TAB 2: Preferências */}
+                {activeTab === "PREFERENCIAS" && (
+                  <div className="space-y-5">
+                    {/* Dias de Estudo */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        DIAS DE ESTUDO
+                      </label>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d, idx) => {
+                          const isSelected = diasEstudo.includes(d)
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => toggleDia(d)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                isSelected
+                                  ? "bg-[#2563EB] text-white border-[#2563EB]"
+                                  : "border-muted text-muted-foreground hover:border-[#2563EB]"
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          )
+                        })}
                       </div>
-                      <span>Usar minha foto de perfil</span>
-                    </label>
+                    </div>
 
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="foto"
-                        checked={tipoFoto === "iniciais"}
-                        onChange={() => setTipoFoto("iniciais")}
-                        className="text-[#2563EB]"
-                      />
-                      <div className="w-7 h-7 rounded-full bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center">
-                        {(nome?.[0] || "?")}{(sobrenome?.[0] || "")}
+                    {/* Espectro de Classificação de Desempenho */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        CLASSIFICAÇÃO DE DESEMPENHO
+                      </label>
+                      <div className="flex h-5 rounded-md overflow-hidden font-bold text-[10px] text-white text-center">
+                        <div className="w-[65%] bg-rose-500 flex items-center justify-center">Ruim</div>
+                        <div className="w-[10%] bg-amber-400 text-amber-950 flex items-center justify-center">Regular</div>
+                        <div className="w-[25%] bg-emerald-500 flex items-center justify-center">Bom</div>
                       </div>
-                      <span>Usar minhas iniciais</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Meu Nome */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    MEU NOME
-                  </label>
-                  <div className="space-y-2 text-xs font-semibold">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="nome"
-                        checked={tipoNome === "nome"}
-                        onChange={() => setTipoNome("nome")}
-                        className="text-[#2563EB]"
-                      />
-                      <span>Usar meu nome de perfil</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="nome"
-                        checked={tipoNome === "apelido"}
-                        onChange={() => setTipoNome("apelido")}
-                        className="text-[#2563EB]"
-                      />
-                      <span>Usar meu apelido</span>
-                    </label>
-                  </div>
-                  {tipoNome === "apelido" && (
-                    <Input value={apelido} onChange={(e) => setApelido(e.target.value)} className="mt-1" />
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* CONTEÚDO TAB 4: Categorias */}
-            {activeTab === "CATEGORIAS" && (
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    CATEGORIAS FIXAS
-                  </label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className="bg-purple-600 text-white font-bold text-xs px-3 py-1">TEORIA</Badge>
-                    <Badge className="bg-rose-500 text-white font-bold text-xs px-3 py-1">REVISÃO</Badge>
-                    <Badge className="bg-emerald-500 text-white font-bold text-xs px-3 py-1">QUESTÕES</Badge>
-                    <Badge className="bg-sky-500 text-white font-bold text-xs px-3 py-1">SIMULADOS</Badge>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                    CATEGORIAS PERSONALIZADAS
-                  </label>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {customCategories.map((cat, idx) => (
-                      <Badge key={idx} variant="outline" className="text-xs font-bold">
-                        {cat}
-                      </Badge>
-                    ))}
-
-                    {showAddCat ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          value={newCategoryInput}
-                          onChange={(e) => setNewCategoryInput(e.target.value)}
-                          placeholder="Nova categoria"
-                          className="h-8 text-xs w-36"
-                          autoFocus
-                        />
-                        <Button size="sm" onClick={handleAddCategory} className="bg-[#2563EB] text-white h-8 text-xs">
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
+                      <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
+                        <span>0%</span>
+                        <span>65%</span>
+                        <span>75%</span>
+                        <span>100%</span>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowAddCat(true)}
-                        className="px-3 py-1 border rounded-md text-xs font-bold hover:text-[#2563EB] transition-colors"
+                    </div>
+
+                    {/* Período das Revisões */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        PERÍODO DAS REVISÕES
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {["1d", "7d", "30d", "60d", "120d"].map((r) => (
+                          <span key={r} className="px-3 py-1 rounded-md border text-xs font-bold text-muted-foreground bg-muted/20">
+                            {r}
+                          </span>
+                        ))}
+                        <button className="p-1 rounded-md border text-xs font-bold hover:text-[#2563EB]">+</button>
+                      </div>
+                    </div>
+
+                    {/* Primeiro dia da semana & Som do Timer */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">PRIMEIRO DIA DA SEMANA</label>
+                        <select
+                          value={primeiroDia}
+                          onChange={(e) => setPrimeiroDia(e.target.value)}
+                          className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        >
+                          <option value="Domingo">Domingo</option>
+                          <option value="Segunda-feira">Segunda-feira</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">SOM DO TIMER</label>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={somTimer}
+                            onChange={(e) => setSomTimer(e.target.value)}
+                            className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                          >
+                            <option value="Melodia 1">Melodia 1</option>
+                            <option value="Sino">Sino</option>
+                            <option value="Silencioso">Silencioso</option>
+                          </select>
+                          <button className="p-2 text-muted-foreground hover:text-foreground">
+                            <Volume2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fuso Horário */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">FUSO HORÁRIO</label>
+                      <select
+                        value={fusoHorario}
+                        onChange={(e) => setFusoHorario(e.target.value)}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
                       >
-                        +
-                      </button>
-                    )}
+                        <option value="(UTC-03:00) Brasília">(UTC-03:00) Brasília</option>
+                        <option value="(UTC-04:00) Manaus">(UTC-04:00) Manaus</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* CONTEÚDO TAB 5: Notificações */}
-            {activeTab === "NOTIFICACOES" && (
-              <div className="space-y-4">
-                <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                  TIPOS DE NOTIFICAÇÕES
-                </span>
+                {/* CONTEÚDO TAB 3: Ranking */}
+                {activeTab === "RANKING" && (
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        TORNAR MEU PERFIL PÚBLICO
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={perfilPublico}
+                          onChange={(e) => setPerfilPublico(e.target.checked)}
+                          className="rounded text-[#2563EB] focus:ring-[#2563EB]"
+                        />
+                        <span>PERMITE QUE OUTRAS PESSOAS VEJAM O SEU PERFIL NOS RANKINGS</span>
+                      </label>
+                    </div>
 
-                {/* Card 1: Constância */}
-                <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                  <input
-                    type="checkbox"
-                    checked={notifConstancia}
-                    onChange={(e) => setNotifConstancia(e.target.checked)}
-                    className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                  />
-                  <div>
-                    <h4 className="font-bold text-xs text-foreground">Constância</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Lembretes para manter o ritmo dos seus estudos e criar uma rotina consistente.
-                    </p>
+                    {/* Minha Foto */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        MINHA FOTO
+                      </label>
+                      <div className="space-y-2 text-xs font-semibold">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="foto"
+                            checked={tipoFoto === "foto"}
+                            onChange={() => setTipoFoto("foto")}
+                            className="text-[#2563EB]"
+                          />
+                          <div className="w-7 h-7 rounded-full border-2 border-[#2563EB] text-[#2563EB] flex items-center justify-center">
+                            <User className="h-4 w-4" />
+                          </div>
+                          <span>Usar minha foto de perfil</span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="foto"
+                            checked={tipoFoto === "iniciais"}
+                            onChange={() => setTipoFoto("iniciais")}
+                            className="text-[#2563EB]"
+                          />
+                          <div className="w-7 h-7 rounded-full bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center">
+                            {(nome?.[0] || "?")}{(sobrenome?.[0] || "")}
+                          </div>
+                          <span>Usar minhas iniciais</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Meu Nome */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        MEU NOME
+                      </label>
+                      <div className="space-y-2 text-xs font-semibold">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="nome"
+                            checked={tipoNome === "nome"}
+                            onChange={() => setTipoNome("nome")}
+                            className="text-[#2563EB]"
+                          />
+                          <span>Usar meu nome de perfil</span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="nome"
+                            checked={tipoNome === "apelido"}
+                            onChange={() => setTipoNome("apelido")}
+                            className="text-[#2563EB]"
+                          />
+                          <span>Usar meu apelido</span>
+                        </label>
+                      </div>
+                      {tipoNome === "apelido" && (
+                        <Input value={apelido} onChange={(e) => setApelido(e.target.value)} className="mt-1" />
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Card 2: Revisão */}
-                <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                  <input
-                    type="checkbox"
-                    checked={notifRevisao}
-                    onChange={(e) => setNotifRevisao(e.target.checked)}
-                    className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                  />
-                  <div>
-                    <h4 className="font-bold text-xs text-foreground">Revisão</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Notificações para revisar conteúdos no momento ideal.
-                    </p>
+                {/* CONTEÚDO TAB 4: Categorias */}
+                {activeTab === "CATEGORIAS" && (
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        CATEGORIAS FIXAS
+                      </label>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className="bg-purple-600 text-white font-bold text-xs px-3 py-1">TEORIA</Badge>
+                        <Badge className="bg-rose-500 text-white font-bold text-xs px-3 py-1">REVISÃO</Badge>
+                        <Badge className="bg-emerald-500 text-white font-bold text-xs px-3 py-1">QUESTÕES</Badge>
+                        <Badge className="bg-sky-500 text-white font-bold text-xs px-3 py-1">SIMULADOS</Badge>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        CATEGORIAS PERSONALIZADAS
+                      </label>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {customCategories.map((cat, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs font-bold">
+                            {cat}
+                          </Badge>
+                        ))}
+
+                        {showAddCat ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={newCategoryInput}
+                              onChange={(e) => setNewCategoryInput(e.target.value)}
+                              placeholder="Nova categoria"
+                              className="h-8 text-xs w-36"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault()
+                                  handleAddCategory()
+                                }
+                              }}
+                            />
+                            <Button size="sm" onClick={handleAddCategory} className="bg-[#2563EB] text-white h-8 text-xs">
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowAddCat(true)}
+                            className="px-3 py-1 border rounded-md text-xs font-bold hover:text-[#2563EB] transition-colors"
+                          >
+                            +
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Card 3: Feedback */}
-                <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                  <input
-                    type="checkbox"
-                    checked={notifFeedback}
-                    onChange={(e) => setNotifFeedback(e.target.checked)}
-                    className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                  />
-                  <div>
-                    <h4 className="font-bold text-xs text-foreground">Feedback</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Mensagens com insights e observações sobre seu desempenho e evolução.
-                    </p>
+                {/* CONTEÚDO TAB 5: Notificações */}
+                {activeTab === "NOTIFICACOES" && (
+                  <div className="space-y-4">
+                    <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      TIPOS DE NOTIFICAÇÕES
+                    </span>
+
+                    {/* Card 1: Constância */}
+                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
+                      <input
+                        type="checkbox"
+                        checked={notifConstancia}
+                        onChange={(e) => setNotifConstancia(e.target.checked)}
+                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
+                      />
+                      <div>
+                        <h4 className="font-bold text-xs text-foreground">Constância</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Lembretes para manter o ritmo dos seus estudos e criar uma rotina consistente.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Revisão */}
+                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
+                      <input
+                        type="checkbox"
+                        checked={notifRevisao}
+                        onChange={(e) => setNotifRevisao(e.target.checked)}
+                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
+                      />
+                      <div>
+                        <h4 className="font-bold text-xs text-foreground">Revisão</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Notificações para revisar conteúdos no momento ideal.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 3: Feedback */}
+                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
+                      <input
+                        type="checkbox"
+                        checked={notifFeedback}
+                        onChange={(e) => setNotifFeedback(e.target.checked)}
+                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
+                      />
+                      <div>
+                        <h4 className="font-bold text-xs text-foreground">Feedback</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Mensagens com insights e observações sobre seu desempenho e evolução.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* CONTEÚDO TAB 6: Segurança */}
-            {activeTab === "SEGURANCA" && (
-              <div className="space-y-4">
-                <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                  ALTERAR SENHA
-                </span>
+                {/* CONTEÚDO TAB 6: Segurança */}
+                {activeTab === "SEGURANCA" && (
+                  <div className="space-y-4">
+                    <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      ALTERAR SENHA
+                    </span>
 
-                <div className="space-y-3 max-w-sm">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground">Senha Atual</label>
-                    <Input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} />
+                    <div className="space-y-3 max-w-sm">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-muted-foreground">Senha Atual</label>
+                        <Input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-muted-foreground">Nova Senha</label>
+                        <Input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-muted-foreground">Confirmar Nova Senha</label>
+                        <Input type="password" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} />
+                      </div>
+
+                      <Button
+                        onClick={handleChangePassword}
+                        disabled={isChangingPassword}
+                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs w-full mt-2"
+                      >
+                        {isChangingPassword ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Alterando...
+                          </>
+                        ) : (
+                          "Alterar Senha"
+                        )}
+                      </Button>
+                    </div>
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground">Nova Senha</label>
-                    <Input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground">Confirmar Nova Senha</label>
-                    <Input type="password" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} />
-                  </div>
-
-                  <Button
-                    onClick={() => {
-                      toast.success("Senha alterada com sucesso!")
-                      setSenhaAtual("")
-                      setNovaSenha("")
-                      setConfirmarSenha("")
-                    }}
-                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs w-full mt-2"
-                  >
-                    Alterar Senha
-                  </Button>
-                </div>
-              </div>
+                )}
+              </>
             )}
 
             {/* Botões do Rodapé: Cancelar & Salvar (100% Estudei) */}
@@ -744,7 +929,7 @@ export function AccountSettingsModal({
 
               <Button
                 onClick={handleSave}
-                disabled={isSaving || isLoadingProfile}
+                disabled={isSaving || isLoadingProfile || isUploadingAvatar}
                 className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-9 shadow-xs gap-1.5"
               >
                 {isSaving ? (
@@ -763,4 +948,3 @@ export function AccountSettingsModal({
     </Dialog>
   )
 }
-

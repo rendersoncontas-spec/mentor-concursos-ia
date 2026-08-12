@@ -178,6 +178,20 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   }, [session])
 
   useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return
+      setSession(prev => {
+        if (!prev || !prev.isActive) return prev
+        const { activeSeconds, pausedSeconds } = calculateTimes(prev)
+        if (prev.activeSeconds === activeSeconds && prev.pausedSeconds === pausedSeconds) return prev
+        return { ...prev, activeSeconds, pausedSeconds }
+      })
+    }
+    document.addEventListener("visibilitychange", handleVisibility)
+    return () => document.removeEventListener("visibilitychange", handleVisibility)
+  }, [])
+
+  useEffect(() => {
     if (session && session.isActive) {
       const timeStr = formatTime(session.activeSeconds)
       const isStudying = session.phase === 'STUDYING'
@@ -245,6 +259,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       // Timestamps para cálculo server-side
       sessionStartTime: session.startTime,
       sessionTotalPausedMs: session.totalPausedMs,
+      sessionLastPauseStartTime: session.lastPauseStartTime,
       is_manual_mode: false,
       // Dados que o saveStudySessionAction espera
       discipline_id: session.disciplineId,

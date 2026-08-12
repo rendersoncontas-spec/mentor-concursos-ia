@@ -28,17 +28,8 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
   useEffect(() => {
     const handleOpenCustomization = () => setIsCustomizationOpen(true)
     window.addEventListener("open-dashboard-customization", handleOpenCustomization)
-    
-    const handleRestoreStudy = () => setIsRegisterModalOpen(true)
-    window.addEventListener("restore-study-session", handleRestoreStudy)
-    
-    const handleOpenStudySession = () => setIsRegisterModalOpen(true)
-    window.addEventListener("open-study-session-modal", handleOpenStudySession)
-    
     return () => {
       window.removeEventListener("open-dashboard-customization", handleOpenCustomization)
-      window.removeEventListener("restore-study-session", handleRestoreStudy)
-      window.removeEventListener("open-study-session-modal", handleOpenStudySession)
     }
   }, [])
 
@@ -96,7 +87,10 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Button
-              onClick={() => setIsRegisterModalOpen(true)}
+              onClick={() => {
+                setIsRegisterModalOpen(true)
+                window.dispatchEvent(new CustomEvent("study-center-opened"))
+              }}
               className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs cursor-pointer"
             >
               Adicionar Estudo

@@ -20,14 +20,10 @@ export async function getDisciplinesForAutocomplete(): Promise<{
   planDisciplines: DisciplineOption[]
   allDisciplines: DisciplineOption[]
 }> {
-  console.warn("[getDisciplinesForAutocomplete] Iniciando busca...")
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  console.warn("[getDisciplinesForAutocomplete] User:", user?.id, "AuthError:", authError)
-
   if (authError || !user) {
-    console.warn("[getDisciplinesForAutocomplete] Sem usuário autenticado, retornando vazio")
     return { planDisciplines: [], allDisciplines: [] }
   }
 
@@ -45,7 +41,9 @@ export async function getDisciplinesForAutocomplete(): Promise<{
     .eq("user_id", user.id)
     .limit(50)
 
-  console.warn("[getDisciplinesForAutocomplete] userDiscs:", userDiscs, "Error:", userDiscsError)
+  if (userDiscsError) {
+    console.error("Erro ao buscar disciplinas do usuário:", userDiscsError)
+  }
 
   const planDisciplines: DisciplineOption[] = ((userDiscs || []) as unknown as UserDisciplineRecord[])
     .map((ud) => {
@@ -60,7 +58,7 @@ export async function getDisciplinesForAutocomplete(): Promise<{
     })
     .filter((d): d is DisciplineOption => d !== null)
     // Remover duplicatas
-    .filter((d: DisciplineOption, i: number, arr: DisciplineOption[]) => 
+    .filter((d: DisciplineOption, i: number, arr: DisciplineOption[]) =>
       arr.findIndex(x => x.id === d.id) === i
     )
 
@@ -71,7 +69,9 @@ export async function getDisciplinesForAutocomplete(): Promise<{
     .order("name")
     .limit(200)
 
-  console.warn("[getDisciplinesForAutocomplete] allDiscs:", allDiscs, "Error:", allDiscsError)
+  if (allDiscsError) {
+    console.error("Erro ao buscar disciplinas globais:", allDiscsError)
+  }
 
   const allDisciplines: DisciplineOption[] = (allDiscs || []).map((d) => ({
     id: d.id,
@@ -80,6 +80,5 @@ export async function getDisciplinesForAutocomplete(): Promise<{
     fromPlan: false,
   }))
 
-  console.warn("[getDisciplinesForAutocomplete] Retornando:", { planDisciplines, allDisciplines })
   return { planDisciplines, allDisciplines }
 }

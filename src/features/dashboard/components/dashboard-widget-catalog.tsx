@@ -599,6 +599,13 @@ export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetPr
 // 10. WIDGET: Ranking
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
+  // REGRA DE PONTOS DO RANKING DAS MATÉRIAS
+  // A única regra de ranking por disciplina existente no sistema é baseada em
+  // tempo de estudo (getDisciplineRanking). Para não criar uma segunda regra
+  // incompatível, os pontos reutilizam essa métrica: 1 ponto = 1 minuto de
+  // estudo na disciplina, acumulado no período de 30 dias (item.value).
+  // A ordenação é determinística (minutos -> nº de sessões -> nome alfabético),
+  // definida em application/study-analytics/rankings.ts.
   const ranking = snapshot?.analytics?.rankings?.disciplines || []
 
   return (
@@ -615,15 +622,20 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
             Sem dados suficientes para o ranking.
           </div>
         ) : (
-          ranking.slice(0, colSpan === 3 ? 5 : 3).map((item: { name?: string; disciplineName?: string; score?: number; points?: number }, idx: number) => (
-            <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 text-xs font-bold">
+          ranking.slice(0, colSpan === 3 ? 5 : 3).map((item, idx) => (
+            <div key={item.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 text-xs font-bold">
               <div className="flex items-center gap-2 truncate">
                 <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 flex items-center justify-center text-[10px] font-black shrink-0">
                   #{idx + 1}
                 </span>
-                <span className="truncate text-foreground">{item.name || item.disciplineName}</span>
+                <span className="truncate text-foreground">{item.name}</span>
+                {typeof item.secondaryValue === "number" && item.secondaryValue > 0 && (
+                  <span className="text-[10px] text-muted-foreground font-medium shrink-0">
+                    {item.secondaryValue} sessões
+                  </span>
+                )}
               </div>
-              <span className="font-mono text-[#2563EB] shrink-0">{item.score || item.points || 0} pts</span>
+              <span className="font-mono text-[#2563EB] shrink-0">{item.value ?? 0} pts</span>
             </div>
           ))
         )}
@@ -725,10 +737,11 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
   const time = snapshot?.activeTarget?.exam_time || "Horário não informado"
 
   const getDaysUntil = (date: string) => {
-    const d = new Date(date)
+    const d = new Date(date + "T00:00:00")
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
     const diff = d.getTime() - today.getTime()
-    return Math.ceil(diff / (1000 * 3600 * 24))
+    return Math.round(diff / (1000 * 3600 * 24))
   }
 
   const daysUntil = targetDate ? getDaysUntil(targetDate) : null
@@ -745,7 +758,7 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
           <>
             <div className="text-sm font-black text-foreground">{examName}</div>
             <div className="text-sm font-bold text-[#2563EB]">
-              {new Date(targetDate).toLocaleDateString("pt-BR")}
+              {new Date(targetDate + "T00:00:00").toLocaleDateString("pt-BR")}
               {daysUntil !== null && (
                 <span className="block text-xs text-muted-foreground font-medium">
                   {daysUntil > 0 ? `Faltam ${daysUntil} dias` : "Prova hoje ou já realizada"}

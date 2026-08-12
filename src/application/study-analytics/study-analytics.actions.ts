@@ -7,6 +7,8 @@ import type { StudyHistory } from "@/domain/study-history/study-history.types"
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
+export type RankingPeriod = 'today' | 'this_week' | 'last_week' | 'this_month' | 'general'
+
 interface RankingEntry {
   rank: number
   id: string
@@ -14,6 +16,7 @@ interface RankingEntry {
   avatar: string
   targetContest: string
   hours: string
+  totalMinutes: number
   questions: number
   pages: number
   initials: string
@@ -72,6 +75,7 @@ function normalizeRankingList(rows: unknown): RankingEntry[] {
         avatar: firstString(row['avatar'], row['avatar_url']),
         targetContest: firstString(row['targetContest']) || 'Global',
         hours: typeof rawHours === 'string' ? rawHours : formatHours(totalMinutes),
+        totalMinutes,
         questions: toNumber(row['questions'] ?? row['questions_count']),
         pages: toNumber(row['pages'] ?? row['pages_count']),
         initials: firstString(row['initials']) || initialsFor(name),
@@ -100,9 +104,14 @@ export async function getUserStatisticsAction(periodDays: number = 365) {
     const disciplineRanking = AnalyticsEngine.rankings.getDisciplineRanking(context)
     const evolution = AnalyticsEngine.visuals.getEvolutionTimeSeries(context, 7) // Ultimos 7 dias
     
-    // Mock de acertos por enquanto até integrar com 'question_attempts'
-    const totalCorrect = 0
-    const totalWrong = 0
+    // Acertos/erros reais (question_attempts)
+    const { data: attemptsRows } = await supabase
+      .from("question_attempts")
+      .select("correct")
+      .eq("user_id", user.id)
+    const attempts = attemptsRows || []
+    const totalCorrect = attempts.filter((a: { correct: boolean }) => a.correct).length
+    const totalWrong = attempts.length - totalCorrect
     
     return {
       data: {
@@ -120,7 +129,7 @@ export async function getUserStatisticsAction(periodDays: number = 365) {
   }
 }
 
-export async function getGlobalRankingAction(period: 'this_week' | 'last_week' | 'general' = 'this_week') {
+export async function getGlobalRankingAction(period: RankingPeriod = 'this_week', weekOffset: number = 0) {
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   
   try {
@@ -129,12 +138,16 @@ export async function getGlobalRankingAction(period: 'this_week' | 'last_week' |
 
     // Usar a RPC que bypassa RLS via SECURITY DEFINER
     const { data: rpcData, error: rpcError } = await supabase
-      .rpc('get_global_ranking', { p_period: period, p_current_user_id: currentUser?.id || null })
+      .rpc('get_global_ranking', {
+        p_period: period,
+        p_current_user_id: currentUser?.id || null,
+        p_week_offset: weekOffset,
+      })
 
     if (rpcError) {
       console.error("Erro ao chamar RPC get_global_ranking:", rpcError)
       // Fallback: tentar query direta (caso a RPC não esteja disponível)
-      return await getRankingViaDirectQuery(supabase, period, currentUser?.id)
+      return await getRankingViaDirectQuery(supabase, period, currentUser?.id, weekOffset)
     }
 
     // Normaliza a resposta da RPC para o shape esperado pelo cliente:
@@ -197,7 +210,7 @@ export async function getGlobalRankingAction(period: 'this_week' | 'last_week' |
 // A view também devolve display_name (docs/fix-ranking-names.sql):
 // sem isso o nome dos demais usuários nunca chega, pois profiles tem RLS por
 // usuário e o SELECT direto só retorna o perfil de quem está logado.
-async function getRankingViaDirectQuery(supabase: Supabase, period: string, currentUserId?: string) {
+async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPeriod, currentUserId?: string, weekOffset: number = 0) {
   const now = new Date()
   const getMonday = (d: Date) => {
     const date = new Date(d)
@@ -213,14 +226,29 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: string, curr
   const lastSunday = new Date(thisMonday)
   lastSunday.setMilliseconds(-1)
 
+  const offsetMonday = new Date(thisMonday)
+  offsetMonday.setDate(offsetMonday.getDate() + weekOffset * 7)
+  const offsetSunday = new Date(offsetMonday)
+  offsetSunday.setDate(offsetSunday.getDate() + 7)
+  offsetSunday.setMilliseconds(-1)
+
   let startDate: string | null = null
   let endDate: string | null = null
 
-  if (period === 'this_week') {
-    startDate = thisMonday.toISOString()
+  if (period === 'today') {
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+    startDate = todayStart.toISOString()
+  } else if (period === 'this_week') {
+    startDate = offsetMonday.toISOString()
+    // Semana anterior (offset < 0): janela fechada de Segunda a Domingo
+    if (weekOffset < 0) endDate = offsetSunday.toISOString()
   } else if (period === 'last_week') {
     startDate = lastMonday.toISOString()
     endDate = lastSunday.toISOString()
+  } else if (period === 'this_month') {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    startDate = monthStart.toISOString()
   }
 
   let query = supabase
@@ -348,7 +376,8 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: string, curr
     rank: idx + 1, id: item.id,
     name: item.id === currentUserId ? `${item.name} (Você)` : item.name,
     avatar: item.avatar, targetContest: 'Global',
-    hours: formatHours(item.totalMinutes), questions: item.questionsCount,
+    hours: formatHours(item.totalMinutes), totalMinutes: item.totalMinutes,
+    questions: item.questionsCount,
     pages: item.pagesCount, initials: item.initials,
     bgColor: item.bgColor, hasActivity: item.totalMinutes > 0,
   }))
@@ -362,7 +391,7 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: string, curr
     const found = ranking.find(r => r.id === currentUserId)
     return found || {
       rank: ranking.length + 1, id: currentUserId, name: 'Você', avatar: '',
-      targetContest: 'Global', hours: '0min', questions: 0, pages: 0,
+      targetContest: 'Global', hours: '0min', totalMinutes: 0, questions: 0, pages: 0,
       initials: 'VC', bgColor: 'bg-blue-600', hasActivity: false,
     }
   }

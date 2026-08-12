@@ -12,6 +12,7 @@ async function handleLogout() {
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   let user = null
   let profileName: string | null = null
+  let avatarUrl: string | null = null
 
   try {
     const supabase = await createClient()
@@ -21,18 +22,18 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     if (user) {
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("name, full_name")
+        .select("name, full_name, avatar_url")
         .eq("id", user.id)
         .maybeSingle()
 
       profileName = profileData?.name ?? profileData?.full_name ?? null
+      avatarUrl = profileData?.avatar_url ?? null
     }
   } catch {
     console.warn("Conexão Supabase indisponível no ProtectedLayout. Modo de desenvolvimento/contingência ativado.")
   }
 
-  // @ts-expect-error: TS4111 prevents dot notation, but Next.js requires it for build-time inline replacement
-  const isDevMode = process.env.NEXT_PUBLIC_APP_MODE === 'development' || process.env.NODE_ENV === 'development'
+  const isDevMode = process.env.NODE_ENV === "development"
 
   if (!user && !isDevMode) {
     redirect("/login")
@@ -47,6 +48,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
       userEmail={userEmail}
       userName={userName}
       userId={userId}
+      avatarUrl={avatarUrl}
       logoutAction={handleLogout}
     >
       {children}

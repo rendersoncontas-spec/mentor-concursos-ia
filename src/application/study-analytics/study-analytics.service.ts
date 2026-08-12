@@ -25,6 +25,8 @@ export async function getStudyHistoryForAnalytics(
     .select(`
       id,
       discipline_id,
+      study_source,
+      study_type,
       started_at,
       duration_minutes,
       completed,

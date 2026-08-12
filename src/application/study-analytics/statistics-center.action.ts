@@ -47,7 +47,7 @@ type Supabase = Awaited<ReturnType<typeof createClient>>
 async function fetchActivePlan(supabase: Supabase, userId: string): Promise<ActivePlan | null> {
   const { data: plan } = await supabase
     .from("study_plans")
-    .select("id, weekly_hours, weekly_questions, weekly_days")
+    .select("id, active")
     .eq("user_id", userId)
     .eq("active", true)
     .order("generated_at", { ascending: false })
@@ -61,25 +61,25 @@ async function fetchActivePlan(supabase: Supabase, userId: string): Promise<Acti
     .select("day_of_week, duration_minutes, discipline_id")
     .eq("study_plan_id", plan.id)
 
-  const weekDays = Number(plan.weekly_days)
-  const hasWeeklyTarget =
-    Number(plan.weekly_hours) > 0 ||
-    Number(plan.weekly_questions) > 0 ||
-    Number(weekDays) > 0
+  const planItems = (items ?? [])
+    .map((it) => ({
+      dayOfWeek: Number(it.day_of_week) || 0,
+      durationMinutes: Number(it.duration_minutes) || 0,
+      disciplineId: it.discipline_id ?? null,
+    }))
+    .filter((it) => it.durationMinutes > 0)
 
-  if (!hasWeeklyTarget) return null
+  if (planItems.length === 0) return null
+
+  // Carga semanal = soma da duração dos itens do plano (colunas reais de study_plans
+  // não possuem metas; as metas semanais do perfil ficam em profiles).
+  const weeklyHours = planItems.reduce((acc, it) => acc + it.durationMinutes, 0)
 
   return {
-    weeklyHours: plan.weekly_hours !== null && plan.weekly_hours !== undefined ? Number(plan.weekly_hours) : null,
-    weeklyQuestions: plan.weekly_questions !== null && plan.weekly_questions !== undefined ? Number(plan.weekly_questions) : null,
-    weeklyDays: weekDays || null,
-    items: (items ?? [])
-      .map((it) => ({
-        dayOfWeek: Number(it.day_of_week) || 0,
-        durationMinutes: Number(it.duration_minutes) || 0,
-        disciplineId: it.discipline_id ?? null,
-      }))
-      .filter((it) => it.durationMinutes > 0),
+    weeklyHours: weeklyHours > 0 ? weeklyHours : null,
+    weeklyQuestions: null,
+    weeklyDays: null,
+    items: planItems,
   }
 }
 
@@ -265,7 +265,7 @@ export async function getStatisticsCenterAction(): Promise<{
         .from("review_history")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
-        .gte("reviewed_at", last30.toISOString())
+        .gte("review_date", last30.toISOString())
       reviewsCompletedLast30 = count ?? 0
     } catch {
       reviewsCompletedLast30 = 0

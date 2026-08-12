@@ -322,7 +322,7 @@ export async function getDisciplinesPageData(
   const [questionAttemptsResult, studyHistoryResult] = await Promise.all([
     supabase
       .from("question_attempts")
-      .select("id, correct, discipline_id")
+      .select("id, correct, questions!inner ( discipline_id )")
       .eq("user_id", userId),
     supabase
       .from("study_history")
@@ -330,7 +330,15 @@ export async function getDisciplinesPageData(
       .eq("user_id", userId)
   ])
 
-  const attempts = questionAttemptsResult?.data || []
+  const attempts = (questionAttemptsResult?.data || []).map((a: {
+    id: string
+    correct: boolean
+    questions?: { discipline_id?: string } | Array<{ discipline_id?: string }>
+  }) => ({
+    id: a.id,
+    correct: a.correct,
+    discipline_id: (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ?? null,
+  }))
   const history = studyHistoryResult?.data || []
 
   const COLOR_PALETTE = [

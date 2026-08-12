@@ -47,7 +47,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       getRecentActivities(supabase, userId, 5).catch(() => []),
       supabase
         .from("question_attempts")
-        .select("id, correct, discipline_id, created_at, answered_at")
+        .select("id, correct, question_id, created_at, answered_at, questions!inner ( discipline_id )")
         .eq("user_id", userId),
       supabase
         .from("user_dashboard_layouts")
@@ -95,7 +95,22 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       exam_name,
     } : null
 
-    const attempts = questionAttemptsResult?.data || []
+    const attemptsRaw = questionAttemptsResult?.data || []
+    const attempts = attemptsRaw.map((a: {
+      id: string
+      correct: boolean
+      question_id: string
+      created_at: string
+      answered_at: string
+      questions?: { discipline_id?: string } | Array<{ discipline_id?: string }>
+    }) => ({
+      id: a.id,
+      correct: a.correct,
+      question_id: a.question_id,
+      created_at: a.created_at,
+      answered_at: a.answered_at,
+      discipline_id: (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ?? null,
+    }))
     let totalQuestions = attempts.length
     let correctQuestions = attempts.filter((a: { correct: boolean }) => a.correct).length
 
@@ -150,11 +165,10 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       }
     })
 
-    // Revisions (Apenas mock para UI inicial ou calcular se tivermos dados de reviews completas)
-    // Para simplificar, consideramos "revisões concluídas na semana" a partir das sessões de revisão no histórico
+    // Revisões concluídas na semana = sessões registradas como revisão no histórico
     const weeklyRevisions = rawHistory.filter((h) => {
       const d = new Date(h.started_at)
-      return h.completed && d.getTime() >= startOfWeekMs && (h as { is_review?: boolean }).is_review // is_review pode não existir, fallback 0
+      return h.completed && d.getTime() >= startOfWeekMs && (h.study_type === "REVISAO" || h.study_source === "REVIEW")
     }).length || 0
     
     // Dias ativos na semana

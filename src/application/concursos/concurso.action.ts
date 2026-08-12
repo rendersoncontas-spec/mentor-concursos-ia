@@ -370,33 +370,8 @@ export async function deleteConcursoAction(id: string): Promise<{ success: boole
 
     if (!existing) return { success: false, error: "Concurso não encontrado." }
 
-    // Excluir planos de estudo e seus itens
-    const { data: plans } = await supabase
-      .from("study_plans")
-      .select("id")
-      .eq("user_id", user.id)
-
-    if (plans && plans.length > 0) {
-      const planIds = plans.map((p: { id: string }) => p.id)
-      
-      // Excluir os itens do plano
-      await supabase
-        .from("study_plan_items")
-        .delete()
-        .in("study_plan_id", planIds)
-        
-      // Excluir o histórico de estudo associado
-      await supabase
-        .from("study_history")
-        .delete()
-        .eq("user_id", user.id)
-        
-      // Excluir os planos
-      await supabase
-        .from("study_plans")
-        .delete()
-        .in("id", planIds)
-    }
+    // Excluir somente o concurso. Planos de estudo e histórico NÃO são vinculados
+    // a um concurso (não possuem target_id), portanto preservá-los evita perda de dados.
 
     const { error } = await supabase
       .from("user_targets")

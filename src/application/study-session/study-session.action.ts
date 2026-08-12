@@ -4,33 +4,17 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export async function saveStudySessionAction(data: Record<string, unknown>) {
-  const log = (msg: string, payload?: unknown) => {
-    console.warn(`[STUDY_SAVE] ${msg}`, payload !== undefined ? payload : "")
-  }
-
   try {
-    log("START", { 
-      is_manual_mode: data["is_manual_mode"], 
-      discipline_id: data["discipline_id"], 
-      discipline_name: data["discipline_name"],
-      studyType: data["studyType"],
-      technique: data["technique"],
-      has_sessionStartTime: !!data["sessionStartTime"],
-    })
-
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    log("USER", { userId: user?.id, authError: authError?.message })
 
     if (authError || !user) {
-      log("AUTH_ERROR", authError)
       return { success: false, error: "Usuário não autenticado. Faça login novamente." }
     }
 
     // 1. Busca Disciplina (não cria mais - RLS impede INSERT na tabela disciplines)
     let disciplineId = data["discipline_id"]
     if (!disciplineId && data["discipline_name"]) {
-      log("DISCIPLINE_FIND", { name: data["discipline_name"] })
       const { data: existingDisc, error: findError } = await supabase
         .from("disciplines")
         .select("id")
@@ -38,25 +22,20 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
         .maybeSingle()
 
       if (findError) {
-        log("DISCIPLINE_FIND_ERROR", findError)
         console.error("Erro ao buscar disciplina:", findError)
       }
 
       if (existingDisc) {
         disciplineId = existingDisc.id
-        log("DISCIPLINE_FOUND", { id: disciplineId })
       } else {
-        // Não tentar criar — RLS impede INSERT na tabela disciplines
-        log("DISCIPLINE_NOT_FOUND", { name: data["discipline_name"] })
-        return { 
-          success: false, 
-          error: "Disciplina não encontrada no sistema. Selecione uma disciplina existente na lista." 
+        return {
+          success: false,
+          error: "Disciplina não encontrada no sistema. Selecione uma disciplina existente na lista.",
         }
       }
     }
 
     if (!disciplineId) {
-      log("DISCIPLINE_MISSING")
       return { success: false, error: "Disciplina não encontrada e não foi possível criar." }
     }
 
@@ -86,9 +65,15 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     if (!data["is_manual_mode"] && data["sessionStartTime"]) {
       const now = Date.now()
       const startTime = Number(data["sessionStartTime"])
-      const totalPausedMs = Number(data["sessionTotalPausedMs"] || 0)
+      // Desconta o total de pausas já finalizadas E a pausa em andamento (se houver),
+      // espelhando o cálculo do client (calculateTimes).
+      let totalPausedMs = Number(data["sessionTotalPausedMs"] || 0)
+      const lastPauseStartTime = Number(data["sessionLastPauseStartTime"])
+      if (lastPauseStartTime > 0) {
+        totalPausedMs += Math.max(0, now - lastPauseStartTime)
+      }
 
-const totalElapsedMs = now - startTime
+      const totalElapsedMs = now - startTime
       const activeMs = Math.max(0, totalElapsedMs - totalPausedMs)
 
       // Banco espera integer — arredondar para inteiro
@@ -158,8 +143,6 @@ const totalElapsedMs = now - startTime
       insertPayload["finished_at"] = now
     }
 
-    log("PAYLOAD", insertPayload)
-
     // 6. Salva no study_history
     const { data: historyData, error: historyError } = await supabase
       .from("study_history")
@@ -168,16 +151,13 @@ const totalElapsedMs = now - startTime
       .single()
 
     if (historyError) {
-      log("DATABASE_ERROR", historyError)
       console.error("[STUDY_SAVE] Erro ao inserir study_history:", historyError)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: "Erro ao salvar sessão: " + (historyError.message || JSON.stringify(historyError)),
-        code: historyError.code
+        code: historyError.code,
       }
     }
-
-    log("SUCCESS", { id: historyData.id })
 
     // Revalidar páginas que dependem de dados de sessão
     revalidatePath("/dashboard")
@@ -189,8 +169,6 @@ const totalElapsedMs = now - startTime
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro inesperado ao salvar."
-    const stack = err instanceof Error ? err.stack : undefined
-    log("EXCEPTION", { message, stack })
     console.error("[saveStudySession] Erro inesperado:", err)
     return { success: false, error: message }
   }

@@ -18,7 +18,6 @@ export default async function PlanejamentoPage() {
 
     if (user) {
       cycleData = await getCycleOverviewData(supabase, user.id)
-      console.warn("DEBUG: cycleData loading state:", { hasData: !!cycleData, blocksCount: cycleData?.blocks?.length });
     }
   } catch (error) {
     console.error("Erro ao carregar dados do Planejamento:", error)

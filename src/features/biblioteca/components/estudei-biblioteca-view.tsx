@@ -1,11 +1,13 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Library,
-  ChevronDown,
   ExternalLink,
   Trash2,
+  Search,
+  Loader2,
+  Download,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,79 +20,236 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
-
-export interface MaterialItem {
-  id: string
-  title: string
-  disciplineName: string
-  type: "PDF" | "Resumo" | "Link" | "Vídeo"
-  url: string
-  dateAdded: string
-}
-
-const DEFAULT_MATERIALS: MaterialItem[] = [
-  {
-    id: "m1",
-    title: "Vade Mecum Direito Constitucional 2026",
-    disciplineName: "Direito Constitucional",
-    type: "PDF",
-    url: "https://planalto.gov.br",
-    dateAdded: "01/08/2026",
-  },
-  {
-    id: "m2",
-    title: "Resumo Esquetematizado - Contabilidade Geral",
-    disciplineName: "Contabilidade Geral",
-    type: "Resumo",
-    url: "https://drive.google.com",
-    dateAdded: "03/08/2026",
-  },
-  {
-    id: "m3",
-    title: "Caderno de Questões - RLM Completo",
-    disciplineName: "Raciocínio Lógico",
-    type: "Link",
-    url: "https://qconcursos.com",
-    dateAdded: "05/08/2026",
-  },
-]
+import {
+  listLibraryMaterialsAction,
+  createLibraryMaterialAction,
+  deleteLibraryMaterialAction,
+  type LibraryMaterialItem,
+} from "@/application/library/library.action"
 
 export function EstudeiBibliotecaView() {
-  const [materials, setMaterials] = useState<MaterialItem[]>(DEFAULT_MATERIALS)
+  const [materials, setMaterials] = useState<LibraryMaterialItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Form State
   const [titleInput, setTitleInput] = useState("")
   const [disciplineInput, setDisciplineInput] = useState("")
-  const [typeInput, setTypeInput] = useState<"PDF" | "Resumo" | "Link" | "Vídeo">("PDF")
+  const [typeInput, setTypeInput] = useState<LibraryMaterialItem["type"]>("PDF")
   const [urlInput, setUrlInput] = useState("")
 
-  const handleAddMaterial = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!titleInput.trim()) return
-
-    const newMaterial: MaterialItem = {
-      id: `mat-${Date.now()}`,
-      title: titleInput.trim(),
-      disciplineName: disciplineInput.trim() || "Geral",
-      type: typeInput,
-      url: urlInput.trim() || "#",
-      dateAdded: new Date().toLocaleDateString("pt-BR"),
+  const loadMaterials = async () => {
+    setIsLoading(true)
+    setLoadError(null)
+    const res = await listLibraryMaterialsAction()
+    if (res.success && res.data) {
+      setMaterials(res.data)
+    } else {
+      setLoadError(res.error || "Erro ao carregar biblioteca.")
     }
-
-    const updated = [newMaterial, ...materials]
-    setMaterials(updated)
-    toast.success("Material adicionado à biblioteca!")
-
-    setTitleInput("")
-    setDisciplineInput("")
-    setUrlInput("")
-    setIsModalOpen(false)
+    setIsLoading(false)
   }
 
-  const handleRemoveMaterial = (id: string) => {
-    setMaterials(materials.filter((m) => m.id !== id))
-    toast.success("Material removido com sucesso.")
+  useEffect(() => {
+    let cancelled = false
+    listLibraryMaterialsAction().then((res) => {
+      if (cancelled) return
+      if (res.success && res.data) {
+        setMaterials(res.data)
+      } else {
+        setLoadError(res.error || "Erro ao carregar biblioteca.")
+      }
+      setIsLoading(false)
+    }).catch(() => {
+      if (!cancelled) setIsLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleAddMaterial = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!titleInput.trim()) {
+      toast.error("Informe o título do material.")
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const res = await createLibraryMaterialAction({
+        title: titleInput,
+        disciplineName: disciplineInput,
+        type: typeInput,
+        url: urlInput,
+      })
+
+      if (!res.success) {
+        toast.error(res.error || "Erro ao adicionar material.")
+        return
+      }
+
+      toast.success("Material adicionado à biblioteca!")
+      setTitleInput("")
+      setDisciplineInput("")
+      setUrlInput("")
+      setIsModalOpen(false)
+      loadMaterials()
+    } catch {
+      toast.error("Erro inesperado ao adicionar material.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRemoveMaterial = async (id: string) => {
+    setRemovingId(id)
+    try {
+      const res = await deleteLibraryMaterialAction(id)
+      if (!res.success) {
+        toast.error(res.error || "Erro ao remover material.")
+        return
+      }
+      setMaterials((prev) => prev.filter((m) => m.id !== id))
+      toast.success("Material removido com sucesso.")
+    } catch {
+      toast.error("Erro inesperado ao remover material.")
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const filteredMaterials = materials.filter((m) => {
+    if (!normalizedSearch) return true
+    return (
+      m.title.toLowerCase().includes(normalizedSearch) ||
+      m.disciplineName.toLowerCase().includes(normalizedSearch)
+    )
+  })
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
+          <Loader2 className="h-8 w-8 animate-spin text-[#2563EB]" />
+          <p className="text-xs text-muted-foreground font-medium">Carregando sua biblioteca...</p>
+        </div>
+      )
+    }
+
+    if (loadError) {
+      return (
+        <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
+          <h3 className="text-lg font-bold text-foreground">Não foi possível carregar a biblioteca</h3>
+          <p className="text-xs text-muted-foreground font-medium">{loadError}</p>
+          <Button
+            onClick={loadMaterials}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs"
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      )
+    }
+
+    if (filteredMaterials.length === 0) {
+      return (
+        <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
+          <div className="relative w-24 h-24 flex items-center justify-center">
+            <Library className="h-16 w-16 text-[#2563EB]" />
+          </div>
+
+          <div className="space-y-1.5 max-w-md">
+            <h3 className="text-lg font-bold text-foreground">
+              {normalizedSearch
+                ? "Nenhum material encontrado para essa busca"
+                : "Você ainda não possui materiais cadastrados na biblioteca"}
+            </h3>
+            <p className="text-xs text-muted-foreground font-medium">
+              {normalizedSearch ? "Tente buscar por outro termo." : "Vamos adicionar?"}
+            </p>
+          </div>
+
+          {!normalizedSearch && (
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs"
+            >
+              Adicionar Material
+            </Button>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filteredMaterials.map((item) => (
+          <div
+            key={item.id}
+            className="rounded-xl border bg-card p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary" className="text-[10px] font-bold bg-[#2563EB]/10 text-[#2563EB]">
+                  {item.type}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground font-mono">{item.dateAdded}</span>
+              </div>
+
+              <h3 className="font-bold text-sm text-foreground line-clamp-2">{item.title}</h3>
+              <p className="text-xs text-muted-foreground font-medium">{item.disciplineName}</p>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t">
+              {item.url ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-bold text-[#2563EB] hover:underline flex items-center gap-1.5"
+                >
+                  <span>Acessar Material</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : (
+                <span className="text-xs text-muted-foreground font-medium">Sem link cadastrado</span>
+              )}
+
+              <div className="flex items-center gap-1">
+                {item.url && (
+                  <a
+                    href={item.url}
+                    download={item.type === "PDF" || item.type === "Resumo"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-1 text-muted-foreground hover:text-[#2563EB] transition-colors"
+                    title="Baixar"
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                )}
+                <button
+                  onClick={() => handleRemoveMaterial(item.id)}
+                  disabled={removingId === item.id}
+                  className="p-1 text-muted-foreground hover:text-rose-500 transition-colors disabled:opacity-40"
+                  title="Remover"
+                >
+                  {removingId === item.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -99,19 +258,23 @@ export function EstudeiBibliotecaView() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-black text-foreground">Biblioteca</h1>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
-          >
-            Adicionar Material
-          </Button>
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
+        >
+          Adicionar Material
+        </Button>
+      </div>
 
-          <Button variant="outline" className="border-[#2563EB] text-[#2563EB] font-bold text-xs gap-2">
-            Analista Tributário
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+      {/* Busca */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Pesquisar materiais..."
+          className="pl-9"
+        />
       </div>
 
       {/* Top Metrics Cards */}
@@ -143,68 +306,7 @@ export function EstudeiBibliotecaView() {
       </div>
 
       {/* Materials Cards Grid */}
-      {materials.length === 0 ? (
-        <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
-          <div className="relative w-24 h-24 flex items-center justify-center">
-            <Library className="h-16 w-16 text-[#2563EB]" />
-          </div>
-
-          <div className="space-y-1.5 max-w-md">
-            <h3 className="text-lg font-bold text-foreground">
-              Você ainda não possui materiais cadastrados na biblioteca
-            </h3>
-            <p className="text-xs text-muted-foreground font-medium">Vamos adicionar?</p>
-          </div>
-
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs"
-          >
-            Adicionar Material
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {materials.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-xl border bg-card p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-[10px] font-bold bg-[#2563EB]/10 text-[#2563EB]">
-                    {item.type}
-                  </Badge>
-                  <span className="text-[10px] text-muted-foreground font-mono">{item.dateAdded}</span>
-                </div>
-
-                <h3 className="font-bold text-sm text-foreground line-clamp-2">{item.title}</h3>
-                <p className="text-xs text-muted-foreground font-medium">{item.disciplineName}</p>
-              </div>
-
-              <div className="flex items-center justify-between pt-3 border-t">
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs font-bold text-[#2563EB] hover:underline flex items-center gap-1.5"
-                >
-                  <span>Acessar Material</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-
-                <button
-                  onClick={() => handleRemoveMaterial(item.id)}
-                  className="p-1 text-muted-foreground hover:text-rose-500 transition-colors"
-                  title="Remover"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {renderContent()}
 
       {/* Modal Adicionar Material */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -240,7 +342,7 @@ export function EstudeiBibliotecaView() {
               <label className="text-xs font-semibold text-muted-foreground">Tipo</label>
               <select
                 value={typeInput}
-                onChange={(e) => setTypeInput(e.target.value as MaterialItem["type"])}
+                onChange={(e) => setTypeInput(e.target.value as LibraryMaterialItem["type"])}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-2xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="PDF">PDF / Apostila</option>
@@ -263,8 +365,15 @@ export function EstudeiBibliotecaView() {
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold">
-                Salvar Material
+              <Button type="submit" disabled={isSubmitting} className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar Material"
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -273,4 +382,3 @@ export function EstudeiBibliotecaView() {
     </div>
   )
 }
-

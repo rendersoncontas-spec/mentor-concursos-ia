@@ -1,7 +1,7 @@
 ﻿"use client"
 
-import { useState } from "react"
-import { Upload, Trash2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Upload, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -9,33 +9,21 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
-
-export interface EditalRequestItem {
-  id: string
-  editalName: string
-  cargo?: string | undefined
-  linkUrl?: string | undefined
-  pdfName?: string | undefined
-  description?: string | undefined
-  date: string
-  status: "Pendente" | "Em Análise" | "Concluído"
-}
-
-function getSavedRequests(): EditalRequestItem[] {
-  if (typeof window === "undefined") return []
-  const saved = localStorage.getItem("mentor_edital_requests")
-  if (!saved) return []
-  try {
-    return JSON.parse(saved) as EditalRequestItem[]
-  } catch {
-    return []
-  }
-}
+import {
+  listEditalRequestsAction,
+  createEditalRequestAction,
+  deleteEditalRequestAction,
+  type EditalRequestItem,
+} from "@/application/editais/edital-request.action"
 
 export function EstudeiPedirEditalView() {
-  const [requests, setRequests] = useState<EditalRequestItem[]>(getSavedRequests)
+  const [requests, setRequests] = useState<EditalRequestItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState("Todos")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   // Modal Form States — 100% Paridade Estudei
   const [editalName, setEditalName] = useState("")
@@ -44,8 +32,35 @@ export function EstudeiPedirEditalView() {
   const [description, setDescription] = useState("")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
 
+  const loadRequests = async () => {
+    setIsLoading(true)
+    setLoadError(null)
+    const res = await listEditalRequestsAction()
+    if (res.success && res.data) {
+      setRequests(res.data)
+    } else {
+      setLoadError(res.error || "Erro ao carregar pedidos.")
+    }
+    setIsLoading(false)
+  }
 
-  const handleSendRequest = (e: React.FormEvent) => {
+  useEffect(() => {
+    let cancelled = false
+    listEditalRequestsAction().then((res) => {
+      if (cancelled) return
+      if (res.success && res.data) {
+        setRequests(res.data)
+      } else {
+        setLoadError(res.error || "Erro ao carregar pedidos.")
+      }
+      setIsLoading(false)
+    }).catch(() => {
+      if (!cancelled) setIsLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleSendRequest = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editalName.trim()) {
       toast.error("Informe o nome do edital que procura.")
@@ -57,42 +72,167 @@ export function EstudeiPedirEditalView() {
       return
     }
 
-    const newRequest: EditalRequestItem = {
-      id: `req-${Date.now()}`,
-      editalName: editalName.trim(),
-      cargo: cargo.trim() || undefined,
-      linkUrl: linkUrl.trim() || undefined,
-      pdfName: pdfFile ? pdfFile.name : undefined,
-      description: description.trim() || undefined,
-      date: new Date().toLocaleDateString("pt-BR"),
-      status: "Pendente",
+    setIsSubmitting(true)
+    try {
+      const res = await createEditalRequestAction({
+        editalName,
+        cargo,
+        linkUrl,
+        pdfName: pdfFile ? pdfFile.name : undefined,
+        description,
+      })
+
+      if (!res.success) {
+        toast.error(res.error || "Erro ao enviar o pedido.")
+        return
+      }
+
+      toast.success("Pedido de edital enviado com sucesso! Nosso time analisará em até 5 dias úteis.")
+      setEditalName("")
+      setCargo("")
+      setLinkUrl("")
+      setDescription("")
+      setPdfFile(null)
+      setIsModalOpen(false)
+      loadRequests()
+    } catch {
+      toast.error("Erro inesperado ao enviar o pedido.")
+    } finally {
+      setIsSubmitting(false)
     }
-
-    const updated = [newRequest, ...requests]
-    setRequests(updated)
-    localStorage.setItem("mentor_edital_requests", JSON.stringify(updated))
-    toast.success("Pedido de edital enviado com sucesso! Nosso time analisará em até 5 dias úteis.")
-
-    // Reset Form
-    setEditalName("")
-    setCargo("")
-    setLinkUrl("")
-    setDescription("")
-    setPdfFile(null)
-    setIsModalOpen(false)
   }
 
-  const handleRemoveRequest = (id: string) => {
-    const updated = requests.filter((r) => r.id !== id)
-    setRequests(updated)
-    localStorage.setItem("mentor_edital_requests", JSON.stringify(updated))
-    toast.success("Pedido removido.")
+  const handleRemoveRequest = async (id: string) => {
+    setRemovingId(id)
+    try {
+      const res = await deleteEditalRequestAction(id)
+      if (!res.success) {
+        toast.error(res.error || "Erro ao remover o pedido.")
+        return
+      }
+      setRequests((prev) => prev.filter((r) => r.id !== id))
+      toast.success("Pedido removido.")
+    } catch {
+      toast.error("Erro inesperado ao remover o pedido.")
+    } finally {
+      setRemovingId(null)
+    }
   }
 
   const filteredRequests = requests.filter((r) => {
     if (statusFilter === "Todos") return true
     return r.status === statusFilter
   })
+
+  const statusBadgeClass = (status: EditalRequestItem["status"]) => {
+    if (status === "Concluído") return "bg-emerald-500/10 text-emerald-600"
+    if (status === "Em Análise") return "bg-sky-500/10 text-sky-600"
+    return "bg-amber-500/10 text-amber-600"
+  }
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
+          <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
+          <p className="text-xs text-muted-foreground font-medium">Carregando seus pedidos...</p>
+        </div>
+      )
+    }
+
+    if (loadError) {
+      return (
+        <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
+          <h3 className="text-lg font-bold text-foreground">Não foi possível carregar os pedidos</h3>
+          <p className="text-xs text-muted-foreground font-medium">{loadError}</p>
+          <Button
+            onClick={loadRequests}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs mt-2"
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      )
+    }
+
+    if (filteredRequests.length === 0) {
+      return (
+        <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
+          <div className="space-y-1 max-w-md">
+            <h3 className="text-lg font-bold text-foreground">Nenhum pedido de edital ainda</h3>
+            <p className="text-xs text-muted-foreground font-medium">
+              Quando você não encontrar um edital, pode enviar um pedido para nossa equipe.
+            </p>
+          </div>
+
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs mt-2"
+          >
+            Pedir agora
+          </Button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="p-4 border-b bg-card flex items-center justify-between">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+            MEUS PEDIDOS DE EDITAIS
+          </h3>
+          <Badge variant="outline" className="text-[10px] font-semibold">
+            {filteredRequests.length} pedidos
+          </Badge>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left">
+            <thead>
+              <tr className="border-b bg-muted/30 text-muted-foreground font-semibold">
+                <th className="px-4 py-3">Data</th>
+                <th className="px-4 py-3">Edital Solicitado</th>
+                <th className="px-4 py-3">Cargo</th>
+                <th className="px-3 py-3 text-center">Status</th>
+                <th className="px-3 py-3 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filteredRequests.map((req) => (
+                <tr key={req.id} className="hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-3 font-mono text-muted-foreground">{req.date}</td>
+                  <td className="px-4 py-3 font-bold text-foreground">{req.editalName}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{req.cargo || "—"}</td>
+                  <td className="px-3 py-3 text-center">
+                    <Badge
+                      variant="secondary"
+                      className={`text-[10px] font-bold ${statusBadgeClass(req.status)}`}
+                    >
+                      {req.status}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    <button
+                      onClick={() => handleRemoveRequest(req.id)}
+                      disabled={removingId === req.id}
+                      className="text-muted-foreground/50 hover:text-rose-500 p-1 rounded transition-colors disabled:opacity-40"
+                      title="Remover"
+                    >
+                      {removingId === req.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -126,78 +266,7 @@ export function EstudeiPedirEditalView() {
       </div>
 
       {/* Main Content Area (Empty State or Requests Table 100% Estudei) */}
-      {filteredRequests.length === 0 ? (
-        <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
-          <div className="space-y-1 max-w-md">
-            <h3 className="text-lg font-bold text-foreground">Nenhum pedido de edital ainda</h3>
-            <p className="text-xs text-muted-foreground font-medium">
-              Quando você não encontrar um edital, pode enviar um pedido para nossa equipe.
-            </p>
-          </div>
-
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs mt-2"
-          >
-            Pedir agora
-          </Button>
-        </div>
-      ) : (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-          <div className="p-4 border-b bg-card flex items-center justify-between">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-              MEUS PEDIDOS DE EDITAIS
-            </h3>
-            <Badge variant="outline" className="text-[10px] font-semibold">
-              {filteredRequests.length} pedidos
-            </Badge>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b bg-muted/30 text-muted-foreground font-semibold">
-                  <th className="px-4 py-3">Data</th>
-                  <th className="px-4 py-3">Edital Solicitado</th>
-                  <th className="px-4 py-3">Cargo</th>
-                  <th className="px-3 py-3 text-center">Status</th>
-                  <th className="px-3 py-3 text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredRequests.map((req) => (
-                  <tr key={req.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{req.date}</td>
-                    <td className="px-4 py-3 font-bold text-foreground">{req.editalName}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{req.cargo || "—"}</td>
-                    <td className="px-3 py-3 text-center">
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] font-bold ${
-                          req.status === "Concluído"
-                            ? "bg-emerald-500/10 text-emerald-600"
-                            : "bg-amber-500/10 text-amber-600"
-                        }`}
-                      >
-                        {req.status}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <button
-                        onClick={() => handleRemoveRequest(req.id)}
-                        className="text-muted-foreground/50 hover:text-rose-500 p-1 rounded transition-colors"
-                        title="Remover"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {renderContent()}
 
       {/* Modal Pedir Edital — 100% Paridade com a Imagem 2 do Estudei */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -309,9 +378,17 @@ export function EstudeiPedirEditalView() {
 
                 <Button
                   type="submit"
+                  disabled={isSubmitting}
                   className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-7 h-9 rounded-xl shadow-xs"
                 >
-                  Enviar
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    "Enviar"
+                  )}
                 </Button>
               </div>
             </form>
@@ -321,4 +398,3 @@ export function EstudeiPedirEditalView() {
     </div>
   )
 }
-

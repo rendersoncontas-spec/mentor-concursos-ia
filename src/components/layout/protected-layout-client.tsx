@@ -11,6 +11,7 @@ interface ProtectedLayoutClientProps {
   userEmail: string
   userName: string
   userId: string
+  avatarUrl?: string | null
   logoutAction: () => Promise<void>
   children: React.ReactNode
 }
@@ -19,6 +20,7 @@ export function ProtectedLayoutClient({
   userEmail,
   userName,
   userId,
+  avatarUrl = null,
   logoutAction,
   children,
 }: ProtectedLayoutClientProps) {
@@ -69,6 +71,7 @@ export function ProtectedLayoutClient({
           userEmail={userEmail}
           userName={userName}
           userId={userId}
+          avatarUrl={avatarUrl}
           logoutAction={logoutAction}
         />
 

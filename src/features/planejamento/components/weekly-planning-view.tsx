@@ -382,7 +382,9 @@ export function WeeklyPlanningView({
               <button type="button" className="p-1 hover:bg-muted rounded-md text-muted-foreground">
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <h2 className="text-lg font-black text-[#2563EB]">Agosto, 2026</h2>
+              <h2 className="text-lg font-black text-[#2563EB]">
+                {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+              </h2>
               <button type="button" className="p-1 hover:bg-muted rounded-md text-muted-foreground">
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -394,7 +396,8 @@ export function WeeklyPlanningView({
           </div>
 
           {/* Grade dos 7 Dias da Semana (Screenshot 3 100% Paridade Estudei) */}
-          <div className="grid grid-cols-7 border rounded-xl overflow-hidden min-h-[460px]">
+          <div className="overflow-x-auto">
+            <div className="grid grid-cols-7 min-w-[720px] border rounded-xl overflow-hidden min-h-[460px]">
             {daysHeader.map((d) => {
               const dayEvts = getEventsForDay(d.dayIdx, d.dateNum)
               const hasEvts = dayEvts.length > 0
@@ -505,6 +508,7 @@ export function WeeklyPlanningView({
                 </div>
               )
             })}
+            </div>
           </div>
         </div>
 

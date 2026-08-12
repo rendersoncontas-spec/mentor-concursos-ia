@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import {
@@ -27,40 +28,47 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { AccountSettingsModal } from "@/features/profile/components/account-settings-modal"
+import { clearUserLocalData } from "@/utils/user-data"
 
 interface AppHeaderProps {
   userEmail?: string
   userName?: string
   userId?: string
+  avatarUrl?: string | null
   logoutAction: () => Promise<void>
 }
 
-export function AppHeader({ userEmail, userName = "Estudante", userId = "", logoutAction }: AppHeaderProps) {
+export function AppHeader({ userEmail, userName = "Estudante", userId = "", avatarUrl = null, logoutAction }: AppHeaderProps) {
   const router = useRouter()
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isEditalModalOpen, setIsEditalModalOpen] = useState(false)
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
   const [editalRequestInput, setEditalRequestInput] = useState("")
-  const [avatarImg, setAvatarImg] = useState<string | null>(null)
+  // Fonte de verdade: avatar_url do banco. localStorage é apenas cache de fallback.
+  const [avatarImg, setAvatarImg] = useState<string | null>(avatarUrl ?? null)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Carregar foto inicial (user-scoped)
     const avatarKey = userId ? `mentor_user_avatar_${userId}` : "mentor_user_avatar"
-    const saved = localStorage.getItem(avatarKey)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (saved) setAvatarImg(saved)
+
+    // Fallback: cache local apenas quando não há foto no banco
+    if (!avatarUrl) {
+      const saved = localStorage.getItem(avatarKey)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved) setAvatarImg(saved)
+    }
 
     // Escutar atualizações de outros componentes
     const handleAvatarUpdate = () => {
+      if (avatarUrl) return
       const updated = localStorage.getItem(avatarKey)
       setAvatarImg(updated)
     }
     window.addEventListener("avatarUpdated", handleAvatarUpdate)
     return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
-  }, [userId])
+  }, [userId, avatarUrl])
 
   // Fechar menu ao clicar fora
   useEffect(() => {
@@ -73,10 +81,19 @@ export function AppHeader({ userEmail, userName = "Estudante", userId = "", logo
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // Fechar menu com ESC
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsUserMenuOpen(false)
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode)
-    document.documentElement.classList.toggle("dark")
-    toast.info(!isDarkMode ? "Modo escuro ativado." : "Modo claro ativado.")
+    const isDark = resolvedTheme === "dark"
+    setTheme(isDark ? "light" : "dark")
+    toast.info(isDark ? "Modo claro ativado." : "Modo escuro ativado.")
   }
 
   const handleRequestEdital = (e: React.FormEvent) => {
@@ -143,7 +160,7 @@ export function AppHeader({ userEmail, userName = "Estudante", userId = "", logo
           className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           title="Alternar Tema"
         >
-          {isDarkMode ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
+          {resolvedTheme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
         </button>
 
         {/* Dropdown Menu do Usuário (Avatar Clicável — 100% Paridade Estudei) */}
@@ -152,6 +169,8 @@ export function AppHeader({ userEmail, userName = "Estudante", userId = "", logo
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="w-9 h-9 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xs focus:outline-none overflow-hidden"
             title="Menu do Usuário"
+            aria-haspopup="menu"
+            aria-expanded={isUserMenuOpen}
           >
             {avatarImg ? (
               <Image src={avatarImg} alt="User" width={36} height={36} unoptimized className="w-full h-full object-cover" />
@@ -162,7 +181,7 @@ export function AppHeader({ userEmail, userName = "Estudante", userId = "", logo
 
           {isUserMenuOpen && (
             <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-card p-2 shadow-xl z-50 text-foreground space-y-1 animate-in fade-in zoom-in-95 duration-100">
-              {/* Cumprimento: Olá, Renders... */}
+              {/* Cumprimento: Olá, {userName}... */}
               <div className="font-bold text-xs text-muted-foreground px-3 py-2 border-b">
                 Olá, <span className="text-foreground font-black">{userName}...</span>
               </div>
@@ -221,17 +240,9 @@ export function AppHeader({ userEmail, userName = "Estudante", userId = "", logo
               <button
                 onClick={async () => {
                   setIsUserMenuOpen(false)
-                  // Limpar dados user-scoped do localStorage antes do logout
-                  const keysToClean = Object.keys(localStorage).filter(k =>
-                    k.startsWith("mentor_user_avatar_") ||
-                    k === "mentor_user_avatar" ||
-                    k.startsWith("mentor_user_reminders_") ||
-                    k === "mentor_user_reminders"
-                  )
-                  keysToClean.forEach(k => localStorage.removeItem(k))
+                  clearUserLocalData()
                   await logoutAction()
-                  router.push("/login")
-                  router.refresh()
+                  window.location.replace("/login")
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors text-left"
               >

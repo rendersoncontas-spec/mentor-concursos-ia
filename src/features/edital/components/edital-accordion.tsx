@@ -587,7 +587,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
               </Button>
             </div>
             {disciplineSuggestions.length > 0 && (
-              <div className="absolute left-4 top-14 mt-1 w-[400px] bg-popover border rounded-md shadow-lg z-50 py-1">
+              <div className="absolute left-4 top-14 mt-1 w-[min(400px,calc(100vw-2rem))] bg-popover border rounded-md shadow-lg z-50 py-1">
                 {disciplineSuggestions.map((s, idx) => (
                   <button
                     key={idx}

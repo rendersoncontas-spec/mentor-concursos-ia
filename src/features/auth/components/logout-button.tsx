@@ -9,6 +9,7 @@ import { toast } from "sonner"
 
 import { logoutAction } from "@/application/auth/logout.action"
 import { Button } from "@/components/ui/button"
+import { clearUserLocalData } from "@/utils/user-data"
 
 export function LogoutButton() {
   const router = useRouter()
@@ -16,6 +17,7 @@ export function LogoutButton() {
 
   function handleLogout() {
     startTransition(async () => {
+      clearUserLocalData()
       const result = await logoutAction()
       if (result.success) {
         toast.success("Desconectado com sucesso!")

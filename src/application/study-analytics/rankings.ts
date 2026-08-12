@@ -74,7 +74,17 @@ export function getDisciplineRanking(ctx: AnalyticsContext): RankingItem[] {
       })
     })
 
-    return ranking.sort((a, b) => b.value - a.value)
+    // Ordenação determinística (regra documentada do ranking de matérias):
+    // 1. pontos/minutos totais (desc)
+    // 2. nº de sessões (desc) como desempate
+    // 3. nome da disciplina (A-Z) como desempate final
+    // Isso garante que o ranking nunca apresente ordem aleatória em caso de empate.
+    return ranking.sort(
+      (a, b) =>
+        b.value - a.value ||
+        (b.secondaryValue ?? 0) - (a.secondaryValue ?? 0) ||
+        a.name.localeCompare(b.name)
+    )
   })
 }
 

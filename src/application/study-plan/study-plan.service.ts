@@ -139,19 +139,51 @@ export async function generateStudyPlan(
   )
 
   // 1e. Construir AnalyticsContext para o Motor Adaptativo
-  // Numa aplicação real, preencheríamos os scores e retentions com base no study_history.
-  // Aqui geramos um stub para integração e teste do fluxo:
+  // Desempenho real por disciplina (acurácia e volume de estudo nos últimos 90 dias).
+  const perfCutoff = new Date()
+  perfCutoff.setDate(perfCutoff.getDate() - 90)
+  const { data: perfHistory } = await supabase
+    .from("study_history")
+    .select("discipline_id, duration_minutes, metadata")
+    .eq("user_id", userId)
+    .gte("started_at", perfCutoff.toISOString())
+
+  const perfByDiscipline = new Map<string, { answered: number; correct: number; minutes: number }>()
+  ;(perfHistory ?? []).forEach((h) => {
+    const meta = (h.metadata ?? {}) as Record<string, unknown>
+    const answered = Number(meta["questions_answered"]) || 0
+    const correct = Number(meta["questions_correct"]) || 0
+    const record = perfByDiscipline.get(h.discipline_id) ?? { answered: 0, correct: 0, minutes: 0 }
+    record.answered += answered
+    record.correct += correct
+    record.minutes += Number(h.duration_minutes) || 0
+    perfByDiscipline.set(h.discipline_id, record)
+  })
+
+  let hasRealPerformance = false
   const mockContext: AnalyticsContext = {
     userId,
-    disciplines: examDisciplines.map(ed => ({
-      id: ed.discipline_id,
-      name: ed.discipline?.name || "Desconhecido",
-      weight: ed.weight,
-      performanceScore: Math.random() > 0.5 ? 95 : 45, // Simula dominância ou dificuldade
-      retentionRate: Math.random() > 0.5 ? 95 : 45,
-      lapsesCount: 0,
-      daysSinceLastStudy: 0
-    })),
+    disciplines: examDisciplines.map(ed => {
+      const record = perfByDiscipline.get(ed.discipline_id)
+      let performanceScore = 50
+      let retentionRate = 50
+      if (record && (record.answered > 0 || record.minutes > 0)) {
+        hasRealPerformance = true
+        performanceScore = record.answered > 0
+          ? Math.round((record.correct / record.answered) * 100)
+          : 60
+        retentionRate = performanceScore
+      }
+      return {
+        id: ed.discipline_id,
+        name: ed.discipline?.name || "Desconhecido",
+        weight: ed.weight,
+        performanceScore,
+        retentionRate,
+        lapsesCount: 0,
+        daysSinceLastStudy: 0
+      }
+    }),
     userStats: {
       averageEnergy: 3,
       weeklyHoursStudied: profile?.weekly_study_hours ?? 20,
@@ -163,8 +195,9 @@ export async function generateStudyPlan(
   // 1f. Gerar decisões adaptativas
   const adaptiveDecisions = generateAdaptiveDecisions(mockContext)
 
-  // 1g. Salvar decisões no banco (Auditoria)
-  if (adaptiveDecisions.length > 0) {
+  // 1g. Salvar decisões no banco (Auditoria) — somente com desempenho real,
+  // para não persistir recomendações fabricadas no adaptive_history.
+  if (hasRealPerformance && adaptiveDecisions.length > 0) {
     const historyPayload = adaptiveDecisions.map(d => ({
       user_id: userId,
       discipline_id: d.disciplineId,

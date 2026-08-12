@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { clearUserLocalData } from "@/utils/user-data"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const navItems = [
@@ -168,6 +169,7 @@ export function AppSidebar({ logoutAction, className, isOpen, onClose }: AppSide
                 <form action={logoutAction}>
                   <button
                     type="submit"
+                    onClick={() => clearUserLocalData()}
                     className="flex w-full items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium text-[hsl(var(--sidebar-foreground))/0.5] hover:bg-[hsl(var(--sidebar-accent))] hover:text-red-400 transition-colors"
                   >
                     <LogOut style={{ width: "18px", height: "18px" }} />
@@ -180,6 +182,7 @@ export function AppSidebar({ logoutAction, className, isOpen, onClose }: AppSide
             <form action={logoutAction}>
               <button
                 type="submit"
+                onClick={() => clearUserLocalData()}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[hsl(var(--sidebar-foreground))/0.5] hover:bg-[hsl(var(--sidebar-accent))] hover:text-red-400 transition-colors"
               >
                 <LogOut style={{ width: "18px", height: "18px" }} />

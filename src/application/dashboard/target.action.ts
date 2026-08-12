@@ -38,23 +38,26 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
       return { success: false, error: "Erro ao buscar lista de concursos." }
     }
 
-    // Calcular progresso do edital geral
-    let editalProgress = 0
+    // Calcular progresso do edital por concurso a partir do status real das disciplinas
+    let disciplinesByTarget: Record<string, { total: number; completed: number }> = {}
     try {
-      const { count: completedCount } = await supabase
-        .from("study_plan_items")
-        .select("id", { count: "exact", head: true })
-        .eq("completed", true)
+      const { data: udRows } = await supabase
+        .from("user_disciplines")
+        .select("id, target_id, status")
+        .eq("user_id", user.id)
 
-      const { count: totalCount } = await supabase
-        .from("study_plan_items")
-        .select("id", { count: "exact", head: true })
-
-      if (totalCount && totalCount > 0) {
-        editalProgress = Math.round(((completedCount || 0) / totalCount) * 100)
+      if (udRows) {
+        udRows.forEach((r: { target_id?: string | null; status?: string }) => {
+          const tid = r.target_id ?? ""
+          if (!tid) return
+          const bucket = disciplinesByTarget[tid] ?? { total: 0, completed: 0 }
+          bucket.total += 1
+          if (r.status === "COMPLETED") bucket.completed += 1
+          disciplinesByTarget[tid] = bucket
+        })
       }
     } catch {
-      editalProgress = 0
+      disciplinesByTarget = {}
     }
 
     const today = new Date()
@@ -89,6 +92,9 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
         daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
       }
 
+      const disc = disciplinesByTarget[t.id] ?? { total: 0, completed: 0 }
+      const targetProgress = disc.total > 0 ? Math.round((disc.completed / disc.total) * 100) : 0
+
       return {
         id: t.id,
         target_exam: t.target_exam || "Concurso Alvo",
@@ -100,7 +106,7 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
         exam_location,
         icon,
         daysRemaining,
-        editalProgress,
+        editalProgress: targetProgress,
       }
     })
 

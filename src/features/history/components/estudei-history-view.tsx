@@ -301,7 +301,7 @@ export function EstudeiHistoryView() {
             {showFilters && (
               <div
                 ref={filterPanelRef}
-                className="absolute right-0 top-full mt-2 z-50 bg-card border rounded-xl shadow-lg p-4 w-[360px] space-y-4"
+                className="absolute right-0 top-full mt-2 z-50 bg-card border rounded-xl shadow-lg p-4 w-[min(360px,calc(100vw-2rem))] space-y-4"
               >
                 {/* Date Start */}
                 <div className="space-y-1">
