@@ -33,6 +33,7 @@ import { toast } from "sonner"
 import { getStatisticsCenterAction, type StatisticsCenterPayload } from "@/application/study-analytics/statistics-center.action"
 import {
   buildDayBuckets,
+  buildDayBucketsFromKeys,
   buildHeatmap,
   computeComparisons,
   computeDisciplineStats,
@@ -81,9 +82,10 @@ import {
 
 const TIMEZONE = "America/Sao_Paulo"
 
-type RangeId = "7" | "30" | "90" | "365" | "custom"
+type RangeId = "all" | "7" | "30" | "90" | "365" | "custom"
 
 const RANGES: { id: RangeId; label: string; days: number }[] = [
+  { id: "all", label: "Tudo", days: 0 },
   { id: "7", label: "7 dias", days: 7 },
   { id: "30", label: "30 dias", days: 30 },
   { id: "90", label: "90 dias", days: 90 },
@@ -92,6 +94,7 @@ const RANGES: { id: RangeId; label: string; days: number }[] = [
 ]
 
 function rangeDays(range: RangeId, customStart: string, customEnd: string): number {
+  if (range === "all") return 0
   if (range !== "custom") return RANGES.find((r) => r.id === range)?.days ?? 30
   const from = new Date(customStart + "T00:00:00")
   const to = new Date(customEnd + "T00:00:00")
@@ -174,7 +177,24 @@ export function StatisticsCenterView() {
 
   // ── Filtros derivados ─────────────────────────────────────────────────────
   const days = rangeDays(range, customStart, customEnd)
+  const isAllRange = range === "all"
+  const allSessionKeys = useMemo(() => {
+    if (!isAllRange) return [] as string[]
+    const keys = new Set<string>()
+    for (const s of payload?.sessions ?? []) {
+      const k = dateKeyOf(s.startedAt, TIMEZONE)
+      if (k) keys.add(k)
+    }
+    for (const a of payload?.attempts ?? []) {
+      if (!a.answeredAt) continue
+      const k = dateKeyOf(a.answeredAt, TIMEZONE)
+      if (k) keys.add(k)
+    }
+    return [...keys].sort()
+  }, [payload, isAllRange])
+
   const rangeKeys = useMemo(() => {
+    if (isAllRange) return allSessionKeys
     const today = todayKey(now, TIMEZONE)
     if (range === "custom" && customStart && customEnd) {
       return keysBetween(customStart, customEnd)
@@ -185,7 +205,7 @@ export function StatisticsCenterView() {
       if (k) keys.push(k)
     }
     return keys
-  }, [range, customStart, customEnd, days, now])
+  }, [range, customStart, customEnd, days, now, isAllRange, allSessionKeys])
 
   const registry = useMemo(() => {
     const m = new Map<string, { id: string; name: string; area: string | null }>()
@@ -200,13 +220,15 @@ export function StatisticsCenterView() {
     return m
   }, [payload?.disciplines, payload?.sessions])
 
-  const filteredSessions = useMemo(() => filterSessions(payload?.sessions ?? [], rangeKeys, disciplineId, studyType, TIMEZONE), [payload, rangeKeys, disciplineId, studyType])
-  const filteredAttempts = useMemo(() => filterAttempts(payload?.attempts ?? [], rangeKeys, disciplineId, TIMEZONE), [payload, rangeKeys, disciplineId])
+  const filteredSessions = useMemo(() => filterSessions(payload?.sessions ?? [], rangeKeys, disciplineId, studyType, TIMEZONE, isAllRange), [payload, rangeKeys, disciplineId, studyType, isAllRange])
+  const filteredAttempts = useMemo(() => filterAttempts(payload?.attempts ?? [], rangeKeys, disciplineId, TIMEZONE, isAllRange), [payload, rangeKeys, disciplineId, isAllRange])
 
   // ── Cálculos ──────────────────────────────────────────────────────────────
   const buckets = useMemo(
-    () => buildDayBuckets(filteredSessions, filteredAttempts, Math.max(1, rangeKeys.length), now, TIMEZONE),
-    [filteredSessions, filteredAttempts, rangeKeys, now]
+    () => isAllRange
+      ? buildDayBucketsFromKeys(filteredSessions, filteredAttempts, rangeKeys, TIMEZONE)
+      : buildDayBuckets(filteredSessions, filteredAttempts, Math.max(1, rangeKeys.length), now, TIMEZONE),
+    [filteredSessions, filteredAttempts, rangeKeys, now, isAllRange]
   )
   const timeCards = useMemo(() => computeTimeCards(buckets, now, TIMEZONE), [buckets, now])
   const sessionStats = useMemo(() => computeSessionStatistics(filteredSessions), [filteredSessions])
@@ -280,14 +302,15 @@ export function StatisticsCenterView() {
         timeCards,
         productivity,
         daysSinceLastStudy: frequency.daysSinceLastStudy,
-        questionsPerDay: days > 0 ? questionStats.total / days : 0,
+        questionsPerDay: (isAllRange ? rangeKeys.length : days) > 0 ? questionStats.total / (isAllRange ? rangeKeys.length : days) : 0,
       }),
-    [filteredSessions.length, hoursOfDay, timeOfDayAnalysis, focusStats.averagePct, questionStats, streaks, comparisons, planning, revisionStats, disciplineStats, topicStats, timeCards, productivity, frequency.daysSinceLastStudy, days]
+    [filteredSessions.length, hoursOfDay, timeOfDayAnalysis, focusStats.averagePct, questionStats, streaks, comparisons, planning, revisionStats, disciplineStats, topicStats, timeCards, productivity, frequency.daysSinceLastStudy, days, isAllRange, rangeKeys.length]
   )
   const priorities = useMemo(() => computePriorities(disciplineStats, revisionStats), [disciplineStats, revisionStats])
   const weeklyReport = useMemo(() => computeWeeklyReport(buckets, now, TIMEZONE), [buckets, now])
   const monthlyReport = useMemo(() => computeMonthlyReport(buckets, now, TIMEZONE), [buckets, now])
-  const chartData = useMemo(() => buildChartData(buckets, days, TIMEZONE), [buckets, days])
+  const effectiveDays = isAllRange ? rangeKeys.length : days
+  const chartData = useMemo(() => buildChartData(buckets, effectiveDays, TIMEZONE), [buckets, effectiveDays])
 
   // Opções de filtro (a partir dos dados totais, não filtrados)
   const allSessions = useMemo(() => payload?.sessions ?? [], [payload?.sessions])
@@ -650,7 +673,7 @@ export function StatisticsCenterView() {
       </div>
 
       {/* ===================== EVOLUÇÃO ===================== */}
-      <EvolutionChart data={chartData} rangeDays={days} empty={filteredSessions.length === 0} />
+      <EvolutionChart data={chartData} rangeDays={effectiveDays} empty={filteredSessions.length === 0} />
 
       {/* ===================== HEATMAP ===================== */}
       <SectionCard title="Calendário de atividade" subtitle="Intensidade de estudo por dia (nível por percentil)" action={<HeatmapLegendNote />}>
@@ -956,8 +979,16 @@ function filterSessions(
   rangeKeys: string[],
   disciplineId: string,
   studyType: string,
-  timezone: string
+  timezone: string,
+  isAllRange: boolean,
 ) {
+  if (isAllRange) {
+    return sessions.filter((s) => {
+      if (disciplineId !== "all" && s.disciplineId !== disciplineId) return false
+      if (studyType !== "all" && s.studyType !== studyType) return false
+      return true
+    })
+  }
   const min = rangeKeys[0]
   const max = rangeKeys[rangeKeys.length - 1]
   return sessions.filter((s) => {
@@ -974,8 +1005,15 @@ function filterAttempts(
   attempts: StatisticsCenterPayload["attempts"],
   rangeKeys: string[],
   disciplineId: string,
-  timezone: string
+  timezone: string,
+  isAllRange: boolean,
 ) {
+  if (isAllRange) {
+    return attempts.filter((a) => {
+      if (disciplineId !== "all" && a.disciplineId !== disciplineId && a.disciplineId !== null) return false
+      return true
+    })
+  }
   const min = rangeKeys[0]
   const max = rangeKeys[rangeKeys.length - 1]
   return attempts.filter((a) => {

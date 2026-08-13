@@ -24,6 +24,7 @@ export const DAY_SHORT: Record<DayOfWeek, string> = {
 }
 
 export type PlanType = "CICLO_ROTATIVO" | "CRONOGRAMA_SEMANAL"
+export type PlanStatus = "ACTIVE" | "PAUSED" | "ARCHIVED" | "COMPLETED"
 export type BlockStatus = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO"
 
 // Plano de estudos (cabeçalho)
@@ -31,8 +32,18 @@ export interface StudyPlan {
   id: string
   user_id: string
   version: number
-  plan_type?: PlanType
+  plan_type: PlanType
+  status: PlanStatus
+  name: string | null
+  description: string | null
   total_cycle_minutes?: number
+  weekly_minutes?: number | null
+  start_date?: string | null
+  end_date?: string | null
+  parent_plan_id?: string | null
+  plan_group_id?: string | null
+  paused_at?: string | null
+  archived_at?: string | null
   generated_reason: string
   active: boolean
   generated_at: string

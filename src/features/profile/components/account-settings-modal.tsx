@@ -14,6 +14,8 @@ import {
   Check,
   Loader2,
   Trash2,
+  Mail,
+  Send,
 } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -22,6 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import Image from "next/image"
 import { getProfileAction, updateProfileAction } from "@/application/profile/profile.action"
+import { sendTestEmailAction } from "@/application/email/email.action"
 import { createClient } from "@/infrastructure/supabase/client"
 import { clearUserLocalData } from "@/utils/user-data"
 
@@ -47,6 +50,9 @@ const DEFAULT_PREFERENCES: Preferences = {
   notifyConstancia: true,
   notifyRevisao: true,
   notifyFeedback: true,
+  notifyResumoSemanal: true,
+  notifyImportacoes: true,
+  notifyRanking: false,
   customCategories: [],
 }
 
@@ -139,6 +145,10 @@ export function AccountSettingsModal({
   const [notifConstancia, setNotifConstancia] = useState(true)
   const [notifRevisao, setNotifRevisao] = useState(true)
   const [notifFeedback, setNotifFeedback] = useState(true)
+  const [notifResumoSemanal, setNotifResumoSemanal] = useState(true)
+  const [notifImportacoes, setNotifImportacoes] = useState(true)
+  const [notifRanking, setNotifRanking] = useState(false)
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false)
 
   // Form States - Seguranca
   const [senhaAtual, setSenhaAtual] = useState("")
@@ -183,6 +193,9 @@ export function AccountSettingsModal({
         setNotifConstancia(prefsValue<boolean>(prefs, "notifyConstancia", true))
         setNotifRevisao(prefsValue<boolean>(prefs, "notifyRevisao", true))
         setNotifFeedback(prefsValue<boolean>(prefs, "notifyFeedback", true))
+        setNotifResumoSemanal(prefsValue<boolean>(prefs, "notifyResumoSemanal", true))
+        setNotifImportacoes(prefsValue<boolean>(prefs, "notifyImportacoes", true))
+        setNotifRanking(prefsValue<boolean>(prefs, "notifyRanking", false))
         setCustomCategories(prefsValue<string[]>(prefs, "customCategories", []))
       } else if (res.error) {
         toast.error(res.error)
@@ -272,6 +285,9 @@ export function AccountSettingsModal({
         notifyConstancia: notifConstancia,
         notifyRevisao: notifRevisao,
         notifyFeedback: notifFeedback,
+        notifyResumoSemanal: notifResumoSemanal,
+        notifyImportacoes: notifImportacoes,
+        notifyRanking: notifRanking,
         customCategories,
       }
 
@@ -821,10 +837,26 @@ export function AccountSettingsModal({
                 {activeTab === "NOTIFICACOES" && (
                   <div className="space-y-4">
                     <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                      TIPOS DE NOTIFICAÇÕES
+                      PREFERÊNCIAS DE E-MAIL E NOTIFICAÇÕES
                     </span>
 
-                    {/* Card 1: Constância */}
+                    {/* Card 1: Resumo Semanal */}
+                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
+                      <input
+                        type="checkbox"
+                        checked={notifResumoSemanal}
+                        onChange={(e) => setNotifResumoSemanal(e.target.checked)}
+                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
+                      />
+                      <div>
+                        <h4 className="font-bold text-xs text-foreground">Resumo Semanal</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Relatório semanal consolidado com horas estudadas, questões respondidas e taxa de acerto.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Lembretes de Estudo */}
                     <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
                       <input
                         type="checkbox"
@@ -833,14 +865,14 @@ export function AccountSettingsModal({
                         className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
                       />
                       <div>
-                        <h4 className="font-bold text-xs text-foreground">Constância</h4>
+                        <h4 className="font-bold text-xs text-foreground">Lembretes de Estudo & Constância</h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Lembretes para manter o ritmo dos seus estudos e criar uma rotina consistente.
+                          Lembretes para manter o ritmo dos seus estudos e proteger sua sequência de dias consecutivos.
                         </p>
                       </div>
                     </div>
 
-                    {/* Card 2: Revisão */}
+                    {/* Card 3: Revisões */}
                     <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
                       <input
                         type="checkbox"
@@ -849,14 +881,46 @@ export function AccountSettingsModal({
                         className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
                       />
                       <div>
-                        <h4 className="font-bold text-xs text-foreground">Revisão</h4>
+                        <h4 className="font-bold text-xs text-foreground">Alertas de Revisão</h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Notificações para revisar conteúdos no momento ideal.
+                          Avisos quando houver flashcards e matérias agendadas pelo algoritmo de repetição espaçada.
                         </p>
                       </div>
                     </div>
 
-                    {/* Card 3: Feedback */}
+                    {/* Card 4: Importações */}
+                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
+                      <input
+                        type="checkbox"
+                        checked={notifImportacoes}
+                        onChange={(e) => setNotifImportacoes(e.target.checked)}
+                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
+                      />
+                      <div>
+                        <h4 className="font-bold text-xs text-foreground">Importações de Histórico</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          E-mail de confirmação e resumo de processamento ao importar dados externos.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 5: Ranking e Conquistas */}
+                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
+                      <input
+                        type="checkbox"
+                        checked={notifRanking}
+                        onChange={(e) => setNotifRanking(e.target.checked)}
+                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
+                      />
+                      <div>
+                        <h4 className="font-bold text-xs text-foreground">Ranking & Conquistas</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Notificações sobre evolução de posição no ranking geral e novos troféus conquistados.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 6: Feedback & Análise */}
                     <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
                       <input
                         type="checkbox"
@@ -865,11 +929,51 @@ export function AccountSettingsModal({
                         className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
                       />
                       <div>
-                        <h4 className="font-bold text-xs text-foreground">Feedback</h4>
+                        <h4 className="font-bold text-xs text-foreground">Feedback & Insights</h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Mensagens com insights e observações sobre seu desempenho e evolução.
+                          Mensagens com insights inteligentes e observações sobre sua evolução.
                         </p>
                       </div>
+                    </div>
+
+                    {/* Card de Teste do Serviço de E-mail */}
+                    <div className="rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-[#2563EB]" />
+                        <h4 className="font-bold text-xs text-foreground">Teste do Serviço Resend</h4>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Envie um e-mail de validação para a sua caixa postal ({email || userEmail || "seu e-mail"}) para verificar a entrega em tempo real.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isSendingTestEmail}
+                        onClick={async () => {
+                          setIsSendingTestEmail(true)
+                          try {
+                            const res = await sendTestEmailAction()
+                            if (res.success) {
+                              toast.success(res.message || "E-mail de teste enviado!")
+                            } else {
+                              toast.error(res.error || "Erro ao enviar e-mail de teste.")
+                            }
+                          } catch {
+                            toast.error("Erro inesperado ao disparar teste.")
+                          } finally {
+                            setIsSendingTestEmail(false)
+                          }
+                        }}
+                        className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+                      >
+                        {isSendingTestEmail ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        {isSendingTestEmail ? "Enviando..." : "Enviar E-mail de Teste"}
+                      </Button>
                     </div>
                   </div>
                 )}

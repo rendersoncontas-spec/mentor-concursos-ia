@@ -254,7 +254,7 @@ function ProgressBar({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   VIEW PRINCIPAL
+   VIEW PRINCIPAL DO RANKING
 ──────────────────────────────────────────────────────────────────────────────*/
 export function EstudeiRankingView() {
   const [activeTab, setActiveTab] = useState<RankingMetric>("TEMPO")
@@ -291,7 +291,7 @@ export function EstudeiRankingView() {
       }
     }
 
-    // Semana anterior: usado apenas no comparativo do "Sua Posição" (dados reais).
+    // Semana anterior: usado no comparativo de posições
     async function loadPreviousWeek() {
       if (period !== "this_week") {
         setPrevWeekData(null)
@@ -314,7 +314,7 @@ export function EstudeiRankingView() {
     }
   }, [period, reloadKey])
 
-  // Meta semanal + constância (dados reais, sem N+1)
+  // Meta semanal + constância
   useEffect(() => {
     let cancelled = false
     getRankingPersonalContextAction()
@@ -384,27 +384,27 @@ export function EstudeiRankingView() {
   }
 
   let positionCaption: ReactNode = (
-    <span className="text-[11px] font-bold text-muted-foreground">Ranking Global</span>
+    <span className="text-xs font-semibold text-muted-foreground">Ranking Geral</span>
   )
   if (positionDelta !== null) {
     if (positionDelta > 0) {
       positionCaption = (
-        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-600">
+        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
           <TrendingUp className="h-3.5 w-3.5" />
           Subiu {positionDelta} {positionDelta === 1 ? "posição" : "posições"}
         </span>
       )
     } else if (positionDelta < 0) {
       positionCaption = (
-        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-destructive">
+        <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
           <TrendingDown className="h-3.5 w-3.5" />
           Caiu {Math.abs(positionDelta)} {Math.abs(positionDelta) === 1 ? "posição" : "posições"}
         </span>
       )
     } else {
       positionCaption = (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-          <Minus className="h-3.5 w-3.5" /> Manteve a posição
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border">
+          <Minus className="h-3.5 w-3.5" /> Manteve posição
         </span>
       )
     }
@@ -422,26 +422,31 @@ export function EstudeiRankingView() {
     totalParticipants <= 1 && rankedStudents.length === 1 && myIndex >= 0
 
   return (
-    <div className="space-y-4 pb-16">
-      {/* ── Cabeçalho (baixo e compacto) ──────────────────────────────────── */}
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            <Trophy className="h-4.5 w-4.5" />
+    <div className="space-y-6 pb-16 animate-fade-in">
+      {/* ── CABEÇALHO & FILTROS ────────────────────────────────────────────── */}
+      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card/60 backdrop-blur-md p-5 rounded-2xl border shadow-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-amber-500/20 to-primary/20 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
+            <Trophy className="h-6 w-6 text-amber-500" />
           </div>
           <div>
-            <h1 className="text-lg sm:text-xl font-black text-foreground tracking-tight leading-none">
-              Ranking
-            </h1>
-            <p className="text-xs text-muted-foreground mt-1">
-              Compare seu desempenho com todos os alunos do Mentor IA.
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+                Ranking de Estudantes
+              </h1>
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
+                <Users className="h-3 w-3" /> {totalParticipants} alunos
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              Acompanhe sua evolução e dispute o topo com a comunidade de concurseiros.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
           <Select value="global" onValueChange={() => undefined}>
-            <SelectTrigger className="h-9 w-[170px] rounded-lg border bg-card text-xs font-bold shadow-sm">
+            <SelectTrigger className="h-10 w-[150px] rounded-xl border bg-background text-xs font-bold shadow-sm hover:border-primary/50 transition-colors">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -450,7 +455,7 @@ export function EstudeiRankingView() {
           </Select>
 
           <Select value={period} onValueChange={(value) => setPeriod(value as RankingPeriod)}>
-            <SelectTrigger className="h-9 w-[170px] rounded-lg border bg-card text-xs font-bold shadow-sm">
+            <SelectTrigger className="h-10 w-[160px] rounded-xl border bg-background text-xs font-bold shadow-sm hover:border-primary/50 transition-colors">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -464,294 +469,339 @@ export function EstudeiRankingView() {
         </div>
       </header>
 
-      {loading && data && (
-        <div className="flex items-center gap-2 text-[11px] font-bold text-primary animate-fade-in">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Atualizando ranking...
-        </div>
-      )}
-
-      <main
-        className={`space-y-4 transition-opacity duration-300 ${
-          loading && data ? "opacity-70" : "opacity-100"
-        }`}
-      >
-        {/* ── Barra: período atual + métrica ──────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 w-fit rounded-full border bg-card px-3.5 py-1.5 shadow-sm">
-              <CalendarDays className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-foreground">
-                {periodInfo.label}
+      {/* ── BARRA DE STATUS + SELETOR DE MÉTRICA ───────────────────────────── */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card/40 p-2.5 rounded-2xl border shadow-xs">
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          <div className="flex items-center gap-2 rounded-xl bg-background/80 border px-3 py-1.5 shadow-2xs">
+            <CalendarDays className="h-4 w-4 text-primary" />
+            <span className="text-xs font-black uppercase tracking-wider text-foreground">
+              {periodInfo.label}
+            </span>
+            <span className="text-xs text-muted-foreground">({periodInfo.range})</span>
+          </div>
+          {period === "this_week" && (
+            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5">
+              <Flame className="h-4 w-4 text-amber-500 animate-pulse" />
+              <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                Em andamento
               </span>
-              <span className="text-[11px] font-medium text-muted-foreground">{periodInfo.range}</span>
             </div>
-            {period === "this_week" && (
-              <div className="flex items-center gap-1.5 w-fit rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1.5">
-                <Flame className="h-3.5 w-3.5 text-amber-500" />
-                <span className="text-[11px] font-extrabold text-amber-600">
-                  Ranking em andamento
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Abas de métrica (controlam todo o ranking) */}
-          <div role="group" aria-label="Métrica do ranking" className="flex flex-wrap gap-1.5">
-            {METRICS.map(({ id, label, icon: MetricIcon }) => {
-              const selected = activeTab === id
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActiveTab(id)}
-                  aria-pressed={selected}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-150 border ${FOCUS_RING} ${
-                    selected
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-muted"
-                  }`}
-                >
-                  <MetricIcon className="h-3.5 w-3.5" />
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          )}
+          {loading && data && (
+            <div className="flex items-center gap-1.5 text-xs font-bold text-primary animate-fade-in pl-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Atualizando...
+            </div>
+          )}
         </div>
 
-        {/* ── Faixa de métricas (resumo compacto) ─────────────────────────── */}
-        <section
-          key={`band-${activeTab}`}
-          className="rounded-xl border bg-card shadow-sm overflow-hidden animate-fade-in"
-          aria-label="Resumo das suas métricas"
-        >
-          <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
-            <MetricCell
-              label="Tempo"
-              value={data?.userStats.tempo?.hours || "0min"}
-              caption="estudado"
-            />
-            <MetricCell
-              label="Questões"
-              value={data?.userStats.tempo?.questions ?? 0}
-              caption="respondidas"
-            />
-            <MetricCell
-              label="Páginas"
-              value={data?.userStats.tempo?.pages ?? 0}
-              caption="lidas"
-            />
-            <MetricCell
-              label="Sequência"
-              value={`${personal?.streak.consecutiveDays ?? 0} dias`}
-              caption="constância"
-            />
-          </div>
-        </section>
-
-        {/* ── ÁREA DE COMPETIÇÃO: HERO + PRÓXIMO ALVO ─────────────────────── */}
-        <section
-          key={`duel-${activeTab}`}
-          className="grid grid-cols-1 lg:grid-cols-[6fr_4fr] gap-4 animate-fade-in"
-          aria-label="Sua posição e próximo alvo no ranking"
-        >
-          <SuaPosicaoCard
-            student={currentUserStats}
-            hasActivity={currentUserStats?.hasActivity ?? false}
-            metric={activeTab}
-            above={above}
-            below={below}
-            totalParticipants={totalParticipants}
-            isOnlyParticipant={isOnlyParticipant}
-            positionCaption={positionCaption}
-          />
-          <ProximoAlvoCard
-            student={currentUserStats}
-            metric={activeTab}
-            above={above}
-            below={below}
-            totalParticipants={totalParticipants}
-            isOnlyParticipant={isOnlyParticipant}
-          />
-        </section>
-
-        {/* ── Avisos (dados reais) ────────────────────────────────────────── */}
-        <div className="space-y-2.5">
-          {error && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 p-3.5 rounded-xl bg-destructive/5 border border-destructive/20 animate-fade-in">
-              <div className="flex items-center gap-2.5 text-destructive min-w-0">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <p className="text-xs font-bold truncate">
-                  Falha ao atualizar o ranking: {error}
-                </p>
-              </div>
+        {/* Abas de métricas */}
+        <div role="group" aria-label="Métrica do ranking" className="flex items-center gap-1.5 p-1 bg-background/80 rounded-xl border shadow-2xs">
+          {METRICS.map(({ id, label, icon: MetricIcon }) => {
+            const selected = activeTab === id
+            return (
               <button
-                onClick={() => setReloadKey((key) => key + 1)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-[11px] font-bold hover:opacity-90 transition-opacity ${FOCUS_RING}`}
+                key={id}
+                onClick={() => setActiveTab(id)}
+                aria-pressed={selected}
+                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all duration-200 ${FOCUS_RING} ${
+                  selected
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
               >
-                <RotateCw className="h-3.5 w-3.5" /> Tentar novamente
+                <MetricIcon className={`h-4 w-4 ${selected ? "text-primary-foreground" : "text-muted-foreground"}`} />
+                <span>{label}</span>
               </button>
-            </div>
-          )}
-
-          {!loading && rankedStudents.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-center space-y-3 bg-muted/20 rounded-xl border border-dashed animate-fade-in">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <Users className="h-5 w-5 text-muted-foreground/40" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-foreground">Ranking começando</h3>
-                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                  Estude hoje para entrar no ranking e disputar o pódio.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {data &&
-            rankedStudents.length > 0 &&
-            (!currentUserStats || !currentUserStats.hasActivity) && (
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 animate-fade-in">
-                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                <p className="text-xs font-bold text-amber-700">
-                  Você ainda não registrou {metricLabelFor(activeTab).toLowerCase()} no período
-                  selecionado. Estude hoje para entrar no ranking.
-                </p>
-              </div>
-            )}
+            )
+          })}
         </div>
+      </div>
 
-        {/* ── TOP 3 (pódio horizontal) ────────────────────────────────────── */}
-        {top3.length > 0 && (
-          <section key={`podium-${activeTab}-${period}`} className="animate-fade-in-up">
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 items-end">
-              {[top3[1], top3[0], top3[2]].map((student, index) =>
-                student ? (
-                  <PodiumCard
-                    key={student.id || `pos-${student.rank}`}
-                    student={student}
-                    metric={activeTab}
-                    isYou={isCurrentUserStudent(student, isCurrentUserId)}
-                  />
-                ) : (
-                  <div key={`empty-podium-${index}`} />
-                ),
-              )}
-            </div>
-          </section>
+      {/* ── CARDS DE RESUMO DO SEU DESEMPENHO (4 CARDS MODERNOS) ───────────── */}
+      <section
+        key={`band-${activeTab}`}
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-fade-in"
+        aria-label="Resumo das suas métricas"
+      >
+        <MetricSummaryCard
+          icon={Timer}
+          iconColor="text-blue-500 bg-blue-500/10 border-blue-500/20"
+          label="Tempo Estudado"
+          value={data?.userStats.tempo?.hours || "0min"}
+          caption="no período selecionado"
+          highlight={activeTab === "TEMPO"}
+        />
+        <MetricSummaryCard
+          icon={ListChecks}
+          iconColor="text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+          label="Questões Feitas"
+          value={data?.userStats.tempo?.questions ?? 0}
+          caption="questões resolvidas"
+          highlight={activeTab === "QUESTOES"}
+        />
+        <MetricSummaryCard
+          icon={BookOpen}
+          iconColor="text-purple-500 bg-purple-500/10 border-purple-500/20"
+          label="Páginas Lidas"
+          value={data?.userStats.tempo?.pages ?? 0}
+          caption="páginas concluídas"
+          highlight={activeTab === "PAGINAS"}
+        />
+        <MetricSummaryCard
+          icon={Flame}
+          iconColor="text-amber-500 bg-amber-500/10 border-amber-500/20"
+          label="Sequência Atual"
+          value={`${personal?.streak.consecutiveDays ?? 0} dias`}
+          caption={`Recorde: ${personal?.streak.longestDays ?? 0} dias`}
+          highlight={false}
+        />
+      </section>
+
+      {/* ── ÁREA DE BATALHA: SUA POSIÇÃO & PRÓXIMO ALVO ─────────────────────── */}
+      <section
+        key={`duel-${activeTab}`}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in"
+        aria-label="Sua posição e próximo alvo no ranking"
+      >
+        <SuaPosicaoCard
+          student={currentUserStats}
+          hasActivity={currentUserStats?.hasActivity ?? false}
+          metric={activeTab}
+          above={above}
+          below={below}
+          totalParticipants={totalParticipants}
+          isOnlyParticipant={isOnlyParticipant}
+          positionCaption={positionCaption}
+        />
+        <ProximoAlvoCard
+          student={currentUserStats}
+          metric={activeTab}
+          above={above}
+          below={below}
+          totalParticipants={totalParticipants}
+          isOnlyParticipant={isOnlyParticipant}
+        />
+      </section>
+
+      {/* ── AVISOS E FEEDBACKS ─────────────────────────────────────────────── */}
+      {data &&
+        rankedStudents.length > 0 &&
+        (!currentUserStats || !currentUserStats.hasActivity) && (
+          <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 animate-fade-in">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-xs sm:text-sm font-semibold leading-relaxed">
+              Você ainda não registrou {metricLabelFor(activeTab).toLowerCase()} no período selecionado.
+              Estude hoje para pontuar e subir no ranking!
+            </p>
+          </div>
         )}
 
-        {/* ── Ranking + Painel lateral ────────────────────────────────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] items-start gap-4">
-          {/* Ranking completo */}
-          <section className="rounded-xl border bg-card shadow-sm overflow-hidden min-w-0">
-            <div className="px-4 sm:px-5 py-3.5 border-b bg-muted/30">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-xs font-black uppercase tracking-wider text-foreground">
-                  Ranking completo
-                </h2>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground tabular-nums">
-                  {totalParticipants} participante{totalParticipants === 1 ? "" : "s"}
-                  {myIndex >= 0 && (
-                    <button
-                      onClick={scrollToMyRow}
-                      className={`inline-flex items-center gap-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 px-2 py-1 font-black transition-colors ${FOCUS_RING}`}
-                      aria-label="Ir para a minha posição na lista"
-                    >
-                      <Crosshair className="h-3 w-3" /> Minha posição
-                    </button>
-                  )}
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Passe uma posição para subir · cuidado com quem vem atrás.
+      {/* ── PÓDIO TOP 3 GLORIOSO ───────────────────────────────────────────── */}
+      {top3.length > 0 && (
+        <section key={`podium-${activeTab}-${period}`} className="animate-fade-in space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Crown className="h-4 w-4 text-amber-500" /> Pódio dos Campeões
+            </h2>
+            <span className="text-xs text-muted-foreground font-medium">
+              Top 3 melhores desempenhos
+            </span>
+          </div>
+
+          <div className="bg-gradient-to-b from-card/80 to-card border rounded-3xl p-4 sm:p-6 shadow-sm">
+            <div className="grid grid-cols-3 gap-2 sm:gap-6 items-end max-w-3xl mx-auto pt-4 pb-2">
+              {/* 2º Lugar */}
+              <PodiumPedestal
+                rank={2}
+                student={top3[1] ?? null}
+                metric={activeTab}
+                isYou={top3[1] ? isCurrentUserStudent(top3[1], isCurrentUserId) : false}
+              />
+              {/* 1º Lugar (Centro, mais alto) */}
+              <PodiumPedestal
+                rank={1}
+                student={top3[0] ?? null}
+                metric={activeTab}
+                isYou={top3[0] ? isCurrentUserStudent(top3[0], isCurrentUserId) : false}
+              />
+              {/* 3º Lugar */}
+              <PodiumPedestal
+                rank={3}
+                student={top3[2] ?? null}
+                metric={activeTab}
+                isYou={top3[2] ? isCurrentUserStudent(top3[2], isCurrentUserId) : false}
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── GRID PRINCIPAL: LISTA GERAL + SIDEBAR ──────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* COLUNA ESQUERDA: LISTA COMPLETA DE PARTICIPANTES (8 cols) */}
+        <section className="lg:col-span-8 rounded-3xl border bg-card shadow-sm overflow-hidden min-w-0">
+          <div className="px-5 py-4 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-primary" /> Classificação Geral
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Todos os alunos participantes ordenados por {metricLabelFor(activeTab).toLowerCase()}
               </p>
             </div>
-
-            <div className="p-3 sm:p-4 space-y-1">
-              {others.length === 0 && myIndex < 0 && !currentUserStats && (
-                <p className="text-center text-xs text-muted-foreground py-5">
-                  Sem outros participantes no período.
-                </p>
-              )}
-
-              <div key={`list-${activeTab}`} className="space-y-1 animate-fade-in-up">
-                {others.map((student, idx) => {
-                  const isYou = isCurrentUserStudent(student, isCurrentUserId)
-                  const prevStudent = idx > 0 ? others[idx - 1] ?? null : null
-                  const nextStudent =
-                    idx < others.length - 1 ? others[idx + 1] ?? null : null
-
-                  return (
-                    <div
-                      key={student.id || `pos-${student.rank}`}
-                      id={isYou ? "minha-posicao-ranking" : undefined}
-                      className="scroll-mt-6"
-                    >
-                      {isYou &&
-                        prevStudent &&
-                        metricNumber(prevStudent, activeTab) > metricNumber(student, activeTab) && (
-                          <GapLine
-                            icon={<ArrowUp className="h-3.5 w-3.5" />}
-                            text={`Faltam ${formatGap(
-                              activeTab,
-                              metricNumber(prevStudent, activeTab) -
-                                metricNumber(student, activeTab),
-                            )} para passar o #${prevStudent.rank}`}
-                          />
-                        )}
-                      <RankRankingRow student={student} metric={activeTab} isYou={isYou} />
-                      {isYou &&
-                        nextStudent &&
-                        metricNumber(student, activeTab) > metricNumber(nextStudent, activeTab) && (
-                          <GapLine
-                            icon={<ArrowDown className="h-3.5 w-3.5" />}
-                            text={`Você está ${formatGap(
-                              activeTab,
-                              metricNumber(student, activeTab) -
-                                metricNumber(nextStudent, activeTab),
-                            )} à frente do #${nextStudent.rank}`}
-                          />
-                        )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Usuário fora da lista exibida (sem atividade ou posição além da lista) */}
-              {currentUserStats && myIndex < 0 && (
-                <div
-                  id="minha-posicao-ranking"
-                  className="pt-2.5 mt-0.5 border-t border-border space-y-1 scroll-mt-6"
+            
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                {rankedStudents.length} {rankedStudents.length === 1 ? "aluno ativo" : "alunos ativos"}
+              </span>
+              {myIndex >= 0 && (
+                <button
+                  onClick={scrollToMyRow}
+                  className={`inline-flex items-center gap-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 text-xs font-extrabold transition-colors ${FOCUS_RING}`}
+                  aria-label="Ir para a minha posição na lista"
                 >
-                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                    Sua posição
-                  </p>
-                  <RankRankingRow student={currentUserStats} metric={activeTab} isYou />
-                </div>
+                  <Crosshair className="h-3.5 w-3.5" /> Minha posição
+                </button>
               )}
             </div>
-          </section>
+          </div>
 
-          {/* Painel lateral: meta, constância, líder e vencedores */}
-          <aside className="space-y-4 min-w-0">
-            <WeeklyGoalCard personal={personal} />
-            <ConsistencyCard personal={personal} />
-            {(() => {
-              const leader = rankedStudents[0] ?? null
-              return leader ? (
-                <LeaderOfWeekCard leader={leader} metric={activeTab} period={period} />
-              ) : null
-            })()}
-            {period === "this_week" && <WeeklyWinnersCard />}
-          </aside>
-        </div>
-      </main>
+          <div className="p-4 sm:p-5 space-y-2">
+            {rankedStudents.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                  <Users className="h-6 w-6 text-muted-foreground/40" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-foreground">Nenhum registro ainda</h3>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                    Seja o primeiro a estudar e garantir o topo do pódio!
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div key={`list-${activeTab}`} className="space-y-2 animate-fade-in">
+              {rankedStudents.map((student, idx) => {
+                const isYou = isCurrentUserStudent(student, isCurrentUserId)
+                const prevStudent = idx > 0 ? rankedStudents[idx - 1] ?? null : null
+                const nextStudent =
+                  idx < rankedStudents.length - 1 ? rankedStudents[idx + 1] ?? null : null
+
+                return (
+                  <div
+                    key={student.id || `pos-${student.rank}`}
+                    id={isYou ? "minha-posicao-ranking" : undefined}
+                    className="scroll-mt-8"
+                  >
+                    {isYou &&
+                      prevStudent &&
+                      metricNumber(prevStudent, activeTab) > metricNumber(student, activeTab) && (
+                        <GapLine
+                          icon={<ArrowUp className="h-3.5 w-3.5" />}
+                          text={`Faltam ${formatGap(
+                            activeTab,
+                            metricNumber(prevStudent, activeTab) -
+                              metricNumber(student, activeTab),
+                          )} para ultrapassar #${prevStudent.rank} ${cleanStudentName(prevStudent.name)}`}
+                        />
+                      )}
+                    <RankRankingRow
+                      student={student}
+                      metric={activeTab}
+                      isYou={isYou}
+                    />
+                    {isYou &&
+                      nextStudent &&
+                      metricNumber(student, activeTab) > metricNumber(nextStudent, activeTab) && (
+                        <GapLine
+                          icon={<ArrowDown className="h-3.5 w-3.5" />}
+                          text={`Você tem ${formatGap(
+                            activeTab,
+                            metricNumber(student, activeTab) -
+                              metricNumber(nextStudent, activeTab),
+                          )} de vantagem sobre #${nextStudent.rank} ${cleanStudentName(nextStudent.name)}`}
+                        />
+                      )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Usuário fora do ranking ativo */}
+            {currentUserStats && myIndex < 0 && (
+              <div
+                id="minha-posicao-ranking"
+                className="pt-4 mt-4 border-t border-dashed border-border space-y-2 scroll-mt-8"
+              >
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground px-1">
+                  Sua posição atual (sem atividade no período)
+                </p>
+                <RankRankingRow student={currentUserStats} metric={activeTab} isYou />
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* COLUNA DIREITA: WIDGETS DE ENGAJAMENTO (4 cols) */}
+        <aside className="lg:col-span-4 space-y-5 min-w-0">
+          <WeeklyGoalCard personal={personal} />
+          <ConsistencyCard personal={personal} />
+          {period === "this_week" && <WeeklyWinnersCard />}
+        </aside>
+      </div>
     </div>
   )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CARD: SUA POSIÇÃO (elemento visual mais forte)
+   CARD: RESUMO DE MÉTRICA INDIVIDUAL
+──────────────────────────────────────────────────────────────────────────────*/
+function MetricSummaryCard({
+  icon: Icon,
+  iconColor,
+  label,
+  value,
+  caption,
+  highlight,
+}: {
+  icon: LucideIcon
+  iconColor: string
+  label: string
+  value: ReactNode
+  caption: string
+  highlight: boolean
+}) {
+  return (
+    <div
+      className={`relative p-4 rounded-2xl border transition-all duration-200 overflow-hidden bg-card ${
+        highlight
+          ? "border-primary/40 shadow-sm ring-1 ring-primary/20"
+          : "hover:border-border/80"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${iconColor}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+            {label}
+          </span>
+          <span className="block text-lg sm:text-xl font-black text-foreground tracking-tight tabular-nums truncate">
+            {value}
+          </span>
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground font-medium mt-2 truncate">
+        {caption}
+      </p>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CARD: SUA POSIÇÃO
 ──────────────────────────────────────────────────────────────────────────────*/
 function SuaPosicaoCard({
   student,
@@ -787,22 +837,19 @@ function SuaPosicaoCard({
 
   if (student && hasActivity && rank > 0) {
     if (isOnlyParticipant) {
-      message = "Você é o líder do Ranking Global agora."
-      goalLabel = "Continue estudando para manter a liderança."
+      message = "Você é o líder absoluto do Ranking Global agora!"
+      goalLabel = "Continue estudando para manter sua liderança."
       progress = value > 0 ? 100 : 0
     } else if (rank === 1) {
-      message = "Você está liderando."
-      goalLabel = "Defenda sua liderança"
-      progress =
-        value > 0 && belowValue !== null
-          ? Math.min(100, Math.round((belowValue / value) * 100))
-          : 100
+      message = "Parabéns! Você está no topo da liderança."
+      goalLabel = belowValue !== null && below ? `Vantagem de ${formatGap(metric, value - belowValue)} sobre o 2º` : "Defenda seu primeiro lugar"
+      progress = 100
     } else if (rank === 2) {
       message =
         aboveValue !== null && aboveValue > value
-          ? `Faltam ${formatGap(metric, aboveValue - value)} para assumir a liderança.`
-          : "Você é o 2º colocado. Falta pouco para a liderança."
-      goalLabel = "Próximo objetivo: chegar ao #1"
+          ? `Faltam apenas ${formatGap(metric, aboveValue - value)} para assumir a liderança.`
+          : "Você é o 2º colocado. Falta pouco para o topo!"
+      goalLabel = "Objetivo: Conquistar o 1º lugar"
       progress =
         aboveValue !== null && aboveValue > 0
           ? Math.min(100, Math.round((value / aboveValue) * 100))
@@ -810,9 +857,9 @@ function SuaPosicaoCard({
     } else if (rank === 3) {
       message =
         aboveValue !== null && aboveValue > value
-          ? `Faltam ${formatGap(metric, aboveValue - value)} para o #2.`
-          : "Você é o 3º colocado. Mantenha o pódio."
-      goalLabel = "Próximo objetivo: chegar ao #2"
+          ? `Faltam ${formatGap(metric, aboveValue - value)} para alcançar o 2º lugar.`
+          : "Você está no pódio! Mantenha a dedicação."
+      goalLabel = "Objetivo: Subir para o 2º lugar"
       progress =
         aboveValue !== null && aboveValue > 0
           ? Math.min(100, Math.round((value / aboveValue) * 100))
@@ -820,9 +867,9 @@ function SuaPosicaoCard({
     } else if (rank <= 10) {
       message =
         aboveValue !== null && aboveValue > value
-          ? `Você está a ${formatGap(metric, aboveValue - value)} de alcançar o #${above?.rank}.`
-          : "Você está perto do TOP 3. Suba uma posição."
-      goalLabel = `Próximo objetivo: chegar ao #${above?.rank ?? rank - 1}`
+          ? `Você está a ${formatGap(metric, aboveValue - value)} de passar o #${above?.rank}.`
+          : "Você está no TOP 10! Acelere para entrar no pódio."
+      goalLabel = `Objetivo: Ultrapassar o #${above?.rank ?? rank - 1}`
       progress =
         aboveValue !== null && aboveValue > 0
           ? Math.min(100, Math.round((value / aboveValue) * 100))
@@ -831,73 +878,77 @@ function SuaPosicaoCard({
       const positionsToTop10 = rank - 10
       message = `Suba ${positionsToTop10} ${
         positionsToTop10 === 1 ? "posição" : "posições"
-      } para entrar no TOP 10.`
+      } para conquistar uma vaga no TOP 10.`
       goalLabel =
         aboveValue !== null && aboveValue > value
           ? `Faltam ${formatGap(metric, aboveValue - value)} para o #${above?.rank}`
-          : "Cada sessão conta"
+          : "Mantenha o foco nos estudos diários"
       progress =
         aboveValue !== null && aboveValue > 0
           ? Math.min(100, Math.round((value / aboveValue) * 100))
           : 0
     }
   } else if (student && !hasActivity && totalParticipants > 0) {
-    message = "Estude hoje e comece a subir no Ranking Global."
+    message = "Cadastre suas sessões de estudo para pontuar e disputar o pódio."
     goalLabel = "Registre seu primeiro estudo do período"
   }
 
   return (
-    <div className="relative rounded-2xl border bg-card shadow-sm overflow-hidden">
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary/70 via-primary to-sky-400" />
-      <div className="flex flex-col justify-between gap-4 p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-              🏆 Sua posição
-            </p>
-            <div className="mt-2 flex items-center gap-3">
-              <span className="text-5xl sm:text-6xl font-black tracking-tight text-primary leading-none tabular-nums">
-                {rank > 0 ? `#${rank}` : "#--"}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-black text-foreground leading-tight">
-                  {rankLabel}
-                  {isMedalRank(rank) && (
-                    <Medal
-                      className="inline h-4 w-4 ml-1 -mt-0.5"
-                      style={medalStyleFor(rank)}
-                    />
-                  )}
-                </p>
-                <p className="text-[11px] font-bold text-muted-foreground mt-0.5 tabular-nums">
-                  {metricLabelFor(metric)} · {student ? metricValueFor(student, metric) : "0"}
-                </p>
-              </div>
+    <div className="relative rounded-3xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
+      <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+      
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <span className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+            <Trophy className="h-4 w-4" /> Sua Classificação
+          </span>
+          <div className="flex items-baseline gap-3 pt-1">
+            <span className="text-4xl sm:text-5xl font-black tracking-tight text-primary leading-none tabular-nums">
+              {rank > 0 ? `#${rank}` : "#--"}
+            </span>
+            <div>
+              <p className="text-base font-black text-foreground flex items-center gap-1.5">
+                {rankLabel}
+                {isMedalRank(rank) && (
+                  <Medal
+                    className="h-4 w-4"
+                    style={medalStyleFor(rank)}
+                  />
+                )}
+              </p>
+              <p className="text-xs font-bold text-muted-foreground mt-0.5 tabular-nums">
+                {student ? metricValueFor(student, metric) : "0"} acumulados
+              </p>
             </div>
           </div>
-          {positionCaption && <div className="shrink-0 pt-0.5">{positionCaption}</div>}
         </div>
 
-        <div>
-          <p className="text-[13px] font-bold text-foreground leading-snug">{message}</p>
-          {goalLabel && (
-            <p className="text-[11px] text-muted-foreground font-semibold mt-1 flex items-center gap-1.5">
+        {positionCaption && <div className="shrink-0">{positionCaption}</div>}
+      </div>
+
+      <div className="space-y-2.5 pt-2 border-t border-border/60">
+        <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">{message}</p>
+        
+        {goalLabel && (
+          <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+            <span className="flex items-center gap-1.5">
               <Target className="h-3.5 w-3.5 text-primary" /> {goalLabel}
-            </p>
-          )}
-          <ProgressBar
-            className="mt-3"
-            value={progress}
-            ariaLabel="Progresso em direção ao próximo objetivo no ranking"
-          />
-        </div>
+            </span>
+            <span className="font-bold text-foreground">{progress}%</span>
+          </div>
+        )}
+
+        <ProgressBar
+          value={progress}
+          ariaLabel="Progresso em direção ao próximo objetivo no ranking"
+        />
       </div>
     </div>
   )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CARD: PRÓXIMO ALVO + DE OLHO (caçada à frente e defesa atrás)
+   CARD: PRÓXIMO ALVO / DEFESA
 ──────────────────────────────────────────────────────────────────────────────*/
 function ProximoAlvoCard({
   student,
@@ -923,223 +974,201 @@ function ProximoAlvoCard({
       ? Math.min(100, Math.round((userValue / aboveValue) * 100))
       : 0
 
-  let targetTitle = "Ninguém está na sua frente"
-  if (totalParticipants <= 0) targetTitle = "Seja o primeiro a entrar no ranking"
-  else if (isOnlyParticipant) targetTitle = "Você é o único participante"
-
   return (
-    <div className="relative rounded-2xl border bg-card shadow-sm overflow-hidden">
-      <div className="flex flex-col justify-between gap-4 p-5 sm:p-6">
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-            <Target className="inline h-3.5 w-3.5 mr-1 -mt-0.5 text-primary" />
-            Próximo alvo
-          </p>
+    <div className="relative rounded-3xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
+      <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
-          {above ? (
-            <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
-              <Avatar student={above} sizeClass="h-11 w-11 text-xs" imgSize={88} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-extrabold text-muted-foreground">#{above.rank}</p>
-                <p className="text-sm font-black text-foreground truncate leading-tight">
+      <div>
+        <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          <Crosshair className="h-4 w-4 text-primary" />
+          {isTop1 ? "Defesa da Liderança" : "Próximo Adversário à Frente"}
+        </span>
+
+        {above ? (
+          <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-primary/20 bg-primary/[0.03] p-3.5">
+            <Avatar student={above} sizeClass="h-12 w-12 text-sm shadow-sm" imgSize={96} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black text-primary">#{above.rank}</span>
+                <p className="text-sm font-black text-foreground truncate">
                   {cleanStudentName(above.name)}
                 </p>
-                <p className="text-[11px] font-bold text-muted-foreground tabular-nums">
-                  {metricValueFor(above, metric)}
-                </p>
               </div>
+              <p className="text-xs font-bold text-muted-foreground tabular-nums mt-0.5">
+                {metricValueFor(above, metric)}
+              </p>
             </div>
-          ) : (
-            <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/20 px-3 py-2.5">
-              <Crown className="h-6 w-6 shrink-0 text-amber-500/60" />
-              <div className="min-w-0">
-                <p className="text-sm font-black text-foreground">{targetTitle}</p>
-                <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">
-                  Continue estudando para construir vantagem.
-                </p>
-              </div>
+            <div className="text-right shrink-0">
+              <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">Distância</span>
+              <span className="text-xs font-black text-primary tabular-nums">
+                {aboveValue !== null && aboveValue > userValue ? formatGap(metric, aboveValue - userValue) : "0"}
+              </span>
             </div>
-          )}
-
-          {above && aboveValue !== null && aboveValue > userValue && (
-            <p className="mt-3 text-sm font-black text-foreground">
-              Faltam{" "}
-              <span className="text-primary tabular-nums">
-                {formatGap(metric, aboveValue - userValue)}
-              </span>{" "}
-              para alcançar o #{above.rank}
-            </p>
-          )}
-
-          {above && (
-            <div className="mt-2">
-              <ProgressBar
-                value={progress}
-                ariaLabel={`Progresso para alcançar o ${above.rank}º lugar`}
-              />
+          </div>
+        ) : isTop1 ? (
+          <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center shrink-0">
+              <Crown className="h-6 w-6 text-amber-500" />
             </div>
-          )}
-        </div>
-
-        {/* Quem está atrás (defesa) */}
-        {below && belowValue !== null && userValue > belowValue && (
-          <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2.5">
-            <Eye className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
-            <p className="text-xs font-bold text-foreground leading-snug">
-              {isTop1 ? (
-                <>
-                  Defenda a liderança:{" "}
-                  <span className="text-amber-600">{cleanStudentName(below.name)}</span> está a{" "}
-                  <span className="text-amber-600 tabular-nums">
-                    {formatGap(metric, userValue - belowValue)}
-                  </span>{" "}
-                  de você.
-                </>
-              ) : (
-                <>
-                  <span className="text-amber-600">{cleanStudentName(below.name)}</span> (#{below.rank}) está{" "}
-                  <span className="text-amber-600 tabular-nums">
-                    {formatGap(metric, userValue - belowValue)}
-                  </span>{" "}
-                  atrás de você.
-                </>
-              )}
-            </p>
+            <div className="min-w-0">
+              <p className="text-sm font-black text-foreground">Você é o líder da competição!</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Nenhum concorrente está na sua frente. Mantenha o ritmo de estudo.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-dashed p-3.5 bg-muted/20">
+            <Target className="h-6 w-6 text-muted-foreground/50 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground">Disputa aberta</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Estude para registrar seu tempo e definir o próximo alvo.
+              </p>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Alerta de quem vem atrás ou status de defesa */}
+      {below && belowValue !== null && userValue >= belowValue ? (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
+          <Eye className="h-4 w-4 shrink-0 text-amber-500" />
+          <p className="text-xs font-bold text-foreground leading-snug truncate">
+            Atenção: <span className="text-amber-600 dark:text-amber-400">{cleanStudentName(below.name)}</span> (#{below.rank}) está a apenas{" "}
+            <span className="text-amber-600 dark:text-amber-400 tabular-nums font-black">
+              {formatGap(metric, userValue - belowValue)}
+            </span>{" "}
+            de você.
+          </p>
+        </div>
+      ) : isOnlyParticipant ? (
+        <p className="text-xs text-muted-foreground font-semibold px-1">
+          Chame outros concurseiros para medir o nível de preparação!
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground font-semibold px-1">
+          Continue firme para garantir sua melhor colocação histórica.
+        </p>
+      )}
     </div>
   )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   LINHA DE DISTÂNCIA (entre posições)
+   PÓDIO: PEDESTAL MODERNO (TOP 1, 2, 3)
 ──────────────────────────────────────────────────────────────────────────────*/
-function GapLine({ icon, text }: { icon: ReactNode; text: string }) {
-  return (
-    <div className="flex items-center justify-center gap-1.5 py-1 text-[11px] font-black text-primary">
-      {icon}
-      <span>{text}</span>
-    </div>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   CÉLULA DA FAIXA DE MÉTRICAS (resumo secundário)
-──────────────────────────────────────────────────────────────────────────────*/
-function MetricCell({
-  label,
-  value,
-  caption,
-}: {
-  label: string
-  value: ReactNode
-  caption: ReactNode
-}) {
-  return (
-    <div className="px-4 py-3.5 text-center min-w-0">
-      <span className="block text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
-        {label}
-      </span>
-      <span className="block text-lg font-black text-foreground tracking-tight tabular-nums leading-tight truncate">
-        {value}
-      </span>
-      <span className="block min-h-4 truncate text-[11px] font-semibold text-muted-foreground">
-        {caption}
-      </span>
-    </div>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   PÓDIO (TOP 3)
-──────────────────────────────────────────────────────────────────────────────*/
-function PodiumCard({
+function PodiumPedestal({
+  rank,
   student,
   metric,
   isYou,
 }: {
-  student: RankingStudent
+  rank: 1 | 2 | 3
+  student: RankingStudent | null
   metric: RankingMetric
   isYou: boolean
 }) {
-  const isFirst = student.rank === 1
-  const isSecond = student.rank === 2
-  let stepClass = "h-4 bg-gradient-to-r from-orange-400/70 to-orange-600/70"
-  if (isFirst) stepClass = "h-5 bg-gradient-to-r from-amber-500 to-yellow-400"
-  else if (isSecond) stepClass = "h-4 bg-gradient-to-r from-slate-300 to-slate-400"
-  return (
-    <div
-      className={`relative flex flex-col items-center text-center overflow-hidden rounded-2xl border transition-all duration-200 min-w-0 ${
-        isFirst
-          ? "border-primary/30 bg-gradient-to-b from-primary/[0.08] to-card shadow-md"
-          : "bg-card border-border shadow-sm hover:border-muted"
-      } ${isFirst ? "pt-10 pb-0" : "pt-7 pb-0"} px-3`}
-    >
-      {isFirst && (
-        <Crown className="absolute -top-2.5 left-1/2 -translate-x-1/2 h-5 w-5 text-amber-500" />
-      )}
-      <span
-        className={`absolute top-2.5 right-3 font-black leading-none tabular-nums ${
-          isFirst ? "text-lg" : "text-base"
-        }`}
-        style={{ color: medalStyleFor(student.rank).color }}
-      >
-        {student.rank}º
-      </span>
+  const isFirst = rank === 1
+  const isSecond = rank === 2
+  const isThird = rank === 3
 
-      <div className={`relative ${isFirst ? "mt-0.5" : ""}`}>
-        <Avatar
-          student={student}
-          sizeClass={`${
-            isFirst ? "h-16 w-16" : "h-12 w-12"
-          } text-sm border-2 border-background shadow-md`}
-          imgSize={isFirst ? 128 : 96}
-        />
-        {isYou && (
-          <Badge className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground border-transparent text-[8px] font-black px-1.5 py-0 rounded-full whitespace-nowrap">
-            VOCÊ
-          </Badge>
+  // Configurações visuais por posição
+  const pedestalHeights = {
+    1: "h-40 sm:h-44",
+    2: "h-32 sm:h-36",
+    3: "h-24 sm:h-28",
+  }
+
+  const pedestalGradients = {
+    1: "bg-gradient-to-t from-amber-500/30 via-amber-500/15 to-transparent border-amber-500/40 text-amber-500",
+    2: "bg-gradient-to-t from-slate-400/30 via-slate-400/15 to-transparent border-slate-400/40 text-slate-400",
+    3: "bg-gradient-to-t from-amber-700/30 via-amber-700/15 to-transparent border-amber-700/40 text-amber-700",
+  }
+
+  const crownColors = {
+    1: "text-amber-500 fill-amber-500",
+    2: "text-slate-400 fill-slate-400",
+    3: "text-amber-700 fill-amber-700",
+  }
+
+  if (!student) {
+    return (
+      <div className="flex flex-col items-center justify-end text-center">
+        <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/40 mb-3">
+          <span className="text-xs font-black">{rank}º</span>
+        </div>
+        <div
+          className={`w-full rounded-t-2xl border-t border-x border-dashed border-border/60 bg-muted/10 flex items-center justify-center ${pedestalHeights[rank]}`}
+        >
+          <span className="text-[11px] font-bold text-muted-foreground/60">Vago</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 ${isFirst ? "order-2" : isSecond ? "order-1" : "order-3"}`}>
+      {/* Coroa / Medalha no topo */}
+      <div className="relative mb-2 flex flex-col items-center">
+        {isFirst && (
+          <Crown className={`h-6 w-6 mb-1 filter drop-shadow-md animate-bounce ${crownColors[1]}`} />
         )}
+        {!isFirst && (
+          <Medal className={`h-5 w-5 mb-1 ${crownColors[rank]}`} />
+        )}
+
+        <div className="relative">
+          <Avatar
+            student={student}
+            sizeClass={`${
+              isFirst ? "h-16 w-16 sm:h-20 sm:w-20" : "h-12 w-12 sm:h-16 sm:w-16"
+            } text-base font-black border-4 ${
+              isFirst ? "border-amber-400 shadow-amber-500/20" : isSecond ? "border-slate-300 shadow-slate-400/20" : "border-amber-600 shadow-amber-700/20"
+            } shadow-lg`}
+            imgSize={isFirst ? 160 : 128}
+          />
+          {isYou && (
+            <Badge className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground border-background text-[9px] font-black px-2 py-0 rounded-full shadow-sm">
+              VOCÊ
+            </Badge>
+          )}
+        </div>
       </div>
 
-      <span
-        className={`mt-2.5 max-w-full truncate leading-tight font-black text-foreground ${
-          isFirst ? "text-[15px]" : "text-[13px]"
-        }`}
-      >
-        {cleanStudentName(student.name)}
-      </span>
-      <span
-        className={`mt-0.5 flex items-center justify-center gap-1 text-[10px] font-extrabold uppercase tracking-widest ${
-          isFirst ? "text-primary" : "text-muted-foreground"
-        }`}
-      >
-        {ordinalLabelFor(student.rank)}
-        {isFirst && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-600 px-1.5 py-px text-[8px] font-black normal-case tracking-normal">
-            <Crown className="h-2.5 w-2.5" /> LÍDER
-          </span>
-        )}
-      </span>
-      <span
-        className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-black tabular-nums ${
-          isFirst
-            ? "bg-gradient-to-r from-amber-500 to-yellow-400 text-white shadow-sm"
-            : "bg-muted text-foreground"
-        }`}
-      >
-        {metricValueFor(student, metric)}
-      </span>
+      {/* Nome e Pontuação */}
+      <div className="mb-2 max-w-full px-1">
+        <p className={`font-black text-foreground truncate ${isFirst ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}>
+          {cleanStudentName(student.name)}
+        </p>
+        <span
+          className={`inline-block font-black tabular-nums mt-0.5 rounded-full px-2.5 py-0.5 text-[11px] sm:text-xs ${
+            isFirst
+              ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {metricValueFor(student, metric)}
+        </span>
+      </div>
 
-      {/* Degrau do pódio */}
-      <div className={`mt-3 w-full rounded-t-lg ${stepClass}`} aria-hidden />
+      {/* Pedestal estilizado */}
+      <div
+        className={`w-full rounded-t-2xl sm:rounded-t-3xl border-t border-x flex flex-col items-center justify-start pt-3 shadow-inner ${pedestalHeights[rank]} ${pedestalGradients[rank]}`}
+      >
+        <span className="text-2xl sm:text-4xl font-black tabular-nums tracking-tighter opacity-80">
+          {rank}º
+        </span>
+        <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest opacity-70 mt-0.5">
+          {rank === 1 ? "Ouro" : rank === 2 ? "Prata" : "Bronze"}
+        </span>
+      </div>
     </div>
   )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   LINHA DO RANKING COMPLETO
+   LINHA DA TABELA DE RANKING
 ──────────────────────────────────────────────────────────────────────────────*/
 function RankRankingRow({
   student,
@@ -1151,191 +1180,182 @@ function RankRankingRow({
   isYou: boolean
 }) {
   const inMedal = isMedalRank(student.rank)
-  let rankTextClass = "text-muted-foreground"
-  if (isYou) rankTextClass = "text-primary"
-  else if (inMedal) rankTextClass = ""
+
   return (
     <div
-      className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${
+      className={`flex items-center gap-3 sm:gap-4 px-4 py-3 rounded-2xl border transition-all duration-150 ${
         isYou
-          ? "bg-primary/[0.06] border-primary/30 shadow-sm"
-          : "bg-card border-border hover:bg-muted/40 hover:border-muted"
+          ? "bg-primary/[0.08] border-primary/40 shadow-xs ring-1 ring-primary/20"
+          : "bg-card/70 border-border/70 hover:bg-muted/40 hover:border-border"
       }`}
     >
-      <span
-        className={`w-8 shrink-0 text-sm font-black tabular-nums text-right ${rankTextClass}`}
-        style={!isYou && inMedal ? { color: medalStyleFor(student.rank).color } : undefined}
-      >
-        #{student.rank}
-      </span>
-
-      <Avatar student={student} sizeClass="h-8 w-8 text-[11px]" imgSize={64} />
-
-      <span
-        className={`flex-1 min-w-0 text-sm truncate ${
-          isYou ? "font-black text-primary" : "font-semibold text-foreground"
-        }`}
-      >
-        {cleanStudentName(student.name)}
-        {isYou && (
-          <Badge className="ml-2 bg-primary text-primary-foreground border-transparent text-[8px] font-black px-1.5 py-0 rounded-full align-middle">
-            VOCÊ
-          </Badge>
+      {/* Posição */}
+      <div className="w-8 shrink-0 text-center">
+        {student.rank === 1 ? (
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15 text-amber-600 font-black text-xs">
+            1º
+          </span>
+        ) : student.rank === 2 ? (
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-400/20 text-slate-600 dark:text-slate-300 font-black text-xs">
+            2º
+          </span>
+        ) : student.rank === 3 ? (
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-700 dark:text-amber-400 font-black text-xs">
+            3º
+          </span>
+        ) : (
+          <span className="text-xs font-black text-muted-foreground tabular-nums">
+            #{student.rank}
+          </span>
         )}
-      </span>
+      </div>
 
-      <span className="text-sm font-bold text-foreground min-w-[90px] flex-shrink-0 whitespace-nowrap text-right tabular-nums">
-        {metricValueFor(student, metric)}
-      </span>
+      {/* Avatar */}
+      <Avatar student={student} sizeClass="h-9 w-9 text-xs font-bold shrink-0" imgSize={72} />
+
+      {/* Nome + Identificação */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p
+            className={`text-sm truncate ${
+              isYou ? "font-black text-primary" : "font-bold text-foreground"
+            }`}
+          >
+            {cleanStudentName(student.name)}
+          </p>
+          {isYou && (
+            <Badge className="bg-primary text-primary-foreground text-[9px] font-black px-1.5 py-0 rounded-md">
+              VOCÊ
+            </Badge>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground truncate">
+          {student.targetContest || "Concurseiro Focado"}
+        </p>
+      </div>
+
+      {/* Valor da Métrica */}
+      <div className="text-right shrink-0">
+        <span
+          className={`text-xs sm:text-sm font-black tabular-nums px-2.5 py-1 rounded-xl ${
+            isYou
+              ? "bg-primary text-primary-foreground"
+              : inMedal
+              ? "bg-muted/80 text-foreground font-extrabold"
+              : "text-muted-foreground font-bold"
+          }`}
+        >
+          {metricValueFor(student, metric)}
+        </span>
+      </div>
     </div>
   )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   META DA SEMANA (reutiliza a meta existente do perfil)
+   LINHA DE DISTÂNCIA
+──────────────────────────────────────────────────────────────────────────────*/
+function GapLine({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 text-[11px] font-bold text-primary bg-primary/[0.04] rounded-xl border border-dashed border-primary/20 my-1">
+      {icon}
+      <span>{text}</span>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   WIDGET: META DA SEMANA
 ──────────────────────────────────────────────────────────────────────────────*/
 function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null }) {
   const goal = personal?.weeklyGoal
-  const achieved = goal ? formatGoalTime(goal.achievedMinutes) : "—"
-  const target = goal ? formatGoalTime(goal.targetMinutes) : "—"
+  const achieved = goal ? formatGoalTime(goal.achievedMinutes) : "0h"
+  const target = goal ? formatGoalTime(goal.targetMinutes) : "20h"
   const remaining = goal ? formatGap("TEMPO", goal.remainingMinutes) : "—"
+  const percentage = goal?.percentage ?? 0
   const done = !!goal && goal.remainingMinutes <= 0 && goal.achievedMinutes > 0
 
   return (
-    <section className="rounded-xl border bg-card shadow-sm overflow-hidden min-w-0">
-      <div className="p-4 space-y-3">
-        <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-          <Target className="h-3.5 w-3.5 text-primary" /> Meta da semana
-        </p>
-
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <p className="text-2xl font-black text-foreground leading-none tabular-nums">
-              {target}
-              {done && <span className="ml-2 text-xs font-black text-emerald-600">✓</span>}
-            </p>
-            <p className="text-[11px] font-semibold text-muted-foreground mt-1">
-              {achieved} estudadas
-            </p>
-          </div>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-black tabular-nums ${
-              done ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/10 text-primary"
-            }`}
-          >
-            {goal?.percentage ?? 0}%
-          </span>
-        </div>
-
-        <ProgressBar
-          value={goal?.percentage ?? 0}
-          ariaLabel="Progresso da meta semanal de estudo"
-        />
-
-        <p className="text-xs font-bold text-muted-foreground">
-          {done
-            ? "Meta concluída! Continue para abrir vantagem."
-            : `Faltam ${remaining} para bater a meta.`}
-        </p>
+    <section className="rounded-3xl border bg-card p-5 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          <Target className="h-4 w-4 text-primary" /> Meta de Estudo
+        </span>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-black tabular-nums ${
+            done
+              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+              : "bg-primary/10 text-primary border border-primary/20"
+          }`}
+        >
+          {percentage}%
+        </span>
       </div>
+
+      <div className="flex items-baseline justify-between">
+        <div>
+          <p className="text-2xl sm:text-3xl font-black text-foreground leading-none tabular-nums">
+            {achieved}
+            <span className="text-xs text-muted-foreground font-semibold ml-1">
+              / {target}
+            </span>
+          </p>
+          <p className="text-[11px] text-muted-foreground font-medium mt-1">
+            {done ? "Meta semanal atingida!" : `Faltam ${remaining} para atingir a meta`}
+          </p>
+        </div>
+      </div>
+
+      <ProgressBar
+        value={percentage}
+        ariaLabel="Progresso da meta semanal de estudo"
+      />
     </section>
   )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CONSTÂNCIA (sequência real)
+   WIDGET: CONSTÂNCIA / DIAS SEGUIDOS
 ──────────────────────────────────────────────────────────────────────────────*/
 function ConsistencyCard({ personal }: { personal: RankingPersonalContext | null }) {
   const streak = personal?.streak
   const days = streak?.consecutiveDays ?? 0
 
   return (
-    <section className="rounded-xl border bg-card shadow-sm overflow-hidden min-w-0">
-      <div className="p-4 space-y-3">
-        <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-          <Flame className="h-3.5 w-3.5 text-amber-500" /> Constância
-        </p>
+    <section className="rounded-3xl border bg-card p-5 shadow-sm space-y-4">
+      <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+        <Flame className="h-4 w-4 text-amber-500" /> Fogo da Constância
+      </span>
 
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
-            <Flame className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xl font-black text-foreground leading-none tabular-nums">
-              {days}
-              <span className="text-sm font-bold text-muted-foreground ml-1">dias</span>
-            </p>
-            <p className="text-[11px] font-semibold text-muted-foreground mt-0.5 truncate">
-              {days > 0
-                ? `Estudando há ${days} ${days === 1 ? "dia" : "dias"} seguidos`
-                : "Estude hoje para iniciar sua sequência."}
-            </p>
-          </div>
+      <div className="flex items-center gap-3.5">
+        <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-500 shrink-0">
+          <Flame className="h-6 w-6 animate-pulse" />
         </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-2xl sm:text-3xl font-black text-foreground leading-none tabular-nums">
+            {days}{" "}
+            <span className="text-sm font-bold text-muted-foreground">
+              {days === 1 ? "dia" : "dias"}
+            </span>
+          </p>
+          <p className="text-xs font-semibold text-muted-foreground mt-1 truncate">
+            {days > 0 ? "Estudando consecutivamente" : "Estude hoje para começar"}
+          </p>
+        </div>
+      </div>
 
-        <div className="rounded-lg bg-muted/40 px-3 py-2 text-[11px] font-bold text-muted-foreground">
-          Recorde:{" "}
-          <span className="text-foreground font-black tabular-nums">
-            {streak?.longestDays ?? 0}
-          </span>{" "}
-          dias
-        </div>
+      <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 border text-xs font-semibold text-muted-foreground">
+        <span>Melhor sequência:</span>
+        <span className="text-foreground font-black tabular-nums">
+          🔥 {streak?.longestDays ?? 0} dias
+        </span>
       </div>
     </section>
   )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   LÍDER DA SEMANA
-──────────────────────────────────────────────────────────────────────────────*/
-function LeaderOfWeekCard({
-  leader,
-  metric,
-  period,
-}: {
-  leader: RankingStudent
-  metric: RankingMetric
-  period: RankingPeriod
-}) {
-  const suffix = period === "this_week" ? "esta semana" : "no período"
-  let phrase = `É o aluno que mais estudou ${suffix}.`
-  if (metric === "QUESTOES") phrase = `É o aluno que mais respondeu questões ${suffix}.`
-  if (metric === "PAGINAS") phrase = `É o aluno que mais leu ${suffix}.`
-
-  return (
-    <section className="relative rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.07] to-card shadow-sm overflow-hidden min-w-0">
-      <div className="p-4 space-y-3">
-        <p className="text-[11px] font-black uppercase tracking-widest text-amber-600 flex items-center gap-1.5">
-          <Crown className="h-4 w-4" /> Líder {period === "this_week" ? "da semana" : "do período"}
-        </p>
-
-        <div className="flex items-center gap-3">
-          <Avatar
-            student={leader}
-            sizeClass="h-11 w-11 text-sm border-2 border-amber-400/60 shadow-md"
-            imgSize={88}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-black text-foreground truncate">
-              {cleanStudentName(leader.name)}
-            </p>
-            <p className="text-xs font-black text-amber-600 tabular-nums">
-              {metricValueFor(leader, metric)}
-            </p>
-          </div>
-          <span className="text-2xl leading-none" aria-hidden>
-            👑
-          </span>
-        </div>
-
-        <p className="text-xs font-semibold text-muted-foreground leading-snug">{phrase}</p>
-      </div>
-    </section>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   VENCEDORES DAS SEMANAS ANTERIORES (dados reais, compacto)
+   WIDGET: VENCEDORES DAS SEMANAS ANTERIORES
 ──────────────────────────────────────────────────────────────────────────────*/
 interface WeekWinners {
   offset: number
@@ -1421,147 +1441,102 @@ function WeeklyWinnersCard() {
   }
 
   return (
-    <section className="rounded-xl border bg-card shadow-sm overflow-hidden min-w-0">
-      <div className="p-4 space-y-3">
-        <div className="relative">
-          <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground pr-24 leading-none">
-            Vencedores anteriores
-          </p>
+    <section className="rounded-3xl border bg-card p-5 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          <Crown className="h-4 w-4 text-amber-500" /> Histórico de Campeões
+        </span>
 
+        {/* Navegação entre semanas */}
+        <div className="flex items-center gap-1">
           <button
             onClick={goOlder}
             disabled={loading}
             aria-label="Semana anterior"
-            className={`absolute top-0 right-8 text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none ${FOCUS_RING} rounded-md`}
+            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-
-          <span className="absolute top-0.5 right-0 text-[11px] font-bold text-primary/70 whitespace-nowrap">
+          <span className="text-[11px] font-bold text-muted-foreground px-1">
             {current?.rangeLabel ?? "—"}
           </span>
-
           <button
             onClick={goNewer}
             disabled={!showRight || loading}
             aria-label="Semana mais recente"
-            className={`absolute top-0 right-14 text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none ${FOCUS_RING} rounded-md`}
+            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-
-        {loading && !current && (
-          <div className="space-y-2">
-            {[0, 1, 2].map((item) => (
-              <div key={item} className="skeleton h-9 rounded-lg" />
-            ))}
-          </div>
-        )}
-
-        {error && !loading && !current && (
-          <div className="p-3.5 rounded-xl bg-destructive/5 border border-destructive/20 text-[11px] font-bold text-destructive">
-            Falha ao carregar vencedores: {error}
-          </div>
-        )}
-
-        {current && (current.podium.length > 0 || current.list.length > 0) && (
-          <>
-            <div className="grid grid-cols-[1fr_1.2fr_1fr] gap-1.5 items-end">
-              {[current.podium[1], current.podium[0], current.podium[2]].map((student, index) =>
-                student ? (
-                  <PodiumStep key={`${student.id}-${index}`} student={student} />
-                ) : (
-                  <div key={index} className="h-[92px] rounded-t-xl bg-muted/40" />
-                ),
-              )}
-            </div>
-
-            <div className="space-y-1" aria-label="Demais colocados da semana">
-              {current.list.map((student) => (
-                <div
-                  key={student.id || student.rank}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] hover:bg-primary/5 transition-colors"
-                >
-                  <span className="w-6 shrink-0 font-extrabold text-muted-foreground text-center text-xs">
-                    {student.rank}º
-                  </span>
-                  <Avatar student={student} sizeClass="h-6 w-6 text-[9px]" imgSize={48} />
-                  <span className="flex-1 min-w-0 font-semibold text-primary truncate">
-                    {cleanStudentName(student.name)}
-                  </span>
-                  <span className="text-[11px] font-bold text-primary/80 tabular-nums whitespace-nowrap">
-                    {student.hours}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {current && current.podium.length === 0 && current.list.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-8 text-center space-y-1.5">
-            <Crown className="h-6 w-6 text-muted-foreground/30" />
-            <p className="text-sm font-bold text-foreground">Sem registros nesta semana</p>
-            <p className="text-xs text-muted-foreground max-w-[220px]">
-              Não houve registros suficientes nesta semana ({current.rangeLabel}).
-            </p>
-          </div>
-        )}
       </div>
+
+      {loading && !current && (
+        <div className="space-y-2 py-4">
+          <div className="skeleton h-14 rounded-2xl" />
+        </div>
+      )}
+
+      {current && current.podium.length > 0 && (
+        <div className="space-y-2">
+          {/* Campeão da Semana passada */}
+          {current.podium[0] && (
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25">
+              <div className="relative">
+                <Avatar
+                  student={current.podium[0]}
+                  sizeClass="h-10 w-10 text-xs border border-amber-400"
+                  imgSize={80}
+                />
+                <Crown className="absolute -top-2 -right-1 h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 block">
+                  1º Lugar da Semana
+                </span>
+                <p className="text-sm font-black text-foreground truncate">
+                  {cleanStudentName(current.podium[0].name)}
+                </p>
+              </div>
+              <span className="text-xs font-black text-amber-600 dark:text-amber-400 tabular-nums">
+                {current.podium[0].hours}
+              </span>
+            </div>
+          )}
+
+          {/* 2º e 3º lugares */}
+          {current.podium.slice(1, 3).map((student) => (
+            <div
+              key={student.id || student.rank}
+              className="flex items-center justify-between px-3 py-2 rounded-xl bg-muted/20 text-xs"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <span className="font-bold text-muted-foreground">{student.rank}º</span>
+                <span className="font-semibold text-foreground truncate">
+                  {cleanStudentName(student.name)}
+                </span>
+              </div>
+              <span className="font-bold text-muted-foreground tabular-nums">
+                {student.hours}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {current && current.podium.length === 0 && (
+        <div className="py-6 text-center text-xs text-muted-foreground">
+          Sem registros de campeões para {current.rangeLabel}.
+        </div>
+      )}
     </section>
   )
 }
 
-function PodiumStep({ student }: { student: RankingStudent }) {
-  const isGold = student.rank === 1
-  const heightClass = podiumHeightClass(student.rank)
-  const gradient = podiumGradientFor(student.rank)
-  return (
-    <div
-      className={`relative px-1.5 pt-6 pb-3 text-center text-white rounded-t-xl min-w-0 ${heightClass}`}
-      style={{ background: gradient }}
-    >
-      {isGold && (
-        <Crown
-          className="absolute top-[-36px] left-1/2 -translate-x-1/2 h-[16px] w-[16px]"
-          style={{ color: "#FFB200", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))" }}
-        />
-      )}
-      <div className="absolute top-[-20px] left-1/2 -translate-x-1/2">
-        <Avatar
-          student={student}
-          sizeClass="h-10 w-10 text-xs border-[3px] border-white shadow-[0_4px_10px_rgba(0,0,0,0.18)]"
-          imgSize={80}
-        />
-      </div>
-      <span className="absolute top-1 right-1.5 text-lg font-black text-white/75 leading-none">
-        {student.rank}º
-      </span>
-      <span className="block mt-1 text-[13px] font-bold leading-[1.3] truncate">
-        {cleanStudentName(student.name)}
-      </span>
-      <span className="block text-[11px] font-semibold opacity-95">{student.hours}</span>
-    </div>
-  )
-}
-
-function podiumHeightClass(rank: number): string {
-  if (rank === 1) return "h-[110px]"
-  if (rank === 2) return "h-[92px]"
-  return "h-[86px]"
-}
-
-function podiumGradientFor(rank: number): string {
-  if (rank === 1) return "linear-gradient(180deg, #3B82F6 0%, #1E40AF 100%)"
-  if (rank === 2) return "linear-gradient(180deg, #7FA8F5 0%, #2563EB 100%)"
-  return "linear-gradient(180deg, #1E40AF 0%, #12215C 100%)"
-}
-
 function ordinalLabelFor(rank: number): string {
-  if (rank === 1) return "1º lugar"
-  if (rank === 2) return "2º lugar"
-  return "3º lugar"
+  if (rank === 1) return "1º lugar (Líder)"
+  if (rank === 2) return "2º lugar (Vice-líder)"
+  return "3º lugar (Pódio)"
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1569,66 +1544,22 @@ function ordinalLabelFor(rank: number): string {
 ──────────────────────────────────────────────────────────────────────────────*/
 function RankingSkeleton() {
   return (
-    <div className="space-y-4 pb-16" aria-busy="true" role="status">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="skeleton h-9 w-9 rounded-lg" />
-          <div className="space-y-2">
-            <div className="skeleton h-5 w-36" />
-            <div className="skeleton h-3 w-60 max-w-full" />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <div className="skeleton h-9 w-[170px] rounded-lg" />
-          <div className="skeleton h-9 w-[170px] rounded-lg" />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          {[0, 1].map((item) => (
-            <div key={item} className="skeleton h-8 w-40 rounded-full" />
-          ))}
-        </div>
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map((item) => (
-            <div key={item} className="skeleton h-8 w-32 rounded-lg" />
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 rounded-xl border border-border bg-card shadow-sm">
+    <div className="space-y-6 pb-16" aria-busy="true" role="status">
+      <div className="skeleton h-24 rounded-2xl w-full" />
+      <div className="skeleton h-14 rounded-2xl w-full" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="px-4 py-3.5">
-            <div className="skeleton h-3 w-16 mx-auto" />
-            <div className="skeleton h-5 w-20 mx-auto mt-2" />
-          </div>
+          <div key={item} className="skeleton h-28 rounded-2xl" />
         ))}
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[6fr_4fr] gap-4">
-        <div className="skeleton h-52 rounded-2xl" />
-        <div className="skeleton h-52 rounded-2xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="skeleton h-48 rounded-3xl" />
+        <div className="skeleton h-48 rounded-3xl" />
       </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        {[0, 1, 2].map((item) => (
-          <div key={item} className="skeleton h-56 rounded-2xl" />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] items-start gap-4">
-        <div className="rounded-xl border border-border bg-card shadow-sm space-y-1.5 p-4">
-          <div className="skeleton h-4 w-40 mb-2" />
-          {[0, 1, 2, 3, 4].map((item) => (
-            <div key={item} className="skeleton h-10 rounded-lg" />
-          ))}
-        </div>
-        <div className="space-y-4">
-          <div className="skeleton h-36 rounded-xl" />
-          <div className="skeleton h-28 rounded-xl" />
-          <div className="skeleton h-32 rounded-xl" />
-        </div>
+      <div className="skeleton h-64 rounded-3xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 skeleton h-96 rounded-3xl" />
+        <div className="lg:col-span-4 skeleton h-96 rounded-3xl" />
       </div>
     </div>
   )
@@ -1637,18 +1568,18 @@ function RankingSkeleton() {
 function RankingErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center space-y-5 animate-fade-in">
-      <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center">
-        <AlertCircle className="h-7 w-7 text-destructive" />
+      <div className="w-16 h-16 rounded-3xl bg-destructive/10 flex items-center justify-center text-destructive">
+        <AlertCircle className="h-8 w-8" />
       </div>
       <div className="space-y-1">
-        <h2 className="text-lg font-black text-foreground">Não foi possível carregar o ranking</h2>
-        <p className="text-xs text-muted-foreground max-w-xs mx-auto">{message}</p>
+        <h2 className="text-xl font-black text-foreground">Não foi possível carregar o ranking</h2>
+        <p className="text-xs text-muted-foreground max-w-sm mx-auto">{message}</p>
       </div>
       <button
         onClick={onRetry}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors ${FOCUS_RING}`}
+        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:bg-primary/90 transition-colors shadow-sm ${FOCUS_RING}`}
       >
-        <RotateCw className="h-3.5 w-3.5" /> Tentar novamente
+        <RotateCw className="h-4 w-4" /> Tentar novamente
       </button>
     </div>
   )

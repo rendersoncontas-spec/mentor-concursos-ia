@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Folder,
@@ -36,9 +36,44 @@ export interface DisciplineCardData {
   topicsTotal: number
   questionsSolved: number
   color: string
+  accuracy?: number | null
+  area?: string | null
+  totalMinutes?: number
 }
 
-// Removido DEFAULT_DISCIPLINES (não deve exibir mock data em produção)
+// Função auxiliar para determinar classificação
+function getClassification(
+  topicsStudied: number,
+  topicsTotal: number,
+  questionsSolved: number,
+  accuracy: number | null
+): "DOMINIO" | "ATENCAO" | "PRIORIDADE" | "SEM_DADOS" {
+  if (topicsTotal === 0 && questionsSolved === 0) return "SEM_DADOS"
+  const progresso = topicsTotal > 0 ? topicsStudied / topicsTotal : 0
+  const acc = accuracy ?? 0
+  // Exige amostra mínima de questões para classificar como DOMINIO
+  if (questionsSolved >= 5 && progresso >= 0.8 && acc >= 80) return "DOMINIO"
+  if (progresso < 0.3 || (questionsSolved >= 3 && acc < 60)) return "PRIORIDADE"
+  return "ATENCAO"
+}
+
+function StatusBadge({ status }: { status: "DOMINIO" | "ATENCAO" | "PRIORIDADE" | "SEM_DADOS" }) {
+  const configs = {
+    DOMINIO: { color: "bg-emerald-500", label: "DOMÍNIO" },
+    ATENCAO: { color: "bg-amber-500", label: "ATENÇÃO" },
+    PRIORIDADE: { color: "bg-rose-500", label: "PRIORIDADE" },
+    SEM_DADOS: { color: "bg-slate-400", label: "SEM DADOS" },
+  }
+  const c = configs[status]
+  return <span className={`${c.color} text-white font-black text-[9px] px-2 py-0.5 rounded-full tracking-widest`}>{c.label}</span>
+}
+
+function formatHours(min: number): string {
+  if (min <= 0) return "0h"
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return h > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${m}min`
+}
 
 interface EstudeiDisciplinesViewProps {
   initialData?: DisciplinesPageData | null
@@ -170,7 +205,54 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
     setIsEditModalOpen(true)
   }
 
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState<"prioridade" | "progresso" | "desempenho" | "tempo" | "nome">("prioridade")
+  const [filterStatus, setFilterStatus] = useState<"todas" | "dominio" | "atencao" | "prioridade">("todas")
+
+  // Ordenação e Filtros
+  const processedDisciplines = useMemo(() => {
+    const enriched = disciplines.map(d => {
+      const accuracy = d.accuracy ?? null
+      const progress = d.topicsTotal > 0 ? (d.topicsStudied / d.topicsTotal) * 100 : 0
+      const classification = getClassification(d.topicsStudied, d.topicsTotal, d.questionsSolved, accuracy)
+      return { ...d, progress, classification }
+    })
+
+    let list = enriched
+
+    // Buscar
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      list = list.filter(d =>
+        d.name.toLowerCase().includes(q) ||
+        (d.area && d.area.toLowerCase().includes(q))
+      )
+    }
+
+    // Filtrar
+    if (filterStatus !== "todas") {
+      list = list.filter(d => d.classification.toLowerCase() === filterStatus)
+    }
+
+    // Ordenar
+    return [...list].sort((a, b) => {
+      if (sortBy === "progresso") return b.progress - a.progress
+      if (sortBy === "desempenho") {
+        const accA = a.accuracy ?? -1
+        const accB = b.accuracy ?? -1
+        return accB - accA
+      }
+      if (sortBy === "tempo") return (b.totalMinutes || 0) - (a.totalMinutes || 0)
+      if (sortBy === "nome") return a.name.localeCompare(b.name)
+      // Padrão: prioridade
+      const priorityOrder = { PRIORIDADE: 0, ATENCAO: 1, DOMINIO: 2, SEM_DADOS: 3 }
+      return priorityOrder[a.classification] - priorityOrder[b.classification]
+    })
+  }, [disciplines, searchQuery, sortBy, filterStatus])
+
   const totalTopics = disciplines.reduce((acc, d) => acc + d.topicsTotal, 0)
+  const totalStudied = disciplines.reduce((acc, d) => acc + d.topicsStudied, 0)
+  const totalProgress = totalTopics > 0 ? Math.round((totalStudied / totalTopics) * 100) : 0
 
   if (viewingDiscipline) {
     const targetRole = initialData?.target ? targetInfo.role : undefined
@@ -191,90 +273,25 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   }
 
   return (
-    <div className="space-y-6">
-      {/* Plan Header Card — Paridade 100% com o Estudei */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 rounded-xl border bg-card p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-2xl bg-slate-900 border flex items-center justify-center text-white shrink-0 shadow-sm">
-              <ShieldCheck className="h-10 w-10 text-emerald-400" />
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-black text-emerald-500 tracking-tight">
-                  {targetInfo.name}
-                </h2>
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <button className="p-1 hover:text-foreground transition-colors" title="Arquivar">
-                    <Archive className="h-3.5 w-3.5" />
-                  </button>
-                  <button className="p-1 hover:text-foreground transition-colors" title="Editar">
-                    <Edit className="h-3.5 w-3.5" />
-                  </button>
-                  <button className="p-1 hover:text-rose-500 transition-colors" title="Excluir">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="text-xs text-muted-foreground space-y-0.5 font-medium">
-                <p><strong className="text-foreground">Editais:</strong> {targetInfo.editalName}</p>
-                <p><strong className="text-foreground">Cargos:</strong> {targetInfo.role}</p>
-                <p>
-                  <strong className="text-foreground">Disciplinas:</strong> {disciplines.length} &nbsp;&nbsp;&nbsp;&nbsp;
-                  <strong className="text-foreground">Tópicos:</strong> {totalTopics}
-                </p>
-                <p><strong className="text-foreground">Observações:</strong> {targetInfo.observations}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditingDisc(null)
-                setDisciplineNameInput("")
-                setIsModalOpen(true)
-              }}
-              className="w-full sm:w-auto border-emerald-500 text-emerald-600 hover:bg-emerald-500/10 font-bold text-xs px-5 h-9"
-            >
-              Nova Disciplina
-            </Button>
-          </div>
+    <div className="space-y-6 pb-12">
+      {/* HEADER PROFISSIONAL */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-slate-900/5 dark:bg-slate-100/5 p-6 rounded-3xl border">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-foreground tracking-tight">Disciplinas</h1>
+          <p className="text-xs text-muted-foreground font-medium max-w-lg">
+            Visão geral do seu progresso por matéria.
+          </p>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-center items-center text-center">
-          <div className="space-y-1 mb-4">
-            <span className="text-2xl font-black text-foreground">{totalStats.studyTimeFormatted}</span>
-            <span className="text-[11px] text-muted-foreground font-semibold block">Horas de Estudo</span>
-          </div>
-
-          <div className="w-full grid grid-cols-2 gap-4 border-t pt-3">
-            <div>
-              <span className="text-lg font-bold text-emerald-500 block">{totalStats.totalQuestions}</span>
-              <span className="text-[10px] text-muted-foreground font-medium">Questões</span>
-            </div>
-            <div className="border-l">
-              <span className="text-lg font-bold text-emerald-500 block">{totalStats.accuracyPercentage}%</span>
-              <span className="text-[10px] text-muted-foreground font-medium">Desempenho</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Grade de Cards de Disciplinas */}
-      {disciplines.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 rounded-xl border border-dashed bg-card/50">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-            <Folder className="h-8 w-8 text-emerald-500/60" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-bold text-lg text-foreground">Nenhuma disciplina cadastrada</h3>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              Você ainda não adicionou disciplinas ao seu concurso. Clique em &quot;Nova Disciplina&quot; para começar.
-            </p>
+        <div className="flex items-center gap-3">
+          <div className="relative hidden md:block">
+            <Input
+              placeholder="Buscar disciplina..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 w-64 text-xs rounded-xl bg-card"
+            />
+            <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
           <Button
             onClick={() => {
@@ -282,95 +299,178 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
               setDisciplineNameInput("")
               setIsModalOpen(true)
             }}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold gap-2 rounded-xl mt-2"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-5 h-10 rounded-xl shadow-lg shadow-emerald-500/20 flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
-            Adicionar Disciplina
+            Nova Disciplina
           </Button>
+        </div>
+      </div>
+
+      {/* CONTEXTO ATUAL (CONCURSO/EDITAL) */}
+      <div className="rounded-2xl border bg-card p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 border flex items-center justify-center text-white shrink-0 shadow-sm">
+            <ShieldCheck className="h-8 w-8 text-emerald-400" />
+          </div>
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Concurso / Edital Atual
+            </span>
+            <h2 className="text-xl font-black text-foreground tracking-tight">
+              {targetInfo.name}
+            </h2>
+            <p className="text-xs text-muted-foreground font-medium">
+              Edital Próprio · Cargo: {targetInfo.role}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <button className="p-2 hover:text-foreground transition-colors" title="Arquivar">
+            <Archive className="h-4 w-4" />
+          </button>
+          <button className="p-2 hover:text-foreground transition-colors" title="Editar">
+            <Edit className="h-4 w-4" />
+          </button>
+          <button className="p-2 hover:text-rose-500 transition-colors" title="Excluir">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* RESUMO GERAL */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Tempo de Estudo</span>
+          <span className="text-base font-black text-foreground block">{totalStats.studyTimeFormatted}</span>
+        </div>
+        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Questões</span>
+          <span className="text-base font-black text-[#2563EB] block">{totalStats.totalQuestions}</span>
+        </div>
+        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Acerto</span>
+          <span className="text-base font-black text-emerald-500 block">{totalStats.accuracyPercentage}%</span>
+        </div>
+        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Disciplinas</span>
+          <span className="text-base font-black text-foreground block">{disciplines.length}</span>
+        </div>
+        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Progresso Edital</span>
+          <span className="text-base font-black text-amber-500 block">{totalProgress}%</span>
+        </div>
+      </div>
+
+      {/* BARRA DE PROGRESSO DA PREPARAÇÃO */}
+      <div className="bg-slate-900 dark:bg-slate-100 text-slate-100 dark:text-slate-900 rounded-2xl p-6 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black uppercase tracking-widest opacity-80">
+            Progresso da Preparação
+          </span>
+          <span className="text-xs font-black">{totalStudied} / {totalTopics} tópicos</span>
+        </div>
+        <div className="w-full h-2 bg-slate-800 dark:bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${totalProgress}%` }} />
+        </div>
+        <p className="text-xs font-bold opacity-90">{totalProgress}% do conteúdo concluído</p>
+      </div>
+
+      {/* FILTROS E BUSCA MOBILE */}
+      <div className="relative md:hidden">
+        <Input
+          placeholder="Buscar disciplina..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 h-10 text-xs rounded-xl bg-card"
+        />
+        <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      </div>
+
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {(["todas", "dominio", "atencao", "prioridade"] as const).map(s => (
+          <button
+            key={s}
+            onClick={() => setFilterStatus(s)}
+            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${
+              filterStatus === s
+                ? "bg-foreground text-background"
+                : "bg-muted/40 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          className="text-[11px] font-bold uppercase tracking-wider bg-card border rounded-full px-3 py-1.5 h-8"
+        >
+          <option value="prioridade">Prioridade</option>
+          <option value="progresso">Progresso</option>
+        </select>
+      </div>
+
+      {/* GRADE DE CARDS DE DISCIPLINAS REFORMULADA */}
+      {processedDisciplines.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 rounded-xl border border-dashed bg-card/50">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+            <Folder className="h-8 w-8 text-emerald-500/60" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-lg text-foreground">Nenhuma disciplina encontrada</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              Adicione ou ajuste os filtros para visualizar as matérias do seu edital.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {disciplines.map((disc) => (
+          {processedDisciplines.map((disc) => (
             <div
               key={disc.id}
-              className="group rounded-xl border bg-card p-5 shadow-sm transition-all duration-300 relative overflow-hidden h-[130px] flex flex-col justify-between"
+              onClick={() => openDiscipline(disc)}
+              className="group rounded-2xl border bg-card p-5 shadow-sm hover:shadow-md hover:border-emerald-500/50 cursor-pointer transition-all relative overflow-hidden"
             >
-              {/* Top Color Line */}
+              {/* Top Status Line */}
               <div
-                className="absolute top-0 left-0 right-0 h-1.5 transition-colors"
+                className="absolute top-0 left-0 right-0 h-1 transition-colors"
                 style={{ backgroundColor: disc.color }}
               />
 
-              {/* Conteúdo Normal (Visível por padrão) */}
-              <div className="pt-1 transition-opacity duration-200 group-hover:opacity-0">
-                <h3 className="font-bold text-sm text-foreground truncate" title={disc.name}>
-                  {disc.name}
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-center pt-2 pb-1 transition-opacity duration-200 group-hover:opacity-0">
-                <div>
-                  <span className="text-xl font-extrabold text-foreground block leading-none">
-                    {disc.topicsStudied}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
-                    Tópicos Estudados
-                  </span>
+              <div className="space-y-4 pt-1">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-black text-base text-foreground truncate" title={disc.name}>
+                    {disc.name}
+                  </h3>
+                  <StatusBadge status={disc.classification} />
                 </div>
 
-                <div>
-                  <span className="text-xl font-extrabold text-foreground block leading-none">
-                    {disc.topicsTotal}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
-                    Tópicos Totais
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-muted-foreground">Progresso</span>
+                    <span className="text-foreground">{Math.round(disc.progress)}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-foreground transition-all" style={{ width: `${disc.progress}%` }} />
+                  </div>
+                  <p className="text-[10px] font-bold text-muted-foreground text-right">
+                    {disc.topicsStudied} / {disc.topicsTotal} tópicos
+                  </p>
                 </div>
 
-                <div>
-                  <span className="text-xl font-extrabold text-foreground block leading-none">
-                    {disc.questionsSolved}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-medium block mt-1 leading-tight">
-                    Questões Resolvidas
-                  </span>
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                  <div>
+                    <span className="text-sm font-black text-foreground block">{disc.questionsSolved}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Questões</span>
+                  </div>
+                  <div className="border-l pl-3">
+                    <span className="text-sm font-black text-foreground block">—</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Desempenho</span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Overlay de Ações no HOVER — 100% de Paridade com o Estudei */}
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-around p-4 z-10"
-                style={{ backgroundColor: disc.color }}
-              >
-                {/* Botão 1: Visualizar */}
-                <button
-                  onClick={() => openDiscipline(disc)}
-                  className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 transition-all font-bold group/btn"
-                  title="Visualizar disciplina"
-                >
-                  <Folder className="h-6 w-6 stroke-[2.2]" />
-                  <span className="text-xs">Visualizar</span>
-                </button>
-
-                {/* Botão 2: Editar */}
-                <button
-                  onClick={() => handleOpenEdit(disc)}
-                  className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 transition-all font-bold group/btn"
-                  title="Editar disciplina"
-                >
-                  <Edit3 className="h-6 w-6 stroke-[2.2]" />
-                  <span className="text-xs">Editar</span>
-                </button>
-
-                {/* Botão 3: Remover */}
-                <button
-                  onClick={() => handleRemoveDiscipline(disc.id, disc.name)}
-                  className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 hover:text-rose-700 transition-all font-bold group/btn"
-                  title="Remover disciplina"
-                >
-                  <Trash2 className="h-6 w-6 stroke-[2.2]" />
-                  <span className="text-xs">Remover</span>
-                </button>
               </div>
             </div>
           ))}

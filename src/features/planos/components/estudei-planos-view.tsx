@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -10,21 +10,36 @@ import {
   Archive,
   Loader2,
   Clock,
+  Play,
+  Pause,
+  Copy,
+  Trash2,
+  ChevronRight,
+  History,
+  FileText,
+  Target,
+  BarChart3,
+  ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
 
 import { EstudeiDisciplineDetailView } from "@/features/disciplines/components/estudei-discipline-detail-view"
 import { getDisciplineCatalogTopicsAction, getDisciplineDetailStatsAction, type DisciplineDetailStats } from "@/application/disciplines/discipline-actions"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
 import {
   listPlansAction,
+  activatePlanAction,
+  togglePausePlanAction,
+  duplicatePlanAction,
+  deletePlanAction,
   type PlanCardData,
   type PlanDisciplineSummary,
 } from "@/application/study-plan/list-plans.action"
-import { deactivateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
-import type { PlanType } from "@/domain/study-plan/study-plan.types"
+import type { PlanStatus, PlanType } from "@/domain/study-plan/study-plan.types"
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60)
@@ -45,19 +60,19 @@ function planTypeLabel(type: PlanType | null): string {
   return "Plano"
 }
 
-const REASON_LABELS: Record<string, string> = {
-  manual: "Criado manualmente",
-  replan: "Replanejado",
-  ai_wizard: "Gerado com assistente",
-  AI: "Gerado com assistente",
-}
-
-function reasonLabel(reason: string): string {
-  return REASON_LABELS[reason] ?? (reason ? reason : "")
-}
-
-function planTitle(plan: PlanCardData): string {
-  return `Plano de Estudos v${plan.version}`
+function statusBadge(status: PlanStatus) {
+  switch (status) {
+    case "ACTIVE":
+      return <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] uppercase px-2 h-5">Ativo</Badge>
+    case "PAUSED":
+      return <Badge variant="outline" className="text-amber-600 border-amber-600 font-bold text-[10px] uppercase px-2 h-5">Pausado</Badge>
+    case "ARCHIVED":
+      return <Badge variant="secondary" className="text-muted-foreground font-bold text-[10px] uppercase px-2 h-5">Arquivado</Badge>
+    case "COMPLETED":
+      return <Badge variant="outline" className="text-blue-600 border-blue-600 font-bold text-[10px] uppercase px-2 h-5">Concluído</Badge>
+    default:
+      return null
+  }
 }
 
 export function EstudeiPlanosView() {
@@ -92,14 +107,8 @@ export function EstudeiPlanosView() {
     setViewingDiscipline(null)
   }
 
-  // Modal Arquivar Plano
-  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false)
-  const [planToArchive, setPlanToArchive] = useState<PlanCardData | null>(null)
-  const [isArchiving, setIsArchiving] = useState(false)
-
   const loadPlans = useCallback(() => {
     void (async () => {
-      await Promise.resolve()
       setIsLoading(true)
       setLoadError(null)
       const res = await listPlansAction()
@@ -116,35 +125,70 @@ export function EstudeiPlanosView() {
     loadPlans()
   }, [loadPlans])
 
-  const activePlans = plans.filter((p) => p.active)
-  const archivedPlans = plans.filter((p) => !p.active)
+  const activePlan = plans.find((p) => p.active || p.status === "ACTIVE")
+  const otherPlans = plans.filter((p) => p.id !== activePlan?.id)
 
-  const handleOpenArchiveModal = (plan: PlanCardData, e?: React.MouseEvent) => {
+  const handleTogglePause = async (plan: PlanCardData, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
-    setPlanToArchive(plan)
-    setIsArchiveModalOpen(true)
-  }
-
-  const handleConfirmArchive = async () => {
-    if (!planToArchive) return
-    setIsArchiving(true)
     try {
-      const res = await deactivateStudyPlanAction()
+      const res = await togglePausePlanAction(plan.id, plan.status)
       if (res.success) {
-        setPlans((prev) => prev.map((p) => ({ ...p, active: false })))
-        if (selectedPlan?.id === planToArchive.id) {
-          setSelectedPlan(null)
-        }
-        toast.success(`Plano "${planTitle(planToArchive)}" arquivado com sucesso!`)
+        toast.success(res.newStatus === "PAUSED" ? "Plano pausado com sucesso!" : "Plano retomado!")
+        loadPlans()
       } else {
-        toast.error(res.error || "Erro ao arquivar o plano.")
+        toast.error(res.error || "Erro ao atualizar status.")
       }
     } catch {
-      toast.error("Erro inesperado ao arquivar o plano.")
-    } finally {
-      setIsArchiving(false)
-      setIsArchiveModalOpen(false)
-      setPlanToArchive(null)
+      toast.error("Erro inesperado.")
+    }
+  }
+
+  const handleActivate = async (planId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    try {
+      const res = await activatePlanAction(planId)
+      if (res.success) {
+        toast.success("Plano ativado com sucesso!")
+        loadPlans()
+      } else {
+        toast.error(res.error || "Erro ao ativar plano.")
+      }
+    } catch {
+      toast.error("Erro inesperado.")
+    }
+  }
+
+  const handleDuplicate = async (plan: PlanCardData, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    const name = window.prompt("Nome da nova versão:", `${plan.name} (Cópia)`)
+    if (name === null) return
+    try {
+      const res = await duplicatePlanAction(plan.id, name)
+      if (res.success) {
+        toast.success("Plano duplicado com sucesso!")
+        loadPlans()
+      } else {
+        toast.error(res.error || "Erro ao duplicar.")
+      }
+    } catch {
+      toast.error("Erro inesperado.")
+    }
+  }
+
+  const handleDelete = async (plan: PlanCardData, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    if (!window.confirm(`Excluir o plano "${plan.name}"?\nEsta ação não apaga seu histórico de estudos.`)) return
+    try {
+      const res = await deletePlanAction(plan.id)
+      if (res.success) {
+        toast.success("Plano excluído.")
+        if (selectedPlan?.id === plan.id) setSelectedPlan(null)
+        loadPlans()
+      } else {
+        toast.error(res.error || "Erro ao excluir.")
+      }
+    } catch {
+      toast.error("Erro inesperado.")
     }
   }
 
@@ -160,338 +204,449 @@ export function EstudeiPlanosView() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* VISTA 1: Lista de Planos (Ativos + Arquivados) */}
-      {!selectedPlan ? (
-        <div className="space-y-8">
-          <h1 className="text-2xl font-black text-foreground">Planos</h1>
+    <div className="space-y-8 pb-20">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-slate-900/5 dark:bg-slate-100/5 p-6 rounded-3xl border">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-foreground tracking-tight">PLANOS DE ESTUDO</h1>
+          <p className="text-xs text-muted-foreground font-medium max-w-lg">
+            Organize suas estratégias de estudo e escolha qual plano seguir para sua aprovação.
+          </p>
+        </div>
 
-          {isLoading && (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
-            </div>
-          )}
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => router.push("/planejamento")}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-6 h-11 rounded-2xl shadow-lg shadow-[#2563EB]/20 flex items-center gap-2 group"
+          >
+            <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform" />
+            CRIAR NOVO PLANO
+          </Button>
+        </div>
+      </div>
 
-          {!isLoading && loadError && (
-            <div className="rounded-2xl border bg-card p-10 shadow-xs flex flex-col items-center gap-4 text-center my-4">
-              <p className="text-sm text-muted-foreground font-medium">{loadError}</p>
-              <Button
-                onClick={loadPlans}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-8 h-10 rounded-xl shadow-xs"
-              >
-                Tentar novamente
-              </Button>
-            </div>
-          )}
+      {/* STATE SUMMARY */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Plano Ativo</span>
+          <span className="text-sm font-black text-foreground truncate block">{activePlan?.name || "Nenhum"}</span>
+        </div>
+        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Carga Semanal</span>
+          <span className="text-sm font-black text-[#2563EB] block">{activePlan ? formatMinutes(activePlan.totalMinutes) : "0h"}</span>
+        </div>
+        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Disciplinas</span>
+          <span className="text-sm font-black text-foreground block">{activePlan?.disciplinesCount || 0}</span>
+        </div>
+        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Aderência Real</span>
+          <span className="text-sm font-black text-emerald-500 block">{activePlan?.adherencePercentage != null ? `${activePlan.adherencePercentage}%` : "—"}</span>
+        </div>
+      </div>
 
-          {!isLoading && !loadError && activePlans.length === 0 && (
-            /* Card Estado Vazio Sem Planos Ativos */
-            <div className="rounded-2xl border bg-card p-10 shadow-xs flex flex-col md:flex-row items-center justify-between gap-8 my-4">
-              <div className="flex items-center gap-6">
-                <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
-                  <div className="w-24 h-28 bg-muted/40 border-2 border-muted rounded-xl transform -rotate-6 flex flex-col p-3" />
-                  <div className="w-24 h-28 bg-card border-2 border-[#2563EB] rounded-xl shadow-md absolute transform rotate-6 flex flex-col p-3" />
-                </div>
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-[#2563EB]" />
+          <p className="text-sm font-bold text-muted-foreground">Carregando sua estratégia...</p>
+        </div>
+      )}
 
-                <div className="space-y-2 max-w-md">
-                  <h2 className="text-xl font-extrabold text-foreground">
-                    Ops, parece que você ainda não tem um plano ativo
-                  </h2>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Crie seu cronograma no Planejamento — escolha seu concurso e disciplinas para gerar o plano.
-                  </p>
-                </div>
+      {!isLoading && loadError && (
+        <div className="rounded-3xl border-2 border-dashed border-rose-200 bg-rose-50/30 p-12 flex flex-col items-center gap-4 text-center">
+          <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center">
+            <Trash2 className="h-6 w-6 text-rose-500" />
+          </div>
+          <p className="text-sm text-rose-900 font-bold">{loadError}</p>
+          <Button onClick={loadPlans} variant="outline" className="border-rose-200 text-rose-600 font-bold text-xs h-9">
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+
+      {/* PLANO ATIVO DISPLAY */}
+      {!isLoading && !loadError && (
+        <div className="space-y-6">
+          {activePlan ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                <span className="text-xs font-black uppercase tracking-widest text-foreground">Plano Atual</span>
               </div>
-
-              <Button
-                onClick={() => router.push("/planejamento")}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-8 h-10 rounded-xl shadow-xs shrink-0"
-              >
-                Criar no Planejamento
-              </Button>
-            </div>
-          )}
-
-          {!isLoading && !loadError && activePlans.length > 0 && (
-            /* Grid de Cards dos Planos Ativos */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Card Criar Novo Plano */}
-              <div
-                onClick={() => router.push("/planejamento")}
-                className="rounded-2xl border border-muted bg-card p-6 shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center gap-5 group"
-              >
-                <div className="w-16 h-16 rounded-xl bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Plus className="h-8 w-8 stroke-[2.5]" />
+              
+              <div className="group relative bg-slate-900 dark:bg-white text-slate-100 dark:text-slate-900 rounded-[2rem] overflow-hidden shadow-2xl transition-all">
+                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <ShieldCheck className="h-32 w-32" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="font-extrabold text-base text-foreground">Criar Novo Plano</h3>
-                  <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                    Gere um novo cronograma a partir do seu concurso no Planejamento.
-                  </p>
-                </div>
-              </div>
-
-              {/* Cards dos Planos Existentes */}
-              {activePlans.map((plan) => (
-                <div
-                  key={plan.id}
-                  onClick={() => setSelectedPlan(plan)}
-                  className="rounded-2xl border bg-card p-6 shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-between gap-4 group relative"
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-16 h-16 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs border group-hover:scale-105 transition-transform">
-                      <ShieldCheck className="h-9 w-9 text-[#2563EB]" />
-                    </div>
-
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-extrabold text-base text-[#2563EB] truncate" title={planTitle(plan)}>
-                          {planTitle(plan)}
-                        </h3>
+                
+                <div className="relative z-10 p-8 md:p-10 flex flex-col lg:flex-row gap-10">
+                  <div className="flex-1 space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-3xl font-black tracking-tight">{activePlan.name}</h2>
+                        {statusBadge(activePlan.status)}
                       </div>
-                      <div className="text-xs text-muted-foreground space-y-0.5 font-medium">
-                        <p>{planTypeLabel(plan.planType)}</p>
-                        <p>Disciplinas: {plan.disciplinesCount}</p>
-                        <p>Itens: {plan.itemsCount}</p>
-                        <p className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatMinutes(plan.totalMinutes)}/semana
-                        </p>
+                      <p className="text-sm text-slate-400 dark:text-slate-500 font-medium leading-relaxed max-w-xl">
+                        {activePlan.description || `Este é seu plano de estudo principal focado em ${activePlan.planType === "CICLO_ROTATIVO" ? "rodar as matérias de forma contínua" : "cumprir uma agenda semanal fixa"}.`}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 py-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Metas</span>
+                        <div className="flex items-center gap-2 font-black text-lg">
+                          <Clock className="h-4 w-4 text-[#2563EB]" />
+                          {formatMinutes(activePlan.totalMinutes)}/sem
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end justify-between h-full space-y-4">
-                    {/* Botões de Ação do Card: Arquivar */}
-                    <div className="flex items-center gap-1.5 text-muted-foreground/60">
-                      <button
-                        type="button"
-                        onClick={(e) => handleOpenArchiveModal(plan, e)}
-                        className="p-1 hover:text-foreground transition-colors"
-                        title="Arquivar"
-                      >
-                        <Archive className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
-                      <Calendar className="h-3 w-3 text-[#2563EB]" />
-                      <span>{formatDate(plan.generatedAt)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* SEÇÃO PLANOS ARQUIVADOS */}
-          {archivedPlans.length > 0 && (
-            <div className="space-y-4 pt-4 border-t">
-              <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-                PLANOS ARQUIVADOS
-              </span>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {archivedPlans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    className="rounded-2xl border bg-card p-5 shadow-xs flex items-center justify-between gap-4 opacity-70"
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="w-16 h-16 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 border">
-                        <ShieldCheck className="h-8 w-8 text-[#2563EB]" />
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Conteúdo</span>
+                        <div className="flex items-center gap-2 font-black text-lg">
+                          <Target className="h-4 w-4 text-emerald-400" />
+                          {activePlan.disciplinesCount} matérias
+                        </div>
                       </div>
-
-                      <div className="space-y-1 min-w-0">
-                        <h3 className="font-extrabold text-sm text-foreground truncate" title={planTitle(plan)}>
-                          {planTitle(plan)}
-                        </h3>
-                        <div className="text-[11px] text-muted-foreground space-y-0.5">
-                          <p>{planTypeLabel(plan.planType)}</p>
-                          <p>Disciplinas: {plan.disciplinesCount}</p>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Início</span>
+                        <div className="flex items-center gap-2 font-black text-lg">
+                          <Calendar className="h-4 w-4 text-sky-400" />
+                          {formatDate(activePlan.generatedAt)}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end justify-between h-full space-y-3">
-                      <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-[#2563EB]" />
-                        <span>{formatDate(plan.generatedAt)}</span>
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <BarChart3 className="h-3.5 w-3.5" /> Progresso da Estratégia
+                        </span>
+                        <span>{activePlan.adherencePercentage || 0}% de aderência</span>
+                      </div>
+                      <Progress value={activePlan.adherencePercentage || 0} className="h-2 bg-slate-800 dark:bg-slate-200" />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-4">
+                      <Button 
+                        onClick={() => router.push("/study-plan")}
+                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-8 h-12 rounded-2xl shadow-lg shadow-[#2563EB]/40 flex items-center gap-2"
+                      >
+                        CONTINUAR ESTUDANDO
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => router.push("/planejamento")}
+                        className="border-slate-700 dark:border-slate-300 hover:bg-slate-800 dark:hover:bg-slate-100 text-foreground font-black text-xs px-6 h-12 rounded-2xl flex items-center gap-2"
+                      >
+                        ABRIR PLANEJAMENTO
+                      </Button>
+                      <div className="flex items-center gap-2 h-12 px-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => handleTogglePause(activePlan, e)}
+                          className="h-10 w-10 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100"
+                          title={activePlan.status === "PAUSED" ? "Retomar" : "Pausar"}
+                        >
+                          {activePlan.status === "PAUSED" ? <Play className="h-5 w-5 text-emerald-400" /> : <Pause className="h-5 w-5 text-amber-400" />}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => handleDuplicate(activePlan, e)}
+                          className="h-10 w-10 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100"
+                          title="Duplicar / Criar Versão"
+                        >
+                          <Copy className="h-5 w-5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => setSelectedPlan(activePlan)}
+                          className="h-10 w-10 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100"
+                          title="Ver Detalhes"
+                        >
+                          <FileText className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MINI PREVIEW DAS DISCIPLINAS */}
+                  <div className="hidden lg:flex flex-col w-64 bg-slate-800/50 dark:bg-slate-50/50 rounded-2xl border border-slate-700/50 dark:border-slate-200/50 p-5 space-y-4">
+                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Top 5 Disciplinas</span>
+                    <div className="space-y-3">
+                      {activePlan.disciplines.slice(0, 5).map(d => (
+                        <div key={d.id} className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[11px] font-bold">
+                            <span className="truncate w-32">{d.name}</span>
+                            <span className="text-[#2563EB]">{formatMinutes(d.weeklyMinutes)}</span>
+                          </div>
+                          <Progress value={Math.min(100, (d.weeklyMinutes / (activePlan.totalMinutes / activePlan.disciplinesCount)) * 50)} className="h-1" />
+                        </div>
+                      ))}
+                    </div>
+                    {activePlan.disciplinesCount > 5 && (
+                      <button onClick={() => setSelectedPlan(activePlan)} className="text-[10px] font-black text-[#2563EB] hover:underline uppercase text-center pt-2">
+                        + {activePlan.disciplinesCount - 5} OUTRAS
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* EMPTY STATE SEM PLANO ATIVO */
+            <div className="rounded-[2.5rem] border-4 border-dashed border-slate-200 dark:border-slate-800 p-16 flex flex-col items-center gap-6 text-center">
+              <div className="h-24 w-24 rounded-full bg-[#2563EB]/10 flex items-center justify-center">
+                <Target className="h-12 w-12 text-[#2563EB]" />
+              </div>
+              <div className="space-y-2 max-w-sm">
+                <h2 className="text-2xl font-black text-foreground">AINDA NÃO HÁ UM PLANO ATIVO</h2>
+                <p className="text-sm text-muted-foreground font-medium leading-relaxed">
+                  Crie uma estratégia de preparação para organizar seus estudos e acelerar sua aprovação.
+                </p>
+              </div>
+              <Button
+                onClick={() => router.push("/planejamento")}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-10 h-14 rounded-3xl shadow-xl shadow-[#2563EB]/30 flex items-center gap-2"
+              >
+                CRIAR MEU PRIMEIRO PLANO
+              </Button>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                Ou use o Planejamento para montar o cronograma
+              </p>
+            </div>
+          )}
+
+          {/* LISTA DE OUTROS PLANOS */}
+          <div className="space-y-6 pt-6">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <Archive className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Estratégias Arquivadas / Pausadas</span>
+              </div>
+              {otherPlans.length > 0 && (
+                <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{otherPlans.length} planos</span>
+              )}
+            </div>
+
+            {otherPlans.length === 0 ? (
+              <div className="bg-muted/30 rounded-3xl p-10 flex flex-col items-center gap-2 text-center border-2 border-dashed">
+                <History className="h-8 w-8 text-muted-foreground/30" />
+                <p className="text-xs text-muted-foreground font-bold italic">Nenhum plano anterior encontrado.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {otherPlans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    onClick={() => setSelectedPlan(plan)}
+                    className="group bg-card border rounded-3xl p-6 shadow-xs hover:shadow-xl hover:border-[#2563EB]/40 transition-all cursor-pointer relative"
+                  >
+                    <div className="absolute top-6 right-6 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => handleActivate(plan.id, e)}
+                        className="h-8 w-8 rounded-lg hover:bg-emerald-50 text-emerald-600"
+                        title="Ativar como Principal"
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => handleDuplicate(plan, e)}
+                        className="h-8 w-8 rounded-lg hover:bg-sky-50 text-[#2563EB]"
+                        title="Duplicar"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => handleDelete(plan, e)}
+                        className="h-8 w-8 rounded-lg hover:bg-rose-50 text-rose-500"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-black text-base text-foreground truncate pr-16">{plan.name}</h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {statusBadge(plan.status)}
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{planTypeLabel(plan.planType)}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 py-1">
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Carga</span>
+                          <div className="text-xs font-black flex items-center gap-1.5">
+                            <Clock className="h-3 w-3 text-[#2563EB]" /> {formatMinutes(plan.totalMinutes)}
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Matérias</span>
+                          <div className="text-xs font-black flex items-center gap-1.5">
+                            <Target className="h-3 w-3 text-emerald-500" /> {plan.disciplinesCount}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3" /> {formatDate(plan.generatedAt)}
+                        </div>
+                        {plan.versionsCount > 1 && (
+                          <div className="flex items-center gap-1 text-[#2563EB]">
+                            <History className="h-3 w-3" /> {plan.versionsCount} versões
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* VISTA 2: Detalhes do Plano Selecionado */
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setSelectedPlan(null)}
-              className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-[#2563EB] transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Voltar para Todos os Planos</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div className="lg:col-span-2 rounded-xl border bg-card p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="flex items-center gap-5">
-                <div className="w-20 h-20 rounded-2xl bg-slate-900 border flex items-center justify-center text-white shrink-0 shadow-sm">
-                  <ShieldCheck className="h-10 w-10 text-[#2563EB]" />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-black text-[#2563EB] tracking-tight">
-                      {planTitle(selectedPlan)}
-                    </h2>
-                    {selectedPlan.active && (
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <button
-                          onClick={() => handleOpenArchiveModal(selectedPlan)}
-                          className="p-1 hover:text-foreground transition-colors"
-                          title="Arquivar"
-                        >
-                          <Archive className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-xs text-muted-foreground space-y-0.5 font-medium">
-                    <p>
-                      <strong className="text-foreground">Tipo:</strong> {planTypeLabel(selectedPlan.planType)}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">Origem:</strong>{" "}
-                      {reasonLabel(selectedPlan.generatedReason) || "—"}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">Criado em:</strong> {formatDate(selectedPlan.generatedAt)}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">Disciplinas:</strong> {selectedPlan.disciplinesCount}{" "}
-                      &nbsp;&nbsp;&nbsp;&nbsp;
-                      <strong className="text-foreground">Itens do plano:</strong> {selectedPlan.itemsCount}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/planejamento")}
-                  className="w-full sm:w-auto border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs px-5 h-9"
-                >
-                  Ajustar no Planejamento
-                </Button>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-center items-center text-center">
-              <div className="space-y-1 mb-4">
-                <span className="text-2xl font-black text-foreground">
-                  {formatMinutes(selectedPlan.totalMinutes)}
-                </span>
-                <span className="text-[11px] text-muted-foreground font-semibold block">
-                  Carga semanal de estudo
-                </span>
-              </div>
-
-              <div className="w-full grid grid-cols-2 gap-4 border-t pt-3">
-                <div>
-                  <span className="text-lg font-bold text-[#2563EB] block">{selectedPlan.disciplinesCount}</span>
-                  <span className="text-[10px] text-muted-foreground font-medium">Disciplinas</span>
-                </div>
-                <div className="border-l">
-                  <span className="text-lg font-bold text-[#2563EB] block">{selectedPlan.itemsCount}</span>
-                  <span className="text-[10px] text-muted-foreground font-medium">Itens no plano</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cards das Disciplinas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {selectedPlan.disciplines.map((disc) => (
-              <div
-                key={disc.id}
-                onClick={() => openDiscipline(disc)}
-                className="rounded-2xl border bg-card p-5 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-6 rounded-full bg-[#2563EB]" />
-                    <h3 className="font-extrabold text-sm text-foreground truncate">{disc.name}</h3>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center border-t pt-3">
-                  <div>
-                    <span className="text-sm font-black text-foreground block">
-                      {formatMinutes(disc.weeklyMinutes)}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground font-semibold block">Min / Semana</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-black text-foreground block">{disc.itemsCount}</span>
-                    <span className="text-[9px] text-muted-foreground font-semibold block">Itens</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-black text-foreground block truncate">
-                      {disc.area ?? "Geral"}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground font-semibold block">Área</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+            )}
           </div>
         </div>
       )}
 
-      {/* Modal Arquivar Plano */}
-      <Dialog open={isArchiveModalOpen} onOpenChange={setIsArchiveModalOpen}>
-        <DialogContent className="sm:max-w-md p-6 rounded-2xl text-center space-y-6">
-          {/* Ícone Grande do Ponto de Interrogação */}
-          <div className="flex justify-center pt-2">
-            <div className="w-20 h-20 rounded-full bg-[#dbeafe] text-[#2563EB] flex items-center justify-center text-4xl font-black shadow-xs">
-              ?
+      {/* PLAN DETAILS DIALOG */}
+      <Dialog open={!!selectedPlan} onOpenChange={() => setSelectedPlan(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 rounded-3xl gap-0 border-none shadow-2xl">
+          {selectedPlan && (
+            <div className="flex flex-col">
+              {/* DIALOG HEADER */}
+              <div className="bg-slate-900 text-white p-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-2xl font-black tracking-tight">{selectedPlan.name}</h2>
+                      {statusBadge(selectedPlan.status)}
+                    </div>
+                    <p className="text-xs text-slate-400 font-medium">{planTypeLabel(selectedPlan.planType)} · Versão {selectedPlan.version}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!selectedPlan.active && (
+                      <Button onClick={() => handleActivate(selectedPlan.id)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs h-10 px-6 rounded-xl">
+                        ATIVAR PLANO
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={() => setSelectedPlan(null)} className="border-slate-700 hover:bg-slate-800 text-white font-black text-xs h-10 rounded-xl">
+                      FECHAR
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-slate-800">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Carga Semanal</span>
+                    <p className="font-black text-lg">{formatMinutes(selectedPlan.totalMinutes)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Disciplinas</span>
+                    <p className="font-black text-lg">{selectedPlan.disciplinesCount}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Criado em</span>
+                    <p className="font-black text-lg">{formatDate(selectedPlan.generatedAt)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Aderência</span>
+                    <p className="font-black text-lg text-emerald-400">{selectedPlan.adherencePercentage || 0}%</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* DIALOG CONTENT */}
+              <div className="p-8 space-y-8 bg-background">
+                {/* ACTIONS BAR */}
+                <div className="flex items-center justify-between pb-6 border-b">
+                   <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => router.push("/planejamento")} className="font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2">
+                      <ExternalLink className="h-3.5 w-3.5" /> Ajustar no Planejamento
+                    </Button>
+                    <Button variant="outline" onClick={(e) => handleDuplicate(selectedPlan, e)} className="font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2">
+                      <Copy className="h-3.5 w-3.5" /> Duplicar Estratégia
+                    </Button>
+                  </div>
+                  <Button variant="ghost" onClick={(e) => handleDelete(selectedPlan, e)} className="text-rose-500 font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2 hover:bg-rose-50">
+                    <Trash2 className="h-3.5 w-3.5" /> Excluir permanentemente
+                  </Button>
+                </div>
+
+                {/* DISCIPLINAS LIST */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-[#2563EB]" />
+                    <span className="text-xs font-black uppercase tracking-widest">Disciplinas do Plano</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedPlan.disciplines.map(d => (
+                      <div key={d.id} onClick={() => openDiscipline(d)} className="p-4 border rounded-2xl hover:border-[#2563EB] hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group">
+                        <div className="space-y-0.5">
+                          <h4 className="font-black text-sm">{d.name}</h4>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase">{d.area || "Geral"} · {d.itemsCount} blocos</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-sm text-[#2563EB]">{formatMinutes(d.weeklyMinutes)}</p>
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase">por semana</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* HISTÓRICO DE VERSÕES */}
+                {selectedPlan.previousVersions.length > 0 && (
+                  <div className="space-y-4 pt-6">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-[#2563EB]" />
+                      <span className="text-xs font-black uppercase tracking-widest">Histórico de Versões do Grupo</span>
+                    </div>
+                    
+                    <div className="border rounded-2xl overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-muted/50 text-muted-foreground font-black uppercase text-[9px] border-b">
+                            <th className="text-left p-4">Versão</th>
+                            <th className="text-left p-4">Gerado em</th>
+                            <th className="text-left p-4">Carga</th>
+                            <th className="text-left p-4">Status</th>
+                            <th className="text-right p-4">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedPlan.previousVersions.map(v => (
+                            <tr key={v.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                              <td className="p-4 font-black">v{v.version}</td>
+                              <td className="p-4 font-medium">{formatDate(v.generatedAt)}</td>
+                              <td className="p-4 font-medium">{formatMinutes(v.weeklyMinutes)}/sem</td>
+                              <td className="p-4">{statusBadge(v.status)}</td>
+                              <td className="p-4 text-right">
+                                <Button variant="link" onClick={() => handleActivate(v.id)} className="text-[#2563EB] font-bold text-[11px] p-0 h-auto">
+                                  Restaurar
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-xl font-black text-foreground">Arquivar Plano?</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
-              Tem certeza que deseja arquivar o plano &apos;{planToArchive ? planTitle(planToArchive) : ""}&apos;?
-              Ele será desativado e você poderá gerar um novo cronograma no Planejamento.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-center gap-4 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsArchiveModalOpen(false)}
-              disabled={isArchiving}
-              className="border-muted-foreground/40 text-foreground font-bold text-xs px-8 h-10 rounded-xl"
-            >
-              Cancelar
-            </Button>
-
-            <Button
-              onClick={handleConfirmArchive}
-              disabled={isArchiving}
-              className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-xs px-8 h-10 rounded-xl shadow-xs"
-            >
-              {isArchiving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sim, arquivar"}
-            </Button>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

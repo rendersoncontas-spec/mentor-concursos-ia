@@ -266,14 +266,22 @@ export interface DisciplinesPageData {
     studyTimeFormatted: string
     totalQuestions: number
     accuracyPercentage: number
+    disciplinesCount: number
+    topicsTotal: number
+    topicsConcluded: number
   }
   disciplines: {
     id: string
+    disciplineId: string
     name: string
     topicsStudied: number
     topicsTotal: number
     questionsSolved: number
+    accuracy: number | null
+    totalMinutes: number
     color: string
+    status: DisciplineStatus
+    area: string | null
   }[]
 }
 
@@ -349,6 +357,8 @@ export async function getDisciplinesPageData(
   let grandTotalMinutes = 0
   let grandTotalQuestions = 0
   let grandTotalCorrect = 0
+  let grandTotalTopics = 0
+  let grandTotalTopicsStudied = 0
 
   const disciplineCards = userDisciplines.map((ud, idx) => {
     const discId = ud.discipline_id
@@ -360,12 +370,12 @@ export async function getDisciplinesPageData(
 
     const discHistory = history.filter((h) => h.discipline_id === discId && h.completed)
     discHistory.forEach((h) => {
-      const meta = h.metadata || {}
-      if (meta.questions_answered) totalCount += Number(meta.questions_answered)
-      if (meta.questions_correct) correctCount += Number(meta.questions_correct)
+      const meta = (h.metadata || {}) as Record<string, unknown>
+      if (meta["questions_answered"]) totalCount += Number(meta["questions_answered"])
+      if (meta["questions_correct"]) correctCount += Number(meta["questions_correct"])
     })
 
-    const totalMinutes = discHistory.reduce((acc, h) => acc + (h.duration_minutes || 0), 0)
+    const totalMinutes = discHistory.reduce((acc, h) => acc + (Number(h.duration_minutes) || 0), 0)
 
     grandTotalMinutes += totalMinutes
     grandTotalQuestions += totalCount
@@ -378,13 +388,21 @@ export async function getDisciplinesPageData(
     const mastery = ud.mastery_level ?? 0
     const topicsStudied = topicsTotal > 0 ? Math.round((topicsTotal * mastery) / 100) : 0
 
+    grandTotalTopics += topicsTotal
+    grandTotalTopicsStudied += topicsStudied
+
     return {
       id: ud.id,
+      disciplineId: discId,
       name: discName,
       topicsStudied,
       topicsTotal,
       questionsSolved: totalCount,
+      accuracy: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : null,
+      totalMinutes,
       color: COLOR_PALETTE[idx % COLOR_PALETTE.length] || "#2563EB",
+      status: ud.status,
+      area: ud.discipline?.area || null,
     }
   })
 
@@ -399,12 +417,15 @@ export async function getDisciplinesPageData(
       name: exam_name,
       editalName: editalName,
       role: role,
-      observations: "Sem informações extras",
+      observations: rawTarget?.observations || "Sem informações extras",
     },
     totalStats: {
       studyTimeFormatted,
       totalQuestions: grandTotalQuestions,
       accuracyPercentage,
+      disciplinesCount: userDisciplines.length,
+      topicsTotal: grandTotalTopics,
+      topicsConcluded: grandTotalTopicsStudied,
     },
     disciplines: disciplineCards,
   }

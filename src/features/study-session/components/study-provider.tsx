@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react"
 import type { StudyTechnique } from "@/domain/study-history/study-history.types"
-import { Play, Pause, Maximize2, Square, RotateCcw } from "lucide-react"
+import { Play, Pause, Maximize2, Square, RotateCcw, Volume2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
+import { useFocusSound, type FocusSoundId } from "../hooks/use-focus-sound"
 
 type TimerPhase = 'IDLE' | 'STUDYING' | 'PAUSED' | 'SHORT_BREAK' | 'LONG_BREAK'
 
@@ -55,6 +56,12 @@ interface StudyContextType {
   finalizeAndSaveSession: (formData?: Record<string, unknown>) => Promise<{ success: boolean; error?: string; historyId?: string }>
   isCentralOpen: boolean
   setIsCentralOpen: (open: boolean) => void
+  focusSound: FocusSoundId
+  focusSoundVolume: number
+  focusSoundIsPlaying: boolean
+  focusSoundActiveLabel: string | null
+  selectFocusSound: (sound: FocusSoundId) => void
+  changeFocusSoundVolume: (vol: number) => void
 }
 
 const StudyContext = createContext<StudyContextType | null>(null)
@@ -113,6 +120,8 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(false)
   const [isCentralOpen, setIsCentralOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const focusSound = useFocusSound()
 
   // Restaurar sessão e preferências do localStorage SOMENTE após a hidratação,
   // para o servidor e o cliente renderizarem o mesmo HTML (evita hydration mismatch).
@@ -219,7 +228,10 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       lastPauseStartTime: null, plannedSeconds: TECHNIQUE_DURATIONS[technique] || 0,
       activeSeconds: 0, pausedSeconds: 0,
     })
-  }, [])
+    if (focusSound.selectedSound !== "off") {
+      void focusSound.startSound(focusSound.selectedSound)
+    }
+  }, [focusSound])
 
   const minimizeSession = useCallback(() => {
     setSession(prev => prev ? { ...prev, isMinimized: true } : null)
@@ -238,7 +250,8 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       if (!prev || prev.phase !== 'STUDYING') return prev
       return { ...prev, phase: 'PAUSED', lastPauseStartTime: Date.now() }
     })
-  }, [])
+    focusSound.pauseSound()
+  }, [focusSound])
 
   const resumeSession = useCallback(() => {
     setSession(prev => {
@@ -246,12 +259,16 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       const pauseDuration = prev.lastPauseStartTime !== null ? (Date.now() - prev.lastPauseStartTime) : 0
       return { ...prev, phase: 'STUDYING', totalPausedMs: prev.totalPausedMs + pauseDuration, lastPauseStartTime: null }
     })
-  }, [])
+    if (focusSound.selectedSound !== "off") {
+      void focusSound.resumeSound()
+    }
+  }, [focusSound])
 
   const endSession = useCallback(() => {
     setSession(null)
     localStorage.removeItem(STORAGE_KEY)
-  }, [])
+    focusSound.stopSound()
+  }, [focusSound])
 
   const updateNotes = useCallback((notes: string) => {
     setSession(prev => prev ? { ...prev, notes } : null)
@@ -285,6 +302,9 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       audio_platform: formData?.["audio_platform"] || null,
       audio_speed: formData?.["audio_speed"] || null,
       audio_url: formData?.["audio_url"] || null,
+      // Focus sound
+      focus_sound: focusSound.selectedSound !== "off" ? focusSound.selectedSound : null,
+      focus_sound_volume: focusSound.selectedSound !== "off" ? focusSound.volume : null,
       // Tempo calculado
       activeSeconds: session.activeSeconds,
       pausedSeconds: session.pausedSeconds,
@@ -303,12 +323,13 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: res.error || "Erro ao salvar sessão" }
     }
 
-    // Só limpar sessão APÓS sucesso confirmado
+    // Parar o som e limpar sessão APÓS sucesso confirmado
+    focusSound.stopSound()
     setSession(null)
     localStorage.removeItem(STORAGE_KEY)
     
     return { success: true, historyId: res.historyId }
-  }, [session])
+  }, [session, focusSound])
 
   const toggleFloatingTimer = useCallback(() => {
     setFloatingTimerEnabled(prev => {
@@ -326,7 +347,15 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <StudyContext.Provider value={{ session, startSession, minimizeSession, restoreSession, pauseSession, resumeSession, endSession, updateNotes, formatTime, floatingTimerEnabled, toggleFloatingTimer, finalizeAndSaveSession, isCentralOpen, setIsCentralOpen }}>
+    <StudyContext.Provider value={{
+      session, startSession, minimizeSession, restoreSession, pauseSession, resumeSession, endSession, updateNotes, formatTime, floatingTimerEnabled, toggleFloatingTimer, finalizeAndSaveSession, isCentralOpen, setIsCentralOpen,
+      focusSound: focusSound.selectedSound,
+      focusSoundVolume: focusSound.volume,
+      focusSoundIsPlaying: focusSound.isPlaying,
+      focusSoundActiveLabel: focusSound.activeSoundLabel,
+      selectFocusSound: focusSound.selectSound,
+      changeFocusSoundVolume: focusSound.changeVolume,
+    }}>
       {children}
       <FloatingStudyWidget />
     </StudyContext.Provider>
@@ -343,7 +372,7 @@ export function useGlobalStudy() {
    FLOATING STUDY WIDGET — Mini cronômetro arrastável e persistido
    ═══════════════════════════════════════════════════════════════ */
 function FloatingStudyWidget() {
-  const { session, restoreSession, pauseSession, resumeSession, formatTime, floatingTimerEnabled, isCentralOpen } = useGlobalStudy()
+  const { session, restoreSession, pauseSession, resumeSession, formatTime, floatingTimerEnabled, isCentralOpen, focusSoundActiveLabel } = useGlobalStudy()
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -437,18 +466,23 @@ className={cn(
          )}
     >
 {/* Indicador de Status */}
-       <div className="flex items-center gap-1 pointer-events-none">
-         <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
-           {isStudying && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
-           <span className={cn("relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3", isStudying ? "bg-emerald-500" : "bg-amber-500")} />
-         </span>
-         <div className="font-mono font-black text-sm sm:text-base text-foreground">
-           {formatTime(session.activeSeconds)}
-         </div>
-         <span className="text-[10px] sm:text-xs font-bold text-muted-foreground">
-           {isStudying ? "Estudando" : "Pausado"}
-         </span>
-       </div>
+        <div className="flex items-center gap-1 pointer-events-none">
+          <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
+            {isStudying && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
+            <span className={cn("relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3", isStudying ? "bg-emerald-500" : "bg-amber-500")} />
+          </span>
+          <div className="font-mono font-black text-sm sm:text-base text-foreground">
+            {formatTime(session.activeSeconds)}
+          </div>
+          <span className="text-[10px] sm:text-xs font-bold text-muted-foreground">
+            {isStudying ? "Estudando" : "Pausado"}
+          </span>
+          {focusSoundActiveLabel && isStudying && (
+            <span className="text-[10px] flex items-center gap-0.5 text-muted-foreground" title={`Som de foco: ${focusSoundActiveLabel}`}>
+              <Volume2 className="h-3 w-3" />
+            </span>
+          )}
+        </div>
 
 {/* Botões de Ação */}
        <div className="flex items-center gap-0.5 border-l pl-1">

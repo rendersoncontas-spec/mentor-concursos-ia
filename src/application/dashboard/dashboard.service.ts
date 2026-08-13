@@ -116,12 +116,12 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
     // Add manual questions from study history metadata
     rawHistory.forEach((session) => {
-      const meta = session.metadata || {}
-      if (meta.questions_answered) {
-        totalQuestions += Number(meta.questions_answered)
+      const meta = (session.metadata || {}) as Record<string, unknown>
+      if (meta["questions_answered"]) {
+        totalQuestions += Number(meta["questions_answered"])
       }
-      if (meta.questions_correct) {
-        correctQuestions += Number(meta.questions_correct)
+      if (meta["questions_correct"]) {
+        correctQuestions += Number(meta["questions_correct"])
       }
     })
 
@@ -158,9 +158,9 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     rawHistory.forEach((session) => {
       const d = new Date(session.started_at)
       if (d.getTime() >= startOfWeekMs) {
-        const meta = session.metadata || {}
-        if (meta.questions_answered) {
-          weeklyQuestions += Number(meta.questions_answered)
+        const meta = (session.metadata || {}) as Record<string, unknown>
+        if (meta["questions_answered"]) {
+          weeklyQuestions += Number(meta["questions_answered"])
         }
       }
     })
@@ -212,9 +212,9 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         const discHistory = rawHistory.filter((h) => h.discipline_id === discId && h.completed)
         
         discHistory.forEach(h => {
-          const meta = h.metadata || {}
-          if (meta.questions_answered) totalCount += Number(meta.questions_answered)
-          if (meta.questions_correct) correctCount += Number(meta.questions_correct)
+          const meta = (h.metadata || {}) as Record<string, unknown>
+          if (meta["questions_answered"]) totalCount += Number(meta["questions_answered"])
+          if (meta["questions_correct"]) correctCount += Number(meta["questions_correct"])
         })
 
         const wrongCount = totalCount - correctCount

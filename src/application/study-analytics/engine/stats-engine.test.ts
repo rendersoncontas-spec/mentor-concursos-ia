@@ -83,6 +83,7 @@ function session(overrides: Partial<SessionRecord> = {}): SessionRecord {
     focusPercentage: null,
     plannedMinutes: null,
     notes: null,
+    focusSound: null,
     ...overrides,
   }
 }

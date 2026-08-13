@@ -2,18 +2,32 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
-import { createStudySession, finishStudySession, getUserHistory, updateStudySession, deleteStudySession } from "./study-history.service"
+import { createStudySession, finishStudySession, getUserHistory, updateStudySession, deleteStudySession, getTotalStudyMinutes, getMonthlyHistory } from "./study-history.service"
 import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
-export async function getUserHistoryAction(limit = 50) {
+export async function getUserHistoryAction(page: number = 1, pageSize: number = 50) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: "Usuário não autenticado", total: 0, totalMinutes: 0 }
+
+    const result = await getUserHistory(supabase, user.id, { page, pageSize })
+    const totalMinutes = await getTotalStudyMinutes(supabase, user.id)
+    return { data: result.data, error: null, total: result.total, totalMinutes }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message, total: 0, totalMinutes: 0 }
+  }
+}
+
+export async function getMonthlyHistoryAction(year: number, month: number) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { data: null, error: "Usuário não autenticado" }
 
-    const history = await getUserHistory(supabase, user.id, limit)
-    return { data: history, error: null }
+    const data = await getMonthlyHistory(supabase, user.id, year, month)
+    return { data, error: null }
   } catch (error) {
     return { data: null, error: (error as { message?: string }).message }
   }

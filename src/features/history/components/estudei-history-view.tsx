@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import {
   History as HistoryIcon,
   Clock,
@@ -18,11 +18,14 @@ import { StudyRegisterModal } from "@/features/study-session/components/study-re
 import { ImportHistoryModal } from "@/features/importacao/components/import-history-modal"
 import { ManageImportsModal } from "@/features/importacao/components/manage-imports-modal"
 import { toast } from "sonner"
-import { getUserHistoryAction, deleteStudySessionAction } from "@/application/study-history/study-history.actions"
+import { getUserHistoryAction, deleteStudySessionAction, getMonthlyHistoryAction } from "@/application/study-history/study-history.actions"
+import { StudyCalendar } from "./study-calendar"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
 import { originDisplayName } from "@/features/importacao/lib/origin"
 
 type HistorySession = StudyHistory & { disciplines?: { name?: string } | null }
+
+const HISTORY_PAGE_SIZE = 50
 
 interface Filters {
   dateStart: string
@@ -129,7 +132,16 @@ function countActiveFilters(f: Filters): number {
 
 export function EstudeiHistoryView() {
   const [sessions, setSessions] = useState<HistorySession[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [dbTotalMinutes, setDbTotalMinutes] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [loadingPage, setLoadingPage] = useState(false)
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list")
+  const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear())
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth() + 1)
+  const [monthlySessions, setMonthlySessions] = useState<HistorySession[]>([])
+  const [loadingMonthly, setLoadingMonthly] = useState(false)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [isManageOpen, setIsManageOpen] = useState(false)
@@ -143,23 +155,50 @@ export function EstudeiHistoryView() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
 
-  const loadHistory = async () => {
-    setLoading(true)
-    const { data, error } = await getUserHistoryAction(200)
+  const totalPages = Math.max(1, Math.ceil(totalCount / HISTORY_PAGE_SIZE))
+
+  const loadHistory = useCallback(async (page: number = 1) => {
+    if (page === 1) {
+      setLoading(true)
+    } else {
+      setLoadingPage(true)
+    }
+    const { data, error, total, totalMinutes: dbMinutes } = await getUserHistoryAction(page, HISTORY_PAGE_SIZE)
     if (error) {
       toast.error("Erro ao carregar histórico: " + error)
     } else if (data) {
       setSessions(data)
+      setTotalCount(total)
+      setDbTotalMinutes(dbMinutes || 0)
+      setCurrentPage(page)
     }
     setLoading(false)
-  }
+    setLoadingPage(false)
+  }, [])
+
+  const loadMonthlyHistory = useCallback(async (year: number, month: number) => {
+    setLoadingMonthly(true)
+    const { data, error } = await getMonthlyHistoryAction(year, month)
+    if (error) {
+      toast.error("Erro ao carregar calendário: " + error)
+    } else if (data) {
+      setMonthlySessions(data)
+    }
+    setLoadingMonthly(false)
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadHistory()
+      void loadHistory(1)
     }, 0)
     return () => clearTimeout(timer)
-  }, [])
+  }, [loadHistory])
+
+  useEffect(() => {
+    if (viewMode === "calendar") {
+      void loadMonthlyHistory(calendarYear, calendarMonth)
+    }
+  }, [viewMode, calendarYear, calendarMonth, loadMonthlyHistory])
 
   const clearImportFilter = () => {
     setImportFilterId(null)
@@ -269,14 +308,71 @@ export function EstudeiHistoryView() {
     return result
   }, [sessions, filters, importFilterId])
 
+  const filteredMonthlySessions = useMemo(() => {
+    let result = [...monthlySessions]
+
+    if (importFilterId) {
+      result = result.filter(s => s.import_batch_id === importFilterId)
+    }
+    // Calendário não usa filtro de data início/fim
+    if (filters.disciplineId) {
+      result = result.filter(s => s.discipline_id === filters.disciplineId)
+    }
+    if (filters.origin) {
+      if (filters.origin === "mentor") {
+        result = result.filter(s => !s.origin_source)
+      } else {
+        result = result.filter(s => s.origin_source_name === filters.origin)
+      }
+    }
+    if (filters.studyType) {
+      result = result.filter(s => s.study_type === filters.studyType)
+    }
+    if (filters.technique) {
+      result = result.filter(s => s.technique === filters.technique)
+    }
+    if (filters.timeRange) {
+      result = result.filter(s => {
+        const mins = s.duration_minutes || 0
+        switch (filters.timeRange) {
+          case "0-30": return mins <= 30
+          case "30-60": return mins > 30 && mins <= 60
+          case "60-120": return mins > 60 && mins <= 120
+          case "120+": return mins > 120
+          default: return true
+        }
+      })
+    }
+    if (filters.focusRange) {
+      result = result.filter(s => {
+        const focus = Number(s.metadata?.["focus_percentage"] || 0)
+        switch (filters.focusRange) {
+          case "0-49": return focus >= 0 && focus < 50
+          case "50-69": return focus >= 50 && focus < 70
+          case "70-89": return focus >= 70 && focus < 90
+          case "90-100": return focus >= 90 && focus <= 100
+          default: return true
+        }
+      })
+    }
+
+    return result
+  }, [monthlySessions, filters, importFilterId])
+
   // KPIs from filtered
-  const totalMinutes = filteredSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)
-  const totalCorrect = filteredSessions.reduce((acc, s) => acc + Number(s.metadata?.["questions_correct"] || 0), 0)
-  const totalAnswered = filteredSessions.reduce((acc, s) => acc + Number(s.metadata?.["questions_answered"] || 0), 0)
+  const activeFilterCount = countActiveFilters(filters)
+  // When no filters are active, use the total minutes from the database (all records).
+  // When filters are active, we can only sum the current page's filtered sessions
+  // (the DB query does not support these client-side filters).
+  const currentSessions = viewMode === "calendar" ? filteredMonthlySessions : filteredSessions
+  const totalMinutes = viewMode === "list" && activeFilterCount === 0 && !importFilterId
+    ? dbTotalMinutes
+    : currentSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)
+  const totalCorrect = currentSessions.reduce((acc, s) => acc + Number(s.metadata?.["questions_correct"] || 0), 0)
+  const totalAnswered = currentSessions.reduce((acc, s) => acc + Number(s.metadata?.["questions_answered"] || 0), 0)
   const totalWrong = totalAnswered - totalCorrect
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0
-  const totalPages = filteredSessions.reduce((acc, s) => acc + Number(s.metadata?.["pages_read"] || 0), 0)
-  const activeFilterCount = countActiveFilters(filters)
+  const totalPagesRead = currentSessions.reduce((acc, s) => acc + Number(s.metadata?.["pages_read"] || 0), 0)
 
   const handleEditSession = (session: HistorySession) => {
     setEditingSession(session)
@@ -287,13 +383,17 @@ export function EstudeiHistoryView() {
     setIsRegisterOpen(open)
     if (!open) {
       setEditingSession(null)
-      loadHistory()
+      void loadHistory(currentPage)
+      if (viewMode === "calendar") {
+        void loadMonthlyHistory(calendarYear, calendarMonth)
+      }
     }
   }
 
   const handleDeleteSession = async (sessionId: string) => {
     const confirmed = window.confirm("Excluir esta sessão de estudo?\nEsta ação não pode ser desfeita.")
     if (!confirmed) return
+    const session = sessions.find(s => s.id === sessionId)
     try {
       const { error } = await deleteStudySessionAction(sessionId)
       if (error) {
@@ -301,6 +401,9 @@ export function EstudeiHistoryView() {
       } else {
         toast.success("Sessão excluída com sucesso")
         setSessions(prev => prev.filter(s => s.id !== sessionId))
+        setMonthlySessions(prev => prev.filter(s => s.id !== sessionId))
+        setTotalCount(prev => Math.max(0, prev - 1))
+        setDbTotalMinutes(prev => Math.max(0, prev - (Number(session?.duration_minutes) || 0)))
       }
     } catch {
       toast.error("Erro inesperado ao excluir")
@@ -315,7 +418,27 @@ export function EstudeiHistoryView() {
     <div className="space-y-6">
       {/* Top Header Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-black text-foreground">Histórico</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <h1 className="text-2xl font-black text-foreground">Histórico</h1>
+          <div className="inline-flex items-center bg-muted/60 p-1 rounded-xl border shadow-xs">
+            <button 
+              type="button"
+              onClick={() => setViewMode("list")} 
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "list" ? "bg-background text-[#2563EB] shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <HistoryIcon className="h-3.5 w-3.5" />
+              Lista
+            </button>
+            <button 
+              type="button"
+              onClick={() => setViewMode("calendar")} 
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "calendar" ? "bg-background text-[#2563EB] shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Calendário
+            </button>
+          </div>
+        </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
           <Button
@@ -536,9 +659,20 @@ export function EstudeiHistoryView() {
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">SESSÕES</span>
           <div className="flex items-end justify-between">
             <div className="text-[11px] font-bold space-y-0.5">
-              <span className="text-primary block">{filteredSessions.length} registro{filteredSessions.length !== 1 ? "s" : ""}</span>
-              {activeFilterCount > 0 && (
-                <span className="text-muted-foreground block">de {sessions.length} total</span>
+              {viewMode === "list" ? (
+                <>
+                  <span className="text-primary block">{totalCount.toLocaleString("pt-BR")} registro{totalCount !== 1 ? "s" : ""}</span>
+                  {activeFilterCount > 0 && (
+                    <span className="text-muted-foreground block">{filteredSessions.length} na página</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="text-primary block">{filteredMonthlySessions.length} registro{filteredMonthlySessions.length !== 1 ? "s" : ""} neste mês</span>
+                  {activeFilterCount > 0 && (
+                    <span className="text-muted-foreground block">Com filtros aplicados</span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -547,7 +681,7 @@ export function EstudeiHistoryView() {
         <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">PÁGINAS LIDAS</span>
           <div className="text-right">
-            <span className="text-2xl font-black text-foreground font-mono">{totalPages}</span>
+            <span className="text-2xl font-black text-foreground font-mono">{totalPagesRead}</span>
           </div>
         </div>
       </div>
@@ -575,6 +709,23 @@ export function EstudeiHistoryView() {
 
       <div className="space-y-4 pt-2">
         {(() => {
+          if (viewMode === "calendar") {
+            return (
+              <StudyCalendar
+                sessions={filteredMonthlySessions}
+                currentYear={calendarYear}
+                currentMonth={calendarMonth}
+                onNavigate={(y, m) => {
+                  setCalendarYear(y);
+                  setCalendarMonth(m);
+                }}
+                onEditSession={handleEditSession}
+                onDeleteSession={handleDeleteSession}
+                isLoading={loadingMonthly}
+              />
+            )
+          }
+
           if (loading) return (
           <div className="flex items-center justify-center p-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -608,6 +759,11 @@ export function EstudeiHistoryView() {
                 {activeFilterCount > 0 && ` (${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""})`}
               </span>
               <div className="flex-1 h-0.5 bg-[#2563EB]/30" />
+              {!importFilterId && activeFilterCount === 0 && totalPages > 1 && (
+                <span className="text-[11px] font-bold text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </span>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -684,6 +840,36 @@ export function EstudeiHistoryView() {
                 </div>
               ))}
             </div>
+
+            {!importFilterId && activeFilterCount === 0 && totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1 || loadingPage}
+                  onClick={() => void loadHistory(currentPage - 1)}
+                  className="text-xs font-bold"
+                >
+                  Anterior
+                </Button>
+                <span className="text-xs font-bold text-muted-foreground px-2">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages || loadingPage}
+                  onClick={() => void loadHistory(currentPage + 1)}
+                  className="text-xs font-bold"
+                >
+                  {loadingPage ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    "Próxima"
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
           )
         })()}
@@ -700,7 +886,7 @@ export function EstudeiHistoryView() {
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
         onImported={() => {
-          void loadHistory()
+          void loadHistory(1)
         }}
       />
 
@@ -708,7 +894,7 @@ export function EstudeiHistoryView() {
         open={isManageOpen}
         onOpenChange={setIsManageOpen}
         onChanged={() => {
-          void loadHistory()
+          void loadHistory(currentPage)
         }}
         onImportClick={() => setIsImportOpen(true)}
       />

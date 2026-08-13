@@ -38,6 +38,7 @@ export interface SessionRecord {
   focusPercentage: number | null
   plannedMinutes: number | null
   notes: string | null
+  focusSound: string | null
 }
 
 export interface QuestionAttemptRecord {
@@ -539,16 +540,31 @@ function safeStr(v: unknown): string | null {
   return s.length > 0 ? s : null
 }
 
-export function sanitizeSession(raw: Record<string, unknown>): SessionRecord | null {
+export function sanitizeSession(raw: Record<string, unknown>, isImported: boolean = false): SessionRecord | null {
   const startedAt = safeStr(raw["started_at"])
   if (!startedAt || isNaN(new Date(startedAt).getTime())) return null
   const duration = safeInt(raw["duration_minutes"] ?? raw["active_minutes"] ?? 0)
   const questionsAnswered = safeInt(raw["questions_answered"])
   const questionsCorrect = Math.min(safeInt(raw["questions_correct"]), questionsAnswered)
-  const focusScore =
-    raw["focus_score"] === null || raw["focus_score"] === undefined
+
+  let focusScore: number | null = null
+  let focusPercentage: number | null = null
+
+  if (!isImported) {
+    focusScore = raw["focus_score"] === null || raw["focus_score"] === undefined
       ? null
       : Math.min(5, Math.max(1, safeInt(raw["focus_score"]) || 3))
+    focusPercentage = raw["focus_percentage"] === null || raw["focus_percentage"] === undefined
+      ? null
+      : Math.min(100, safeInt(raw["focus_percentage"]))
+  } else {
+    // Para sessões importadas, apenas aceitamos se vier explicitamente no metadata
+    const meta = (raw["metadata"] as Record<string, unknown> | null) ?? {}
+    if (meta["focus_percentage"] !== undefined && meta["focus_percentage"] !== null) {
+      focusPercentage = Math.min(100, Math.max(0, safeInt(meta["focus_percentage"])))
+    }
+  }
+
   return {
     id: safeStr(raw["id"]) ?? "?",
     disciplineId: safeStr(raw["discipline_id"]),
@@ -571,9 +587,10 @@ export function sanitizeSession(raw: Record<string, unknown>): SessionRecord | n
     questionsCorrect,
     flashcardsReviewed: safeInt(raw["flashcards_reviewed"]),
     topicName: safeStr(raw["topic_name"]),
-    focusPercentage: raw["focus_percentage"] === null || raw["focus_percentage"] === undefined ? null : Math.min(100, safeInt(raw["focus_percentage"])),
+    focusPercentage,
     plannedMinutes: raw["planned_minutes"] === null || raw["planned_minutes"] === undefined ? null : safeInt(raw["planned_minutes"]),
     notes: safeStr(raw["notes"]),
+    focusSound: safeStr(raw["focus_sound"]) || null,
   }
 }
 
@@ -740,6 +757,20 @@ export function buildDayBuckets(
   timezone: string = DEFAULT_TIMEZONE
 ): DailyBucket[] {
   const keys = lastNDays(days, now, timezone)
+  return buildDayBucketsFromKeys(sessions, attempts, keys, timezone)
+}
+
+/**
+ * Constrói buckets diários a partir de um conjunto explícito de chaves de data.
+ * Usado para o modo "Tudo", onde as datas vêm das próprias sessões em vez de
+ * serem geradas a partir de "últimos N dias".
+ */
+export function buildDayBucketsFromKeys(
+  sessions: SessionRecord[],
+  attempts: QuestionAttemptRecord[],
+  keys: string[],
+  timezone: string = DEFAULT_TIMEZONE
+): DailyBucket[] {
   const byDate = new Map<string, DailyBucket>()
   const base: Omit<DailyBucket, "date"> = {
     minutes: 0,

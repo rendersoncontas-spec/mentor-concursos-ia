@@ -154,25 +154,84 @@ export async function deleteStudySession(
 }
 
 /**
- * Busca todo o histórico de um usuário
+ * Busca o histórico de um usuário com paginação.
+ * Retorna os registros da página solicitada + contagem total real.
  */
 export async function getUserHistory(
   supabase: SupabaseClient,
   userId: string,
-  limit = 50
+  options: { page: number; pageSize: number } = { page: 1, pageSize: 50 },
 ) {
-  const { data, error } = await supabase
+  const { page, pageSize } = options
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const { data, error, count } = await supabase
     .from("study_history")
-    .select(`
+    .select(
+      `
       *,
       disciplines ( id, name, area )
-    `)
+    `,
+      { count: "exact" },
+    )
     .eq("user_id", userId)
     .order("started_at", { ascending: false })
-    .limit(limit)
+    .range(from, to)
 
   if (error) throw new Error("Erro ao buscar histórico: " + error.message)
-  return data
+  return { data: data ?? [], total: count ?? 0 }
+}
+
+/**
+ * Pagina todos os registros de uma query do Supabase que ultrapassam o
+ * limite do PostgREST (geralmente 1000 linhas). Usa múltiplas requisições
+ * com .range() para buscar tudo.
+ */
+async function fetchAllRows<T>(
+  supabase: SupabaseClient,
+  table: string,
+  select: string,
+  filters: { column: string; op: "eq" | "not.is"; value: unknown }[],
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = []
+  let offset = 0
+  while (true) {
+    let query = supabase.from(table).select(select).range(offset, offset + pageSize - 1)
+    for (const f of filters) {
+      if (f.op === "eq") query = query.eq(f.column, f.value)
+      else if (f.op === "not.is") query = query.not(f.column, "is", f.value)
+    }
+    const { data, error } = await query
+    if (error) break
+    if (!data || data.length === 0) break
+    all.push(...(data as T[]))
+    if (data.length < pageSize) break
+    offset += pageSize
+  }
+  return all
+}
+
+/**
+ * Busca a soma total de duration_minutes de TODAS as sessões do usuário.
+ * Pagina a query porque o PostgREST limita o número de linhas retornadas
+ * por requisição (geralmente 1000).
+ */
+export async function getTotalStudyMinutes(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<number> {
+  const rows = await fetchAllRows<{ duration_minutes: number | null }>(
+    supabase,
+    "study_history",
+    "duration_minutes",
+    [
+      { column: "user_id", op: "eq", value: userId },
+      { column: "duration_minutes", op: "not.is", value: null },
+    ],
+  )
+  return rows.reduce((acc, row) => acc + (Number(row.duration_minutes) || 0), 0)
 }
 
 /**
@@ -213,3 +272,52 @@ export async function getRecentActivities(
   }})
 }
 
+/**
+ * Busca todas as sessões de um usuário em um determinado mês e ano.
+ * Realiza paginação automática para ultrapassar limites do PostgREST e garantir que
+ * todas as sessões daquele mês sejam carregadas.
+ * O agrupamento leva em consideração o timezone "America/Sao_Paulo".
+ */
+export async function getMonthlyHistory(
+  supabase: SupabaseClient,
+  userId: string,
+  year: number,
+  month: number // 1 a 12
+) {
+  // Construir as datas de início e fim do mês usando offset -03:00 (Brasília padrão)
+  const paddedMonth = String(month).padStart(2, '0')
+  const startStr = `${year}-${paddedMonth}-01T00:00:00.000-03:00`
+  
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const paddedNextMonth = String(nextMonth).padStart(2, '0')
+  const nextMonthStartStr = `${nextYear}-${paddedNextMonth}-01T00:00:00.000-03:00`
+
+  const allSessions: any[] = []
+  let offset = 0
+  const pageSize = 1000
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("study_history")
+      .select(`
+        *,
+        disciplines ( id, name, area )
+      `)
+      .eq("user_id", userId)
+      .gte("started_at", startStr)
+      .lt("started_at", nextMonthStartStr)
+      .order("started_at", { ascending: false })
+      .range(offset, offset + pageSize - 1)
+
+    if (error) throw new Error("Erro ao buscar histórico mensal: " + error.message)
+    if (!data || data.length === 0) break
+    
+    allSessions.push(...data)
+    
+    if (data.length < pageSize) break
+    offset += pageSize
+  }
+
+  return allSessions
+}

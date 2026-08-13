@@ -36,8 +36,9 @@ export interface StatisticsCenterPayload {
   activePlan: ActivePlan | null
 }
 
-// Quantos dias de histórico o fetch considera (27 meses ≈ janelas do mês).
-const HISTORY_DAYS = 830
+// Limite de segurança: 50.000 sessões carregadas por usuário (muito acima do
+// uso normal; evita que alguém com volumes astronômicos prejudique o servidor).
+const SESSIONS_LIMIT = 50_000
 // Tentativas de questões: limitamos às mais recentes para manter o payload
 // enxuto; a acurácia reflete a janela carregada (documentado na coleção).
 const ATTEMPTS_LIMIT = 50000
@@ -137,66 +138,80 @@ export async function getStatisticsCenterAction(): Promise<{
       return { data: cached.payload, error: null, cached: true }
     }
 
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - HISTORY_DAYS)
-
     // 1. Sessões de estudo (a fonte primária de dados).
-    //    Colunas reais de study_history: discipline_id (FK), started_at, duration_minutes,
-    //    active_minutes, paused_minutes, planned_minutes, completed, interrupted,
-    //    energy_level, difficulty, focus_score, study_type, study_source, notes, metadata.
-    //    Questões/páginas/foco/tópico vivem no JSON metadata (mesma fonte do Histórico).
+    //    Carregamos TODAS as sessões do usuário (sem filtro de data) para
+    //    permitir o período "Tudo" nas Estatísticas — o filtro acontecerá no
+    //    cliente. Paginamos porque o PostgREST limita ~1000 linhas por
+    //    requisição.
     let sessions: SessionRecord[] = []
-    const { data: historyRows, error: historyError } = await supabase
-      .from("study_history")
-      .select(
-        `
+    const SESSION_SELECT = `
         id, discipline_id, started_at, finished_at, duration_minutes,
         active_minutes, paused_minutes, planned_minutes,
         completed, interrupted, energy_level, difficulty, focus_score,
-        study_type, study_source, notes, metadata,
+        study_type, study_source, origin_source, notes, metadata,
         disciplines ( id, name, area )
       `
-      )
-      .eq("user_id", user.id)
-      .gte("started_at", cutoff.toISOString())
-      .order("started_at", { ascending: true })
-      .limit(6000)
+    try {
+      const PAGE = 1000
+      let offset = 0
+      let fetched = 0
+      let totalLoaded = 0
+      while (totalLoaded < SESSIONS_LIMIT) {
+        const { data: pageData, error: pageError } = await supabase
+          .from("study_history")
+          .select(SESSION_SELECT)
+          .eq("user_id", user.id)
+          .order("started_at", { ascending: true })
+          .range(offset, offset + PAGE - 1)
 
-    if (historyError) {
-      console.error("[ESTATISTICAS] Erro ao carregar study_history:", historyError)
-    } else {
-      sessions = (historyRows ?? [])
-        .map((row) => {
-          const disc = Array.isArray(row.disciplines) ? row.disciplines[0] : row.disciplines
-          return sanitizeSession({
-            id: row.id,
-            discipline_id: row.discipline_id ?? null,
-            discipline_name: disc?.name ?? null,
-            discipline_area: disc?.area ?? null,
-            started_at: row.started_at,
-            finished_at: row.finished_at,
-            duration_minutes: row.duration_minutes,
-            active_minutes: row.active_minutes,
-            paused_minutes: row.paused_minutes,
-            planned_minutes: row.planned_minutes,
-            completed: row.completed,
-            interrupted: row.interrupted,
-            energy_level: row.energy_level,
-            difficulty: row.difficulty,
-            focus_score: row.focus_score,
-            study_type: row.study_type,
-            study_source: row.study_source,
-            notes: row.notes,
-            metadata: row.metadata ?? {},
-            pages_read: row.metadata?.pages_read,
-            questions_answered: row.metadata?.questions_answered,
-            questions_correct: row.metadata?.questions_correct,
-            flashcards_reviewed: row.metadata?.flashcards_reviewed,
-            topic_name: row.metadata?.topic_name,
-            focus_percentage: row.metadata?.focus_percentage,
+        if (pageError) {
+          console.error("[ESTATISTICAS] Erro ao carregar study_history:", pageError)
+          break
+        }
+        if (!pageData || pageData.length === 0) break
+
+        const pageSessions = (pageData as Record<string, unknown>[])
+          .map((row) => {
+            const disc = Array.isArray(row["disciplines"]) ? row["disciplines"][0] : row["disciplines"]
+            return sanitizeSession({
+              id: row["id"] as string,
+              discipline_id: (row["discipline_id"] as string) ?? null,
+              discipline_name: (disc as { name?: string } | null)?.name ?? null,
+              discipline_area: (disc as { area?: string | null } | null)?.area ?? null,
+              started_at: row["started_at"] as string,
+              finished_at: (row["finished_at"] as string | null) ?? null,
+              duration_minutes: row["duration_minutes"] as number | null,
+              active_minutes: row["active_minutes"] as number | null,
+              paused_minutes: row["paused_minutes"] as number | null,
+              planned_minutes: row["planned_minutes"] as number | null,
+              completed: row["completed"] as boolean,
+              interrupted: row["interrupted"] as boolean,
+              energy_level: (row["energy_level"] as number | null) ?? null,
+              difficulty: (row["difficulty"] as number | null) ?? null,
+              focus_score: (row["focus_score"] as number | null) ?? null,
+              study_type: (row["study_type"] as string | null) ?? null,
+              study_source: (row["study_source"] as string | null) ?? null,
+              notes: (row["notes"] as string | null) ?? null,
+              metadata: (row["metadata"] as Record<string, unknown>) ?? {},
+              pages_read: (row["metadata"] as Record<string, unknown> | null)?.["pages_read"],
+              questions_answered: (row["metadata"] as Record<string, unknown> | null)?.["questions_answered"],
+              questions_correct: (row["metadata"] as Record<string, unknown> | null)?.["questions_correct"],
+              flashcards_reviewed: (row["metadata"] as Record<string, unknown> | null)?.["flashcards_reviewed"],
+              topic_name: (row["metadata"] as Record<string, unknown> | null)?.["topic_name"],
+              focus_percentage: (row["metadata"] as Record<string, unknown> | null)?.["focus_percentage"],
+            }, !!row["origin_source"])
           })
-        })
-        .filter((s): s is SessionRecord => s !== null)
+          .filter((s): s is SessionRecord => s !== null)
+
+        sessions.push(...pageSessions)
+        totalLoaded += pageData.length
+        if (pageData.length < PAGE) break
+        offset += PAGE
+        fetched++
+        if (fetched > 100) break // safety: max 100 pages = 100k rows
+      }
+    } catch (err) {
+      console.error("[ESTATISTICAS] Falha em study_history:", err)
     }
 
     // 2. Tentativas de questões (disciplina vem do join com questions).
@@ -206,7 +221,6 @@ export async function getStatisticsCenterAction(): Promise<{
         .from("question_attempts")
         .select("id, correct, answered_at, questions ( discipline_id )")
         .eq("user_id", user.id)
-        .gte("answered_at", cutoff.toISOString())
         .order("answered_at", { ascending: false })
         .limit(ATTEMPTS_LIMIT)
 

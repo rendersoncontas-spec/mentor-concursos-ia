@@ -243,17 +243,27 @@ export async function generateStudyPlan(
   // 3. Desativar planos anteriores
   await supabase
     .from("study_plans")
-    .update({ active: false })
+    .update({ active: false, status: "ARCHIVED", archived_at: new Date().toISOString() })
     .eq("user_id", userId)
     .eq("active", true)
 
-  // 4a. Determinar nova versão
+  // 4a. Determinar nova versão e nome amigável
   const { count } = await supabase
     .from("study_plans")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
 
+  const { data: activeTarget } = await supabase
+    .from("user_targets")
+    .select("target_exam")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle()
+
+  const targetExamName = activeTarget?.target_exam || "Plano de Estudos"
   const newVersion = (count ?? 0) + 1
+  const planName = `${targetExamName} — v${newVersion}`
 
   // 4b. Inserir novo plano
   const { data: newPlan, error: planError } = await supabase
@@ -261,8 +271,13 @@ export async function generateStudyPlan(
     .insert({
       user_id: userId,
       version: newVersion,
+      name: planName,
+      plan_type: "CRONOGRAMA_SEMANAL",
+      status: "ACTIVE",
+      weekly_minutes: weeklyMinutes,
       generated_reason: reason,
       active: true,
+      start_date: new Date().toISOString().split("T")[0],
     })
     .select()
     .single()
@@ -519,17 +534,27 @@ export async function createCycleStudyPlan(
   // 1. Desativar planos anteriores
   await supabase
     .from("study_plans")
-    .update({ active: false })
+    .update({ active: false, status: "ARCHIVED", archived_at: new Date().toISOString() })
     .eq("user_id", userId)
     .eq("active", true)
 
-  // 2. Determinar versão
+  // 2. Determinar versão e nome
   const { count } = await supabase
     .from("study_plans")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
 
+  const { data: activeTarget } = await supabase
+    .from("user_targets")
+    .select("target_exam")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle()
+
+  const targetExamName = activeTarget?.target_exam || "Ciclo de Estudos"
   const newVersion = (count ?? 0) + 1
+  const planName = `${targetExamName} — v${newVersion}`
 
   // 3. Inserir novo plano
   const { data: newPlan, error: planError } = await supabase
@@ -537,8 +562,13 @@ export async function createCycleStudyPlan(
     .insert({
       user_id: userId,
       version: newVersion,
+      name: planName,
+      plan_type: "CICLO_ROTATIVO",
+      status: "ACTIVE",
+      weekly_minutes: totalCycleMinutes,
       generated_reason: "cycle_wizard",
       active: true,
+      start_date: new Date().toISOString().split("T")[0],
     })
     .select()
     .single()
@@ -701,7 +731,7 @@ export async function deactivateUserStudyPlan(
 ): Promise<boolean> {
   const { error } = await supabase
     .from("study_plans")
-    .update({ active: false })
+    .update({ active: false, status: "ARCHIVED", archived_at: new Date().toISOString() })
     .eq("user_id", userId)
     .eq("active", true)
 

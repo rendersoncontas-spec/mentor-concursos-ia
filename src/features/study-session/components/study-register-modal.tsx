@@ -21,6 +21,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils"
 
 import { useGlobalStudy } from "./study-provider"
+import { FocusSoundControl } from "./focus-sound-control"
 import type { StudyHistory, StudyTechnique } from "@/domain/study-history/study-history.types"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { updateStudySessionAction } from "@/application/study-history/study-history.actions"
@@ -152,7 +153,10 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     form.setValue("is_manual_mode", newVal, { shouldDirty: true, shouldValidate: true })
   }
 
-  const { session, startSession, pauseSession, resumeSession, endSession, minimizeSession, toggleFloatingTimer, floatingTimerEnabled, finalizeAndSaveSession } = useGlobalStudy()
+  const { session, startSession, pauseSession, resumeSession, endSession, minimizeSession, toggleFloatingTimer, floatingTimerEnabled, finalizeAndSaveSession,
+    focusSound: focusSoundId, focusSoundVolume, focusSoundIsPlaying,
+    selectFocusSound, changeFocusSoundVolume
+  } = useGlobalStudy()
 
   const phase = session?.phase ?? 'IDLE'
   const activeSeconds = session?.activeSeconds ?? 0
@@ -525,6 +529,16 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                           </Select>
                         )} />
                       </div>
+                    )}
+
+                    {!isManualMode && (
+                      <FocusSoundControl
+                        selectedSound={focusSoundId}
+                        volume={focusSoundVolume}
+                        isPlaying={focusSoundIsPlaying}
+                        onSelectSound={selectFocusSound}
+                        onVolumeChange={changeFocusSoundVolume}
+                      />
                     )}
                   </div>
 

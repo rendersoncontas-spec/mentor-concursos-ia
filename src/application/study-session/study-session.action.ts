@@ -54,6 +54,8 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       focus_percentage: data["focusPercentage"] || 0,
       completed_cycles: data["completedCycles"] || 0,
       topic_name: data["topic_name"] || null,
+      focus_sound: data["focus_sound"] || null,
+      focus_sound_volume: data["focus_sound_volume"] ?? null,
     }
 
     // 3. Calcular duração real
