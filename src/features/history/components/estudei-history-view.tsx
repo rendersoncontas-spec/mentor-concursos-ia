@@ -9,12 +9,18 @@ import {
   GraduationCap,
   Loader2,
   Filter,
+  Upload,
+  Database,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+import { ImportHistoryModal } from "@/features/importacao/components/import-history-modal"
+import { ManageImportsModal } from "@/features/importacao/components/manage-imports-modal"
 import { toast } from "sonner"
 import { getUserHistoryAction, deleteStudySessionAction } from "@/application/study-history/study-history.actions"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
+import { originDisplayName } from "@/features/importacao/lib/origin"
 
 type HistorySession = StudyHistory & { disciplines?: { name?: string } | null }
 
@@ -22,6 +28,7 @@ interface Filters {
   dateStart: string
   dateEnd: string
   disciplineId: string
+  origin: string
   studyType: string
   technique: string
   timeRange: string
@@ -32,6 +39,7 @@ const EMPTY_FILTERS: Filters = {
   dateStart: "",
   dateEnd: "",
   disciplineId: "",
+  origin: "",
   studyType: "",
   technique: "",
   timeRange: "",
@@ -111,6 +119,7 @@ function countActiveFilters(f: Filters): number {
   if (f.dateStart) count++
   if (f.dateEnd) count++
   if (f.disciplineId) count++
+  if (f.origin) count++
   if (f.studyType) count++
   if (f.technique) count++
   if (f.timeRange) count++
@@ -122,6 +131,12 @@ export function EstudeiHistoryView() {
   const [sessions, setSessions] = useState<HistorySession[]>([])
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
+  const [isManageOpen, setIsManageOpen] = useState(false)
+  const [importFilterId, setImportFilterId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    return new URLSearchParams(window.location.search).get("import")
+  })
   const [editingSession, setEditingSession] = useState<HistorySession | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
@@ -145,6 +160,13 @@ export function EstudeiHistoryView() {
     }, 0)
     return () => clearTimeout(timer)
   }, [])
+
+  const clearImportFilter = () => {
+    setImportFilterId(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete("import")
+    window.history.replaceState({}, "", url.toString())
+  }
 
   // Close filter panel on outside click or ESC
   useEffect(() => {
@@ -179,10 +201,24 @@ export function EstudeiHistoryView() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
   }, [sessions])
 
+  // Unique origins from sessions (imported sessions only)
+  const origins = useMemo(() => {
+    const map = new Map<string, string>()
+    sessions.forEach(s => {
+      if (!s.origin_source) return
+      const name = s.origin_source_name || originDisplayName(s.origin_source ?? null, null)
+      if (!map.has(name)) map.set(name, name)
+    })
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [sessions])
+
   // Apply filters
   const filteredSessions = useMemo(() => {
     let result = [...sessions]
 
+    if (importFilterId) {
+      result = result.filter(s => s.import_batch_id === importFilterId)
+    }
     if (filters.dateStart) {
       result = result.filter(s => getStudyDate(s) >= filters.dateStart)
     }
@@ -191,6 +227,13 @@ export function EstudeiHistoryView() {
     }
     if (filters.disciplineId) {
       result = result.filter(s => s.discipline_id === filters.disciplineId)
+    }
+    if (filters.origin) {
+      if (filters.origin === "mentor") {
+        result = result.filter(s => !s.origin_source)
+      } else {
+        result = result.filter(s => s.origin_source_name === filters.origin)
+      }
     }
     if (filters.studyType) {
       result = result.filter(s => s.study_type === filters.studyType)
@@ -224,7 +267,7 @@ export function EstudeiHistoryView() {
     }
 
     return result
-  }, [sessions, filters])
+  }, [sessions, filters, importFilterId])
 
   // KPIs from filtered
   const totalMinutes = filteredSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)
@@ -282,6 +325,33 @@ export function EstudeiHistoryView() {
             Adicionar Estudo
           </Button>
 
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsImportOpen(true)}
+                      className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Importar Histórico
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Importar histórico de estudos de outra plataforma
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <Button
+                variant="outline"
+                onClick={() => setIsManageOpen(true)}
+                className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+              >
+                <Database className="h-4 w-4" />
+                Gerenciar Importações
+              </Button>
+
           <Button variant="outline" className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2">
             <GraduationCap className="h-4 w-4" />
             Cargo Alvo
@@ -336,6 +406,22 @@ export function EstudeiHistoryView() {
                     <option value="">Todas</option>
                     {disciplines.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Origin */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-muted-foreground">Origem</label>
+                  <select
+                    value={filters.origin}
+                    onChange={e => setFilters(f => ({ ...f, origin: e.target.value }))}
+                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                  >
+                    <option value="">Todas as origens</option>
+                    <option value="mentor">Mentor IA</option>
+                    {origins.map(o => (
+                      <option key={o.id} value={o.id}>{o.name}</option>
                     ))}
                   </select>
                 </div>
@@ -467,6 +553,26 @@ export function EstudeiHistoryView() {
       </div>
 
       {/* Registros */}
+      {importFilterId && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2563EB]/30 bg-[#2563EB]/5 px-4 py-3">
+          <div className="space-y-0.5 min-w-0">
+            <p className="text-xs font-extrabold text-[#2563EB]">Filtrando uma importação</p>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {filteredSessions.length} sessão{filteredSessions.length !== 1 ? "es" : ""} desta
+              importação.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearImportFilter}
+            className="text-[11px] font-bold shrink-0"
+          >
+            Limpar filtro
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-4 pt-2">
         {(() => {
           if (loading) return (
@@ -516,6 +622,11 @@ export function EstudeiHistoryView() {
                       <h3 className="font-extrabold text-xs text-foreground tracking-tight">
                         {session.disciplines?.name || "Estudo Livre"}
                       </h3>
+                      {session.origin_source && (
+                        <span className="inline-flex items-center rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#2563EB]">
+                          Importado · {originDisplayName(session.origin_source, session.origin_source_name)}
+                        </span>
+                      )}
                       <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
                         Data: {formatStudyDate(session.started_at) || "Não informada"}
                       </p>
@@ -583,6 +694,23 @@ export function EstudeiHistoryView() {
         onOpenChange={handleModalClose}
         mode={editingSession ? "edit" : "create"}
         {...(editingSession ? { sessionToEdit: editingSession } : {})}
+      />
+
+      <ImportHistoryModal
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onImported={() => {
+          void loadHistory()
+        }}
+      />
+
+      <ManageImportsModal
+        open={isManageOpen}
+        onOpenChange={setIsManageOpen}
+        onChanged={() => {
+          void loadHistory()
+        }}
+        onImportClick={() => setIsImportOpen(true)}
       />
     </div>
   )

@@ -3,13 +3,15 @@
 import { useState } from "react"
 import { Clock, CheckCircle2, AlertTriangle, Ban, Play, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { ReviewSessionMode } from "@/domain/reviews/models"
+import { ReviewPlayerModal } from "./review-player-modal"
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Tipos (dados vêm do banco via review_items, populados pelo servidor) ───
 
 type ReviewStatus = "scheduled" | "overdue" | "ignored" | "completed"
 type RepetitionInterval = "24h" | "7d" | "15d" | "30d" | "60d" | "custom"
 
-interface ReviewItem {
+export interface TabReviewItem {
   id: string
   topic: string
   discipline: string
@@ -55,7 +57,7 @@ function badgeStyle(isActive: boolean, tabId: ReviewStatus, count: number): stri
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
-function ReviewCard({ item }: { item: ReviewItem }) {
+function ReviewCard({ item, onReview }: { item: TabReviewItem; onReview: () => void }) {
   const isOverdue = item.status === "overdue"
   const isCompleted = item.status === "completed"
   const isIgnored = item.status === "ignored"
@@ -101,7 +103,10 @@ function ReviewCard({ item }: { item: ReviewItem }) {
             </div>
 
             {!isCompleted && !isIgnored && (
-              <button className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 opacity-0 group-hover:opacity-100 transition-all">
+              <button
+                onClick={onReview}
+                className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 opacity-0 group-hover:opacity-100 transition-all"
+              >
                 <Play className="h-3 w-3" fill="currentColor" />
                 Revisar
               </button>
@@ -118,8 +123,10 @@ function ReviewCard({ item }: { item: ReviewItem }) {
 
 // ─── Main Tabs Component ──────────────────────────────────────────────────────
 
-export function ReviewTabs({ initialReviews = [] }: { initialReviews?: ReviewItem[] }) {
+export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReviewItem[] }) {
   const [activeTab, setActiveTab] = useState<ReviewStatus>("scheduled")
+  const [playerOpen, setPlayerOpen] = useState(false)
+  const [playerMode, setPlayerMode] = useState<ReviewSessionMode>("ALL")
 
   const filtered = initialReviews.filter((r) => r.status === activeTab)
   const counts = {
@@ -173,10 +180,26 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: ReviewIte
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filtered.map((item) => (
-            <ReviewCard key={item.id} item={item} />
+            <ReviewCard
+              key={item.id}
+              item={item}
+              onReview={() => {
+                setPlayerMode(item.status === "overdue" ? "OVERDUE" : "ALL")
+                setPlayerOpen(true)
+              }}
+            />
           ))}
         </div>
       )}
+
+      <ReviewPlayerModal
+        open={playerOpen}
+        onOpenChange={setPlayerOpen}
+        mode={playerMode}
+        onFinished={() => {
+          if (typeof window !== "undefined") window.location.reload()
+        }}
+      />
     </div>
   )
 }

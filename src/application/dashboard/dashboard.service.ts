@@ -142,10 +142,10 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
     const ctx = AnalyticsEngine.createContext(rawHistory as unknown as Parameters<typeof AnalyticsEngine.createContext>[0], 30, "America/Sao_Paulo", profile?.week_start_day ?? 1)
     const baseStats = AnalyticsEngine.aggregations.getBase(ctx)
-    const targetHours = profile?.weekly_study_hours || 10
-    const targetQuestions = profile?.weekly_questions_goal || 100
-    const targetRevisions = profile?.weekly_revisions_goal || 5
-    const targetDays = profile?.weekly_study_days_goal || 6
+    const targetHours = profile?.weekly_study_hours ?? null
+    const targetQuestions = profile?.weekly_questions_goal ?? null
+    const targetRevisions = profile?.weekly_revisions_goal ?? null
+    const targetDays = profile?.weekly_study_days_goal ?? null
     
     // Calcular metas adicionais não presentes na base
     const startOfWeekMs = getStartOfWeek(new Date(), profile?.week_start_day ?? 1).getTime()
@@ -259,9 +259,24 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         goals: {
           weekly: AnalyticsEngine.goals.getWeeklyGoalProgress(ctx, targetHours),
           daily: AnalyticsEngine.goals.getDailyGoalProgress(ctx, targetHours),
-          questions: { target: targetQuestions, achieved: weeklyQuestions, percentage: targetQuestions > 0 ? Math.min(100, Math.round((weeklyQuestions / targetQuestions) * 100)) : 0, remaining: Math.max(0, targetQuestions - weeklyQuestions) },
-          revisions: { target: targetRevisions, achieved: weeklyRevisions, percentage: targetRevisions > 0 ? Math.min(100, Math.round((weeklyRevisions / targetRevisions) * 100)) : 0, remaining: Math.max(0, targetRevisions - weeklyRevisions) },
-          studyDays: { target: targetDays, achieved: weeklyStudyDays, percentage: targetDays > 0 ? Math.min(100, Math.round((weeklyStudyDays / targetDays) * 100)) : 0, remaining: Math.max(0, targetDays - weeklyStudyDays) }
+          questions: {
+            target: targetQuestions,
+            achieved: weeklyQuestions,
+            percentage: targetQuestions && targetQuestions > 0 ? Math.min(100, Math.round((weeklyQuestions / targetQuestions) * 100)) : null,
+            remaining: targetQuestions && targetQuestions > 0 ? Math.max(0, targetQuestions - weeklyQuestions) : null,
+          },
+          revisions: {
+            target: targetRevisions,
+            achieved: weeklyRevisions,
+            percentage: targetRevisions && targetRevisions > 0 ? Math.min(100, Math.round((weeklyRevisions / targetRevisions) * 100)) : null,
+            remaining: targetRevisions && targetRevisions > 0 ? Math.max(0, targetRevisions - weeklyRevisions) : null,
+          },
+          studyDays: {
+            target: targetDays,
+            achieved: weeklyStudyDays,
+            percentage: targetDays && targetDays > 0 ? Math.min(100, Math.round((weeklyStudyDays / targetDays) * 100)) : null,
+            remaining: targetDays && targetDays > 0 ? Math.max(0, targetDays - weeklyStudyDays) : null,
+          }
         },
         insights: AnalyticsEngine.ai.getInsights(ctx)
       },
@@ -319,8 +334,11 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         evolution: [],
         rankings: { disciplines: [], areas: [] },
         goals: {
-          weekly: { target: 600, achieved: 0, percentage: 0, remaining: 600 },
-          daily: { target: 120, achieved: 0, percentage: 0, remaining: 120 }
+          weekly: { target: null, achieved: 0, percentage: null, remaining: null },
+          daily: { target: null, achieved: 0, percentage: null, remaining: null },
+          questions: { target: null, achieved: 0, percentage: null, remaining: null },
+          revisions: { target: null, achieved: 0, percentage: null, remaining: null },
+          studyDays: { target: null, achieved: 0, percentage: null, remaining: null }
         },
         insights: []
       }

@@ -406,6 +406,129 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
   }
 }
 
+// Contexto pessoal do Ranking (dados reais, mínimas queries):
+// meta semanal (profiles.weekly_study_hours + minutos da semana) e constância
+// (sequência atual e recorde). Reutiliza o AnalyticsEngine e o histórico do usuário.
+export interface RankingPersonalContext {
+  weeklyGoal: {
+    targetMinutes: number
+    achievedMinutes: number
+    percentage: number
+    remainingMinutes: number
+  }
+  streak: {
+    consecutiveDays: number
+    longestDays: number
+  }
+}
+
+export async function getRankingPersonalContextAction(): Promise<{
+  data: RankingPersonalContext | null
+  error: string | null
+}> {
+  if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
+
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      throw new Error("Usuário não autenticado")
+    }
+
+    const [profileResult, history] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("weekly_study_hours, week_start_day")
+        .eq("id", user.id)
+        .maybeSingle(),
+      getStudyHistoryForAnalytics(supabase, user.id, 365),
+    ])
+
+    const profile = profileResult?.data
+    const ctx = AnalyticsEngine.createContext(
+      history as unknown as StudyHistory[],
+      365,
+      "America/Sao_Paulo",
+      profile?.week_start_day ?? 1,
+    )
+    const base = AnalyticsEngine.aggregations.getBase(ctx)
+
+    const targetMinutes = (profile?.weekly_study_hours || 10) * 60
+    const achievedMinutes = base.weeklyMinutes
+    const remainingMinutes = Math.max(0, targetMinutes - achievedMinutes)
+    const percentage =
+      targetMinutes > 0 ? Math.min(100, Math.round((achievedMinutes / targetMinutes) * 100)) : 0
+
+    return {
+      data: {
+        weeklyGoal: {
+          targetMinutes,
+          achievedMinutes,
+          percentage,
+          remainingMinutes,
+        },
+        streak: {
+          consecutiveDays: base.consecutiveStreak,
+          longestDays: base.longestStreak,
+        },
+      },
+      error: null,
+    }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message ?? "Erro inesperado." }
+  }
+}
+
+export interface RecentHistoryEntry {
+  date: string
+  disciplineId: string
+  minutes: number
+}
+
+// Histórico recente de estudo (por dia) para o widget "Estudos de Hoje": dados
+// reais de study_history, sem valores inventados.
+export async function getRecentStudyHistoryAction(
+  days = 14
+): Promise<{ data: RecentHistoryEntry[] | null; error: string | null }> {
+  if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: [], error: null }
+
+    const since = new Date(Date.now() - days * 86_400_000).toISOString()
+    const { data: rows, error } = await supabase
+      .from("study_history")
+      .select("discipline_id, duration_minutes, started_at")
+      .eq("user_id", user.id)
+      .gte("started_at", since)
+      .order("started_at", { ascending: false })
+      .limit(500)
+
+    if (error) return { data: null, error: error.message }
+
+    const entries: RecentHistoryEntry[] = []
+    for (const r of rows ?? []) {
+      const startedAt = r.started_at
+      if (startedAt === null || startedAt === undefined) continue
+      const minutes = Number(r.duration_minutes) || 0
+      if (minutes <= 0) continue
+      const disciplineId = typeof r.discipline_id === "string" ? r.discipline_id : ""
+      if (!disciplineId) continue
+      entries.push({
+        date: String(startedAt).split("T")[0] ?? "",
+        disciplineId,
+        minutes,
+      })
+    }
+
+    return { data: entries, error: null }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message ?? "Erro inesperado." }
+  }
+}
+
 // Nova função de teste para debug direto do RPC
 export async function testGlobalRankingRpc() {
   try {

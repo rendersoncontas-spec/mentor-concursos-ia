@@ -98,6 +98,7 @@ export async function generateStudyPlanAction(
     revalidatePath("/planejamento")
     revalidatePath("/study-plan")
     revalidatePath("/dashboard")
+    revalidatePath("/planos")
 
     return { success: true, planId: plan.id, version: plan.version }
   } catch (err: unknown) {
@@ -117,6 +118,7 @@ export async function deactivateStudyPlanAction(): Promise<{ success: boolean; e
     if (ok) {
       revalidatePath("/planejamento")
       revalidatePath("/dashboard")
+      revalidatePath("/planos")
     }
     return { success: ok }
   } catch (err: unknown) {

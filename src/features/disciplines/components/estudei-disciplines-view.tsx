@@ -24,8 +24,10 @@ import { toast } from "sonner"
 
 import { EstudeiDisciplineDetailView } from "@/features/disciplines/components/estudei-discipline-detail-view"
 import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
-import { addUserDisciplineAction, removeUserDisciplineAction } from "@/application/disciplines/discipline-actions"
+import { addUserDisciplineAction, removeUserDisciplineAction, getDisciplineCatalogTopicsAction, getDisciplineDetailStatsAction } from "@/application/disciplines/discipline-actions"
+import { type DisciplineDetailStats } from "@/application/disciplines/discipline-actions"
 import { type DisciplinesPageData } from "@/application/disciplines/disciplines.service"
+import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
 
 export interface DisciplineCardData {
   id: string
@@ -73,10 +75,24 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   }
 
   const [viewingDiscipline, setViewingDiscipline] = useState<DisciplineCardData | null>(null)
+  const [catalogTopics, setCatalogTopics] = useState<CatalogTopicWithSubTopics[]>([])
+  const [disciplineStats, setDisciplineStats] = useState<DisciplineDetailStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingDisc, setEditingDisc] = useState<DisciplineCardData | null>(null)
   const [disciplineNameInput, setDisciplineNameInput] = useState("")
+
+  const openDiscipline = async (disc: DisciplineCardData) => {
+    setViewingDiscipline(disc)
+    setCatalogTopics([])
+    setDisciplineStats(null)
+    const [catalogRes, statsRes] = await Promise.all([
+      getDisciplineCatalogTopicsAction(disc.name),
+      getDisciplineDetailStatsAction(disc.name),
+    ])
+    if (catalogRes.success) setCatalogTopics(catalogRes.topics)
+    if (statsRes.success) setDisciplineStats(statsRes.data)
+  }
 
   useEffect(() => {
     if (!nameParam) return
@@ -85,12 +101,24 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
       id: "custom",
       name: nameParam,
       topicsStudied: 0,
-      topicsTotal: 34,
+      topicsTotal: 0,
       questionsSolved: 0,
       color: "#fef08a",
     }
-    const timer = setTimeout(() => setViewingDiscipline(discipline), 0)
-    return () => clearTimeout(timer)
+    let cancelled = false
+    ;(async () => {
+      const [catalogRes, statsRes] = await Promise.all([
+        getDisciplineCatalogTopicsAction(discipline.name),
+        getDisciplineDetailStatsAction(discipline.name),
+      ])
+      if (cancelled) return
+      setViewingDiscipline(discipline)
+      setCatalogTopics(catalogRes.success ? catalogRes.topics : [])
+      setDisciplineStats(statsRes.success ? statsRes.data : null)
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [nameParam, disciplines])
 
   const handleAddOrEditDiscipline = async (e: React.FormEvent) => {
@@ -108,7 +136,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
         id: `disc-${Date.now()}`,
         name: nameClean,
         topicsStudied: 0,
-        topicsTotal: 15,
+        topicsTotal: 0,
         questionsSolved: 0,
         color: "#fef08a",
       }
@@ -145,11 +173,19 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   const totalTopics = disciplines.reduce((acc, d) => acc + d.topicsTotal, 0)
 
   if (viewingDiscipline) {
+    const targetRole = initialData?.target ? targetInfo.role : undefined
     return (
       <EstudeiDisciplineDetailView
         disciplineName={viewingDiscipline.name}
         topicsTotal={viewingDiscipline.topicsTotal}
-        onBack={() => setViewingDiscipline(null)}
+        catalogTopics={catalogTopics}
+        stats={disciplineStats}
+        {...(targetRole ? { targetName: targetRole } : {})}
+        onBack={() => {
+          setCatalogTopics([])
+          setDisciplineStats(null)
+          setViewingDiscipline(null)
+        }}
       />
     )
   }
@@ -308,7 +344,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
               >
                 {/* Botão 1: Visualizar */}
                 <button
-                  onClick={() => setViewingDiscipline(disc)}
+                  onClick={() => openDiscipline(disc)}
                   className="flex flex-col items-center gap-1 text-slate-800 hover:scale-110 active:scale-95 transition-all font-bold group/btn"
                   title="Visualizar disciplina"
                 >

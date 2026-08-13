@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import {
   ArrowLeft,
   ChevronDown,
@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
+import { type DisciplineDetailStats } from "@/application/disciplines/discipline-actions"
 
 export interface TopicItem {
   id: number
@@ -26,6 +28,9 @@ export interface DisciplineDetailProps {
   disciplineName: string
   topicsTotal?: number
   topics?: TopicItem[]
+  catalogTopics?: CatalogTopicWithSubTopics[]
+  stats?: DisciplineDetailStats | null
+  targetName?: string
   onBack: () => void
 }
 
@@ -33,17 +38,38 @@ export function EstudeiDisciplineDetailView({
   disciplineName,
   topicsTotal: _topicsTotal = 0,
   topics = [],
+  catalogTopics = [],
+  stats,
+  targetName,
   onBack,
 }: DisciplineDetailProps) {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
-  const [checkedTopics, setCheckedTopics] = useState<Record<number, boolean>>({})
+  const [checkedTopics, setCheckedTopics] = useState<Record<string, boolean>>({})
 
   const hasHistory = topics.length > 0
   const topicList = topics
 
-  const toggleTopic = (id: number) => {
+  const statsMinutes = stats?.minutes ?? null
+  const statsAnswered = stats?.questionsAnswered ?? 0
+  const statsCorrect = stats?.correct ?? 0
+  const statsPages = stats?.pagesRead ?? null
+  const statsWrong = statsAnswered - statsCorrect
+  const accuracyPct = statsAnswered > 0 ? Math.round((statsCorrect / statsAnswered) * 100) : null
+
+  const toggleTopic = (id: string) => {
     setCheckedTopics((prev) => ({ ...prev, [id]: !prev[id] }))
   }
+
+  const isTopicDone = (topic: CatalogTopicWithSubTopics): boolean => {
+    if (checkedTopics[topic.id]) return true
+    const subs = topic.subtopics ?? []
+    return subs.length > 0 && subs.every((s) => checkedTopics[s.id])
+  }
+
+  const hasCatalog = catalogTopics.length > 0
+  const totalTopics = hasCatalog ? catalogTopics.length : _topicsTotal
+  const doneTopics = hasCatalog ? catalogTopics.filter(isTopicDone).length : 0
+  const progressPercent = totalTopics > 0 ? Math.round((doneTopics / totalTopics) * 100) : 0
 
 
   return (
@@ -73,11 +99,13 @@ export function EstudeiDisciplineDetailView({
             Adicionar Estudo
           </Button>
 
-          <Button variant="outline" className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2">
-            <GraduationCap className="h-4 w-4" />
-            Analista Tributário
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Button>
+          {targetName && (
+            <Button variant="outline" className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2">
+              <GraduationCap className="h-4 w-4" />
+              {targetName}
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -90,7 +118,7 @@ export function EstudeiDisciplineDetailView({
           </span>
           <div className="text-right">
             <span className="text-2xl font-black text-foreground font-mono">
-              {hasHistory ? "10h00min" : "0h00min"}
+              {formatMinutesLabel(statsMinutes)}
             </span>
           </div>
         </div>
@@ -102,10 +130,16 @@ export function EstudeiDisciplineDetailView({
           </span>
           <div className="flex items-end justify-between">
             <div className="text-[11px] font-bold space-y-0.5">
-              <span className="text-emerald-600 block">0 Acertos</span>
-              <span className="text-rose-500 block">0 Erros</span>
+              <span className="text-emerald-600 block">
+                {stats ? `${statsCorrect} Acertos` : "–"}
+              </span>
+              <span className="text-rose-500 block">
+                {stats ? `${statsWrong} Erros` : "–"}
+              </span>
             </div>
-            <span className="text-2xl font-black text-foreground font-mono">0%</span>
+            <span className="text-2xl font-black text-foreground font-mono">
+              {accuracyPct === null ? "–" : `${accuracyPct}%`}
+            </span>
           </div>
         </div>
 
@@ -116,10 +150,10 @@ export function EstudeiDisciplineDetailView({
           </span>
           <div className="flex items-end justify-between">
             <div className="text-[11px] font-bold space-y-0.5">
-              <span className="text-emerald-600 block">1 Tópicos Concluídos</span>
-              <span className="text-rose-500 block">33 Tópicos Pendentes</span>
+              <span className="text-emerald-600 block">{doneTopics} Tópicos Concluídos</span>
+              <span className="text-rose-500 block">{totalTopics - doneTopics} Tópicos Pendentes</span>
             </div>
-            <span className="text-2xl font-black text-foreground font-mono">3%</span>
+            <span className="text-2xl font-black text-foreground font-mono">{progressPercent}%</span>
           </div>
         </div>
 
@@ -129,8 +163,14 @@ export function EstudeiDisciplineDetailView({
             PÁGINAS LIDAS
           </span>
           <div className="flex items-end justify-between">
-            <span className="text-[11px] text-muted-foreground font-semibold">0.0 páginas por hora</span>
-            <span className="text-2xl font-black text-foreground font-mono">0</span>
+            <span className="text-[11px] text-muted-foreground font-semibold">
+              {statsPages === null || statsMinutes === null || statsMinutes <= 0
+                ? "–"
+                : `${((statsPages / statsMinutes) * 60).toFixed(1)} páginas por hora`}
+            </span>
+            <span className="text-2xl font-black text-foreground font-mono">
+              {statsPages === null ? "–" : statsPages}
+            </span>
           </div>
         </div>
       </div>
@@ -244,44 +284,122 @@ export function EstudeiDisciplineDetailView({
               </tr>
             </thead>
             <tbody className="divide-y font-semibold">
-              {topicList.map((topic, idx) => {
-                const isDone = !!checkedTopics[topic.id]
-                return (
-                  <tr
-                    key={topic.id}
-                    className={`hover:bg-muted/30 transition-colors ${
-                      idx % 2 === 1 ? "bg-muted/10" : "bg-card"
-                    }`}
-                  >
-                    <td className="px-3 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isDone}
-                        onChange={() => toggleTopic(topic.id)}
-                        className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
-                      />
-                    </td>
-                    <td className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}>
-                      {topic.title}
-                    </td>
-                    <td className="px-3 py-3 text-center font-mono text-emerald-600">{topic.correct}</td>
-                    <td className="px-3 py-3 text-center font-mono text-rose-500">{topic.wrong}</td>
-                    <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.notebook}</td>
-                    <td className="px-3 py-3 text-center font-mono">{topic.accuracy}</td>
-                    <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.date}</td>
-                    <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.questions}</td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => toast.info("Adicionar link de caderno")}
-                        className="text-[#2563EB] font-bold hover:underline"
+              {hasCatalog ? (
+                catalogTopics.map((topic, idx) => {
+                  const isDone = isTopicDone(topic)
+                  const subs = topic.subtopics ?? []
+                  const subsDone = subs.filter((s) => checkedTopics[s.id]).length
+                  const subsPercent = subs.length > 0 ? Math.round((subsDone / subs.length) * 100) : null
+                  return (
+                    <Fragment key={topic.id}>
+                      <tr
+                        className={`hover:bg-muted/30 transition-colors ${
+                          idx % 2 === 1 ? "bg-muted/10" : "bg-card"
+                        }`}
                       >
-                        Adicionar
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
+                        <td className="px-3 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isDone}
+                            onChange={() => toggleTopic(topic.id)}
+                            className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                          />
+                        </td>
+                        <td className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}>
+                          {topic.name}
+                        </td>
+                        <td className="px-3 py-3 text-center font-mono text-emerald-600">{subsDone}</td>
+                        <td className="px-3 py-3 text-center font-mono text-rose-500">{subs.length - subsDone}</td>
+                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
+                        <td className="px-3 py-3 text-center font-mono">
+                          {subsPercent === null ? "-" : `${subsPercent}%`}
+                        </td>
+                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
+                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toast.info("Adicionar link de caderno")}
+                            className="text-[#2563EB] font-bold hover:underline"
+                          >
+                            Adicionar
+                          </button>
+                        </td>
+                      </tr>
+                      {subs.map((sub) => {
+                        const subDone = !!checkedTopics[sub.id]
+                        return (
+                          <tr
+                            key={sub.id}
+                            className={`hover:bg-muted/30 transition-colors ${
+                              idx % 2 === 1 ? "bg-muted/10" : "bg-card"
+                            }`}
+                          >
+                            <td className="px-3 py-2.5 text-center">
+                              <input
+                                type="checkbox"
+                                checked={subDone}
+                                onChange={() => toggleTopic(sub.id)}
+                                className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                              />
+                            </td>
+                            <td className={`px-4 py-2.5 pl-9 text-muted-foreground ${subDone ? "text-emerald-700" : ""}`}>
+                              <span className="mr-1.5 text-muted-foreground/50">└</span>
+                              {sub.name}
+                            </td>
+                            <td className="px-3 py-2.5 text-center" />
+                            <td className="px-3 py-2.5 text-center" />
+                            <td className="px-3 py-2.5 text-center" />
+                            <td className="px-3 py-2.5 text-center" />
+                            <td className="px-3 py-2.5 text-center" />
+                            <td className="px-3 py-2.5 text-center" />
+                            <td className="px-4 py-2.5" />
+                          </tr>
+                        )
+                      })}
+                    </Fragment>
+                  )
+                })
+              ) : (
+                topicList.map((topic, idx) => {
+                  const isDone = !!checkedTopics[topic.id]
+                  return (
+                    <tr
+                      key={topic.id}
+                      className={`hover:bg-muted/30 transition-colors ${
+                        idx % 2 === 1 ? "bg-muted/10" : "bg-card"
+                      }`}
+                    >
+                      <td className="px-3 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isDone}
+                          onChange={() => toggleTopic(String(topic.id))}
+                          className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                        />
+                      </td>
+                      <td className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}>
+                        {topic.title}
+                      </td>
+                      <td className="px-3 py-3 text-center font-mono text-emerald-600">{topic.correct}</td>
+                      <td className="px-3 py-3 text-center font-mono text-rose-500">{topic.wrong}</td>
+                      <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.notebook}</td>
+                      <td className="px-3 py-3 text-center font-mono">{topic.accuracy}</td>
+                      <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.date}</td>
+                      <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.questions}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => toast.info("Adicionar link de caderno")}
+                          className="text-[#2563EB] font-bold hover:underline"
+                        >
+                          Adicionar
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -294,5 +412,12 @@ export function EstudeiDisciplineDetailView({
       />
     </div>
   )
+}
+
+function formatMinutesLabel(minutes: number | null): string {
+  if (minutes === null) return "–"
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return h > 0 ? `${h}h${String(m).padStart(2, "0")}min` : `${m}min`
 }
 

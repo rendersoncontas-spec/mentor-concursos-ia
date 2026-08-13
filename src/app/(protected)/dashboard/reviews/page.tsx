@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { RefreshCcw, Brain, Play } from "lucide-react"
+import { RefreshCcw, Brain } from "lucide-react"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import {
@@ -7,10 +7,32 @@ import {
   getMemoryStages,
   getAverageRetention,
 } from "@/application/review-engine/review-analytics.service"
-import { ReviewTabs } from "@/features/reviews/components/review-tabs"
+import { ReviewTabs, type TabReviewItem } from "@/features/reviews/components/review-tabs"
+import { StartReviewButton } from "@/features/reviews/components/start-review-button"
 
 export const metadata = {
   title: "Revisões - Mentor Concursos IA",
+}
+
+const DISC_PALETTE = [
+  "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
+  "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#ef4444",
+]
+
+function intervalLabel(days: number): TabReviewItem["interval"] {
+  if (days <= 1) return "24h"
+  if (days <= 7) return "7d"
+  if (days <= 15) return "15d"
+  if (days <= 30) return "30d"
+  if (days <= 60) return "60d"
+  return "custom"
+}
+
+function discColor(id: string | null): string {
+  if (!id) return "#3b82f6"
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
+  return DISC_PALETTE[hash % DISC_PALETTE.length] ?? "#3b82f6"
 }
 
 export default async function ReviewsDashboardPage() {
@@ -21,11 +43,51 @@ export default async function ReviewsDashboardPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  const [backlogCount, memoryStages, retentionData] = await Promise.all([
+  const [backlogCount, memoryStages, retentionData, itemsRes, discRes] = await Promise.all([
     getReviewBacklog(supabase, user.id),
     getMemoryStages(supabase, user.id),
     getAverageRetention(supabase, user.id),
+    supabase
+      .from("review_items")
+      .select(
+        "id, card_front, discipline_id, review_stage, next_review_at, last_review_at, lapses_count, last_interval_days, is_suspended, source_type"
+      )
+      .eq("user_id", user.id)
+      .is("deleted_at", null),
+    supabase.from("disciplines").select("id, name"),
   ])
+
+  const discNameMap = new Map<string, string>(
+    (discRes.data ?? []).map((d) => [String(d.id), String(d.name ?? "")])
+  )
+  const nowIso = new Date().toISOString()
+
+  const initialReviews: TabReviewItem[] = (itemsRes.data ?? [])
+    .map((r) => {
+      const stage = String(r.review_stage ?? "")
+      let status: TabReviewItem["status"]
+      if (r.is_suspended) status = "ignored"
+      else if (stage === "MASTERED") status = "completed"
+      else if (!r.next_review_at || String(r.next_review_at) <= nowIso) status = "overdue"
+      else status = "scheduled"
+
+      const intervalDays = Number(r.last_interval_days ?? 0)
+
+      return {
+        id: String(r.id),
+        topic: String(r.card_front || (r.source_type === "QUESTION" ? "Questão revisada" : "Cartão de revisão")),
+        discipline: discNameMap.get(String(r.discipline_id ?? "")) || "Disciplina",
+        disciplineColor: discColor(r.discipline_id),
+        dueDate: String(r.next_review_at || r.last_review_at || nowIso),
+        interval: intervalLabel(intervalDays),
+        status,
+        ...(Number(r.lapses_count) > 0 ? { lapses: Number(r.lapses_count) } : {}),
+      }
+    })
+    .sort((a, b) => {
+      if (a.status === b.status) return a.dueDate.localeCompare(b.dueDate)
+      return a.status < b.status ? -1 : 1
+    })
 
   return (
     <div className="flex flex-col min-h-full">
@@ -51,13 +113,7 @@ export default async function ReviewsDashboardPage() {
               <p className="text-4xl font-bold text-orange-600 mt-1">{backlogCount}</p>
               <p className="text-xs text-muted-foreground mt-1">cartões pendentes</p>
             </div>
-            <button
-              className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
-              disabled={backlogCount === 0}
-            >
-              <Play className="h-4 w-4" fill="currentColor" />
-              Iniciar
-            </button>
+            <StartReviewButton disabled={backlogCount === 0} />
           </div>
 
           {/* Retention */}
@@ -107,7 +163,7 @@ export default async function ReviewsDashboardPage() {
         </div>
 
         {/* Review Tabs */}
-        <ReviewTabs />
+        <ReviewTabs initialReviews={initialReviews} />
       </div>
     </div>
   )

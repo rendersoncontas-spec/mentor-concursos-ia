@@ -73,6 +73,7 @@ export interface CycleBlock {
   color?: string
   executionOrder: number
   durationMinutes: number
+  studiedMinutes?: number
   status: BlockStatus
   priorityScore: number
 }

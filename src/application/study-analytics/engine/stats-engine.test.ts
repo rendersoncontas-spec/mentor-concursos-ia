@@ -22,6 +22,7 @@ import {
   computeSessionStatistics,
   computeStreaks,
   computeTimeCards,
+  computeTimeOfDayAnalysis,
   computeTopicStats,
   computeWeeklyReport,
   dateKeyFromYmd,
@@ -465,6 +466,25 @@ test("computeEditalCoverage conta status", () => {
   assert.equal(c.percentage, 25)
 })
 
+test("computeEditalCoverage deduplica disciplinas em múltiplos concursos", () => {
+  const registry = new Map<string, DisciplineMeta>([
+    ["d1", { id: "d1", name: "Constitucional", area: "X" }],
+  ])
+  const ud: UserDisciplineInput[] = [
+    { disciplineId: "d1", status: "EM_ESTUDO" },
+    { disciplineId: "d1", status: "NOT_STARTED" },
+    { disciplineId: "d2", status: "CONCLUIDA" },
+  ]
+  const c = computeEditalCoverage(ud, [], registry, NOW)
+  assert.equal(c.total, 2)
+  assert.equal(c.byDiscipline.length, 2)
+  const d1 = c.byDiscipline.find((d) => d.disciplineId === "d1")
+  assert.ok(d1)
+  assert.equal(d1.status, "EM_ESTUDO")
+  const byId = c.byDiscipline.map((d) => d.disciplineId)
+  assert.deepEqual(byId, ["d1", "d2"])
+})
+
 // ─── Produtividade ──────────────────────────────────────────────────────────
 
 test("computeProductivity: null sem sessões e com menos de 3 sessões", () => {
@@ -492,6 +512,7 @@ function insightInput(overrides: Partial<InsightInput> = {}): InsightInput {
     hasPlan: true,
     sessionsInRange: 10,
     hoursOfDay: [],
+    timeOfDayAnalysis: null,
     focusPct: 80,
     questionStats: { total: 20, correct: 14, wrong: 6, accuracy: 70, fromSessions: 20, fromAttempts: 0 },
     streaks: { current: 4, currentEndsToday: true, longest: 6 },
@@ -708,4 +729,161 @@ test("utilidades de data restantes", () => {
   assert.equal(monthKeyOf("2026-08-01"), "2026-08")
   const k = addDaysToKey("2026-08-11", 1)!
   assert.equal(keyToDate(k)!.toISOString().slice(0, 10), "2026-08-12")
+})
+
+// ─── Análise de desempenho por faixa de horário ─────────────────────────────
+
+// Caso 1: Manhã com maior foco → Manhã
+test("computeTimeOfDayAnalysis: manhã com maior foco → overallBest = Manhã", () => {
+  const sessions: SessionRecord[] = [
+    // 3 sessões na manhã (08:00 UTC) com foco alto (91%)
+    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 50 }),
+    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 50 }),
+    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 90, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
+    // 3 sessões à tarde (14:00 UTC) com foco menor (72%)
+    session({ id: "t1", startedAt: "2026-08-10T14:00:00Z", focusPercentage: 72, questionsAnswered: 10, questionsCorrect: 5, durationMinutes: 50 }),
+    session({ id: "t2", startedAt: "2026-08-09T14:00:00Z", focusPercentage: 72, questionsAnswered: 10, questionsCorrect: 6, durationMinutes: 50 }),
+    session({ id: "t3", startedAt: "2026-08-08T14:00:00Z", focusPercentage: 73, questionsAnswered: 10, questionsCorrect: 4, durationMinutes: 50 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.hasEnoughData, true)
+  assert.equal(result.overallBest!.period, "MANHA")
+  assert.equal(result.bestByFocus!.period, "MANHA")
+  assert.ok(result.overallBest!.focusAvg! > 85)
+})
+
+// Caso 2: Noite com maior foco → Noite
+test("computeTimeOfDayAnalysis: noite com maior foco → overallBest = Noite", () => {
+  const sessions: SessionRecord[] = [
+    session({ id: "n1", startedAt: "2026-08-10T20:00:00Z", focusPercentage: 92, questionsAnswered: 8, questionsCorrect: 6, durationMinutes: 40 }),
+    session({ id: "n2", startedAt: "2026-08-09T20:00:00Z", focusPercentage: 92, questionsAnswered: 8, questionsCorrect: 7, durationMinutes: 40 }),
+    session({ id: "n3", startedAt: "2026-08-08T20:00:00Z", focusPercentage: 91, questionsAnswered: 8, questionsCorrect: 5, durationMinutes: 40 }),
+    session({ id: "mm1", startedAt: "2026-08-10T03:00:00Z", focusPercentage: 70, questionsAnswered: 5, questionsCorrect: 3, durationMinutes: 30 }),
+    session({ id: "mm2", startedAt: "2026-08-09T03:00:00Z", focusPercentage: 71, questionsAnswered: 5, questionsCorrect: 2, durationMinutes: 30 }),
+    session({ id: "mm3", startedAt: "2026-08-08T03:00:00Z", focusPercentage: 72, questionsAnswered: 5, questionsCorrect: 4, durationMinutes: 30 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.hasEnoughData, true)
+  assert.equal(result.overallBest!.period, "NOITE")
+  assert.equal(result.bestByFocus!.period, "NOITE")
+})
+
+// Caso 3: Manhã com maior foco, Noite com maior acerto → respeitar regra definida
+test("computeTimeOfDayAnalysis: melhor foco ≠ melhor acerto, overallBest segue critério foco primeiro", () => {
+  const sessions: SessionRecord[] = [
+    // Manhã: foco 91%, acerto 82%
+    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 50 }),
+    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 50 }),
+    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
+    // Noite: foco 91%, acerto 89% → mesmno foco, maior acerto → Noite vence
+    session({ id: "n1", startedAt: "2026-08-10T20:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 40 }),
+    session({ id: "n2", startedAt: "2026-08-09T20:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 40 }),
+    session({ id: "n3", startedAt: "2026-08-08T20:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 10, durationMinutes: 40 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.hasEnoughData, true)
+  // Melhor foco: empate entre manhã e noite (91%) → morning aparece primeiro na ordenação
+  // overallBest: foco empatado, acerto da noite (89%) > manhã (82%) → Noite
+  assert.equal(result.overallBest!.period, "NOITE")
+  assert.ok(result.bestByAccuracy!.period === "NOITE")
+})
+
+// Caso 4: Somente uma sessão → dados insuficientes
+test("computeTimeOfDayAnalysis: uma única sessão → dados insuficientes", () => {
+  const sessions: SessionRecord[] = [
+    session({ id: "s1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 100, questionsAnswered: 10, questionsCorrect: 10, durationMinutes: 30 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.hasEnoughData, false)
+  assert.ok(result.notEnoughDataMessage !== null)
+  assert.equal(result.overallBest, null)
+})
+
+// Caso 5: Sessões sem horário → ignoradas para análise de horário
+test("computeTimeOfDayAnalysis: sessões sem horário são ignoradas", () => {
+  const sessions: SessionRecord[] = [
+    session({ id: "ok1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 80, durationMinutes: 50 }),
+    session({ id: "ok2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 80, durationMinutes: 50 }),
+    session({ id: "ok3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 80, durationMinutes: 50 }),
+  ]
+  // Sessão com startedAt vazio/nulo não pode ser criada pois sanitizeSession rejeita.
+  // Mas computeTimeOfDayAnalysis recebe SessionRecord[], então localParts retorna null para ISO inválido
+  const badSession = session({ id: "bad", startedAt: "", focusPercentage: 50, durationMinutes: 20 })
+  const allSessions = [...sessions, badSession]
+  const result = computeTimeOfDayAnalysis(allSessions, [], TZ)
+  assert.equal(result.hasEnoughData, true)
+  assert.equal(result.overallBest!.period, "MANHA")
+  assert.equal(result.buckets.find((b) => b.period === "MANHA")!.sessions, 3)
+})
+
+// Caso 6: Sessões importadas (origin_source) são consideradas se têm horário válido
+test("computeTimeOfDayAnalysis: sessões importadas são consideradas", () => {
+  const sessions: SessionRecord[] = [
+    // Sessão "importada" (simulada — studySource diferente, mas os mesmos dados)
+    session({ id: "imp1", startedAt: "2026-08-10T20:00:00Z", studySource: "APROVADO", focusPercentage: 95, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 60 }),
+    session({ id: "imp2", startedAt: "2026-08-09T20:00:00Z", studySource: "APROVADO", focusPercentage: 94, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 60 }),
+    session({ id: "imp3", startedAt: "2026-08-08T20:00:00Z", studySource: "APROVADO", focusPercentage: 96, questionsAnswered: 10, questionsCorrect: 10, durationMinutes: 60 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.hasEnoughData, true)
+  assert.equal(result.overallBest!.period, "NOITE")
+  assert.equal(result.bestByFocus!.period, "NOITE")
+  assert.ok(result.bestByFocus!.focusAvg! > 90)
+})
+
+// Caso 7: Verificar que buckets estão na ordem correta (00-06, 06-12, 12-18, 18-24)
+test("computeTimeOfDayAnalysis: buckets sempre na ordem Madrugada, Manhã, Tarde, Noite", () => {
+  const sessions: SessionRecord[] = [
+    session({ id: "n1", startedAt: "2026-08-10T20:00:00Z", focusPercentage: 80, durationMinutes: 30 }),
+    session({ id: "n2", startedAt: "2026-08-09T20:00:00Z", focusPercentage: 80, durationMinutes: 30 }),
+    session({ id: "n3", startedAt: "2026-08-08T20:00:00Z", focusPercentage: 80, durationMinutes: 30 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.buckets[0]!.period, "MADRUGADA")
+  assert.equal(result.buckets[0]!.range, "00h–06h")
+  assert.equal(result.buckets[1]!.period, "MANHA")
+  assert.equal(result.buckets[1]!.range, "06h–12h")
+  assert.equal(result.buckets[2]!.period, "TARDE")
+  assert.equal(result.buckets[2]!.range, "12h–18h")
+  assert.equal(result.buckets[3]!.period, "NOITE")
+  assert.equal(result.buckets[3]!.range, "18h–24h")
+})
+
+// Caso 8: Mínimo de 3 sessões OU 60 minutos — madrugada com 2 sessões curtas não vence
+test("computeTimeOfDayAnalysis: faixa com poucos dados não vence mesmo com foco/accuracy alto", () => {
+  const sessions: SessionRecord[] = [
+    // Madrugada: 2 sessões, 40 min total, foco 100% — mas não atinge mínimo
+    session({ id: "md1", startedAt: "2026-08-10T02:00:00Z", focusPercentage: 100, questionsAnswered: 5, questionsCorrect: 5, durationMinutes: 20 }),
+    session({ id: "md2", startedAt: "2026-08-09T02:00:00Z", focusPercentage: 100, questionsAnswered: 5, questionsCorrect: 5, durationMinutes: 20 }),
+    // Manhã: 3 sessões, 150 min, foco 80%
+    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 80, questionsAnswered: 10, questionsCorrect: 6, durationMinutes: 50 }),
+    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 80, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
+    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 81, questionsAnswered: 10, questionsCorrect: 6, durationMinutes: 50 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.hasEnoughData, true)
+  // Madrugada não atende mínimo (2 < 3 AND 40 < 60) → não é overallBest
+  assert.notEqual(result.overallBest!.period, "MADRUGADA")
+  assert.equal(result.overallBest!.period, "MANHA")
+})
+
+// Caso 9: Recomendação contém a faixa de horário correta
+test("computeTimeOfDayAnalysis: recomendação menciona o horário correto", () => {
+  const sessions: SessionRecord[] = [
+    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 50 }),
+    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 50 }),
+    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 90, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.ok(result.recommendation.includes("06h–12h"))
+  assert.ok(result.recommendation.includes("Manhã"))
+})
+
+// Caso 10: Sem nenhum dado
+test("computeTimeOfDayAnalysis: sem sessões → mensagem de dados insuficientes", () => {
+  const result = computeTimeOfDayAnalysis([], [], TZ)
+  assert.equal(result.hasEnoughData, false)
+  assert.equal(result.overallBest, null)
+  assert.ok(result.notEnoughDataMessage !== null)
+  assert.ok(result.recommendation.includes("suficiente"))
 })

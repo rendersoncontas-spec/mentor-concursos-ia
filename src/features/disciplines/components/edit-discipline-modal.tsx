@@ -44,30 +44,21 @@ const COLOR_OPTIONS = [
   { name: "Verde Água", value: "#dbeafe" },
 ]
 
-const DEFAULT_TOPICS_LIST: DisciplineTopicItem[] = [
-  { id: "t1", title: "1. Teoria da administração e das organizações.", badgeText: "RFB" },
-  { id: "t2", title: "2. O processo administrativo.", badgeText: "RFB" },
-  { id: "t3", title: "3. Funções de administração: planejamento, organização, direção e controle.", badgeText: "RFB" },
-  { id: "t4", title: "4. Papéis e habilidades do administrador.", badgeText: "RFB" },
-  { id: "t5", title: "5. Planejamento estratégico: conceitos, princípios, etapas, níveis, métodos e ferramentas.", badgeText: "RFB" },
-  { id: "t6", title: "6. Planejamento tático.", badgeText: "RFB" },
-  { id: "t7", title: "7. Planejamento operacional.", badgeText: "RFB" },
-  { id: "t8", title: "8. Administração por objetivos.", badgeText: "RFB" },
-]
+// Removido DEFAULT_TOPICS_LIST (não deve exibir mock data em produção)
 
 export function EditDisciplineModal({
   open,
   onOpenChange,
   disciplineName,
   disciplineColor = "#fef08a",
-  badgeText = "RFB",
+  badgeText,
   initialTopics,
   onSave,
   onRemove,
 }: EditDisciplineModalProps) {
   const [name, setName] = useState(disciplineName)
   const [color, setColor] = useState(disciplineColor)
-  const [topics, setTopics] = useState<DisciplineTopicItem[]>(initialTopics || DEFAULT_TOPICS_LIST)
+  const [topics, setTopics] = useState<DisciplineTopicItem[]>(initialTopics || [])
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
   const [editingTopicText, setEditingTopicText] = useState("")
   const [newTopicText, setNewTopicText] = useState("")
@@ -78,7 +69,7 @@ export function EditDisciplineModal({
     const timer = setTimeout(() => {
       setName(disciplineName)
       setColor(disciplineColor)
-      setTopics(initialTopics && initialTopics.length > 0 ? initialTopics : DEFAULT_TOPICS_LIST)
+      setTopics(initialTopics && initialTopics.length > 0 ? initialTopics : [])
     }, 0)
     return () => clearTimeout(timer)
   }, [disciplineName, disciplineColor, initialTopics, open])
@@ -110,7 +101,7 @@ export function EditDisciplineModal({
     const newTopic: DisciplineTopicItem = {
       id: `topic-${Date.now()}`,
       title: `${topics.length + 1}. ${newTopicText.trim()}`,
-      badgeText: badgeText || "RFB",
+      ...(badgeText ? { badgeText } : {}),
     }
     setTopics([...topics, newTopic])
     setNewTopicText("")
@@ -243,15 +234,22 @@ export function EditDisciplineModal({
 
             {/* Lista Scrollável de Tópicos (100% Paridade Estudei) */}
             <div className="border rounded-xl max-h-64 overflow-y-auto divide-y bg-card">
+              {topics.length === 0 && (
+                <div className="p-6 text-center text-xs text-muted-foreground font-medium">
+                  Nenhum tópico cadastrado. Use &quot;NOVO TÓPICO&quot; para adicionar.
+                </div>
+              )}
               {topics.map((t, idx) => (
                 <div
                   key={t.id}
                   className="flex items-center justify-between p-2.5 hover:bg-muted/20 transition-colors text-xs font-semibold text-foreground group"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#2563EB] text-white font-extrabold text-[9px] shrink-0">
-                      {t.badgeText || badgeText}
-                    </span>
+                    {(t.badgeText || badgeText) && (
+                      <span className="px-2 py-0.5 rounded-md bg-[#2563EB] text-white font-extrabold text-[9px] shrink-0">
+                        {t.badgeText || badgeText}
+                      </span>
+                    )}
 
                     {editingTopicId === t.id ? (
                       <div className="flex items-center gap-1 flex-1">

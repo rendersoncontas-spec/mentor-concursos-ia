@@ -44,6 +44,35 @@ const ATTEMPTS_LIMIT = 50000
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
+interface UserDisciplineRow {
+  discipline_id: string | null
+  status: string | null
+  target_id?: string | null
+  disciplines?: { id: string; name: string; area: string | null } | { id: string; name: string; area: string | null }[] | null
+}
+
+// Prioridade de linha: concurso ativo > linha sem concurso (target NULL) > outros.
+function rankUserDisciplineRow(row: UserDisciplineRow, activeTargetId: string | null): number {
+  const tid = row.target_id ?? null
+  if (activeTargetId && tid === activeTargetId) return 2
+  if (tid === null) return 1
+  return 0
+}
+
+// Uma disciplina por usuário no payload: ordena com o concurso ativo em primeiro
+// lugar e mantém apenas a primeira ocorrência de cada discipline_id.
+function dedupeUserDisciplines(rows: UserDisciplineRow[], activeTargetId: string | null): UserDisciplineRow[] {
+  const sorted = activeTargetId
+    ? [...rows].sort((a, b) => rankUserDisciplineRow(b, activeTargetId) - rankUserDisciplineRow(a, activeTargetId))
+    : [...rows]
+  const seen = new Set<string>()
+  return sorted.filter((r) => {
+    if (!r.discipline_id || seen.has(r.discipline_id)) return false
+    seen.add(r.discipline_id)
+    return true
+  })
+}
+
 async function fetchActivePlan(supabase: Supabase, userId: string): Promise<ActivePlan | null> {
   const { data: plan } = await supabase
     .from("study_plans")
@@ -202,20 +231,39 @@ export async function getStatisticsCenterAction(): Promise<{
     }
 
     // 3. Registro de disciplinas + user_disciplines (status do edital).
+    //    A mesma disciplina pode existir legitimamente em vários concursos
+    //    (UNIQUE user_id,target_id,discipline_id). O "Progresso no edital" mostra
+    //    UMA linha por disciplina: priorizamos a linha do concurso ativo e
+    //    eliminamos duplicatas por discipline_id antes de montar o payload.
     let userDisciplines: UserDisciplineInput[] = []
     let disciplines: DisciplineMeta[] = []
     try {
+      let activeTargetId: string | null = null
+      try {
+        const { data: activeTarget } = await supabase
+          .from("user_targets")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle()
+        activeTargetId = activeTarget?.id ?? null
+      } catch {
+        activeTargetId = null
+      }
+
       const { data: userDisciplineRows, error: udError } = await supabase
         .from("user_disciplines")
-        .select("discipline_id, status, disciplines ( id, name, area )")
+        .select("discipline_id, status, target_id, disciplines ( id, name, area )")
         .eq("user_id", user.id)
 
       if (!udError) {
-        userDisciplines = (userDisciplineRows ?? [])
+        const rows = dedupeUserDisciplines(userDisciplineRows ?? [], activeTargetId)
+        userDisciplines = rows
           .map((row) => sanitizeUserDiscipline({ discipline_id: row.discipline_id, status: row.status }))
           .filter((u): u is UserDisciplineInput => u !== null)
 
-        disciplines = (userDisciplineRows ?? [])
+        disciplines = rows
           .map((row) => {
             const disc = Array.isArray(row.disciplines) ? row.disciplines[0] : row.disciplines
             return sanitizeDisciplineMeta({

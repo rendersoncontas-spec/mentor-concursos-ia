@@ -25,6 +25,8 @@ import type { StudyHistory, StudyTechnique } from "@/domain/study-history/study-
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { updateStudySessionAction } from "@/application/study-history/study-history.actions"
 import { getDisciplinesForAutocomplete, type DisciplineOption } from "@/application/study-session/get-disciplines.action"
+import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
+import { TopicAutocomplete } from "@/features/topic-catalog/components/topic-autocomplete"
 
 const sessionSchema = z.object({
   studyType: z.string().min(1, "Obrigatório"),
@@ -104,6 +106,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
   const watchType = useWatch({ control: form.control, name: "studyType" })
   const watchTechnique = useWatch({ control: form.control, name: "technique" }) as StudyTechnique
   const isManualMode = useWatch({ control: form.control, name: "is_manual_mode" })
+  const watchDisciplineId = useWatch({ control: form.control, name: "discipline_id" })
 
   // Pre-fill form when entering edit mode
   useEffect(() => {
@@ -255,6 +258,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
         }
         
         toast.success("Sessão atualizada com sucesso!")
+        registerTopicInCatalog(data.topic_name, data.discipline_id)
         form.reset()
         onOpenChange(false)
         window.dispatchEvent(new CustomEvent("close-study-session-modal"))
@@ -329,6 +333,7 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
         }
         
         toast.success("Estudo salvo com sucesso!")
+        registerTopicInCatalog(data.topic_name, data.discipline_id)
         form.reset()
         onOpenChange(false)
         window.dispatchEvent(new CustomEvent("close-study-session-modal"))
@@ -349,6 +354,12 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
     form.setValue("discipline_name", disc.name, { shouldValidate: true })
     form.setValue("discipline_id", disc.id)
     setDisciplinePopoverOpen(false)
+  }
+
+  // Registra o tópico no catálogo personalizado (dedupe-safe) após salvar a sessão
+  const registerTopicInCatalog = (topicName: string | undefined, disciplineId: string | undefined) => {
+    if (!topicName?.trim() || !disciplineId) return
+    void createCustomTopicAction(disciplineId, topicName)
   }
 
   const renderDynamicFields = () => {
@@ -661,13 +672,13 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                   <FormField control={form.control} name="topic_name" render={({field}) => (
                     <FormItem>
                       <FormLabel className="text-xs">Tópico</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Ex: Direitos Fundamentais" 
-                          {...field} 
-                          className="relative z-[160]"
-                        />
-                      </FormControl>
+                      <TopicAutocomplete
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        disciplineId={watchDisciplineId}
+                        placeholder="Ex: Direitos Fundamentais"
+                        className="relative z-[160]"
+                      />
                       <FormMessage />
                     </FormItem>
                   )} />

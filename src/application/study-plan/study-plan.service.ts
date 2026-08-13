@@ -641,7 +641,7 @@ export async function getCycleOverviewData(
     // Status per day is calculated by DailyPlanningView / WeeklyPlanningView
     // using history filtered by the selected date.
     const status: BlockStatus = "PENDENTE"
-    const studied = 0
+    const studied = studiedMap.get(discId) || 0
 
     return {
       id: item.id,

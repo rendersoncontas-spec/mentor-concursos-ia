@@ -147,10 +147,10 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
         <div className="bg-primary/10 border border-primary/20 p-6 rounded-xl flex gap-4 items-start">
           <Brain className="h-8 w-8 text-primary shrink-0 mt-1" />
           <div>
-            <h3 className="font-bold text-lg text-primary mb-1">Por que estudar {disciplineName} hoje?</h3>
+            <h3 className="font-bold text-lg text-primary mb-1">Sessão de {disciplineName}</h3>
             <p className="text-muted-foreground leading-relaxed">
-              De acordo com o seu perfil, a sua retenção neste assunto começou a decair. 
-              Garantir {plannedTime} minutos hoje vai assegurar a memorização de longo prazo.
+              Seu plano prevê {plannedTime} minutos de estudo para esta disciplina hoje. Mantenha a
+              constância para consolidar o conteúdo de longo prazo.
             </p>
           </div>
         </div>

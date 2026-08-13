@@ -5,7 +5,6 @@ import { AppSidebar } from "@/components/layout/sidebar"
 import { AppHeader } from "@/components/layout/header"
 import { FloatingActionButton } from "@/components/layout/floating-action-button"
 import { Menu } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 interface ProtectedLayoutClientProps {
   userEmail: string
@@ -58,10 +57,10 @@ export function ProtectedLayoutClient({
         logoutAction={logoutAction}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        className={cn(
-          "shrink-0 transition-all duration-300",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        )}
+        userEmail={userEmail}
+        userName={userName}
+        userId={userId}
+        avatarUrl={avatarUrl}
       />
 
 

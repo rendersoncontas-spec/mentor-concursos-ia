@@ -1459,6 +1459,227 @@ export function computeHoursOfDay(
 }
 
 // ---------------------------------------------------------------------------
+// ANÁLISE DE DESEMPENHO POR FAIXA DE HORÁRIO
+// ---------------------------------------------------------------------------
+
+export interface TimeOfDayBucket {
+  period: "MADRUGADA" | "MANHA" | "TARDE" | "NOITE"
+  label: string
+  shortLabel: string
+  range: string
+  sessions: number
+  totalMinutes: number
+  activeMinutes: number
+  questions: number
+  correct: number
+  wrong: number
+  accuracy: number | null
+  focusAvg: number | null
+  studiedDays: number
+  avgSessionMinutes: number
+}
+
+export interface TimeOfDayAnalysis {
+  buckets: TimeOfDayBucket[]
+  bestByFocus: TimeOfDayBucket | null
+  bestByAccuracy: TimeOfDayBucket | null
+  overallBest: TimeOfDayBucket | null
+  hasEnoughData: boolean
+  notEnoughDataMessage: string | null
+  recommendation: string
+  bestRangeLabel: string | null
+  totalIgnoredSessions: number
+}
+
+const TIME_OF_DAY_PERIODS = [
+  { period: "MADRUGADA", label: "Madrugada", shortLabel: "Madrugada", range: "00h–06h" },
+  { period: "MANHA", label: "Manhã", shortLabel: "Manhã", range: "06h–12h" },
+  { period: "TARDE", label: "Tarde", shortLabel: "Tarde", range: "12h–18h" },
+  { period: "NOITE", label: "Noite", shortLabel: "Noite", range: "18h–24h" },
+] as const
+
+const MIN_SESSIONS_FOR_BEST = 3
+const MIN_MINUTES_FOR_BEST = 60
+
+export function computeTimeOfDayAnalysis(
+  sessions: SessionRecord[],
+  attempts: QuestionAttemptRecord[],
+  timezone: string = DEFAULT_TIMEZONE
+): TimeOfDayAnalysis {
+  const buckets: TimeOfDayBucket[] = TIME_OF_DAY_PERIODS.map((p) => ({
+    period: p.period,
+    label: p.label,
+    shortLabel: p.shortLabel,
+    range: p.range,
+    sessions: 0,
+    totalMinutes: 0,
+    activeMinutes: 0,
+    questions: 0,
+    correct: 0,
+    wrong: 0,
+    accuracy: null,
+    focusAvg: null,
+    studiedDays: 0,
+    avgSessionMinutes: 0,
+  }))
+
+  const index = (hour: number): number => {
+    if (hour >= 18) return 3
+    if (hour >= 12) return 2
+    if (hour >= 6) return 1
+    return 0
+  }
+
+  let totalIgnoredSessions = 0
+
+  const dayKeysByPeriod: Set<string>[] = [new Set(), new Set(), new Set(), new Set()]
+  const focusSumByPeriod = [0, 0, 0, 0]
+  const focusCountByPeriod = [0, 0, 0, 0]
+
+  sessions.forEach((s) => {
+    const p = localParts(s.startedAt, timezone)
+    if (!p) {
+      totalIgnoredSessions++
+      return
+    }
+    const idx = index(p.hour)
+    const b = buckets[idx]
+    if (!b) return
+    b.sessions += 1
+    b.totalMinutes += s.durationMinutes
+    b.activeMinutes += activeMinutesOf(s)
+    b.questions += s.questionsAnswered
+    b.correct += s.questionsCorrect
+    b.wrong += Math.max(0, s.questionsAnswered - s.questionsCorrect)
+    const dayKey = dateKeyFromYmd(p.year, p.month, p.day)
+    const daySet = dayKeysByPeriod[idx]
+    if (daySet) daySet.add(dayKey)
+    const focusPct = focusPercentOf(s)
+    if (focusPct !== null) {
+      focusSumByPeriod[idx] = (focusSumByPeriod[idx] ?? 0) + focusPct
+      focusCountByPeriod[idx] = (focusCountByPeriod[idx] ?? 0) + 1
+    }
+  })
+
+  attempts.forEach((a) => {
+    if (!a.answeredAt) return
+    const p = localParts(a.answeredAt, timezone)
+    if (!p) return
+    const idx = index(p.hour)
+    const b = buckets[idx]
+    if (!b) return
+    b.questions += 1
+    if (a.correct) b.correct += 1
+    else b.wrong += 1
+  })
+
+  buckets.forEach((b, i) => {
+    b.accuracy = b.questions > 0 ? (b.correct / b.questions) * 100 : null
+    const daySet = dayKeysByPeriod[i]
+    b.studiedDays = daySet ? daySet.size : 0
+    b.avgSessionMinutes = b.sessions > 0 ? b.totalMinutes / b.sessions : 0
+    const fCount = focusCountByPeriod[i] ?? 0
+    const fSum = focusSumByPeriod[i] ?? 0
+    b.focusAvg = fCount > 0 ? fSum / fCount : null
+  })
+
+  const meetsMinData = (b: TimeOfDayBucket): boolean =>
+    b.sessions >= MIN_SESSIONS_FOR_BEST || b.totalMinutes >= MIN_MINUTES_FOR_BEST
+
+  const eligibleForBest = buckets.filter(meetsMinData)
+  const anyWithSessions = buckets.some((b) => b.sessions > 0)
+
+  let hasEnoughData = false
+  let notEnoughDataMessage: string | null = null
+
+  if (!anyWithSessions) {
+    notEnoughDataMessage = "Ainda não temos dados suficientes para identificar seu melhor horário."
+  } else if (eligibleForBest.length === 0) {
+    notEnoughDataMessage = "Continue estudando. Assim que tivermos dados suficientes, identificaremos seu melhor horário."
+  } else {
+    hasEnoughData = true
+  }
+
+  const sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions = (a: TimeOfDayBucket, b: TimeOfDayBucket): number => {
+    const aFocus = a.focusAvg ?? -1
+    const bFocus = b.focusAvg ?? -1
+    const focusClose = Math.abs(aFocus - bFocus) <= 2
+    if (!focusClose) return bFocus - aFocus
+    const aAcc = a.accuracy ?? -1
+    const bAcc = b.accuracy ?? -1
+    if (aAcc !== bAcc) return bAcc - aAcc
+    if (a.questions !== b.questions) return b.questions - a.questions
+    if (a.totalMinutes !== b.totalMinutes) return b.totalMinutes - a.totalMinutes
+    return b.sessions - a.sessions
+  }
+
+  const sortByAccuracyThenQuestionsThenTimeThenSessions = (a: TimeOfDayBucket, b: TimeOfDayBucket): number => {
+    const aAcc = a.accuracy ?? -1
+    const bAcc = b.accuracy ?? -1
+    if (aAcc !== bAcc) return bAcc - aAcc
+    if (a.questions !== b.questions) return b.questions - a.questions
+    if (a.totalMinutes !== b.totalMinutes) return b.totalMinutes - a.totalMinutes
+    return b.sessions - a.sessions
+  }
+
+  let bestByFocus: TimeOfDayBucket | null = null
+  let bestByAccuracy: TimeOfDayBucket | null = null
+  let overallBest: TimeOfDayBucket | null = null
+
+  if (hasEnoughData) {
+    const focusEligible = eligibleForBest.filter((b) => b.focusAvg !== null)
+    if (focusEligible.length > 0) {
+      const sorted = [...focusEligible].sort(sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions)
+      bestByFocus = sorted[0] ?? null
+    }
+
+    const accuracyEligible = eligibleForBest.filter((b) => b.accuracy !== null && b.questions >= 5)
+    if (accuracyEligible.length > 0) {
+      const sorted = [...accuracyEligible].sort(sortByAccuracyThenQuestionsThenTimeThenSessions)
+      bestByAccuracy = sorted[0] ?? null
+    }
+
+    const overallSorted = [...eligibleForBest].sort(sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions)
+    overallBest = overallSorted[0] ?? null
+  }
+
+  let recommendation = ""
+  let bestRangeLabel: string | null = null
+
+  if (notEnoughDataMessage) {
+    recommendation = notEnoughDataMessage
+  } else if (overallBest) {
+    bestRangeLabel = overallBest.range
+    const overallFocus = overallBest.focusAvg
+    const overallAcc = overallBest.accuracy
+
+    if (bestByFocus && bestByAccuracy && bestByFocus.period !== bestByAccuracy.period) {
+      recommendation = `Nos seus registros de estudo, seu melhor foco ocorre entre ${bestByFocus.range} (${Math.round(bestByFocus.focusAvg ?? 0)}%) e sua melhor taxa de acerto entre ${bestByAccuracy.range} (${Math.round(bestByAccuracy.accuracy ?? 0)}%). Considerando o conjunto de foco e desempenho, seu melhor período geral é ${overallBest.range} (${overallBest.label}).`
+    } else if (overallFocus !== null && overallAcc !== null) {
+      recommendation = `Nos seus registros de estudo, seus melhores resultados aparecem entre ${overallBest.range} (${overallBest.label}), com foco médio de ${Math.round(overallFocus)}% e taxa de acerto de ${Math.round(overallAcc)}%.`
+    } else if (overallFocus !== null) {
+      recommendation = `Nos seus registros de estudo, seu maior foco ocorre entre ${overallBest.range} (${overallBest.label}), com ${Math.round(overallFocus)}% de foco médio.`
+    } else if (overallAcc !== null) {
+      recommendation = `Nos seus registros de estudo, você apresenta melhor taxa de acerto entre ${overallBest.range} (${overallBest.label}), com ${Math.round(overallAcc)}% de acerto.`
+    } else {
+      recommendation = `Nos seus registros de estudo, seu melhor período é ${overallBest.range} (${overallBest.label}).`
+    }
+  }
+
+  return {
+    buckets,
+    bestByFocus,
+    bestByAccuracy,
+    overallBest,
+    hasEnoughData,
+    notEnoughDataMessage,
+    recommendation,
+    bestRangeLabel,
+    totalIgnoredSessions,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // EU VS EU (COMPARAÇÕES)
 // ---------------------------------------------------------------------------
 
@@ -1715,7 +1936,18 @@ export function computeEditalCoverage(
 ): EditalCoverage {
   const statsByDiscipline = new Map(disciplineStats.map((d) => [d.disciplineId, d]))
 
-  const byDiscipline: EditalDisciplineStat[] = userDisciplines.map((u) => {
+  // A mesma disciplina pode pertencer legitimamente a vários concursos
+  // (UNIQUE user_id,target_id,discipline_id). No "Progresso no edital" cada
+  // disciplina é UMA linha: mantém a primeira ocorrência (a action de
+  // estatísticas envia primeiro a linha do concurso ativo).
+  const seen = new Set<string>()
+  const uniqueUserDisciplines = userDisciplines.filter((u) => {
+    if (seen.has(u.disciplineId)) return false
+    seen.add(u.disciplineId)
+    return true
+  })
+
+  const byDiscipline: EditalDisciplineStat[] = uniqueUserDisciplines.map((u) => {
     const meta = disciplineRegistry.get(u.disciplineId)
     const stats = statsByDiscipline.get(u.disciplineId)
     return {
@@ -1806,6 +2038,7 @@ export interface InsightInput {
   hasPlan: boolean
   sessionsInRange: number
   hoursOfDay: HourBucket[]
+  timeOfDayAnalysis: TimeOfDayAnalysis | null
   focusPct: number | null
   questionStats: QuestionStatistics
   streaks: StreakStatistics
@@ -1900,24 +2133,21 @@ export function generateInsights(input: InsightInput): Insight[] {
     })
   }
 
-  const bestHour = input.hoursOfDay.find((h) => h.best)
-  if (bestHour) {
+  if (input.timeOfDayAnalysis?.overallBest) {
+    const ob = input.timeOfDayAnalysis.overallBest
     insights.push({
       id: "melhor_periodo",
       severity: "positive",
-      title: `Melhor rendimento: ${bestHour.label}`,
-      message: `Seu melhor desempenho registrado (≤ acurácia com ${bestHour.questions} questões) aconteceu no período da ${bestHour.label}. Considere fixar as sessões de prática nesse horário.`,
+      title: `Melhor horário: ${ob.label} (${ob.range})`,
+      message: input.timeOfDayAnalysis.recommendation,
     })
-  } else {
-    const bestByMinutes = [...input.hoursOfDay].sort((a, b) => b.minutes - a.minutes)[0]
-    if (bestByMinutes && bestByMinutes.minutes > 0) {
-      insights.push({
-        id: "horario_frequente",
-        severity: "info",
-        title: `Horário mais produtivo: ${bestByMinutes.label}`,
-        message: `Você estuda mais no período da ${bestByMinutes.label} (${formatDurationRaw(bestByMinutes.minutes)}). Consolidar esse horário tende a criar consistência.`,
-      })
-    }
+  } else if (input.timeOfDayAnalysis?.notEnoughDataMessage) {
+    insights.push({
+      id: "melhor_periodo_insuficiente",
+      severity: "info",
+      title: "Análise de horário",
+      message: input.timeOfDayAnalysis.notEnoughDataMessage,
+    })
   }
 
   if (weekRow) {

@@ -83,14 +83,14 @@
     --input:              214 32% 91%;
     --ring:               221 83% 53%; /* #2563EB */
 
-    /* ── Sidebar (Dark Navy #0B1220) ──── */
-    --sidebar-background:  221 48% 8%;  /* #0B1220 */
-    --sidebar-foreground:  210 40% 96%;
+    /* ── Sidebar (Light: coerente com o tema claro) ── */
+    --sidebar-background:  214 33% 98%; /* #F8FAFC */
+    --sidebar-foreground:  222 47% 11%;
     --sidebar-primary:     221 83% 53%; /* #2563EB */
-    --sidebar-accent:      221 40% 14%;
-    --sidebar-border:      221 35% 16%;
+    --sidebar-accent:      214 32% 94%;
+    --sidebar-border:      214 32% 91%;
     --sidebar-width:       260px;
-    --sidebar-width-collapsed: 72px;
+    --sidebar-width-collapsed: 76px;
 
     /* ── Radius ──────────────────────── */
     --radius: 0.625rem;
@@ -148,11 +148,12 @@
     --input:              217 33% 17%;
     --ring:               221 83% 55%;
 
-    --sidebar-background: 221 48% 5%;  /* #070B14 */
-    --sidebar-foreground: 210 40% 90%;
+    /* ── Sidebar (Dark Navy sofisticado, nunca preto puro) ── */
+    --sidebar-background: 221 47% 8%;   /* #0C1322 */
+    --sidebar-foreground: 210 40% 96%;
     --sidebar-primary:    221 83% 55%;
-    --sidebar-accent:     221 40% 11%;
-    --sidebar-border:     221 35% 14%;
+    --sidebar-accent:     221 42% 14%;
+    --sidebar-border:     221 32% 15%;
 
     --shadow-glow: 0 0 30px -5px hsl(var(--primary) / 0.4);
   }

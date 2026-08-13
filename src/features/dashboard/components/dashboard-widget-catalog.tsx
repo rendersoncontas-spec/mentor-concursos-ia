@@ -26,6 +26,7 @@ import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 import { DailyPlanningView } from "@/features/planejamento/components/daily-planning-view"
 import { type StudyCycleBlock } from "@/features/planejamento/components/estudei-planning-view"
 import { RemindersWidget } from "@/features/dashboard/components/reminders-widget"
+import { getRecentStudyHistoryAction, type RecentHistoryEntry } from "@/application/study-analytics/study-analytics.actions"
 
 export interface DashboardWidgetProps {
   snapshot: DashboardSnapshot
@@ -41,7 +42,8 @@ export interface DashboardWidgetProps {
 export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
   const weeklyMins = snapshot?.analytics?.stats?.weeklyMinutes ?? snapshot?.stats?.weeklyMinutes ?? 0
   const dailyMins = snapshot?.analytics?.stats?.dailyMinutes ?? snapshot?.stats?.dailyMinutes ?? 0
-  const targetMins = (snapshot?.user?.weekly_study_hours || 20) * 60
+  const weeklyHours = snapshot?.user?.weekly_study_hours
+  const targetMins = weeklyHours ? weeklyHours * 60 : null
 
   const formatMin = (mins: number) => {
     const h = Math.floor(mins / 60)
@@ -49,7 +51,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
     return `${h}h ${m.toString().padStart(2, "0")}min`
   }
 
-  const pct = Math.min(100, Math.round((weeklyMins / (targetMins || 1)) * 100))
+  const pct = targetMins ? Math.min(100, Math.round((weeklyMins / targetMins) * 100)) : null
 
   if (colSpan === 1) {
     return (
@@ -59,12 +61,14 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO
           </span>
           <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
-            {pct}%
+            {pct === null ? "—" : `${pct}%`}
           </span>
         </div>
         <div>
           <div className="text-2xl font-black text-foreground font-mono leading-tight">{formatMin(weeklyMins)}</div>
-          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">Meta: {formatMin(targetMins)}</div>
+          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
+            {targetMins === null ? "Meta não definida" : `Meta: ${formatMin(targetMins)}`}
+          </div>
         </div>
       </div>
     )
@@ -78,7 +82,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             <Clock className="w-4 h-4 text-[#2563EB]" /> TEMPO DE ESTUDO SEMANAL
           </span>
           <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
-            {pct}% Concluído
+            {pct === null ? "—" : `${pct}% Concluído`}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 my-auto">
@@ -92,7 +96,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
           </div>
         </div>
         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-          <div className="bg-[#2563EB] h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+          <div className="bg-[#2563EB] h-full rounded-full transition-all duration-500" style={{ width: `${pct ?? 0}%` }} />
         </div>
       </div>
     )
@@ -106,7 +110,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
           <Clock className="w-4 h-4 text-[#2563EB]" /> PAINEL GERAL DE TEMPO DE ESTUDO
         </span>
         <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-3 py-1 rounded-full font-mono">
-          Meta Semanal: {formatMin(targetMins)}
+          Meta Semanal: {targetMins === null ? "Não definida" : formatMin(targetMins)}
         </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -377,9 +381,21 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
 // 5. WIDGET: Estudos de Hoje (Visão Diária do Ciclo)
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
+  const [history, setHistory] = React.useState<RecentHistoryEntry[] | undefined>(undefined)
+
+  React.useEffect(() => {
+    let cancelled = false
+    void getRecentStudyHistoryAction(14).then((res) => {
+      if (!cancelled) setHistory(res.data ?? [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div className="w-full">
-      <DailyPlanningView blocks={cycleBlocks} />
+      <DailyPlanningView blocks={cycleBlocks} history={history ?? []} />
     </div>
   )
 }
@@ -389,9 +405,9 @@ export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
   const total = snapshot?.stats?.totalQuestions ?? 0
-  const target = snapshot?.analytics?.goals?.questions?.target ?? 100
+  const target = snapshot?.analytics?.goals?.questions?.target ?? null
   const achieved = snapshot?.analytics?.goals?.questions?.achieved ?? total
-  const pct = snapshot?.analytics?.goals?.questions?.percentage ?? (target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0)
+  const pct = snapshot?.analytics?.goals?.questions?.percentage ?? (target && target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : null)
 
   if (colSpan === 1) {
     return (
@@ -401,12 +417,14 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             <HelpCircle className="w-3.5 h-3.5 text-[#2563EB]" /> QUESTÕES
           </span>
           <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
-            {pct}%
+            {pct === null ? "—" : `${pct}%`}
           </span>
         </div>
         <div>
           <div className="text-2xl font-black text-foreground font-mono leading-tight">{achieved}</div>
-          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">Meta da semana: {target}</div>
+          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
+            {target === null ? "Meta não definida" : `Meta da semana: ${target}`}
+          </div>
         </div>
       </div>
     )
@@ -419,16 +437,16 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           <HelpCircle className="w-4 h-4 text-[#2563EB]" /> META DE QUESTÕES SEMANAL
         </span>
         <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
-          {achieved} / {target}
+          {target === null ? achieved : `${achieved} / ${target}`}
         </span>
       </div>
       <div className="space-y-2 my-auto">
         <div className="flex justify-between text-xs font-bold text-muted-foreground">
           <span>Progresso Semanal</span>
-          <span className="text-foreground font-mono font-black">{pct}%</span>
+          <span className="text-foreground font-mono font-black">{pct === null ? "—" : `${pct}%`}</span>
         </div>
         <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-          <div className="bg-[#2563EB] h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+          <div className="bg-[#2563EB] h-full rounded-full transition-all duration-500" style={{ width: `${pct ?? 0}%` }} />
         </div>
       </div>
     </div>
@@ -489,15 +507,15 @@ export function WidgetRevisoes({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidgetProps) {
   const goals = snapshot?.analytics?.goals
-  const hoursPct = goals?.weekly?.percentage ?? 0
-  const qPct = goals?.questions?.percentage ?? 0
-  const daysPct = goals?.studyDays?.percentage ?? 0
+  const hoursPct = goals?.weekly?.percentage ?? null
+  const qPct = goals?.questions?.percentage ?? null
+  const daysPct = goals?.studyDays?.percentage ?? null
 
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-4">
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Trophy className="w-4 h-4 text-amber-500" /> METAS DE ESTUDO SEMANAL
+          <Trophy className="w-4 w-4 text-amber-500" /> METAS DE ESTUDO SEMANAL
         </span>
         {onOpenGoalsModal && (
           <button type="button" onClick={onOpenGoalsModal} className="text-muted-foreground hover:text-foreground">
@@ -510,30 +528,30 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
         <div className="space-y-1">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-muted-foreground">Horas</span>
-            <span className="text-foreground font-mono">{hoursPct}%</span>
+            <span className="text-foreground font-mono">{hoursPct === null ? "—" : `${hoursPct}%`}</span>
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="bg-[#2563EB] h-full rounded-full transition-all duration-300" style={{ width: `${hoursPct}%` }} />
+            <div className="bg-[#2563EB] h-full rounded-full transition-all duration-300" style={{ width: `${hoursPct ?? 0}%` }} />
           </div>
         </div>
 
         <div className="space-y-1">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-muted-foreground">Questões</span>
-            <span className="text-foreground font-mono">{qPct}%</span>
+            <span className="text-foreground font-mono">{qPct === null ? "—" : `${qPct}%`}</span>
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: `${qPct}%` }} />
+            <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: `${qPct ?? 0}%` }} />
           </div>
         </div>
 
         <div className="space-y-1">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-muted-foreground">Dias Ativos</span>
-            <span className="text-foreground font-mono">{daysPct}%</span>
+            <span className="text-foreground font-mono">{daysPct === null ? "—" : `${daysPct}%`}</span>
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="bg-orange-500 h-full rounded-full transition-all duration-300" style={{ width: `${daysPct}%` }} />
+            <div className="bg-orange-500 h-full rounded-full transition-all duration-300" style={{ width: `${daysPct ?? 0}%` }} />
           </div>
         </div>
       </div>

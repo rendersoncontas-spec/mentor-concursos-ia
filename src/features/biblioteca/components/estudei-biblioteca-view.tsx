@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import {
   Library,
   ExternalLink,
@@ -20,6 +20,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { ImportHistoryModal } from "@/features/importacao/components/import-history-modal"
+import { Import } from "lucide-react"
 import {
   listLibraryMaterialsAction,
   createLibraryMaterialAction,
@@ -32,6 +34,7 @@ export function EstudeiBibliotecaView() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -42,33 +45,24 @@ export function EstudeiBibliotecaView() {
   const [typeInput, setTypeInput] = useState<LibraryMaterialItem["type"]>("PDF")
   const [urlInput, setUrlInput] = useState("")
 
-  const loadMaterials = async () => {
-    setIsLoading(true)
-    setLoadError(null)
-    const res = await listLibraryMaterialsAction()
-    if (res.success && res.data) {
-      setMaterials(res.data)
-    } else {
-      setLoadError(res.error || "Erro ao carregar biblioteca.")
-    }
-    setIsLoading(false)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    listLibraryMaterialsAction().then((res) => {
-      if (cancelled) return
+  const loadMaterials = useCallback(() => {
+    void (async () => {
+      await Promise.resolve()
+      setIsLoading(true)
+      setLoadError(null)
+      const res = await listLibraryMaterialsAction()
       if (res.success && res.data) {
         setMaterials(res.data)
       } else {
         setLoadError(res.error || "Erro ao carregar biblioteca.")
       }
       setIsLoading(false)
-    }).catch(() => {
-      if (!cancelled) setIsLoading(false)
-    })
-    return () => { cancelled = true }
+    })()
   }, [])
+
+  useEffect(() => {
+    loadMaterials()
+  }, [loadMaterials])
 
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -266,6 +260,28 @@ export function EstudeiBibliotecaView() {
         </Button>
       </div>
 
+      {/* Importar dados */}
+      <div className="rounded-xl border-2 border-dashed border-[#2563EB]/30 bg-[#2563EB]/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h3 className="text-[10px] font-black uppercase tracking-wider text-[#2563EB]">
+            Importar dados
+          </h3>
+          <p className="text-sm font-extrabold text-foreground">
+            Traga seu histórico de estudos para o Mentor IA.
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Compatível com arquivos Excel (.xlsx).
+          </p>
+        </div>
+        <Button
+          onClick={() => setIsImportOpen(true)}
+          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs gap-2 shrink-0"
+        >
+          <Import className="h-4 w-4" />
+          Importar histórico
+        </Button>
+      </div>
+
       {/* Busca */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -309,8 +325,7 @@ export function EstudeiBibliotecaView() {
       {renderContent()}
 
       {/* Modal Adicionar Material */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-[#2563EB]">
               Adicionar Material de Estudo
@@ -379,6 +394,8 @@ export function EstudeiBibliotecaView() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ImportHistoryModal open={isImportOpen} onOpenChange={setIsImportOpen} />
     </div>
   )
 }

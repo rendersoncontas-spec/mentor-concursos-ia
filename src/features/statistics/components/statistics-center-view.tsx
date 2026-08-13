@@ -50,6 +50,7 @@ import {
   computeSessionStatistics,
   computeStreaks,
   computeTimeCards,
+  computeTimeOfDayAnalysis,
   computeTopicStats,
   computeWeeklyReport,
   dateKeyOf,
@@ -65,6 +66,7 @@ import {
   type HourBucket,
   type Insight,
   type MetricComparison,
+  type TimeOfDayAnalysis,
   type TopicStat,
 } from "@/application/study-analytics/engine/stats-engine"
 import {
@@ -247,6 +249,7 @@ export function StatisticsCenterView() {
   )
   const topicStats = useMemo(() => computeTopicStats(filteredSessions, now, TIMEZONE), [filteredSessions, now])
   const hoursOfDay = useMemo(() => computeHoursOfDay(filteredSessions, filteredAttempts, TIMEZONE), [filteredSessions, filteredAttempts])
+  const timeOfDayAnalysis = useMemo(() => computeTimeOfDayAnalysis(filteredSessions, filteredAttempts, TIMEZONE), [filteredSessions, filteredAttempts])
   const comparisons = useMemo(() => computeComparisons(buckets, now, TIMEZONE), [buckets, now])
   const planning = useMemo(() => computePlanning(payload?.activePlan ?? null, buckets, now, TIMEZONE), [payload?.activePlan, buckets, now])
   const edital = useMemo(
@@ -265,6 +268,7 @@ export function StatisticsCenterView() {
         hasPlan: planning.hasPlan,
         sessionsInRange: filteredSessions.length,
         hoursOfDay,
+        timeOfDayAnalysis,
         focusPct: focusStats.averagePct,
         questionStats,
         streaks,
@@ -278,7 +282,7 @@ export function StatisticsCenterView() {
         daysSinceLastStudy: frequency.daysSinceLastStudy,
         questionsPerDay: days > 0 ? questionStats.total / days : 0,
       }),
-    [filteredSessions.length, hoursOfDay, focusStats.averagePct, questionStats, streaks, comparisons, planning, revisionStats, disciplineStats, topicStats, timeCards, productivity, frequency.daysSinceLastStudy, days]
+    [filteredSessions.length, hoursOfDay, timeOfDayAnalysis, focusStats.averagePct, questionStats, streaks, comparisons, planning, revisionStats, disciplineStats, topicStats, timeCards, productivity, frequency.daysSinceLastStudy, days]
   )
   const priorities = useMemo(() => computePriorities(disciplineStats, revisionStats), [disciplineStats, revisionStats])
   const weeklyReport = useMemo(() => computeWeeklyReport(buckets, now, TIMEZONE), [buckets, now])
@@ -763,6 +767,7 @@ export function StatisticsCenterView() {
         subtitle="Insights gerados por regras determinísticas sobre os seus dados (sem IA de terceiros)"
         action={<Sparkles className="h-4 w-4 text-[#2563EB]" />}
       >
+        <BestTimeOfDaySection analysis={timeOfDayAnalysis} />
         {insights.length === 0 ? (
           <EmptyState message="Sem sinais suficientes ainda — registre mais sessões." />
         ) : (
@@ -1524,6 +1529,172 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
 }
 
 // ─── Horários ───────────────────────────────────────────────────────────────
+
+function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
+  if (!analysis.hasEnoughData || !analysis.overallBest) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-muted/5 p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="h-4 w-4 text-[#2563EB]" />
+          <p className="text-xs font-bold">Análise de melhor horário</p>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          {analysis.notEnoughDataMessage ?? "Ainda não temos dados suficientes para identificar seu melhor horário."}
+        </p>
+      </div>
+    )
+  }
+
+  const ob = analysis.overallBest
+  const bf = analysis.bestByFocus
+  const ba = analysis.bestByAccuracy
+
+  return (
+    <div className="space-y-4 mb-4">
+      {/* === DESTAQUE: MELHOR HORÁRIO === */}
+      <div className="rounded-xl border border-[#2563EB]/40 bg-[#2563EB]/5 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="h-4 w-4 text-[#2563EB]" />
+          <p className="text-xs font-bold text-foreground">Melhor horário para você</p>
+        </div>
+
+        <div className="flex flex-wrap items-baseline gap-2 mb-3">
+          <p className="text-lg font-black text-[#2563EB] uppercase tracking-tight">{ob.label}</p>
+          <span className="text-sm font-mono text-muted-foreground">{ob.range}</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Foco médio</p>
+            <p className="text-lg font-black text-foreground">{ob.focusAvg !== null ? `${Math.round(ob.focusAvg)}%` : "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Acerto</p>
+            <p className="text-lg font-black text-foreground">{ob.accuracy !== null ? `${Math.round(ob.accuracy)}%` : "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tempo estudado</p>
+            <p className="text-lg font-black text-foreground">{formatDurationRaw(ob.totalMinutes)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Questões</p>
+            <p className="text-lg font-black text-foreground">{ob.questions}</p>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+          {analysis.recommendation}
+        </p>
+      </div>
+
+      {/* === MELHOR FOCO & MELHOR ACERTO === */}
+      {(bf || ba) && (bf?.period !== ba?.period) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {bf && (
+            <div className="rounded-lg border border-border/60 p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-base">{"🧠"}</span>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Melhor foco</p>
+              </div>
+              <p className="text-sm font-bold text-foreground">{bf.label}</p>
+              <p className="text-xs font-mono text-muted-foreground">{bf.range}</p>
+              <p className="text-lg font-black text-[#2563EB] mt-1">{bf.focusAvg !== null ? `${Math.round(bf.focusAvg)}%` : "—"}</p>
+            </div>
+          )}
+          {ba && (
+            <div className="rounded-lg border border-border/60 p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-base">{"🎯"}</span>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Melhor acerto</p>
+              </div>
+              <p className="text-sm font-bold text-foreground">{ba.label}</p>
+              <p className="text-xs font-mono text-muted-foreground">{ba.range}</p>
+              <p className="text-lg font-black text-[#2563EB] mt-1">{ba.accuracy !== null ? `${Math.round(ba.accuracy)}%` : "—"}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* === TABELA COMPARATIVA === */}
+      <div className="rounded-xl border border-border/60 overflow-hidden">
+        <div className="px-3 py-2 border-b border-border/40 bg-muted/5">
+          <p className="text-xs font-bold text-foreground">Desempenho por horário</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-muted-foreground text-[10px] uppercase tracking-wider border-b border-border/40">
+                <th className="text-left py-2 px-3 font-bold">Horário</th>
+                <th className="text-left py-2 px-2 font-bold">Período</th>
+                <th className="text-right py-2 px-2 font-bold">Foco</th>
+                <th className="text-right py-2 px-2 font-bold">Acerto</th>
+                <th className="text-right py-2 px-2 font-bold">Tempo</th>
+                <th className="text-right py-2 px-2 font-bold">Sessões</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analysis.buckets.map((b) => {
+                const isBest = ob.period === b.period
+                return (
+                  <tr
+                    key={b.period}
+                    className={`border-b border-border/20 transition-colors ${isBest ? "bg-[#2563EB]/5" : "hover:bg-muted/5"}`}
+                  >
+                    <td className="py-2.5 px-3 font-mono font-bold">{b.range}</td>
+                    <td className="py-2.5 px-2">
+                      <span className="font-semibold">{b.label}</span>
+                      {isBest && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-black text-[#2563EB] bg-[#2563EB]/10 px-1.5 py-0.5 rounded-full border border-[#2563EB]/20">
+                          <Sparkles className="h-2.5 w-2.5" /> MELHOR
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-2 text-right">
+                      <span className={`font-bold ${b.focusAvg !== null ? "text-foreground" : "text-muted-foreground"}`}>
+                        {b.focusAvg !== null ? `${Math.round(b.focusAvg)}%` : "—"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-2 text-right">
+                      <span className={`font-bold ${b.accuracy !== null ? "text-foreground" : "text-muted-foreground"}`}>
+                        {b.accuracy !== null ? `${Math.round(b.accuracy)}%` : "—"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-2 text-right font-mono font-bold">{formatDurationRaw(b.totalMinutes)}</td>
+                    <td className="py-2.5 px-2 text-right font-bold">{b.sessions}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* DETALHAMENTO COMPLETO POR FAIXA */}
+        <div className="px-3 py-2.5 border-t border-border/40 space-y-1.5">
+          {analysis.buckets.map((b) => {
+            const isBest = ob.period === b.period
+            return (
+              <div key={b.period} className={`text-[10px] ${isBest ? "text-[#2563EB] font-semibold" : "text-muted-foreground"}`}>
+                <span className="font-mono">{b.range}</span>
+                {" — "}
+                <span>Tempo: {formatDurationRaw(b.totalMinutes)}</span>
+                {" · "}
+                <span>Sessões: {b.sessions}</span>
+                {" · "}
+                <span>Questões: {b.questions}</span>
+                {" · "}
+                <span>Acertos: {b.correct}</span>
+                {" · "}
+                <span>Taxa: {b.accuracy !== null ? `${Math.round(b.accuracy)}%` : "—"}</span>
+                {" · "}
+                <span>Foco: {b.focusAvg !== null ? `${Math.round(b.focusAvg)}%` : "—"}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean }) {
   if (empty || hours.every((h) => h.minutes === 0 && h.questions === 0)) {

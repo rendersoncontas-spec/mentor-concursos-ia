@@ -1,5 +1,12 @@
 export type StudySource = 'PLAN' | 'FREE' | 'REVIEW' | 'SIMULADO' | 'QUESTOES' | 'VIDEO' | 'PDF'
 
+/**
+ * Plataforma de origem do estudo importado.
+ * slug: "aprovado" | "estudei" | "gran" | "tec" | "qconcursos" | "outra" (nome customizado)
+ * Sessões criadas no Mentor IA têm origin_source = null.
+ */
+export type OriginSource = 'aprovado' | 'estudei' | 'outra' | 'gran' | 'tec' | 'qconcursos'
+
 export type StudyType =
   | 'TEORIA'
   | 'QUESTOES'
@@ -51,6 +58,10 @@ export type StudyHistory = {
   mood: string | null
   notes: string | null
   metadata: Record<string, unknown> | null
+  origin_source?: OriginSource | null
+  origin_source_name?: string | null
+  origin_imported_at?: string | null
+  import_batch_id?: string | null
   created_at: string
 }
 

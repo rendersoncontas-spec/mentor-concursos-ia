@@ -1,0 +1,514 @@
+{
+  "disciplines": [
+    {
+      "name": "Língua Portuguesa",
+      "area": "Linguagens",
+      "aliases": ["Português", "Língua Portuguesa (Português)", "Português (Língua Portuguesa)"],
+      "topics": [
+        {
+          "name": "Compreensão e Interpretação de Textos",
+          "subtopics": ["Ideia principal e secundárias", "Inferência", "Informação explícita e implícita", "Sentido contextual de palavras e expressões", "Relações entre partes do texto", "Elementos de coesão na interpretação", "Vozes e discursos no texto", "Função e efeito de sentido de recursos expressivos"]
+        },
+        {
+          "name": "Gêneros Textuais",
+          "subtopics": ["Gêneros do cotidiano", "Gêneros jornalísticos", "Gêneros científicos e acadêmicos", "Gêneros oficiais", "Gêneros digitais", "Suporte e circulação dos gêneros"]
+        },
+        {
+          "name": "Tipologia Textual",
+          "subtopics": ["Narração", "Descrição", "Dissertação", "Exposição", "Injunção", "Sequências textuais dominantes"]
+        },
+        {
+          "name": "Coesão Textual",
+          "subtopics": ["Coesão referencial", "Coesão sequencial", "Anáfora e catáfora", "Conectores e operadores argumentativos", "Elipse e substituição", "Reiteração"]
+        },
+        {
+          "name": "Coerência Textual",
+          "subtopics": ["Princípios de coerência", "Coerência e progressão temática", "Implicaturas e pressupostos", "Quebras de coerência", "Coerência e contexto"]
+        },
+        {
+          "name": "Semântica",
+          "subtopics": ["Significação das palavras", "Sinônimos e antônimos", "Polissemia", "Homonímia e paronímia", "Conotação e denotação", "Ambiguidade e duplo sentido"]
+        },
+        {
+          "name": "Funções da Linguagem",
+          "subtopics": ["Função referencial", "Função emotiva", "Função conativa", "Função fática", "Função metalinguística", "Função poética"]
+        },
+        {
+          "name": "Figuras de Linguagem",
+          "subtopics": ["Figuras de palavras", "Figuras de pensamento", "Figuras de sintaxe", "Figuras de som", "Vícios de linguagem"]
+        },
+        {
+          "name": "Ortografia",
+          "subtopics": ["Emprego das letras", "Uso do hífen", "Novo Acordo Ortográfico", "Sufixos e prefixos", "Homófonos e homógrafos"]
+        },
+        {
+          "name": "Acentuação",
+          "subtopics": ["Regras gerais", "Acentuação dos hiatos", "Acentos diferenciais", "Proparoxítonas, paroxítonas e oxítonas", "Novo Acordo Ortográfico"]
+        },
+        {
+          "name": "Formação de Palavras",
+          "subtopics": ["Estrutura das palavras", "Radical, prefixo e sufixo", "Composição por justaposição e aglutinação", "Derivação", "Abreviação, siglas e estrangeirismos"]
+        },
+        {
+          "name": "Classes de Palavras",
+          "subtopics": ["Substantivo", "Adjetivo", "Artigo", "Pronome", "Numeral", "Advérbio", "Preposição", "Conjunção", "Interjeição", "Verbo"]
+        },
+        {
+          "name": "Verbo",
+          "subtopics": ["Conjugação verbal", "Tempos e modos verbais", "Vozes verbais", "Locuções verbais", "Correlação verbal", "Verbos regulares e irregulares", "Formas nominais do verbo"]
+        },
+        {
+          "name": "Sintaxe",
+          "subtopics": ["Termos da oração", "Sujeito e predicado", "Complementos verbais e nominais", "Adjuntos e aposto", "Vocativo", "Período simples", "Período composto", "Coordenação", "Subordinação"]
+        },
+        {
+          "name": "Concordância",
+          "subtopics": ["Concordância verbal", "Concordância nominal", "Casos especiais", "Concordância com sujeito simples e composto", "Concordância com verbos impessoais", "Coletivos e partitivos"]
+        },
+        {
+          "name": "Regência",
+          "subtopics": ["Regência verbal", "Regência nominal", "Crase e regência", "Casos especiais", "Regência de pronomes relativos"]
+        },
+        {
+          "name": "Crase",
+          "subtopics": ["Casos obrigatórios", "Casos proibidos", "Casos facultativos", "Crase com pronomes", "Crase com locuções"]
+        },
+        {
+          "name": "Pontuação",
+          "subtopics": ["Vírgula", "Ponto e vírgula", "Dois-pontos", "Ponto final", "Reticências", "Parênteses e colchetes", "Aspas e travessão", "Aposto e vocativo"]
+        },
+        {
+          "name": "Colocação Pronominal",
+          "subtopics": ["Próclise", "Ênclise", "Mesóclise", "Casos especiais", "Colocação com locuções verbais"]
+        },
+        {
+          "name": "Redação Oficial",
+          "subtopics": ["Manual de Redação", "Padrões oficiais", "Impressões, memorandos e ofícios", "Pronomes de tratamento", "Clareza, concisão e impessoalidade"]
+        }
+      ]
+    },
+    {
+      "name": "Matemática",
+      "area": "Exatas",
+      "aliases": ["Matemática Básica", "Matemática Financeira e Raciocínio Lógico"],
+      "topics": [
+        { "name": "Conjuntos", "subtopics": ["Conjuntos numéricos", "Subconjuntos", "Operações entre conjuntos", "Diagramas de Venn", "Intervalos"] },
+        { "name": "Operações", "subtopics": ["Adição, subtração, multiplicação e divisão", "Potenciação", "Radiciação", "Múltiplos e divisores", "MMC e MDC", "Números primos"] },
+        { "name": "Razão e Proporção", "subtopics": ["Razão", "Proporção", "Grandezas direta e inversamente proporcionais", "Divisão proporcional"] },
+        { "name": "Regra de Três", "subtopics": ["Regra de três simples", "Regra de três composta"] },
+        { "name": "Porcentagem", "subtopics": ["Cálculo de percentuais", "Aumentos e descontos", "Aumentos e descontos sucessivos", "Variação percentual"] },
+        { "name": "Equações", "subtopics": ["Equações do 1º grau", "Equações do 2º grau", "Equações com mais de uma variável", "Sistemas de equações"] },
+        { "name": "Inequações", "subtopics": ["Inequações do 1º grau", "Inequações do 2º grau", "Inequações produto e quociente"] },
+        { "name": "Funções", "subtopics": ["Conceito de função", "Domínio, contradomínio e imagem", "Função afim", "Função quadrática", "Função exponencial", "Função logarítmica", "Composição e inversa"] },
+        { "name": "Sequências", "subtopics": ["Progressão aritmética", "Progressão geométrica", "Termo geral", "Soma dos termos"] },
+        { "name": "Geometria Plana", "subtopics": ["Triângulos", "Quadriláteros", "Circunferência e círculo", "Áreas e perímetros", "Teorema de Pitágoras", "Semelhança de figuras"] },
+        { "name": "Geometria Espacial", "subtopics": ["Prismas", "Pirâmides", "Cilindros", "Cones", "Esferas", "Áreas e volumes"] },
+        { "name": "Trigonometria", "subtopics": ["Razões trigonométricas", "Relações fundamentais", "Arcos notáveis", "Lei dos senos e cossenos", "Funções trigonométricas"] },
+        { "name": "Análise Combinatória", "subtopics": ["Princípio fundamental da contagem", "Permutações", "Arranjos", "Combinações", "Permutações com repetição"] },
+        { "name": "Probabilidade", "subtopics": ["Espaço amostral", "Probabilidade da união e intersecção", "Probabilidade condicional", "Eventos independentes", "Distribuição binomial"] },
+        { "name": "Estatística", "subtopics": ["Tabelas e gráficos", "Média aritmética", "Moda", "Mediana", "Variância e desvio padrão"] },
+        { "name": "Matemática Financeira", "subtopics": ["Juros simples", "Juros compostos", "Descontos", "Taxas equivalentes", "Inflação", "Séries de pagamentos"] }
+      ]
+    },
+    {
+      "name": "Raciocínio Lógico",
+      "area": "Exatas",
+      "aliases": ["Raciocínio Lógico-Matemático", "Raciocínio Lógico Matemático", "RLM"],
+      "topics": [
+        { "name": "Proposições", "subtopics": ["Conceito de proposição", "Proposições simples e compostas", "Sentenças abertas", "Valor lógico"] },
+        { "name": "Conectivos", "subtopics": ["Conjunção", "Disjunção inclusiva e exclusiva", "Condicional", "Bicondicional", "Conectivos e operações lógicas"] },
+        { "name": "Tabela-Verdade", "subtopics": ["Construção de tabelas-verdade", "Número de linhas", "Tautologias, contradições e contingências"] },
+        { "name": "Equivalências", "subtopics": ["Equivalências notáveis", "Leis de De Morgan", "Equivalências do condicional", "Negação de proposições compostas"] },
+        { "name": "Negação", "subtopics": ["Negação de proposições simples", "Negação de proposições compostas", "Negação do condicional", "Negação de quantificadores"] },
+        { "name": "Argumentação", "subtopics": ["Argumento válido e inválido", "Premissas e conclusão", "Métodos de validação", "Argumentos e dedução"] },
+        { "name": "Quantificadores", "subtopics": ["Quantificador universal", "Quantificador existencial", "Negação de proposições quantificadas", "Diagramas lógicos com quantificadores"] },
+        { "name": "Diagramas Lógicos", "subtopics": ["Relações de conjunto", "Diagramas de Venn", "Silogismos e conclusões"] },
+        { "name": "Lógica de Argumentação", "subtopics": ["Argumentação cotidiana", "Assunção e dedução", "Analogias", "Sofismas e falácias"] },
+        { "name": "Conjuntos", "subtopics": ["Operações entre conjuntos", "Elementos e subconjuntos", "Problemas com conjuntos"] },
+        { "name": "Sequências", "subtopics": ["Sequências numéricas", "Sequências figurais", "Lei de formação", "Sequências lógicas"] },
+        { "name": "Análise Combinatória", "subtopics": ["Princípio da contagem", "Arranjos e combinações", "Permutações", "Problemas de contagem"] },
+        { "name": "Probabilidade", "subtopics": ["Eventos", "Probabilidade condicional", "Probabilidade de eventos compostos", "Espaços equiprováveis"] }
+      ]
+    },
+    {
+      "name": "Direito Constitucional",
+      "area": "Direito",
+      "aliases": ["Constitucional", "Direito Constitucional e Administrativo"],
+      "topics": [
+        { "name": "Teoria da Constituição", "subtopics": ["Conceito e classificação das constituições", "Poder constituinte", "Normas constitucionais", "Eficácia e aplicabilidade", "Hermenêutica constitucional"] },
+        { "name": "Princípios Fundamentais", "subtopics": ["Fundamentos da República", "Separação dos Poderes", "Objetivos fundamentais", "Princípios nas relações internacionais"] },
+        { "name": "Direitos Fundamentais", "subtopics": ["Direitos individuais", "Direitos coletivos", "Direitos sociais", "Direitos de nacionalidade", "Direitos políticos", "Garantias fundamentais", "Cláusulas pétreas", "Limites e restrições"] },
+        { "name": "Nacionalidade", "subtopics": ["Nacionalidade originária e derivada", "Português equiparado", "Perda de nacionalidade"] },
+        { "name": "Direitos Políticos", "subtopics": ["Sufrágio e voto", "Elegibilidade", "Perda e suspensão dos direitos políticos", "Ações de impugnação"] },
+        { "name": "Partidos Políticos", "subtopics": ["Liberdade de criação", "Funcionamento parlamentar", "Prestação de contas"] },
+        { "name": "Organização do Estado", "subtopics": ["União", "Estados", "Municípios", "Distrito Federal", "Territórios", "Competências", "Bens públicos"] },
+        { "name": "Intervenção", "subtopics": ["Intervenção federal", "Intervenção estadual", "Limites e controle"] },
+        { "name": "Administração Pública", "subtopics": ["Princípios constitucionais", "Servidores públicos", "Estabilidade", "Acumulação de cargos", "Responsabilidade civil do Estado"] },
+        { "name": "Poder Legislativo", "subtopics": ["Estrutura do Congresso Nacional", "Comissões", "Processo legislativo", "Espécies normativas", "Imunidades e prerrogativas", "Fiscalização contábil e orçamentária"] },
+        { "name": "Poder Executivo", "subtopics": ["Presidente da República", "Atribuições", "Responsabilidade", "Ministros de Estado"] },
+        { "name": "Poder Judiciário", "subtopics": ["Órgãos do Judiciário", "Garantias da magistratura", "Quinto constitucional", "Conselho Nacional de Justiça", "Competências"] },
+        { "name": "Funções Essenciais à Justiça", "subtopics": ["Ministério Público", "Advocacia Pública", "Advocacia", "Defensoria Pública"] },
+        { "name": "Controle de Constitucionalidade", "subtopics": ["Controle difuso e concentrado", "Ação direta de inconstitucionalidade", "Ação declaratória de constitucionalidade", "Arguição de descumprimento de preceito fundamental", "Súmula vinculante", "Efeitos das decisões"] },
+        { "name": "Ordem Social", "subtopics": ["Seguridade social", "Educação", "Saúde", "Previdência e assistência", "Meio ambiente", "Cultura e comunicação"] },
+        { "name": "Tributação e Orçamento na Constituição", "subtopics": ["Sistema tributário nacional", "Limitações ao poder de tributar", "Orçamento", "Crédito adicional"] }
+      ]
+    },
+    {
+      "name": "Direito Administrativo",
+      "area": "Direito",
+      "aliases": ["Administrativo"],
+      "topics": [
+        { "name": "Princípios da Administração Pública", "subtopics": ["Legalidade", "Impessoalidade", "Moralidade", "Publicidade", "Eficiência", "Outros princípios implícitos"] },
+        { "name": "Administração Direta", "subtopics": ["Órgãos públicos", "Desconcentração", "Estrutura administrativa"] },
+        { "name": "Administração Indireta", "subtopics": ["Autarquias", "Fundações públicas", "Empresas públicas", "Sociedades de economia mista", "Entidades de fiscalização"] },
+        { "name": "Centralização e Descentralização", "subtopics": ["Desconcentração e descentralização", "Delegação e outorga"] },
+        { "name": "Atos Administrativos", "subtopics": ["Conceito e atributos", "Elementos e requisitos", "Classificação", "Discricionariedade e vinculação", "Extinção e invalidação", "Revogação e anulação", "Convalidação"] },
+        { "name": "Poderes Administrativos", "subtopics": ["Poder vinculado", "Poder discricionário", "Poder hierárquico", "Poder disciplinar", "Poder regulamentar", "Abuso de poder"] },
+        { "name": "Poder de Polícia", "subtopics": ["Conceito e fundamento", "Atributos", "Limites", "Polícia administrativa e judiciária"] },
+        { "name": "Serviços Públicos", "subtopics": ["Conceito e princípios", "Classificação", "Delegação e concessão", "Permissão e autorização", "Parcerias público-privadas"] },
+        { "name": "Agentes Públicos", "subtopics": ["Espécies", "Cargos, empregos e funções", "Provimento e vacância", "Nomeação e posse", "Acumulação e vedações"] },
+        { "name": "Servidores Públicos", "subtopics": ["Regime estatutário e celetista", "Direitos e deveres", "Licenças e afastamentos", "Aposentadoria", "Sindicância e processo administrativo disciplinar"] },
+        { "name": "Responsabilidade Civil do Estado", "subtopics": ["Responsabilidade objetiva e subjetiva", "Ação regressiva", "Culpa do Estado", "Responsabilidade por omissão", "Excludentes"] },
+        { "name": "Bens Públicos", "subtopics": ["Classificação", "Características", "Utilização", "Alienação"] },
+        { "name": "Licitações", "subtopics": ["Princípios", "Modalidades", "Procedimento", "Contratação direta", "Dispensa e inexigibilidade", "Sanções e recursos", "Nova Lei de Licitações (14.133/2021)"] },
+        { "name": "Contratos Administrativos", "subtopics": ["Cláusulas exorbitantes", "Duração", "Alteração e extinção", "Equilíbrio econômico-financeiro"] },
+        { "name": "Improbidade Administrativa", "subtopics": ["Atos de improbidade", "Sanções", "Prescrição", "Lei 8.429/1992"] },
+        { "name": "Processo Administrativo", "subtopics": ["Princípios", "Fases", "Recursos administrativos", "Prescrição", "Lei 9.784/1999"] },
+        { "name": "Controle da Administração", "subtopics": ["Controle administrativo", "Controle legislativo", "Controle judicial", "Tribunal de Contas", "Ouvidoria e correição"] },
+        { "name": "Intervenção do Estado na Propriedade", "subtopics": ["Desapropriação", "Requisição", "Servidão administrativa", "Ocupação temporária", "Limitações administrativas", "Tombamento"] },
+        { "name": "Terceiro Setor", "subtopics": ["Organizações sociais", "Organizações da sociedade civil de interesse público", "Acordos e parcerias"] }
+      ]
+    },
+    {
+      "name": "Direito Tributário",
+      "area": "Direito",
+      "aliases": ["Tributário", "Legislação Tributária"],
+      "topics": [
+        { "name": "Sistema Tributário Nacional", "subtopics": ["Estrutura constitucional", "Fontes do direito tributário", "Vigência e aplicação"] },
+        { "name": "Princípios Tributários", "subtopics": ["Legalidade", "Anterioridade", "Irretroatividade", "Igualdade", "Capacidade contributiva", "Vedação ao confisco"] },
+        { "name": "Competência Tributária", "subtopics": ["Competência da União, Estados, Municípios e DF", "Competência residual", "Competência cumulativa", "Limites ao exercício"] },
+        { "name": "Tributos", "subtopics": ["Impostos", "Taxas", "Contribuições de melhoria", "Empréstimos compulsórios", "Contribuições especiais", "Espécies tributárias"] },
+        { "name": "Obrigação Tributária", "subtopics": ["Obrigação principal e acessória", "Fato gerador", "Sujeito ativo e passivo", "Solidariedade", "Responsabilidade dos sucessores e terceiros"] },
+        { "name": "Crédito Tributário", "subtopics": ["Constituição do crédito", "Lançamento", "Modalidades de lançamento", "Notificação", "Suspensão", "Extinção", "Exclusão"] },
+        { "name": "Imunidades", "subtopics": ["Imunidades constitucionais", "Imunidade recíproca", "Imunidade de templos e livros", "Imunidade de entidades sem fins lucrativos"] },
+        { "name": "Isenções", "subtopics": ["Conceito e espécies", "Isenção e anistia", "Revogação"] },
+        { "name": "Administração Tributária", "subtopics": ["Fiscalização", "Dívida ativa", "Certidões", "Domicílio tributário", "Sigilo fiscal"] },
+        { "name": "Processo Tributário", "subtopics": ["Processo administrativo fiscal", "Consultas", "Recursos", "Ação anulatória e repetição de indébito", "Mandado de segurança"] }
+      ]
+    },
+    {
+      "name": "Direito Penal",
+      "area": "Direito",
+      "aliases": ["Penal"],
+      "topics": [
+        { "name": "Princípios do Direito Penal", "subtopics": ["Legalidade", "Anterioridade", "Intervenção mínima", "Lesividade", "Humanidade", "Individualização da pena"] },
+        { "name": "Aplicação da Lei Penal", "subtopics": ["Tempo do crime", "Lugar do crime", "Lei penal no tempo e no espaço", "Contagem de prazo", "Exclusão de antijuridicidade"] },
+        { "name": "Crime", "subtopics": ["Conceito analítico", "Fato típico", "Antijuridicidade", "Culpabilidade", "Iter criminis", "Crime consumado e tentado"] },
+        { "name": "Tipicidade", "subtopics": ["Tipo penal", "Tipicidade formal e material", "Dolo e culpa", "Erro de tipo", "Desistência voluntária e arrependimento eficaz"] },
+        { "name": "Ilicitude", "subtopics": ["Legítima defesa", "Estado de necessidade", "Estrito cumprimento do dever legal", "Exercício regular de direito", "Excesso punível"] },
+        { "name": "Culpabilidade", "subtopics": ["Imputabilidade", "Potencial consciência da ilicitude", "Exigibilidade de conduta diversa", "Inimputáveis"] },
+        { "name": "Concurso de Pessoas", "subtopics": ["Autoria e participação", "Concurso necessário", "Cooperação dolosamente distinta"] },
+        { "name": "Concurso de Crimes", "subtopics": ["Concurso material", "Concurso formal", "Crime continuado"] },
+        { "name": "Penas", "subtopics": ["Espécies de pena", "Privativas de liberdade", "Restritivas de direitos", "Multa", "Regimes", "Sursis e livramento condicional"] },
+        { "name": "Extinção da Punibilidade", "subtopics": ["Morte do agente", "Prescrição", "Anistia, graça e indulto", "Decadência e perempção"] },
+        { "name": "Crimes Contra a Pessoa", "subtopics": ["Homicídio", "Lesões corporais", "Periclitação da vida e saúde", "Crimes contra a honra", "Crimes contra a liberdade individual"] },
+        { "name": "Crimes Contra o Patrimônio", "subtopics": ["Furto e roubo", "Extorsão", "Estelionato", "Apropriação indébita", "Dano e receptação"] },
+        { "name": "Crimes Contra a Administração Pública", "subtopics": ["Peculato", "Concussão", "Corrupção passiva e ativa", "Prevaricação", "Contrabando e descaminho", "Abuso de autoridade"] },
+        { "name": "Crimes Contra a Fé Pública", "subtopics": ["Falsificação de documentos", "Falsidade ideológica", "Uso de documento falso"] },
+        { "name": "Crimes Sexuais", "subtopics": ["Estupro", "Corrupção de menores", "Crimes contra a dignidade sexual"] }
+      ]
+    },
+    {
+      "name": "Direito Processual Penal",
+      "area": "Direito",
+      "aliases": ["Processual Penal", "Processo Penal"],
+      "topics": [
+        { "name": "Princípios Processuais", "subtopics": ["Devido processo legal", "Contraditório e ampla defesa", "Presunção de inocência", "Iniciativa probatória", "Publicidade"] },
+        { "name": "Inquérito Policial", "subtopics": ["Natureza e finalidade", "Características", "Início e encerramento", "Prazos", "Indiciamento", "Valor probatório"] },
+        { "name": "Ação Penal", "subtopics": ["Ação penal pública", "Ação penal privada", "Condições da ação", "Querela e queixa", "Ação penal nos crimes complexos"] },
+        { "name": "Competência", "subtopics": ["Critérios de fixação", "Competência pelo lugar do crime", "Competência por prerrogativa de função", "Conflito de competência"] },
+        { "name": "Provas", "subtopics": ["Meios de prova", "Interrogatório", "Confissão", "Perícias", "Testemunhas", "Provas ilícitas", "Cadeia de custódia"] },
+        { "name": "Prisões", "subtopics": ["Prisão em flagrante", "Prisão preventiva", "Prisão temporária", "Medidas cautelares", "Liberdade provisória", "Relaxamento da prisão"] },
+        { "name": "Procedimentos", "subtopics": ["Procedimento comum ordinário, sumário e sumaríssimo", "Procedimentos especiais", "Citação e notificação", "Alegações finais e sentença"] },
+        { "name": "Recursos", "subtopics": ["Princípios dos recursos", "Recursos em espécie", "Apelação", "Recurso em sentido estrito", "Embargos", "Recurso especial e extraordinário"] },
+        { "name": "Habeas Corpus", "subtopics": ["Natureza e espécies", "Legitimidade", "Cabimento", "Processamento"] },
+        { "name": "Tribunal do Júri", "subtopics": ["Competência", "Plenitude de defesa", "Sigilo das votações", "Soberania dos veredictos", "Procedimento"] },
+        { "name": "Sentença", "subtopics": ["Estrutura da sentença", "Classificação", "Publicação e intimação", "Coisa julgada"] },
+        { "name": "Execução Penal", "subtopics": ["Competência", "Execução das penas privativas de liberdade", "Progressão e regressão de regime", "Execução das penas restritivas de direitos"] },
+        { "name": "Nulidades", "subtopics": ["Nulidades absolutas e relativas", "Momentos de arguição", "Princípio da instrumentalidade das formas"] }
+      ]
+    },
+    {
+      "name": "Direito Civil",
+      "area": "Direito",
+      "aliases": ["Civil"],
+      "topics": [
+        { "name": "Parte Geral", "subtopics": ["Lei de introdução", "Pessoas naturais e jurídicas", "Domicílio", "Bens", "Fatos jurídicos", "Negócios jurídicos", "Atos ilícitos", "Prescrição e decadência"] },
+        { "name": "Obrigações", "subtopics": ["Conceito e fontes", "Modalidades", "Transmissão", "Adimplemento e extinção", "Inadimplemento", "Pagamento indevido"] },
+        { "name": "Contratos", "subtopics": ["Formação e validade", "Classificação", "Vícios", "Espécies", "Extinção", "Função social"] },
+        { "name": "Responsabilidade Civil", "subtopics": ["Responsabilidade subjetiva e objetiva", "Dano material e moral", "Excludentes", "Indenização"] },
+        { "name": "Direitos Reais", "subtopics": ["Posse", "Propriedade", "Usufruto e uso", "Hipoteca e penhor", "Condomínio", "Ações reais"] },
+        { "name": "Família", "subtopics": ["Casamento", "União estável", "Parentesco", "Alimentos", "Regime de bens", "Guarda e adoção"] },
+        { "name": "Sucessões", "subtopics": ["Herança", "Sucessão legítima e testamentária", "Inventário e partilha", "Legado"] }
+      ]
+    },
+    {
+      "name": "Contabilidade Geral",
+      "area": "Contábil",
+      "aliases": ["Contabilidade", "Contabilidade Básica"],
+      "topics": [
+        { "name": "Princípios Contábeis", "subtopics": ["Estrutura conceitual", "Postulados", "Convenções contábeis"] },
+        { "name": "Patrimônio", "subtopics": ["Ativo", "Passivo", "Patrimônio líquido", "Equação patrimonial", "Origens e aplicações"] },
+        { "name": "Escrituração", "subtopics": ["Método das partidas dobradas", "Contas", "Lançamentos", "Livros contábeis", "Razonetes e balancete", "Partidas de diário e razão"] },
+        { "name": "Balanço Patrimonial", "subtopics": ["Estrutura", "Circulante e não circulante", "Apresentação", "Notas explicativas"] },
+        { "name": "DRE", "subtopics": ["Receitas e despesas", "Custo das mercadorias vendidas", "Lucro bruto e líquido", "Resultado do exercício"] },
+        { "name": "Demonstrações Contábeis", "subtopics": ["DFC", "DMPL", "DVA", "Notas explicativas"] },
+        { "name": "Estoques", "subtopics": ["Avaliação de estoques", "Custo médio, PEPS e UEPS", "Inventário permanente e periódico", "Ajuste ao valor realizável"] },
+        { "name": "Depreciação", "subtopics": ["Conceito e bases de cálculo", "Métodos", "Amortização", "Exaustão", "Reavaliação"] },
+        { "name": "Provisões", "subtopics": ["Provisões e passivos contingentes", "Perdas estimadas", "Ajustes"] },
+        { "name": "Custos", "subtopics": ["Custos diretos e indiretos", "Custeio por absorção", "Custeio variável", "Ponto de equilíbrio", "Margem de contribuição"] },
+        { "name": "Investimentos", "subtopics": ["MEP e custo", "Consolidação", "Resultado de equivalência"] }
+      ]
+    },
+    {
+      "name": "Contabilidade Pública",
+      "area": "Contábil",
+      "aliases": ["Contabilidade Aplicada ao Setor Público", "CASP"],
+      "topics": [
+        { "name": "Patrimônio Público", "subtopics": ["Conceito e composição", "Variações patrimoniais", "Mensuração"] },
+        { "name": "Orçamento Público", "subtopics": ["Conceito e princípios", "Ciclo orçamentário", "PPA, LDO e LOA", "Créditos adicionais", "Restos a pagar"] },
+        { "name": "Receita Pública", "subtopics": ["Classificação", "Estágios da receita", "Receita orçamentária e extraorçamentária", "Previsão e arrecadação"] },
+        { "name": "Despesa Pública", "subtopics": ["Classificação", "Estágios da despesa", "Despesa orçamentária e extraorçamentária", "Empenho, liquidação e pagamento"] },
+        { "name": "Demonstrações Contábeis Públicas", "subtopics": ["Balanço orçamentário", "Balanço financeiro", "Balanço patrimonial", "DFC e DMPL", "RREO e RGF"] },
+        { "name": "PCASP", "subtopics": ["Estrutura", "Classes de contas", "Registro contábil", "Procedimentos contábeis orçamentários e patrimoniais"] },
+        { "name": "SIAFI", "subtopics": ["Conceito e características", "Operação", "Documentos e eventos"] },
+        { "name": "Variações Patrimoniais", "subtopics": ["Qualitativas e quantitativas", "Aumentativas e diminutivas", "Resultado patrimonial"] }
+      ]
+    },
+    {
+      "name": "Auditoria",
+      "area": "Contábil",
+      "aliases": ["Auditoria Governamental", "Auditoria Contábil"],
+      "topics": [
+        { "name": "Conceitos de Auditoria", "subtopics": ["Objetivos", "Tipos de auditoria", "Normas profissionais", "Independência"] },
+        { "name": "Planejamento", "subtopics": ["Estratégia global", "Plano de auditoria", "Materialidade", "Programa de auditoria"] },
+        { "name": "Risco de Auditoria", "subtopics": ["Risco inerente", "Risco de controle", "Risco de detecção", "Matriz de risco"] },
+        { "name": "Evidência", "subtopics": ["Tipos", "Suficiência e adequação", "Procedimentos de obtenção"] },
+        { "name": "Papéis de Trabalho", "subtopics": ["Finalidade e conteúdo", "Arquivo permanente e corrente", "Documentação"] },
+        { "name": "Amostragem", "subtopics": ["Amostragem estatística e não estatística", "Avaliação dos resultados", "Erro esperado"] },
+        { "name": "Procedimentos", "subtopics": ["Testes de controle", "Testes substantivos", "Circularização", "Análise documental"] },
+        { "name": "Controles Internos", "subtopics": ["Componentes", "Avaliação", "Limitações", "Testes de eficácia"] },
+        { "name": "Relatórios", "subtopics": ["Tipos de parecer", "Opinião", "Comunicação de deficiências", "Relatórios especiais"] },
+        { "name": "Auditoria Governamental", "subtopics": ["Controle externo e interno", "Tribunal de Contas", "Normas de auditoria do TCU", "Achados de auditoria"] }
+      ]
+    },
+    {
+      "name": "AFO",
+      "area": "Contábil",
+      "aliases": ["Administração Financeira e Orçamentária", "Orçamento Público (AFO)"],
+      "topics": [
+        { "name": "Princípios Orçamentários", "subtopics": ["Universalidade", "Unidade", "Anualidade", "Exclusividade", "Especificação"] },
+        { "name": "PPA", "subtopics": ["Conceito e vigência", "Programas e metas", "Avaliação"] },
+        { "name": "LDO", "subtopics": ["Conteúdo", "Metas fiscais", "Critérios e formas de limitação de empenho"] },
+        { "name": "LOA", "subtopics": ["Conteúdo", "Orçamento fiscal, da seguridade e de investimentos", "Emendas"] },
+        { "name": "Receita Pública", "subtopics": ["Previsão", "Lançamento, arrecadação e recolhimento", "Classificação econômica"] },
+        { "name": "Despesa Pública", "subtopics": ["Fixação", "Empenho, liquidação e pagamento", "Despesa de capital e corrente", "Suprimento de fundos"] },
+        { "name": "Créditos Adicionais", "subtopics": ["Suplementares", "Especiais", "Extraordinários"] },
+        { "name": "Restos a Pagar", "subtopics": ["Processados e não processados", "Inscrição e cancelamento"] },
+        { "name": "Despesas de Exercícios Anteriores", "subtopics": ["Conceito", "Requisitos"] },
+        { "name": "Dívida Pública", "subtopics": ["Divida flutuante e fundada", "Operações de crédito", "Limites"] },
+        { "name": "Lei de Responsabilidade Fiscal", "subtopics": ["Limites de pessoal", "Limites da dívida", "Renúncia de receita", "Transparência", "Sanções"] }
+      ]
+    },
+    {
+      "name": "Administração",
+      "area": "Gestão",
+      "aliases": ["Administração Geral", "Administração Pública (Gestão)"],
+      "topics": [
+        { "name": "Teorias da Administração", "subtopics": ["Administração científica", "Teoria clássica", "Escola das relações humanas", "Teoria burocrática", "Teoria neoclássica", "Teoria sistêmica e contingencial"] },
+        { "name": "Planejamento", "subtopics": ["Níveis de planejamento", "Planejamento estratégico", "Análise SWOT", "Missão, visão e valores"] },
+        { "name": "Organização", "subtopics": ["Estruturas organizacionais", "Desenho organizacional", "Departamentalização", "Autoridade e responsabilidade"] },
+        { "name": "Direção", "subtopics": ["Processo decisório", "Liderança", "Motivação", "Comunicação"] },
+        { "name": "Controle", "subtopics": ["Processo de controle", "Tipos de controle", "Ferramentas de controle"] },
+        { "name": "Administração Estratégica", "subtopics": ["Estratégias competitivas", "Vantagem competitiva", "Gestão da mudança"] },
+        { "name": "Gestão de Pessoas", "subtopics": ["Recrutamento e seleção", "Treinamento e desenvolvimento", "Avaliação de desempenho", "Remuneração e benefícios", "Qualidade de vida no trabalho"] },
+        { "name": "Liderança", "subtopics": ["Teorias de liderança", "Estilos de liderança", "Liderança e poder"] },
+        { "name": "Motivação", "subtopics": ["Teorias motivacionais", "Hierarquia de necessidades", "Higiene e motivacionais", "Expectativa e equidade"] },
+        { "name": "Comunicação", "subtopics": ["Processo de comunicação", "Barreiras", "Comunicação organizacional"] },
+        { "name": "Cultura Organizacional", "subtopics": ["Elementos da cultura", "Clima organizacional", "Mudança cultural"] },
+        { "name": "Gestão por Competências", "subtopics": ["Conceito de competência", "Mapeamento", "Gestão do conhecimento"] },
+        { "name": "Gestão da Qualidade", "subtopics": ["Ferramentas da qualidade", "Ciclo PDCA", "Normas ISO", "Excelência em gestão"] },
+        { "name": "Gestão de Processos", "subtopics": ["Mapeamento de processos", "Modelagem BPMN", "Melhoria contínua"] },
+        { "name": "Gestão de Projetos", "subtopics": ["Ciclo de vida do projeto", "Cronograma e custos", "Riscos em projetos", "Metodologias ágeis"] },
+        { "name": "Gestão de Riscos", "subtopics": ["Identificação e avaliação", "Matriz de riscos", "Respostas aos riscos"] },
+        { "name": "Governança", "subtopics": ["Governança corporativa", "Governança pública", "Compliance"] },
+        { "name": "Administração Pública", "subtopics": ["Modelos de gestão pública", "Nova gestão pública", "Governo digital"] }
+      ]
+    },
+    {
+      "name": "Informática",
+      "area": "Tecnologia",
+      "aliases": ["Noções de Informática", "Informática Básica", "Tecnologia da Informação", "TI"],
+      "topics": [
+        { "name": "Sistemas Operacionais", "subtopics": ["Windows", "Linux", "Gerenciamento de arquivos", "Processos e memória"] },
+        { "name": "Internet", "subtopics": ["Navegadores", "URL e protocolos", "Ferramentas de busca", "Redes sociais e colaboração"] },
+        { "name": "Correio Eletrônico", "subtopics": ["Protocolos de e-mail", "Webmail e clientes", "Boas práticas"] },
+        { "name": "Pacote Office", "subtopics": ["Word", "Excel", "PowerPoint", "Fórmulas e funções", "Atalhos e formatação"] },
+        { "name": "Segurança da Informação", "subtopics": ["Malware", "Phishing e engenharia social", "Firewall e antivírus", "Autenticação e senhas", "Backup", "Criptografia básica", "Certificado digital"] },
+        { "name": "Redes", "subtopics": ["Modelo OSI e TCP/IP", "Equipamentos de rede", "Protocolos", "Wi-Fi e cabeamento"] },
+        { "name": "Computação em Nuvem", "subtopics": ["Modelos de serviço", "Provedores", "Armazenamento em nuvem"] },
+        { "name": "Banco de Dados", "subtopics": ["Conceitos básicos", "SGBDs", "Consulta e estrutura"] },
+        { "name": "Sistemas de Informação", "subtopics": ["Tipos de sistemas", "ERP e CRM", "Sistemas corporativos"] }
+      ]
+    },
+    {
+      "name": "Tecnologia da Informação",
+      "area": "Tecnologia",
+      "aliases": ["TI", "Tecnologia da Informação e Comunicação", "TIC"],
+      "topics": [
+        { "name": "Engenharia de Software", "subtopics": ["Ciclo de vida", "Modelos de processo", "Requisitos", "Qualidade de software"] },
+        { "name": "Desenvolvimento de Sistemas", "subtopics": ["Programação", "Algoritmos", "Estruturas de dados", "Paradigmas", "Testes de software"] },
+        { "name": "Banco de Dados", "subtopics": ["Modelagem de dados", "SQL", "Normalização", "Sistemas de gerenciamento de bancos de dados"] },
+        { "name": "Engenharia de Dados", "subtopics": ["Pipelines de dados", "ETL", "Data lakes e warehouses"] },
+        { "name": "Ciência de Dados", "subtopics": ["Inteligência Artificial", "Machine Learning", "Big Data", "Business Intelligence", "Visualização de dados"] },
+        { "name": "Redes", "subtopics": ["Protocolos e modelos", "Infraestrutura", "Segurança de redes"] },
+        { "name": "Segurança da Informação", "subtopics": ["Criptografia", "Gestão de identidade e acesso", "Segurança de aplicações", "Incidentes e resposta"] },
+        { "name": "Computação em Nuvem", "subtopics": ["IaaS, PaaS e SaaS", "Virtualização", "Contêineres e orquestração"] },
+        { "name": "DevOps", "subtopics": ["Integração e entrega contínua", "Infraestrutura como código", "DevSecOps"] },
+        { "name": "Governança de TI", "subtopics": ["ITIL", "COBIT", "ISO 27001", "Continuidade de negócio"] },
+        { "name": "Arquitetura de Sistemas", "subtopics": ["Microserviços", "APIs", "Sistemas distribuídos", "Arquitetura em camadas"] }
+      ]
+    },
+    {
+      "name": "Conhecimentos Bancários",
+      "area": "Finanças",
+      "aliases": ["Conhecimentos Bancários e Atualidades", "Mercado Financeiro"],
+      "topics": [
+        { "name": "Sistema Financeiro Nacional", "subtopics": ["Estrutura do SFN", "Conselho Monetário Nacional", "Banco Central", "Comitê de Política Monetária", "Órgãos normativos"] },
+        { "name": "Mercado Monetário", "subtopics": ["Operações de mercado aberto", "Taxa Selic", "Redesconto"] },
+        { "name": "Mercado de Crédito", "subtopics": ["Operações de crédito", "Taxas de juros", "Risco de crédito"] },
+        { "name": "Mercado de Capitais", "subtopics": ["Bolsa de valores", "Comissão de Valores Mobiliários", "Ações e debêntures", "Fundos de investimento"] },
+        { "name": "Mercado Cambial", "subtopics": ["Câmbio comercial e turismo", "Taxa de câmbio", "Operações cambiais"] },
+        { "name": "Produtos Bancários", "subtopics": ["Contas e cartões", "Crédito e financiamento", "Investimentos", "Previdência", "Seguros", "Tesouro direto", "Renda fixa e variável"] },
+        { "name": "Lavagem de Dinheiro", "subtopics": ["Conceito e fases", "Prevenção e combate", "Comunicação de operações", "Lei 9.613/1998"] },
+        { "name": "Compliance", "subtopics": ["Conceito", "Programas de compliance", "Integridade e ética"] },
+        { "name": "Atendimento e Negociação", "subtopics": ["Atendimento ao cliente", "Técnicas de negociação", "Comunicação institucional"] }
+      ]
+    },
+    {
+      "name": "Estatística",
+      "area": "Exatas",
+      "aliases": ["Estatística Descritiva", "Estatística Aplicada"],
+      "topics": [
+        { "name": "Estatística Descritiva", "subtopics": ["Tabelas e gráficos", "Média", "Mediana", "Moda", "Variância e desvio padrão", "Percentis e quartis"] },
+        { "name": "Probabilidade", "subtopics": ["Espaço amostral", "Probabilidade condicional", "Variáveis aleatórias", "Distribuições discretas e contínuas"] },
+        { "name": "Amostragem", "subtopics": ["Tipos de amostragem", "Erro amostral", "Tamanho da amostra"] },
+        { "name": "Intervalo de Confiança", "subtopics": ["Conceito", "Intervalos para média e proporção"] },
+        { "name": "Testes de Hipótese", "subtopics": ["Hipótese nula e alternativa", "Erros tipo I e II", "Nível de significância"] },
+        { "name": "Correlação e Regressão", "subtopics": ["Coeficiente de correlação", "Regressão linear", "Ajuste de modelos"] },
+        { "name": "Estatística Inferencial", "subtopics": ["Estimação", "Teorema central do limite", "Distribuições amostrais"] }
+      ]
+    },
+    {
+      "name": "Economia",
+      "area": "Humanas",
+      "aliases": ["Economia do Setor Público", "Economia Brasileira"],
+      "topics": [
+        { "name": "Microeconomia", "subtopics": ["Oferta e demanda", "Elasticidade", "Teoria do consumidor", "Teoria da firma", "Estruturas de mercado", "Custos de produção"] },
+        { "name": "Macroeconomia", "subtopics": ["Contas nacionais", "PIB", "Inflação", "Desemprego", "Política fiscal", "Política monetária", "Multiplicadores"] },
+        { "name": "Economia Internacional", "subtopics": ["Câmbio", "Balanço de pagamentos", "Comércio internacional", "Integração econômica"] },
+        { "name": "Economia Brasileira", "subtopics": ["História econômica", "Planos econômicos", "Setor público brasileiro", "Reforma tributária"] }
+      ]
+    },
+    {
+      "name": "Criminologia",
+      "area": "Segurança Pública",
+      "aliases": ["Criminologia e Política Criminal"],
+      "topics": [
+        { "name": "Conceitos de Criminologia", "subtopics": ["Objeto e método", "Criminologia e política criminal", "Vitimologia"] },
+        { "name": "Teorias Criminológicas", "subtopics": ["Escola clássica", "Escola positiva", "Teorias do consenso", "Teorias do conflito", "Teorias críticas"] },
+        { "name": "Controle Social", "subtopics": ["Controle formal e informal", "Polícia e sistema penal", "Eficácia do controle"] },
+        { "name": "Prevenção da Criminalidade", "subtopics": ["Prevenção primária, secundária e terciária", "Programas de prevenção"] }
+      ]
+    },
+    {
+      "name": "Criminalística",
+      "area": "Segurança Pública",
+      "aliases": ["Perícia Criminal"],
+      "topics": [
+        { "name": "Perícia e Peritos", "subtopics": ["Conceito e espécies", "Perito oficial", "Achados periciais"] },
+        { "name": "Local de Crime", "subtopics": ["Isolamento e preservação", "Levantamento do local", "Vestígios e indícios"] },
+        { "name": "Cadeia de Custódia", "subtopics": ["Conceito", "Etapas", "Registro e documentação"] },
+        { "name": "Balística", "subtopics": ["Armas e munições", "Trajetória e distância", "Exames balísticos"] },
+        { "name": "Papiloscopia", "subtopics": ["Impressões digitais", "Classificação", "Identificação humana"] }
+      ]
+    },
+    {
+      "name": "Medicina Legal",
+      "area": "Segurança Pública",
+      "aliases": ["Medicina Legal e Criminalística"],
+      "topics": [
+        { "name": "Conceitos de Medicina Legal", "subtopics": ["Perícias e laudos", "Tanatologia", "Cronotanatognose"] },
+        { "name": "Traumatologia", "subtopics": ["Traumas e lesões", "Energias de ordem física", "Asfixias"] },
+        { "name": "Identificação", "subtopics": ["Identidade e identificação", "Métodos identificadores"] },
+        { "name": "Sexologia Forense", "subtopics": ["Crimes sexuais", "Perícias correlatas"] }
+      ]
+    },
+    {
+      "name": "Legislação Penal Especial",
+      "area": "Segurança Pública",
+      "aliases": ["Legislação Especial Penal"],
+      "topics": [
+        { "name": "Lei de Drogas", "subtopics": ["Crimes de tráfico e uso", "Apreensão e destruição", "Procedimento"] },
+        { "name": "Crimes Organizados", "subtopics": ["Organização criminosa", "Colaboração premiada", "Lei 12.850/2013"] },
+        { "name": "Lavagem de Dinheiro", "subtopics": ["Crime de lavagem", "Fases", "Comunicação de operações"] },
+        { "name": "Abuso de Autoridade", "subtopics": ["Condutas típicas", "Sanções", "Lei 13.869/2019"] },
+        { "name": "Execução Penal", "subtopics": ["Progressão e regressão", "Trabalho e assistência", "Faltas disciplinares", "Lei 7.210/1984"] },
+        { "name": "Direitos Humanos", "subtopics": ["Declaração Universal", "Sistema interamericano", "Proteção de grupos vulneráveis"] },
+        { "name": "Legislação de Trânsito", "subtopics": ["Infrações e crimes de trânsito", "CTB", "Alcoolemia"] },
+        { "name": "Legislação Institucional", "subtopics": ["Estatutos das polícias", "Disciplina e corregedoria"] }
+      ]
+    },
+    {
+      "name": "Segurança Pública",
+      "area": "Segurança Pública",
+      "aliases": ["Polícia e Segurança Pública", "Sistema de Segurança Pública"],
+      "topics": [
+        { "name": "Inteligência Policial", "subtopics": ["Ciclo de inteligência", "Fontes de informação", "Contrainteligência"] },
+        { "name": "Investigação Criminal", "subtopics": ["Técnicas investigativas", "Infiltração e vigilância", "Interceptação de comunicações"] },
+        { "name": "Sistema de Segurança Pública", "subtopics": ["Organização policial", "Sistema Único de Segurança Pública", "Política nacional de segurança"] },
+        { "name": "Atendimento à População", "subtopics": ["Polícia cidadã", "Mediação de conflitos", "Direitos do cidadão"] }
+      ]
+    },
+    {
+      "name": "Saúde Pública",
+      "area": "Saúde",
+      "aliases": ["Saúde Coletiva", "Saúde Pública (SUS)"],
+      "topics": [
+        { "name": "SUS", "subtopics": ["Princípios e diretrizes", "Lei 8.080/1990", "Lei 8.142/1990", "Organização e gestão"] },
+        { "name": "Epidemiologia", "subtopics": ["Vigilância epidemiológica", "Indicadores de saúde", "Prevenção e controle de doenças"] },
+        { "name": "Vigilância Sanitária", "subtopics": ["Controle sanitário", "Produtos e serviços", "Legislação sanitária"] },
+        { "name": "Saúde da Família", "subtopics": ["Estratégia Saúde da Família", "Atenção primária", "Territorialização"] },
+        { "name": "Políticas de Saúde", "subtopics": ["Política Nacional de Saúde", "Programas do Ministério da Saúde", "Financiamento da saúde"] },
+        { "name": "Biossegurança", "subtopics": ["Normas de biossegurança", "Equipamentos de proteção", "Descarte de resíduos"] }
+      ]
+    },
+    {
+      "name": "Educação",
+      "area": "Educação",
+      "aliases": ["Legislação Educacional", "Conhecimentos Pedagógicos"],
+      "topics": [
+        { "name": "LDB", "subtopics": ["Estrutura da educação nacional", "Níveis e modalidades", "Educação básica", "Financiamento"] },
+        { "name": "Legislação Educacional", "subtopics": ["BNCC", "Fundef/Fundeb", "ECA na educação", "Plano Nacional de Educação"] },
+        { "name": "Fundamentos da Educação", "subtopics": ["Filosofia da educação", "Sociologia da educação", "História da educação"] },
+        { "name": "Didática", "subtopics": ["Processo de ensino-aprendizagem", "Metodologias ativas", "Planejamento de aula"] },
+        { "name": "Psicologia da Educação", "subtopics": ["Desenvolvimento humano", "Teorias de aprendizagem", "Avaliação psicopedagógica"] },
+        { "name": "Educação Especial e Inclusiva", "subtopics": ["Educação inclusiva", "Atendimento educacional especializado", "AEE e salas de recursos"] },
+        { "name": "Avaliação", "subtopics": ["Avaliação da aprendizagem", "Avaliação institucional", "Instrumentos avaliativos"] },
+        { "name": "Currículo", "subtopics": ["Teorias de currículo", "Organização curricular", "Currículo e BNCC"] },
+        { "name": "Alfabetização", "subtopics": ["Processos de alfabetização", "Letramento", "Métodos e abordagens"] },
+        { "name": "Gestão Escolar", "subtopics": ["Projeto político-pedagógico", "Conselhos escolares", "Gestão democrática"] }
+      ]
+    }
+  ]
+}

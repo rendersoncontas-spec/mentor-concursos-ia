@@ -109,28 +109,34 @@ function loadSavedPosition(): Position | null {
 }
 
 export function StudyProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<StudySessionState | null>(() => {
-    if (typeof window === "undefined") return null
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (!saved) return null
-      const parsed = JSON.parse(saved) as StudySessionState
-      if (!parsed.isActive || !parsed.startTime) return null
-      const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
-      return { ...parsed, activeSeconds, pausedSeconds, isMinimized: true }
-    } catch (error) {
-      console.error("[STUDY_PROVIDER] Parse error:", error)
-      localStorage.removeItem(STORAGE_KEY)
-      return null
-    }
-  })
-  const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(() => {
-    if (typeof window === "undefined") return false
-    const saved = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
-    return saved === null ? true : JSON.parse(saved) as boolean
-  })
+  const [session, setSession] = useState<StudySessionState | null>(null)
+  const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(false)
   const [isCentralOpen, setIsCentralOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Restaurar sessão e preferências do localStorage SOMENTE após a hidratação,
+  // para o servidor e o cliente renderizarem o mesmo HTML (evita hydration mismatch).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) {
+          const parsed = JSON.parse(saved) as StudySessionState
+          if (parsed.isActive && parsed.startTime) {
+            const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
+            setSession({ ...parsed, activeSeconds, pausedSeconds, isMinimized: true })
+          }
+        }
+      } catch (error) {
+        console.error("[STUDY_PROVIDER] Parse error:", error)
+        localStorage.removeItem(STORAGE_KEY)
+      }
+
+      const savedPref = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
+      setFloatingTimerEnabled(savedPref === null ? true : (JSON.parse(savedPref) as boolean))
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Escutar eventos globais para abrir/fechar a Central
   useEffect(() => {

@@ -66,8 +66,8 @@ export type Insight = {
 }
 
 export type GoalProgress = {
-  target: number
+  target: number | null
   achieved: number
-  percentage: number
-  remaining: number
+  percentage: number | null
+  remaining: number | null
 }

@@ -24,6 +24,8 @@ import { EditDisciplineModal } from "@/features/disciplines/components/edit-disc
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { addCustomDisciplineAction, saveCustomTopicsAction, searchDisciplinesAction, removeDisciplineAction, removeCustomTopicAction } from "@/application/edital/edital.action"
+import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
+import { TopicAutocomplete, type TopicCommit } from "@/features/topic-catalog/components/topic-autocomplete"
 import { Loader2, Trash2 } from "lucide-react"
 
 export interface TopicItem {
@@ -128,7 +130,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     setInputUrl("")
   }
 
-  const totalTopicsCount = data.reduce((acc, d) => acc + d.topics.length, 0) || 275
+  const totalTopicsCount = data.reduce((acc, d) => acc + d.topics.length, 0) || 0
   const completedTopicsCount = Object.values(completedTopics).filter(Boolean).length
   const overallProgressPercentage = totalTopicsCount > 0 ? Math.round((completedTopicsCount / totalTopicsCount) * 100) : 0
 
@@ -160,17 +162,23 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     setIsSaving(false)
   }
 
-  const handleAddTopic = async (discId: string) => {
-    if (!newTopicName.trim() || !activeTargetId) return
+  const handleAddTopic = async (discId: string, name?: string, source?: TopicCommit["source"]) => {
+    const topicName = (name ?? newTopicName).trim()
+    if (!topicName || !activeTargetId) return
     setIsSaving(true)
     
     const disc = data.find(d => d.id === discId)
     if (!disc) return setIsSaving(false)
 
+    // Registra no catálogo de tópicos (dedupe-safe) quando o nome não veio do catálogo nem foi criado agora
+    if (source !== "catalog" && source !== "custom") {
+      void createCustomTopicAction(discId, topicName)
+    }
+
     const newTopic: TopicItem = {
       id: `custom-${Date.now()}`,
       number: disc.topics.length + 1,
-      title: newTopicName.trim().toUpperCase(),
+      title: topicName.toUpperCase(),
       correct: 0,
       wrong: 0,
       questions: 0,
@@ -464,17 +472,21 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
                           <tr className="bg-muted/10">
                             <td colSpan={8} className="p-3">
                               <div className="flex items-center gap-2 max-w-[450px]">
-                                <input
-                                  type="text"
-                                  autoFocus
+                                <TopicAutocomplete
                                   value={newTopicName}
-                                  onChange={(e) => setNewTopicName(e.target.value)}
+                                  onChange={setNewTopicName}
+                                  disciplineId={disc.id}
+                                  autoFocus
                                   placeholder="Digite o nome do tópico..."
-                                  className="flex-1 bg-background border rounded-md px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleAddTopic(disc.id)
-                                    if (e.key === "Escape") setAddingTopicDiscId(null)
+                                  className="flex-1"
+                                  onCommit={(commit) => {
+                                    void handleAddTopic(disc.id, commit.name, commit.source)
+                                    setAddingTopicDiscId(null)
                                   }}
+                                  onEnterFallback={() => {
+                                    void handleAddTopic(disc.id)
+                                  }}
+                                  onEscapeFallback={() => setAddingTopicDiscId(null)}
                                 />
                                 <Button
                                   size="sm"

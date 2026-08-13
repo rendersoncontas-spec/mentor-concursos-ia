@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { Upload, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -32,33 +32,24 @@ export function EstudeiPedirEditalView() {
   const [description, setDescription] = useState("")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
 
-  const loadRequests = async () => {
-    setIsLoading(true)
-    setLoadError(null)
-    const res = await listEditalRequestsAction()
-    if (res.success && res.data) {
-      setRequests(res.data)
-    } else {
-      setLoadError(res.error || "Erro ao carregar pedidos.")
-    }
-    setIsLoading(false)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    listEditalRequestsAction().then((res) => {
-      if (cancelled) return
+  const loadRequests = useCallback(() => {
+    void (async () => {
+      await Promise.resolve()
+      setIsLoading(true)
+      setLoadError(null)
+      const res = await listEditalRequestsAction()
       if (res.success && res.data) {
         setRequests(res.data)
       } else {
         setLoadError(res.error || "Erro ao carregar pedidos.")
       }
       setIsLoading(false)
-    }).catch(() => {
-      if (!cancelled) setIsLoading(false)
-    })
-    return () => { cancelled = true }
+    })()
   }, [])
+
+  useEffect(() => {
+    loadRequests()
+  }, [loadRequests])
 
   const handleSendRequest = async (e: React.FormEvent) => {
     e.preventDefault()

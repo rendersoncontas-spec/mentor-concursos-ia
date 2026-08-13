@@ -111,7 +111,7 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
               disciplineName: b.disciplineName,
               disciplineId: b.disciplineId,
               durationMinutes: b.durationMinutes,
-              studiedMinutes: 0,
+              studiedMinutes: b.studiedMinutes ?? 0,
               color: b.color || "#2563EB",
               completed: b.status === "CONCLUIDO",
             })) || []
