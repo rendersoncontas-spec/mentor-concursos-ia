@@ -10,6 +10,7 @@ import {
 } from "@/application/dashboard/dashboard-layout.action"
 import { Button } from "@/components/ui/button"
 import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
+import { DailyMessageBanner } from "@/features/dashboard/components/daily-message-banner"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { UserExamModal } from "@/features/dashboard/components/user-exam-modal"
 import { WeeklyGoalsModal } from "@/features/dashboard/components/weekly-goals-modal"
@@ -74,39 +75,38 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
     }
   }
 
-  // Obter apenas widgets visíveis, ordenados pela position_order
+  // Obter apenas widgets visíveis na grade (mensagem_dia fica no topo fixo em destaque)
   const visibleWidgets = layout
-    .filter((item) => item.visible)
+    .filter((item) => item.visible && item.widget_id !== "mensagem_dia")
     .sort((a, b) => a.position_order - b.position_order)
 
   return (
     <div className="flex flex-col min-h-full bg-background/50">
-      <div className="flex-1 p-4 md:p-6 space-y-6 w-full pb-24">
-        {/* Header Dinâmico e Unificado */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full min-w-0">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-black text-foreground">Home</h1>
-            <p className="text-sm font-bold text-muted-foreground mt-0.5">
-              Olá, <span className="text-[#2563EB]">{snapshot?.user?.name || "Estudante"}</span>!
-              Hoje é {capitalizedDate}. 👋 Bem-vindo de volta.
-            </p>
-          </div>
+      <div className="flex-1 p-4 md:p-6 space-y-4 md:space-y-5 w-full pb-24">
+        {/* 1. Header: Título e Saudação */}
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-black text-foreground">Home</h1>
+          <p className="text-sm font-bold text-muted-foreground mt-0.5">
+            Olá, <span className="text-[#2563EB]">{snapshot?.user?.name || "Estudante"}</span>! Hoje
+            é {capitalizedDate}. 👋 Bem-vindo de volta.
+          </p>
+        </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto shrink-0 min-w-0">
-            <Button
-              onClick={() => {
-                setIsRegisterModalOpen(true)
-                window.dispatchEvent(new CustomEvent("study-center-opened"))
-              }}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs cursor-pointer w-full sm:w-auto h-9 shrink-0"
-            >
-              Adicionar Estudo
-            </Button>
-            <TargetSelectorDropdown
-              initialActiveTargetName={examName}
-              className="w-full sm:w-auto"
-            />
-          </div>
+        {/* 2. Mensagem do Dia: Faixa Compacta e Elegante no Topo */}
+        <DailyMessageBanner />
+
+        {/* 3. Ações Principais: Adicionar Estudo e Seletor de Cargo */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 w-full min-w-0">
+          <Button
+            onClick={() => {
+              setIsRegisterModalOpen(true)
+              window.dispatchEvent(new CustomEvent("study-center-opened"))
+            }}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs cursor-pointer w-full sm:w-auto h-9 shrink-0"
+          >
+            Adicionar Estudo
+          </Button>
+          <TargetSelectorDropdown initialActiveTargetName={examName} className="w-full sm:w-auto" />
         </div>
 
         <DashboardDndContext items={visibleWidgets} onReorder={handleReorder}>

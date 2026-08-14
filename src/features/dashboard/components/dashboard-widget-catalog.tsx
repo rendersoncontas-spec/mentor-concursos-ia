@@ -35,6 +35,8 @@ import { DailyPlanningView } from "@/features/planejamento/components/daily-plan
 import { type StudyCycleBlock } from "@/features/planejamento/components/estudei-planning-view"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
+import { getDailyMessage } from "./daily-message-banner"
+
 export interface DashboardWidgetProps {
   snapshot: DashboardSnapshot
   colSpan: 1 | 2 | 3
@@ -292,29 +294,27 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             MELHORES DESEMPENHOS POR MATÉRIA
           </span>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {disciplineRanking
-              .slice(0, 4)
-              .map(
-                (
-                  item: {
-                    name?: string
-                    disciplineName?: string
-                    accuracy?: number
-                    percentage?: number
-                  },
-                  idx: number,
-                ) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-[11px] font-bold"
-                  >
-                    <span className="truncate pr-2">{item.name || item.disciplineName}</span>
-                    <span className="text-emerald-600 font-mono">
-                      {item.accuracy || item.percentage || 0}%
-                    </span>
-                  </div>
-                ),
-              )}
+            {disciplineRanking.slice(0, 4).map(
+              (
+                item: {
+                  name?: string
+                  disciplineName?: string
+                  accuracy?: number
+                  percentage?: number
+                },
+                idx: number,
+              ) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-[11px] font-bold"
+                >
+                  <span className="truncate pr-2">{item.name || item.disciplineName}</span>
+                  <span className="text-emerald-600 font-mono">
+                    {item.accuracy || item.percentage || 0}%
+                  </span>
+                </div>
+              ),
+            )}
           </div>
         </div>
       )}
@@ -984,30 +984,20 @@ export function WidgetLembretes({ snapshot: _snapshot, colSpan: _colSpan }: Dash
 // 15. WIDGET: Mensagem do Dia
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetMensagemDia(_props: DashboardWidgetProps) {
-  const messages = [
-    { text: "A disciplina é a ponte entre seus objetivos e suas realizações.", author: "Jim Rohn" },
-    {
-      text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.",
-      author: "Robert Collier",
-    },
-    {
-      text: "Estude enquanto eles dormem, trabalhe enquanto eles descansam, viva o que eles sonham.",
-      author: "Provérbio",
-    },
-    { text: "A persistência é o menor caminho para o êxito.", author: "Charles Chaplin" },
-  ]
-  const todayIndex = new Date().getDate() % messages.length
-  const msg = messages[todayIndex] as { text: string; author: string }
+  const msg = getDailyMessage()
 
   return (
-    <div className="p-5 flex flex-col justify-between h-full space-y-3">
+    <div className="p-4 flex flex-col justify-between h-full space-y-2">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-purple-500" /> MENSAGEM DO DIA
+        <span className="text-[10px] font-extrabold uppercase text-[#2563EB] tracking-wider flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" /> MENSAGEM DO DIA
         </span>
+        <span className="text-[10px] text-muted-foreground font-medium">{msg.category}</span>
       </div>
       <div className="my-auto space-y-2 text-center py-2">
-        <p className="text-xs font-semibold italic text-foreground">&ldquo;{msg.text}&rdquo;</p>
+        <p className="text-xs font-semibold italic text-foreground leading-relaxed">
+          &ldquo;{msg.text}&rdquo;
+        </p>
         <p className="text-[11px] font-bold text-muted-foreground">— {msg.author}</p>
       </div>
     </div>
