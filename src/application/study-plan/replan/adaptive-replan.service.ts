@@ -997,6 +997,11 @@ export async function getReplanInfo(
         )
       }
       const orphanRedist = windowBlocks.filter((b) => b.origin !== "BASE" && !b.source_block_id)
+      const rootKeys = new Map<string, number>()
+      for (const b of roots) {
+        const k = b.itemId ? `${b.itemId}|${b.scheduledDate}` : b.blockId
+        rootKeys.set(k, (rootKeys.get(k) ?? 0) + 1)
+      }
       Sentry.captureMessage("Replan: pendência exibida inconsistente (auditoria)", {
         level: "error",
         extra: {
@@ -1007,6 +1012,7 @@ export async function getReplanInfo(
           plannedTotalMinutes: roots.reduce((acc, b) => acc + b.durationMinutes, 0),
           pastBlockCount: pastBlocks.length,
           rootBlockCount: roots.length,
+          duplicateRootBlocks: [...rootKeys.values()].filter((n) => n > 1).length,
           futureBlockCount: futureBlocks.length,
           orphanRedistBlocks: orphanRedist.length,
           redistBlocksWithDuplicateSource: [...duplicatedSources.values()].filter((n) => n > 1)

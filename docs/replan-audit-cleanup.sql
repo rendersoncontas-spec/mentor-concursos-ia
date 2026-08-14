@@ -103,10 +103,43 @@ WHERE b.id = r.id
   AND b.scheduled_date = d.scheduled_date;
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 7. VALIDAÇÃO FINAL — execute de novo após a limpeza
---    Esperado: 0 órfãos; nenhum grupo de duplicatas no SELECT 3.
+-- 8. DEDUPLICAR BLOCOS BASE por (item_id, scheduled_date)
+--    Rebuilds críticos do código antigo deletavam e regeneravam o futuro
+--    repetidamente, criando ATÉ 29 CÓPIAS do mesmo item na mesma data
+--    (causa das 457h54). O planejamento original tem NO MÁXIMO 1 bloco por
+--    (item, data): mantém-se o mais antigo e removem-se as cópias.
+--    UM ÚNICO STATEMENT (atômico). O SELECT final retorna quantos foram
+--    removidos (ex.: 626).
 -- ───────────────────────────────────────────────────────────────────────────
-SELECT origin, status, count(*) AS blocks, sum(duration_minutes) AS planned_minutes
-FROM study_plan_daily_blocks
-GROUP BY origin, status
-ORDER BY origin, status;
+WITH ranked AS (
+  SELECT id, item_id, scheduled_date,
+         row_number() OVER (
+           PARTITION BY item_id, scheduled_date
+           ORDER BY created_at, id
+         ) AS rn
+  FROM study_plan_daily_blocks
+  WHERE origin = 'BASE' AND item_id IS NOT NULL AND status = 'PENDENTE'
+),
+removed AS (
+  DELETE FROM study_plan_daily_blocks b
+  USING ranked r
+  WHERE b.id = r.id AND r.rn > 1
+)
+SELECT count(*) AS removed_blocks FROM removed;
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 9. PÓS-DEDUP: blocos REAJUSTE/CRITICO cujo source foi uma cópia removida
+--    ficaram órfãos em cascata (FK ON DELETE SET NULL). Remova-os também:
+-- ───────────────────────────────────────────────────────────────────────────
+DELETE FROM study_plan_daily_blocks
+WHERE origin <> 'BASE' AND source_block_id IS NULL;
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 10. VALIDAÇÃO FINAL — janela passada de 7 dias deve ter ~4-7 blocos/dia
+--     (centenas de minutos, não milhares)
+-- ───────────────────────────────────────────────────────────────────────────
+SELECT b.scheduled_date, count(*) AS blocks, sum(b.duration_minutes) AS planned_minutes
+FROM study_plan_daily_blocks b
+WHERE b.scheduled_date >= (CURRENT_DATE - 7) AND b.scheduled_date < CURRENT_DATE
+GROUP BY b.scheduled_date
+ORDER BY b.scheduled_date;

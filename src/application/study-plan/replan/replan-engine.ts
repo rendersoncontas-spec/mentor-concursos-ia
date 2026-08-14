@@ -315,10 +315,19 @@ export function computePendingBlocks(
     (x, y) => x.scheduledDate.localeCompare(y.scheduledDate) || x.executionOrder - y.executionOrder,
   )
 
+  // Defesa contra dados corrompidos: o planejamento ORIGINAL tem NO MÁXIMO UM
+  // bloco BASE por (item_id, data) — duplicatas (ex.: rebuilds críticos do
+  // código antigo) são cópias da MESMA obrigação e nunca geram pendência nova.
+  const seenRootKeys = new Set<string>()
+
   for (const block of sorted) {
     if (block.sourceBlockId) continue // continuação — nunca gera pendência própria
     if (block.manuallyClosed) continue
     if (block.origin !== "BASE") continue // REAJUSTE/CRITICO órfão nunca é raiz
+
+    const rootKey = block.itemId ? `${block.itemId}|${block.scheduledDate}` : block.blockId
+    if (seenRootKeys.has(rootKey)) continue // duplicata da mesma obrigação original
+    seenRootKeys.add(rootKey)
 
     const group = groupByRoot.get(block.blockId) ?? []
     const realizedMinutes = group

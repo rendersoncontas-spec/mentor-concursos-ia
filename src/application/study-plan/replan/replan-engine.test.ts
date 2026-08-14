@@ -869,3 +869,51 @@ test("REAJUSTE órfão não infla o total quando há raiz legítima pendente", (
   assert.equal(result.pendingBlocks.length, 1)
   assert.equal(result.pendingBlocks[0]?.blockId, "b1")
 })
+
+// ============================================================================
+// DEFESA ANTI-DUPLICATA — blocos BASE repetidos por (item_id, data) são cópias
+// da MESMA obrigação (rebuilds críticos do código antigo) e não geram
+// pendência nova. O planejamento original tem no máximo 1 bloco por (item, data).
+// ============================================================================
+test("duplicatas BASE do mesmo item na mesma data contam UMA vez (29 cópias = 1)", () => {
+  const copies = Array.from({ length: 29 }, (_, i) =>
+    block({
+      blockId: `dup-${i}`,
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: YESTERDAY,
+      durationMinutes: 20,
+    }),
+  )
+
+  const result = computeReplan(input({ pastBlocks: copies, sessions: [], toleranceMinutes: 0 }))
+  // 29 × 20 = 580 NUNCA; a obrigação original é 20min.
+  assert.equal(result.totalPendingMinutes, 20)
+  assert.equal(result.pendingBlocks.length, 1)
+})
+
+test("duplicata BASE não é criada por reexecução com o mesmo dado (idempotência real)", () => {
+  const past = [
+    block({ blockId: "b1", itemId: "i1", disciplineId: "d1", scheduledDate: YESTERDAY, durationMinutes: 60 }),
+    block({ blockId: "b1-copy", itemId: "i1", disciplineId: "d1", scheduledDate: YESTERDAY, durationMinutes: 60 }),
+  ]
+
+  const first = computeReplan(input({ pastBlocks: past, sessions: [], toleranceMinutes: 0 }))
+  const second = computeReplan(input({ pastBlocks: past, sessions: [], toleranceMinutes: 0 }))
+  assert.equal(first.totalPendingMinutes, 60)
+  assert.equal(second.totalPendingMinutes, 60)
+  assert.equal(first.totalPendingMinutes, second.totalPendingMinutes)
+})
+
+test("duplicata BASE com estudo completo zera a pendência (60 realizado)", () => {
+  const copies = [
+    block({ blockId: "dup-1", itemId: "i1", disciplineId: "d1", scheduledDate: YESTERDAY, durationMinutes: 60 }),
+    block({ blockId: "dup-2", itemId: "i1", disciplineId: "d1", scheduledDate: YESTERDAY, durationMinutes: 60 }),
+  ]
+  const sessions: ReplanSession[] = [
+    session({ id: "s1", studyPlanItemId: "i1", durationMinutes: 60 }),
+  ]
+
+  const result = computeReplan(input({ pastBlocks: copies, sessions, toleranceMinutes: 0 }))
+  assert.equal(result.totalPendingMinutes, 0)
+})
