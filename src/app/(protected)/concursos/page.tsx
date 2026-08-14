@@ -1,11 +1,12 @@
 import { GraduationCap } from "lucide-react"
-import { createClient } from "@/infrastructure/supabase/server"
-import { ConcursosManagerView } from "@/features/concursos/components/concursos-manager-view"
+
 import type { ConcursoData } from "@/application/concursos/concurso.action"
+import { ConcursosManagerView } from "@/features/concursos/components/concursos-manager-view"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
-  title: "Concursos - Mentor Concursos IA",
-  description: "Gerencie todos os seus concursos e editais em um só lugar.",
+  title: "Concursos",
+  description: "Gerencie todos os seus concursos e editais em um só lugar no Nomeia.",
 }
 
 interface RawMeta {
@@ -24,7 +25,9 @@ function parseRowMeta(raw: any): RawMeta {
   if (!raw || typeof raw !== "string") return {}
   try {
     if (raw.startsWith("{")) return JSON.parse(raw) as RawMeta
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
   return {}
 }
 
@@ -35,7 +38,8 @@ function mapRowToConcurso(row: any): ConcursoData {
 
   let days_remaining: number | null = null
   if (exam_date) {
-    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
     const target = new Date(exam_date + "T00:00:00")
     days_remaining = Math.ceil((target.getTime() - today.getTime()) / 86400000)
   }
@@ -59,7 +63,9 @@ function mapRowToConcurso(row: any): ConcursoData {
 async function getConcursos(): Promise<ConcursoData[]> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return []
 
     const { data } = await supabase
@@ -69,7 +75,7 @@ async function getConcursos(): Promise<ConcursoData[]> {
       .order("is_active", { ascending: false })
       .order("created_at", { ascending: false })
 
-    return (data || []).map(row => mapRowToConcurso(row))
+    return (data || []).map((row) => mapRowToConcurso(row))
   } catch {
     return []
   }
@@ -86,7 +92,9 @@ export default async function ConcursosPage() {
           <GraduationCap className="h-5 w-5 text-primary" />
           <div>
             <h1 className="text-lg font-bold leading-none">Concursos</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Gerencie seus concursos e editais</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Gerencie seus concursos e editais
+            </p>
           </div>
         </div>
       </div>

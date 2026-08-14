@@ -1,17 +1,14 @@
-﻿"use client"
+"use client"
 
-import { useState, Fragment } from "react"
-import {
-  ArrowLeft,
-  ChevronDown,
-  MessageSquare,
-  GraduationCap,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Fragment, useState } from "react"
+
+import { ArrowLeft, ChevronDown, GraduationCap, MessageSquare } from "lucide-react"
 import { toast } from "sonner"
-import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
-import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
+
 import { type DisciplineDetailStats } from "@/application/disciplines/discipline-actions"
+import { Button } from "@/components/ui/button"
+import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
+import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
 export interface TopicItem {
   id: number
@@ -34,7 +31,7 @@ export interface DisciplineDetailProps {
   onBack: () => void
 }
 
-export function EstudeiDisciplineDetailView({
+export function DisciplineDetailView({
   disciplineName,
   topicsTotal: _topicsTotal = 0,
   topics = [],
@@ -71,10 +68,9 @@ export function EstudeiDisciplineDetailView({
   const doneTopics = hasCatalog ? catalogTopics.filter(isTopicDone).length : 0
   const progressPercent = totalTopics > 0 ? Math.round((doneTopics / totalTopics) * 100) : 0
 
-
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Header Actions — 100% Estudei Foto 2 e 5 */}
+      {/* Top Header Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
@@ -100,7 +96,10 @@ export function EstudeiDisciplineDetailView({
           </Button>
 
           {targetName && (
-            <Button variant="outline" className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2">
+            <Button
+              variant="outline"
+              className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+            >
               <GraduationCap className="h-4 w-4" />
               {targetName}
               <ChevronDown className="h-3.5 w-3.5" />
@@ -109,7 +108,7 @@ export function EstudeiDisciplineDetailView({
         </div>
       </div>
 
-      {/* Row de 4 Cards Métricos (Fotos 2, 4 e 5 100% Estudei) */}
+      {/* Row de 4 Cards Métricos */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: TEMPO DE ESTUDO */}
         <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
@@ -133,9 +132,7 @@ export function EstudeiDisciplineDetailView({
               <span className="text-emerald-600 block">
                 {stats ? `${statsCorrect} Acertos` : "–"}
               </span>
-              <span className="text-rose-500 block">
-                {stats ? `${statsWrong} Erros` : "–"}
-              </span>
+              <span className="text-rose-500 block">{stats ? `${statsWrong} Erros` : "–"}</span>
             </div>
             <span className="text-2xl font-black text-foreground font-mono">
               {accuracyPct === null ? "–" : `${accuracyPct}%`}
@@ -151,9 +148,13 @@ export function EstudeiDisciplineDetailView({
           <div className="flex items-end justify-between">
             <div className="text-[11px] font-bold space-y-0.5">
               <span className="text-emerald-600 block">{doneTopics} Tópicos Concluídos</span>
-              <span className="text-rose-500 block">{totalTopics - doneTopics} Tópicos Pendentes</span>
+              <span className="text-rose-500 block">
+                {totalTopics - doneTopics} Tópicos Pendentes
+              </span>
             </div>
-            <span className="text-2xl font-black text-foreground font-mono">{progressPercent}%</span>
+            <span className="text-2xl font-black text-foreground font-mono">
+              {progressPercent}%
+            </span>
           </div>
         </div>
 
@@ -251,7 +252,10 @@ export function EstudeiDisciplineDetailView({
                   <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
                   <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
                   <td className="px-3 py-3 text-center">
-                    <button type="button" className="text-muted-foreground/60 hover:text-foreground">
+                    <button
+                      type="button"
+                      className="text-muted-foreground/60 hover:text-foreground"
+                    >
                       <MessageSquare className="h-4 w-4" />
                     </button>
                   </td>
@@ -262,7 +266,7 @@ export function EstudeiDisciplineDetailView({
         )}
       </div>
 
-      {/* Seção Inferior: EDITAL VERTICALIZADO da Disciplina (Fotos 3 e 5 100% Estudei) */}
+      {/* Seção Inferior: EDITAL VERTICALIZADO da Disciplina */}
       <div className="rounded-xl border bg-card shadow-xs overflow-hidden space-y-4 p-6">
         <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground block border-b pb-3">
           EDITAL VERTICALIZADO
@@ -284,15 +288,102 @@ export function EstudeiDisciplineDetailView({
               </tr>
             </thead>
             <tbody className="divide-y font-semibold">
-              {hasCatalog ? (
-                catalogTopics.map((topic, idx) => {
-                  const isDone = isTopicDone(topic)
-                  const subs = topic.subtopics ?? []
-                  const subsDone = subs.filter((s) => checkedTopics[s.id]).length
-                  const subsPercent = subs.length > 0 ? Math.round((subsDone / subs.length) * 100) : null
-                  return (
-                    <Fragment key={topic.id}>
+              {hasCatalog
+                ? catalogTopics.map((topic, idx) => {
+                    const isDone = isTopicDone(topic)
+                    const subs = topic.subtopics ?? []
+                    const subsDone = subs.filter((s) => checkedTopics[s.id]).length
+                    const subsPercent =
+                      subs.length > 0 ? Math.round((subsDone / subs.length) * 100) : null
+                    return (
+                      <Fragment key={topic.id}>
+                        <tr
+                          className={`hover:bg-muted/30 transition-colors ${
+                            idx % 2 === 1 ? "bg-muted/10" : "bg-card"
+                          }`}
+                        >
+                          <td className="px-3 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isDone}
+                              onChange={() => toggleTopic(topic.id)}
+                              className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                            />
+                          </td>
+                          <td
+                            className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
+                          >
+                            {topic.name}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono text-emerald-600">
+                            {subsDone}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono text-rose-500">
+                            {subs.length - subsDone}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                            -
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono">
+                            {subsPercent === null ? "-" : `${subsPercent}%`}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                            -
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                            -
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toast.info("Adicionar link de caderno")}
+                              className="text-[#2563EB] font-bold hover:underline"
+                            >
+                              Adicionar
+                            </button>
+                          </td>
+                        </tr>
+                        {subs.map((sub) => {
+                          const subDone = !!checkedTopics[sub.id]
+                          return (
+                            <tr
+                              key={sub.id}
+                              className={`hover:bg-muted/30 transition-colors ${
+                                idx % 2 === 1 ? "bg-muted/10" : "bg-card"
+                              }`}
+                            >
+                              <td className="px-3 py-2.5 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={subDone}
+                                  onChange={() => toggleTopic(sub.id)}
+                                  className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                                />
+                              </td>
+                              <td
+                                className={`px-4 py-2.5 pl-9 text-muted-foreground ${subDone ? "text-emerald-700" : ""}`}
+                              >
+                                <span className="mr-1.5 text-muted-foreground/50">└</span>
+                                {sub.name}
+                              </td>
+                              <td className="px-3 py-2.5 text-center" />
+                              <td className="px-3 py-2.5 text-center" />
+                              <td className="px-3 py-2.5 text-center" />
+                              <td className="px-3 py-2.5 text-center" />
+                              <td className="px-3 py-2.5 text-center" />
+                              <td className="px-3 py-2.5 text-center" />
+                              <td className="px-4 py-2.5" />
+                            </tr>
+                          )
+                        })}
+                      </Fragment>
+                    )
+                  })
+                : topicList.map((topic, idx) => {
+                    const isDone = !!checkedTopics[topic.id]
+                    return (
                       <tr
+                        key={topic.id}
                         className={`hover:bg-muted/30 transition-colors ${
                           idx % 2 === 1 ? "bg-muted/10" : "bg-card"
                         }`}
@@ -301,21 +392,31 @@ export function EstudeiDisciplineDetailView({
                           <input
                             type="checkbox"
                             checked={isDone}
-                            onChange={() => toggleTopic(topic.id)}
+                            onChange={() => toggleTopic(String(topic.id))}
                             className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
                           />
                         </td>
-                        <td className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}>
-                          {topic.name}
+                        <td
+                          className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
+                        >
+                          {topic.title}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono text-emerald-600">{subsDone}</td>
-                        <td className="px-3 py-3 text-center font-mono text-rose-500">{subs.length - subsDone}</td>
-                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
-                        <td className="px-3 py-3 text-center font-mono">
-                          {subsPercent === null ? "-" : `${subsPercent}%`}
+                        <td className="px-3 py-3 text-center font-mono text-emerald-600">
+                          {topic.correct}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
-                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
+                        <td className="px-3 py-3 text-center font-mono text-rose-500">
+                          {topic.wrong}
+                        </td>
+                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                          {topic.notebook}
+                        </td>
+                        <td className="px-3 py-3 text-center font-mono">{topic.accuracy}</td>
+                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                          {topic.date}
+                        </td>
+                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                          {topic.questions}
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             type="button"
@@ -326,90 +427,15 @@ export function EstudeiDisciplineDetailView({
                           </button>
                         </td>
                       </tr>
-                      {subs.map((sub) => {
-                        const subDone = !!checkedTopics[sub.id]
-                        return (
-                          <tr
-                            key={sub.id}
-                            className={`hover:bg-muted/30 transition-colors ${
-                              idx % 2 === 1 ? "bg-muted/10" : "bg-card"
-                            }`}
-                          >
-                            <td className="px-3 py-2.5 text-center">
-                              <input
-                                type="checkbox"
-                                checked={subDone}
-                                onChange={() => toggleTopic(sub.id)}
-                                className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
-                              />
-                            </td>
-                            <td className={`px-4 py-2.5 pl-9 text-muted-foreground ${subDone ? "text-emerald-700" : ""}`}>
-                              <span className="mr-1.5 text-muted-foreground/50">└</span>
-                              {sub.name}
-                            </td>
-                            <td className="px-3 py-2.5 text-center" />
-                            <td className="px-3 py-2.5 text-center" />
-                            <td className="px-3 py-2.5 text-center" />
-                            <td className="px-3 py-2.5 text-center" />
-                            <td className="px-3 py-2.5 text-center" />
-                            <td className="px-3 py-2.5 text-center" />
-                            <td className="px-4 py-2.5" />
-                          </tr>
-                        )
-                      })}
-                    </Fragment>
-                  )
-                })
-              ) : (
-                topicList.map((topic, idx) => {
-                  const isDone = !!checkedTopics[topic.id]
-                  return (
-                    <tr
-                      key={topic.id}
-                      className={`hover:bg-muted/30 transition-colors ${
-                        idx % 2 === 1 ? "bg-muted/10" : "bg-card"
-                      }`}
-                    >
-                      <td className="px-3 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isDone}
-                          onChange={() => toggleTopic(String(topic.id))}
-                          className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
-                        />
-                      </td>
-                      <td className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}>
-                        {topic.title}
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-emerald-600">{topic.correct}</td>
-                      <td className="px-3 py-3 text-center font-mono text-rose-500">{topic.wrong}</td>
-                      <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.notebook}</td>
-                      <td className="px-3 py-3 text-center font-mono">{topic.accuracy}</td>
-                      <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.date}</td>
-                      <td className="px-3 py-3 text-center font-mono text-muted-foreground">{topic.questions}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => toast.info("Adicionar link de caderno")}
-                          className="text-[#2563EB] font-bold hover:underline"
-                        >
-                          Adicionar
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
+                    )
+                  })}
             </tbody>
           </table>
         </div>
       </div>
 
       {/* Modal Registrar Estudo */}
-      <StudyRegisterModal
-        open={isRegisterModalOpen}
-        onOpenChange={setIsRegisterModalOpen}
-      />
+      <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
     </div>
   )
 }
@@ -421,3 +447,4 @@ function formatMinutesLabel(minutes: number | null): string {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}min` : `${m}min`
 }
 
+export { DisciplineDetailView as EstudeiDisciplineDetailView }

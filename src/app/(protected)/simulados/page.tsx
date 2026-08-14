@@ -1,9 +1,10 @@
 import { ListCheck } from "lucide-react"
+
 import { SimuladosView } from "@/features/simulados/components/simulados-view"
 
 export const metadata = {
-  title: "Simulados - Mentor Concursos IA",
-  description: "Acompanhe e registre seu desempenho em simulados.",
+  title: "Simulados",
+  description: "Acompanhe e registre seu desempenho em simulados no Nomeia.",
 }
 
 export default function SimuladosPage() {
@@ -14,7 +15,9 @@ export default function SimuladosPage() {
         <ListCheck className="h-5 w-5 text-emerald-500" />
         <div>
           <h1 className="text-lg font-bold leading-none">Simulados</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Gestão de provas e simulados preparatórios</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Gestão de provas e simulados preparatórios
+          </p>
         </div>
       </div>
 

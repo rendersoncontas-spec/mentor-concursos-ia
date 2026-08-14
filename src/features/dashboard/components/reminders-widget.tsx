@@ -1,14 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { BellRing, Plus, CheckCircle2, Circle, Trash2, Calendar } from "lucide-react"
+
+import { BellRing, Calendar, CheckCircle2, Circle, Plus, Trash2 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -38,7 +40,6 @@ export function RemindersWidget({ className }: { className?: string }) {
   const [newTitle, setNewTitle] = useState("")
   const [newDate, setNewDate] = useState("")
 
-
   // Salvar no localStorage
   const saveReminders = (updated: ReminderItem[]) => {
     setReminders(updated)
@@ -64,9 +65,7 @@ export function RemindersWidget({ className }: { className?: string }) {
   }
 
   const toggleReminder = (id: string) => {
-    const updated = reminders.map((r) =>
-      r.id === id ? { ...r, completed: !r.completed } : r
-    )
+    const updated = reminders.map((r) => (r.id === id ? { ...r, completed: !r.completed } : r))
     saveReminders(updated)
   }
 
@@ -76,7 +75,12 @@ export function RemindersWidget({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn("rounded-xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between min-h-[300px] h-full", className)}>
+    <div
+      className={cn(
+        "rounded-xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between min-h-[300px] h-full",
+        className,
+      )}
+    >
       {/* Card Header */}
       <div className="flex items-center justify-between border-b pb-3">
         <div className="flex items-center gap-2">
@@ -100,7 +104,7 @@ export function RemindersWidget({ className }: { className?: string }) {
       {/* Lista ou Estado Vazio */}
       {reminders.length === 0 ? (
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-6 px-4">
-          {/* Ilustração Padrão Estudei */}
+          {/* Ilustração Visual de Lembretes */}
           <div className="flex flex-col gap-2 p-4 rounded-xl border bg-muted/20 w-44 shrink-0 shadow-inner">
             <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -122,7 +126,8 @@ export function RemindersWidget({ className }: { className?: string }) {
               Você ainda não criou nenhum lembrete.
             </h4>
             <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
-              Use este espaço para anotar coisas importantes: datas de inscrição, provas, boletos a pagar, aulas ao vivo...
+              Use este espaço para anotar coisas importantes: datas de inscrição, provas, boletos a
+              pagar, aulas ao vivo...
             </p>
             <div className="pt-1">
               <Button
@@ -206,18 +211,17 @@ export function RemindersWidget({ className }: { className?: string }) {
               <label className="text-xs font-semibold text-muted-foreground">
                 Data do Evento (Opcional)
               </label>
-              <Input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-              />
+              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
             </div>
 
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold">
+              <Button
+                type="submit"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
+              >
                 Salvar Lembrete
               </Button>
             </DialogFooter>

@@ -1,33 +1,42 @@
 "use client"
 
-import { useState, useEffect, useMemo, type ReactNode } from "react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
+
+import Image from "next/image"
+
 import {
-  Trophy,
-  Users,
-  Timer,
-  ListChecks,
-  BookOpen,
-  Crown,
-  Medal,
   AlertCircle,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  RotateCw,
-  Loader2,
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
-  CalendarDays,
-  Flame,
-  Target,
-  Eye,
-  ArrowUp,
-  ArrowDown,
   Crosshair,
+  Crown,
+  Eye,
+  Flame,
+  ListChecks,
+  Loader2,
   type LucideIcon,
+  Medal,
+  Minus,
+  RotateCw,
+  Target,
+  Timer,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  Users,
 } from "lucide-react"
+import { toast } from "sonner"
+
+import {
+  type RankingPersonalContext,
+  getGlobalRankingAction,
+  getRankingPersonalContextAction,
+} from "@/application/study-analytics/study-analytics.actions"
 import { Badge } from "@/components/ui/badge"
-import Image from "next/image"
 import {
   Select,
   SelectContent,
@@ -35,12 +44,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  getGlobalRankingAction,
-  getRankingPersonalContextAction,
-  type RankingPersonalContext,
-} from "@/application/study-analytics/study-analytics.actions"
-import { toast } from "sonner"
 
 export interface RankingStudent {
   rank: number
@@ -256,7 +259,7 @@ function ProgressBar({
 /* ─────────────────────────────────────────────────────────────────────────────
    VIEW PRINCIPAL DO RANKING
 ──────────────────────────────────────────────────────────────────────────────*/
-export function EstudeiRankingView() {
+export function RankingView() {
   const [activeTab, setActiveTab] = useState<RankingMetric>("TEMPO")
   const [period, setPeriod] = useState<RankingPeriod>("this_week")
   const [loading, setLoading] = useState(true)
@@ -366,8 +369,8 @@ export function EstudeiRankingView() {
     [rankedStudents, currentUserStats],
   )
 
-  const above = myIndex > 0 ? rankedStudents[myIndex - 1] ?? null : null
-  const below = myIndex >= 0 ? rankedStudents[myIndex + 1] ?? null : null
+  const above = myIndex > 0 ? (rankedStudents[myIndex - 1] ?? null) : null
+  const below = myIndex >= 0 ? (rankedStudents[myIndex + 1] ?? null) : null
 
   const positionDelta = useMemo(() => {
     const current = currentUserStats?.rank
@@ -418,8 +421,7 @@ export function EstudeiRankingView() {
 
   const totalParticipants = data?.totalParticipants ?? 0
   const periodInfo = periodRangeFor(period)
-  const isOnlyParticipant =
-    totalParticipants <= 1 && rankedStudents.length === 1 && myIndex >= 0
+  const isOnlyParticipant = totalParticipants <= 1 && rankedStudents.length === 1 && myIndex >= 0
 
   return (
     <div className="space-y-6 pb-16 animate-fade-in">
@@ -495,7 +497,11 @@ export function EstudeiRankingView() {
         </div>
 
         {/* Abas de métricas */}
-        <div role="group" aria-label="Métrica do ranking" className="flex items-center gap-1.5 p-1 bg-background/80 rounded-xl border shadow-2xs">
+        <div
+          role="group"
+          aria-label="Métrica do ranking"
+          className="flex items-center gap-1.5 p-1 bg-background/80 rounded-xl border shadow-2xs"
+        >
           {METRICS.map(({ id, label, icon: MetricIcon }) => {
             const selected = activeTab === id
             return (
@@ -509,7 +515,9 @@ export function EstudeiRankingView() {
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
-                <MetricIcon className={`h-4 w-4 ${selected ? "text-primary-foreground" : "text-muted-foreground"}`} />
+                <MetricIcon
+                  className={`h-4 w-4 ${selected ? "text-primary-foreground" : "text-muted-foreground"}`}
+                />
                 <span>{label}</span>
               </button>
             )
@@ -590,8 +598,8 @@ export function EstudeiRankingView() {
           <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 animate-fade-in">
             <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
             <p className="text-xs sm:text-sm font-semibold leading-relaxed">
-              Você ainda não registrou {metricLabelFor(activeTab).toLowerCase()} no período selecionado.
-              Estude hoje para pontuar e subir no ranking!
+              Você ainda não registrou {metricLabelFor(activeTab).toLowerCase()} no período
+              selecionado. Estude hoje para pontuar e subir no ranking!
             </p>
           </div>
         )}
@@ -646,13 +654,15 @@ export function EstudeiRankingView() {
                 <Trophy className="h-4 w-4 text-primary" /> Classificação Geral
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Todos os alunos participantes ordenados por {metricLabelFor(activeTab).toLowerCase()}
+                Todos os alunos participantes ordenados por{" "}
+                {metricLabelFor(activeTab).toLowerCase()}
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
-                {rankedStudents.length} {rankedStudents.length === 1 ? "aluno ativo" : "alunos ativos"}
+                {rankedStudents.length}{" "}
+                {rankedStudents.length === 1 ? "aluno ativo" : "alunos ativos"}
               </span>
               {myIndex >= 0 && (
                 <button
@@ -684,9 +694,9 @@ export function EstudeiRankingView() {
             <div key={`list-${activeTab}`} className="space-y-2 animate-fade-in">
               {rankedStudents.map((student, idx) => {
                 const isYou = isCurrentUserStudent(student, isCurrentUserId)
-                const prevStudent = idx > 0 ? rankedStudents[idx - 1] ?? null : null
+                const prevStudent = idx > 0 ? (rankedStudents[idx - 1] ?? null) : null
                 const nextStudent =
-                  idx < rankedStudents.length - 1 ? rankedStudents[idx + 1] ?? null : null
+                  idx < rankedStudents.length - 1 ? (rankedStudents[idx + 1] ?? null) : null
 
                 return (
                   <div
@@ -701,16 +711,11 @@ export function EstudeiRankingView() {
                           icon={<ArrowUp className="h-3.5 w-3.5" />}
                           text={`Faltam ${formatGap(
                             activeTab,
-                            metricNumber(prevStudent, activeTab) -
-                              metricNumber(student, activeTab),
+                            metricNumber(prevStudent, activeTab) - metricNumber(student, activeTab),
                           )} para ultrapassar #${prevStudent.rank} ${cleanStudentName(prevStudent.name)}`}
                         />
                       )}
-                    <RankRankingRow
-                      student={student}
-                      metric={activeTab}
-                      isYou={isYou}
-                    />
+                    <RankRankingRow student={student} metric={activeTab} isYou={isYou} />
                     {isYou &&
                       nextStudent &&
                       metricNumber(student, activeTab) > metricNumber(nextStudent, activeTab) && (
@@ -718,8 +723,7 @@ export function EstudeiRankingView() {
                           icon={<ArrowDown className="h-3.5 w-3.5" />}
                           text={`Você tem ${formatGap(
                             activeTab,
-                            metricNumber(student, activeTab) -
-                              metricNumber(nextStudent, activeTab),
+                            metricNumber(student, activeTab) - metricNumber(nextStudent, activeTab),
                           )} de vantagem sobre #${nextStudent.rank} ${cleanStudentName(nextStudent.name)}`}
                         />
                       )}
@@ -775,13 +779,13 @@ function MetricSummaryCard({
   return (
     <div
       className={`relative p-4 rounded-2xl border transition-all duration-200 overflow-hidden bg-card ${
-        highlight
-          ? "border-primary/40 shadow-sm ring-1 ring-primary/20"
-          : "hover:border-border/80"
+        highlight ? "border-primary/40 shadow-sm ring-1 ring-primary/20" : "hover:border-border/80"
       }`}
     >
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${iconColor}`}>
+        <div
+          className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${iconColor}`}
+        >
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -793,9 +797,7 @@ function MetricSummaryCard({
           </span>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground font-medium mt-2 truncate">
-        {caption}
-      </p>
+      <p className="text-[11px] text-muted-foreground font-medium mt-2 truncate">{caption}</p>
     </div>
   )
 }
@@ -842,7 +844,10 @@ function SuaPosicaoCard({
       progress = value > 0 ? 100 : 0
     } else if (rank === 1) {
       message = "Parabéns! Você está no topo da liderança."
-      goalLabel = belowValue !== null && below ? `Vantagem de ${formatGap(metric, value - belowValue)} sobre o 2º` : "Defenda seu primeiro lugar"
+      goalLabel =
+        belowValue !== null && below
+          ? `Vantagem de ${formatGap(metric, value - belowValue)} sobre o 2º`
+          : "Defenda seu primeiro lugar"
       progress = 100
     } else if (rank === 2) {
       message =
@@ -896,7 +901,7 @@ function SuaPosicaoCard({
   return (
     <div className="relative rounded-3xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
       <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
-      
+
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <span className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
@@ -909,12 +914,7 @@ function SuaPosicaoCard({
             <div>
               <p className="text-base font-black text-foreground flex items-center gap-1.5">
                 {rankLabel}
-                {isMedalRank(rank) && (
-                  <Medal
-                    className="h-4 w-4"
-                    style={medalStyleFor(rank)}
-                  />
-                )}
+                {isMedalRank(rank) && <Medal className="h-4 w-4" style={medalStyleFor(rank)} />}
               </p>
               <p className="text-xs font-bold text-muted-foreground mt-0.5 tabular-nums">
                 {student ? metricValueFor(student, metric) : "0"} acumulados
@@ -928,7 +928,7 @@ function SuaPosicaoCard({
 
       <div className="space-y-2.5 pt-2 border-t border-border/60">
         <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">{message}</p>
-        
+
         {goalLabel && (
           <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
             <span className="flex items-center gap-1.5">
@@ -999,9 +999,13 @@ function ProximoAlvoCard({
               </p>
             </div>
             <div className="text-right shrink-0">
-              <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">Distância</span>
+              <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                Distância
+              </span>
               <span className="text-xs font-black text-primary tabular-nums">
-                {aboveValue !== null && aboveValue > userValue ? formatGap(metric, aboveValue - userValue) : "0"}
+                {aboveValue !== null && aboveValue > userValue
+                  ? formatGap(metric, aboveValue - userValue)
+                  : "0"}
               </span>
             </div>
           </div>
@@ -1035,7 +1039,11 @@ function ProximoAlvoCard({
         <div className="flex items-center gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
           <Eye className="h-4 w-4 shrink-0 text-amber-500" />
           <p className="text-xs font-bold text-foreground leading-snug truncate">
-            Atenção: <span className="text-amber-600 dark:text-amber-400">{cleanStudentName(below.name)}</span> (#{below.rank}) está a apenas{" "}
+            Atenção:{" "}
+            <span className="text-amber-600 dark:text-amber-400">
+              {cleanStudentName(below.name)}
+            </span>{" "}
+            (#{below.rank}) está a apenas{" "}
             <span className="text-amber-600 dark:text-amber-400 tabular-nums font-black">
               {formatGap(metric, userValue - belowValue)}
             </span>{" "}
@@ -1108,15 +1116,17 @@ function PodiumPedestal({
   }
 
   return (
-    <div className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 ${isFirst ? "order-2" : isSecond ? "order-1" : "order-3"}`}>
+    <div
+      className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 ${isFirst ? "order-2" : isSecond ? "order-1" : "order-3"}`}
+    >
       {/* Coroa / Medalha no topo */}
       <div className="relative mb-2 flex flex-col items-center">
         {isFirst && (
-          <Crown className={`h-6 w-6 mb-1 filter drop-shadow-md animate-bounce ${crownColors[1]}`} />
+          <Crown
+            className={`h-6 w-6 mb-1 filter drop-shadow-md animate-bounce ${crownColors[1]}`}
+          />
         )}
-        {!isFirst && (
-          <Medal className={`h-5 w-5 mb-1 ${crownColors[rank]}`} />
-        )}
+        {!isFirst && <Medal className={`h-5 w-5 mb-1 ${crownColors[rank]}`} />}
 
         <div className="relative">
           <Avatar
@@ -1124,7 +1134,11 @@ function PodiumPedestal({
             sizeClass={`${
               isFirst ? "h-16 w-16 sm:h-20 sm:w-20" : "h-12 w-12 sm:h-16 sm:w-16"
             } text-base font-black border-4 ${
-              isFirst ? "border-amber-400 shadow-amber-500/20" : isSecond ? "border-slate-300 shadow-slate-400/20" : "border-amber-600 shadow-amber-700/20"
+              isFirst
+                ? "border-amber-400 shadow-amber-500/20"
+                : isSecond
+                  ? "border-slate-300 shadow-slate-400/20"
+                  : "border-amber-600 shadow-amber-700/20"
             } shadow-lg`}
             imgSize={isFirst ? 160 : 128}
           />
@@ -1138,7 +1152,9 @@ function PodiumPedestal({
 
       {/* Nome e Pontuação */}
       <div className="mb-2 max-w-full px-1">
-        <p className={`font-black text-foreground truncate ${isFirst ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}>
+        <p
+          className={`font-black text-foreground truncate ${isFirst ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}
+        >
           {cleanStudentName(student.name)}
         </p>
         <span
@@ -1241,8 +1257,8 @@ function RankRankingRow({
             isYou
               ? "bg-primary text-primary-foreground"
               : inMedal
-              ? "bg-muted/80 text-foreground font-extrabold"
-              : "text-muted-foreground font-bold"
+                ? "bg-muted/80 text-foreground font-extrabold"
+                : "text-muted-foreground font-bold"
           }`}
         >
           {metricValueFor(student, metric)}
@@ -1296,9 +1312,7 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
         <div>
           <p className="text-2xl sm:text-3xl font-black text-foreground leading-none tabular-nums">
             {achieved}
-            <span className="text-xs text-muted-foreground font-semibold ml-1">
-              / {target}
-            </span>
+            <span className="text-xs text-muted-foreground font-semibold ml-1">/ {target}</span>
           </p>
           <p className="text-[11px] text-muted-foreground font-medium mt-1">
             {done ? "Meta semanal atingida!" : `Faltam ${remaining} para atingir a meta`}
@@ -1306,10 +1320,7 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
         </div>
       </div>
 
-      <ProgressBar
-        value={percentage}
-        ariaLabel="Progresso da meta semanal de estudo"
-      />
+      <ProgressBar value={percentage} ariaLabel="Progresso da meta semanal de estudo" />
     </section>
   )
 }
@@ -1516,9 +1527,7 @@ function WeeklyWinnersCard() {
                   {cleanStudentName(student.name)}
                 </span>
               </div>
-              <span className="font-bold text-muted-foreground tabular-nums">
-                {student.hours}
-              </span>
+              <span className="font-bold text-muted-foreground tabular-nums">{student.hours}</span>
             </div>
           ))}
         </div>
@@ -1584,3 +1593,5 @@ function RankingErrorState({ message, onRetry }: { message: string; onRetry: () 
     </div>
   )
 }
+
+export { RankingView as EstudeiRankingView }

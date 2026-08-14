@@ -1,8 +1,10 @@
+import { Metadata } from "next"
+
 import { StatisticsCenterView } from "@/features/statistics/components/statistics-center-view"
 
-export const metadata = {
-  title: "Estatísticas - Mentor Concursos IA",
-  description: "Análise real dos seus estudos: tempo, desempenho, consistência e prioridades.",
+export const metadata: Metadata = {
+  title: "Estatísticas",
+  description: "Análise completa de desempenho e métricas no Nomeia.",
 }
 
 export default function EstatisticasPage() {

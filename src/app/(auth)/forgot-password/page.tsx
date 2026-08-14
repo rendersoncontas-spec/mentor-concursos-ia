@@ -4,8 +4,8 @@ import Link from "next/link"
 import { ForgotPasswordForm } from "@/features/auth/components/forgot-password-form"
 
 export const metadata: Metadata = {
-  title: "Recuperar Senha",
-  description: "Recupere o acesso à sua conta.",
+  title: "Recuperar Senha — Nomeia",
+  description: "Recupere o acesso à sua conta no Nomeia.",
 }
 
 export default function ForgotPasswordPage() {
@@ -14,7 +14,7 @@ export default function ForgotPasswordPage() {
       <div className="flex flex-col space-y-2 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Recuperar Senha</h1>
         <p className="text-sm text-muted-foreground">
-          Digite seu e-mail para receber um link de redefinição de senha.
+          Digite seu e-mail para receber um link de redefinição de senha no Nomeia.
         </p>
       </div>
 

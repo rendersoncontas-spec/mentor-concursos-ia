@@ -269,6 +269,10 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
         router.refresh()
       } else {
         // Modo CRIAÇÃO
+        if (!data.discipline_id || !data.discipline_name) {
+          toast.error("Selecione uma disciplina existente na lista antes de salvar.")
+          return
+        }
         
         // Se há sessão ativa (cronômetro rodando ou pausado), usar finalizeAndSaveSession
         // Se não há sessão (fase IDLE), usar saveStudySessionAction diretamente (modo manual)
@@ -577,8 +581,23 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                         <div className="flex items-center gap-2">
                           {phase === 'IDLE' || phase === 'PAUSED' ? (
                             <Button size="sm" type="button" onClick={() => {
-                              if (phase === 'IDLE') startSession({ disciplineName: form.getValues("discipline_name") || "Estudo", topicName: form.getValues("topic_name"), studyType: form.getValues("studyType"), technique: watchTechnique })
-                              else resumeSession()
+                              if (phase === 'IDLE') {
+                                const discId = form.getValues("discipline_id")
+                                const discName = form.getValues("discipline_name")
+                                if (!discId || !discName) {
+                                  toast.error("Selecione uma disciplina existente na lista antes de iniciar.")
+                                  return
+                                }
+                                startSession({
+                                  disciplineName: discName,
+                                  disciplineId: discId,
+                                  topicName: form.getValues("topic_name"),
+                                  studyType: form.getValues("studyType"),
+                                  technique: watchTechnique,
+                                })
+                              } else {
+                                resumeSession()
+                              }
                             }} className="gap-1.5 w-24 bg-blue-600 hover:bg-blue-700 h-9">
                               <Play className="h-4 w-4" /> {phase === 'PAUSED' ? 'Continuar' : 'Iniciar'}
                             </Button>
@@ -637,11 +656,12 @@ export function StudyRegisterModal({ open, onOpenChange, sessionToEdit, mode = "
                               value={field.value}
                               onValueChange={(search) => {
                                 field.onChange(search);
-                                form.setValue("discipline_id", "");
+                                const found = allDisciplines.find(d => d.name.toLowerCase() === search.toLowerCase());
+                                form.setValue("discipline_id", found ? found.id : "");
                               }}
                             />
                             <CommandList className="max-h-[300px] overflow-y-auto">
-                              <CommandEmpty>Pressione Enter para usar &quot;{field.value}&quot;</CommandEmpty>
+                              <CommandEmpty>Nenhuma disciplina encontrada. Selecione uma existente na lista.</CommandEmpty>
                               {planDisciplines.length > 0 && (
                                 <CommandGroup heading="Sugestões do Plano">
                                   {planDisciplines.map((disc) => (

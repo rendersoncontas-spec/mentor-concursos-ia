@@ -1,9 +1,10 @@
 import { Library } from "lucide-react"
-import { EstudeiBibliotecaView } from "@/features/biblioteca/components/estudei-biblioteca-view"
+
+import { BibliotecaView } from "@/features/biblioteca/components/estudei-biblioteca-view"
 
 export const metadata = {
-  title: "Biblioteca - Mentor Concursos IA",
-  description: "Organize seus materiais de estudo, PDFs, resumos e links.",
+  title: "Biblioteca",
+  description: "Organize seus materiais de estudo, PDFs, resumos e links no Nomeia.",
 }
 
 export default function BibliotecaPage() {
@@ -14,12 +15,14 @@ export default function BibliotecaPage() {
         <Library className="h-5 w-5 text-emerald-500" />
         <div>
           <h1 className="text-lg font-bold leading-none">Biblioteca</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Central de materiais de apoio e resumos</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Central de materiais de apoio e resumos
+          </p>
         </div>
       </div>
 
       <div className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
-        <EstudeiBibliotecaView />
+        <BibliotecaView />
       </div>
     </div>
   )

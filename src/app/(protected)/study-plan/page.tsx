@@ -1,20 +1,24 @@
 import { redirect } from "next/navigation"
-import { CalendarDays, BarChart3 } from "lucide-react"
 
-import { createClient } from "@/infrastructure/supabase/server"
-import { getActiveStudyPlan, getStudyPlanDisciplineSummary } from "@/application/study-plan/study-plan.service"
+import { BarChart3, CalendarDays } from "lucide-react"
+
+import {
+  getActiveStudyPlan,
+  getStudyPlanDisciplineSummary,
+} from "@/application/study-plan/study-plan.service"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { GeneratePlanButton } from "@/features/study-plan/components/generate-plan-button"
 import {
-  StudyPlanWeekView,
   StudyPlanDisciplineSummaryView,
   StudyPlanEmptyState,
+  StudyPlanWeekView,
 } from "@/features/study-plan/components/study-plan-week"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
-  title: "Cronograma - Mentor Concursos IA",
-  description: "Seu cronograma de estudos personalizado gerado automaticamente.",
+  title: "Cronograma de Estudos",
+  description: "Seu cronograma de estudos personalizado no Nomeia.",
 }
 
 function formatMinutes(minutes: number): string {
@@ -28,7 +32,9 @@ function formatMinutes(minutes: number): string {
 export default async function StudyPlanPage() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
   const [planWeek, disciplineSummary] = await Promise.all([

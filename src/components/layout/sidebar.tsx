@@ -1,40 +1,35 @@
 "use client"
 
+import { useEffect, useRef, useState, useSyncExternalStore } from "react"
+import type { MouseEventHandler } from "react"
+
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect, useRef, useState, useSyncExternalStore } from "react"
-import type { MouseEventHandler } from "react"
+
 import {
-  LayoutDashboard,
+  BarChart3,
   BookOpen,
-  GraduationCap,
-  FileText,
   CalendarDays,
   CalendarRange,
-  RefreshCcw,
-  History,
-  BarChart3,
-  ListCheck,
-  Library,
-  Trophy,
-  Medal,
-  Heart,
   ChevronLeft,
   ChevronRight,
-  ChevronsUpDown,
-  LogOut,
-  UserCheck,
-  CreditCard,
-  FilePlus,
+  FileText,
+  GraduationCap,
+  Heart,
+  History,
+  LayoutDashboard,
+  Library,
+  ListCheck,
+  Medal,
+  RefreshCcw,
+  Trophy,
   X,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-import { cn } from "@/lib/utils"
-import { clearUserLocalData } from "@/utils/user-data"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { AccountSettingsModal } from "@/features/profile/components/account-settings-modal"
+import { cn } from "@/lib/utils"
 
 const COLLAPSE_KEY = "mentor-sidebar-collapsed"
 
@@ -99,26 +94,12 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 ]
 
 interface AppSidebarProps {
-  logoutAction: () => Promise<void>
   className?: string
   isOpen?: boolean
   onClose?: () => void
-  userEmail?: string
-  userName?: string
-  userId?: string
-  avatarUrl?: string | null
 }
 
-export function AppSidebar({
-  logoutAction,
-  className,
-  isOpen,
-  onClose,
-  userEmail = "",
-  userName = "Estudante",
-  userId = "",
-  avatarUrl = null,
-}: AppSidebarProps) {
+export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   // Estado inicial fixo para evitar mismatch de hydration (não ler window/localStorage aqui).
@@ -142,9 +123,6 @@ export function AppSidebar({
     return () => clearTimeout(timer)
   }, [])
   const isDesktop = useIsDesktop()
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
-  const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Estado recolhido persistente
   const toggleCollapsed = () => {
@@ -159,70 +137,12 @@ export function AppSidebar({
     })
   }
 
-  // Fechar menu do usuário com clique fora e ESC
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false)
-      }
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsUserMenuOpen(false)
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    window.addEventListener("keydown", handleKeyDown)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-      window.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [])
-
-  // Avatar: fonte de verdade avatar_url do banco; localStorage apenas como cache
-  const [avatarImg, setAvatarImg] = useState<string | null>(avatarUrl ?? null)
-  useEffect(() => {
-    const avatarKey = userId ? `mentor_user_avatar_${userId}` : "mentor_user_avatar"
-    if (!avatarUrl) {
-      const saved = localStorage.getItem(avatarKey)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved) setAvatarImg(saved)
-    }
-    const handleAvatarUpdate = () => {
-      if (avatarUrl) return
-      const updated = localStorage.getItem(avatarKey)
-      setAvatarImg(updated)
-    }
-    window.addEventListener("avatarUpdated", handleAvatarUpdate)
-    return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
-  }, [userId, avatarUrl])
-
   // No drawer mobile a sidebar sempre abre completa
   const effectiveCollapsed = isDesktop ? collapsed : false
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard"
     return pathname.startsWith(href)
-  }
-
-  const initials =
-    userName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase() || "?"
-
-  const handleLogout = async () => {
-    setIsUserMenuOpen(false)
-    clearUserLocalData()
-    await logoutAction()
-    window.location.replace("/login")
-  }
-
-  const navigateAndClose = (href: string) => {
-    setIsUserMenuOpen(false)
-    onClose?.()
-    router.push(href)
   }
 
   return (
@@ -273,7 +193,7 @@ export function AppSidebar({
           <div className="flex items-center justify-center shrink-0">
             <Image
               src="/logo.png"
-              alt="Mentor IA Logo"
+              alt="Nomeia Logo"
               width={38}
               height={38}
               className="w-[38px] h-[38px] object-contain rounded-xl"
@@ -283,10 +203,10 @@ export function AppSidebar({
           {!effectiveCollapsed && (
             <div className="min-w-0 leading-tight">
               <p className="text-[15px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] truncate">
-                Mentor IA
+                Nomeia
               </p>
-              <p className="text-[11px] font-medium text-[hsl(var(--sidebar-foreground))/0.5] truncate">
-                Concursos
+              <p className="text-[10px] font-medium text-[hsl(var(--sidebar-foreground))/0.5] truncate">
+                Sua preparação rumo à nomeação.
               </p>
             </div>
           )}
@@ -366,118 +286,6 @@ export function AppSidebar({
           ))}
         </nav>
 
-        {/* ── Rodapé: Bloco do usuário ───────────────────────────────────── */}
-        <div
-          ref={userMenuRef}
-          className="relative shrink-0 border-t border-[hsl(var(--sidebar-border))/70] p-3"
-        >
-          <button
-            onClick={() => setIsUserMenuOpen((prev) => !prev)}
-            aria-haspopup="menu"
-            aria-expanded={isUserMenuOpen}
-            title={effectiveCollapsed ? userName : undefined}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors duration-150 outline-none",
-              effectiveCollapsed ? "justify-center" : "",
-              isUserMenuOpen
-                ? "bg-[hsl(var(--sidebar-accent))]"
-                : "hover:bg-[hsl(var(--sidebar-accent))]",
-              "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-[hsl(var(--sidebar-background))]",
-            )}
-          >
-            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#2563EB]/40 bg-[#2563EB]/10 text-[#2563EB]">
-              {avatarImg ? (
-                <Image
-                  src={avatarImg}
-                  alt=""
-                  width={36}
-                  height={36}
-                  unoptimized
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-[11px] font-black" aria-hidden>
-                  {initials}
-                </span>
-              )}
-            </span>
-
-            {!effectiveCollapsed && (
-              <>
-                <span className="min-w-0 flex-1 leading-tight">
-                  <span className="block truncate text-[13px] font-bold text-[hsl(var(--sidebar-foreground))]">
-                    {userName}
-                  </span>
-                  <span className="block truncate text-[11px] text-[hsl(var(--sidebar-foreground))/0.5]">
-                    {userEmail || "Conta pessoal"}
-                  </span>
-                </span>
-                <ChevronsUpDown
-                  aria-hidden
-                  className="shrink-0 text-[hsl(var(--sidebar-foreground))/0.4]"
-                  style={{ width: 16, height: 16 }}
-                />
-              </>
-            )}
-          </button>
-
-          {isUserMenuOpen && (
-            <div
-              role="menu"
-              className={cn(
-                "absolute z-30 w-60 rounded-xl border bg-popover p-1.5 shadow-xl text-popover-foreground space-y-0.5 animate-in fade-in zoom-in-95 duration-100",
-                effectiveCollapsed ? "left-full bottom-0 ml-2" : "left-0 bottom-full mb-2",
-              )}
-            >
-              <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground truncate">
-                {userName}
-              </div>
-              <div className="border-t border-border/60 my-1" />
-
-              <button
-                role="menuitem"
-                onClick={() => {
-                  setIsUserMenuOpen(false)
-                  setIsAccountModalOpen(true)
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-primary/10 hover:text-primary transition-colors text-left"
-              >
-                <UserCheck className="h-4 w-4 text-primary" />
-                <span>Minha conta</span>
-              </button>
-
-              <button
-                role="menuitem"
-                onClick={() => navigateAndClose("/assinatura")}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-primary/10 hover:text-primary transition-colors text-left"
-              >
-                <CreditCard className="h-4 w-4 text-primary" />
-                <span>Assinatura</span>
-              </button>
-
-              <button
-                role="menuitem"
-                onClick={() => navigateAndClose("/pedidos-editais")}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-primary/10 hover:text-primary transition-colors text-left"
-              >
-                <FilePlus className="h-4 w-4 text-primary" />
-                <span>Pedidos de Editais</span>
-              </button>
-
-              <div className="border-t border-border/60 my-1" />
-
-              <button
-                role="menuitem"
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-left"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Sair</span>
-              </button>
-            </div>
-          )}
-        </div>
-
         {/* ── Botão recolher/expandir ────────────────────────────────────── */}
         <button
           onClick={toggleCollapsed}
@@ -485,22 +293,9 @@ export function AppSidebar({
           aria-label={collapsed ? "Expandir menu" : "Colapsar menu"}
           title={collapsed ? "Expandir menu" : "Colapsar menu"}
         >
-          {collapsed ? (
-            <ChevronRight className="h-3 w-3" />
-          ) : (
-            <ChevronLeft className="h-3 w-3" />
-          )}
+          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
         </button>
       </aside>
-
-      <AccountSettingsModal
-        open={isAccountModalOpen}
-        onOpenChange={setIsAccountModalOpen}
-        _userName={userName}
-        userEmail={userEmail}
-        userId={userId}
-        logoutAction={logoutAction}
-      />
     </TooltipProvider>
   )
 }

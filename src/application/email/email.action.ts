@@ -1,19 +1,21 @@
 "use server"
 
-import { createClient } from "@/infrastructure/supabase/server"
 import { sendTestEmail, sendWelcomeEmail } from "@/infrastructure/email/email.service"
 import { isResendConfigured } from "@/infrastructure/email/resend.client"
+import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
 /**
  * Server Action para envio de e-mail de teste para o usuário autenticado.
  * Apenas usuários com sessão ativa no Supabase podem disparar este teste.
+ * O e-mail do destinatário é SEMPRE obtido do usuário autenticado no Supabase Auth.
  */
 export async function sendTestEmailAction(): Promise<{
   success: boolean
   error?: string
   message?: string
-  simulated?: boolean
+  messageId?: string
+  recipient?: string
 }> {
   if (isMaintenanceMode()) {
     return { success: false, error: "Sistema temporariamente indisponível." }
@@ -26,52 +28,59 @@ export async function sendTestEmailAction(): Promise<{
       error: authError,
     } = await supabase.auth.getUser()
 
-    if (authError || !user || !user.email) {
+    if (authError || !user) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
-    // Buscar nome do perfil se disponível
+    // Buscar profile associado ao usuário autenticado
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name, full_name, nickname")
+      .select("name, full_name, nickname, email")
       .eq("id", user.id)
       .maybeSingle()
+
+    // O destinatário é o e-mail real da conta autenticada
+    const recipientEmail = (user.email || profile?.email)?.trim()
+
+    if (!recipientEmail) {
+      return { success: false, error: "E-mail da conta autenticada não encontrado." }
+    }
 
     const userName =
       profile?.nickname ||
       profile?.name ||
       profile?.full_name ||
       user.user_metadata?.["name"] ||
+      user.user_metadata?.["full_name"] ||
       "Estudante"
 
+    console.log(
+      `[EmailAction] Disparando e-mail de teste para usuário autenticado (User ID: ${user.id}, Destinatário: ${recipientEmail})`,
+    )
+
     const result = await sendTestEmail({
-      to: user.email,
+      to: recipientEmail,
       name: userName,
     })
 
     if (!result.success) {
       return {
         success: false,
+        recipient: recipientEmail,
         error: result.error || "Não foi possível enviar o e-mail de teste.",
       }
     }
 
-    if (result.simulated) {
-      return {
-        success: true,
-        simulated: true,
-        message:
-          "E-mail de teste simulado com sucesso nos logs do servidor (RESEND_API_KEY não configurada no .env.local).",
-      }
-    }
-
+    const messageIdText = result.id ? ` (ID: ${result.id})` : ""
     return {
       success: true,
-      simulated: false,
-      message: `E-mail de teste enviado com sucesso para ${user.email}! Verifique sua caixa de entrada ou spam.`,
+      recipient: recipientEmail,
+      ...(result.id ? { messageId: result.id } : {}),
+      message: `E-mail de teste enviado com sucesso para ${recipientEmail}!${messageIdText}`,
     }
   } catch (err: unknown) {
-    const message = (err as { message?: string })?.message || "Erro interno ao enviar e-mail de teste."
+    const message =
+      (err as { message?: string })?.message || "Erro interno ao enviar e-mail de teste."
     console.error("Erro em sendTestEmailAction:", err)
     return { success: false, error: message }
   }
@@ -83,6 +92,7 @@ export async function sendTestEmailAction(): Promise<{
 export async function sendWelcomeEmailAction(): Promise<{
   success: boolean
   error?: string
+  messageId?: string
 }> {
   if (isMaintenanceMode()) {
     return { success: false, error: "Sistema temporariamente indisponível." }
@@ -95,13 +105,13 @@ export async function sendWelcomeEmailAction(): Promise<{
       error: authError,
     } = await supabase.auth.getUser()
 
-    if (authError || !user || !user.email) {
+    if (authError || !user) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name, full_name, nickname, preferences")
+      .select("name, full_name, nickname, email, preferences")
       .eq("id", user.id)
       .maybeSingle()
 
@@ -111,20 +121,27 @@ export async function sendWelcomeEmailAction(): Promise<{
       return { success: true }
     }
 
+    const recipientEmail = (user.email || profile?.email)?.trim()
+    if (!recipientEmail) {
+      return { success: false, error: "E-mail do usuário não encontrado." }
+    }
+
     const userName =
       profile?.nickname ||
       profile?.name ||
       profile?.full_name ||
       user.user_metadata?.["name"] ||
+      user.user_metadata?.["full_name"] ||
       "Estudante"
 
     const result = await sendWelcomeEmail({
-      to: user.email,
+      to: recipientEmail,
       name: userName,
     })
 
     return {
       success: result.success,
+      ...(result.id ? { messageId: result.id } : {}),
       ...(result.error ? { error: result.error } : {}),
     }
   } catch (err: unknown) {

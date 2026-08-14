@@ -4,8 +4,8 @@ import Link from "next/link"
 import { LoginForm } from "@/features/auth/components/login-form"
 
 export const metadata: Metadata = {
-  title: "Login | Mentor Concursos IA",
-  description: "Acesse sua conta no Mentor Concursos IA.",
+  title: "Login — Nomeia",
+  description: "Acesse sua conta no Nomeia. Sua preparação rumo à nomeação.",
 }
 
 export default function LoginPage() {
@@ -16,7 +16,7 @@ export default function LoginPage() {
           Acesse sua conta
         </h1>
         <p className="text-sm text-muted-foreground">
-          Insira suas credenciais abaixo para acessar a plataforma.
+          Insira suas credenciais abaixo para acessar o Nomeia.
         </p>
       </div>
 
@@ -24,11 +24,13 @@ export default function LoginPage() {
 
       <div className="pt-4 text-center text-sm text-muted-foreground border-t border-border/60">
         Não tem uma conta ainda?{" "}
-        <Link href="/register" className="font-semibold text-primary hover:underline underline-offset-4">
+        <Link
+          href="/register"
+          className="font-semibold text-primary hover:underline underline-offset-4"
+        >
           Cadastre-se grátis
         </Link>
       </div>
     </div>
   )
 }
-

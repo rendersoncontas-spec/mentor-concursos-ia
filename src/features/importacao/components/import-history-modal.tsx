@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
-import { toast } from "sonner"
+
 import {
   AlertTriangle,
   ArrowLeft,
@@ -12,36 +12,42 @@ import {
   Loader2,
   Upload,
 } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { IMPORT_FIELDS } from "@/features/importacao/lib/column-detector"
-import { fileToArrayBuffer, readWorkbook, type RawSheet } from "@/features/importacao/lib/excel-reader"
-import { parseFileSheets } from "@/features/importacao/lib/normalize"
-import { suggestDisciplines } from "@/features/importacao/lib/subject-matcher"
-import { detectStudyType } from "@/features/importacao/lib/study-map"
-import { formatDuration } from "@/features/importacao/lib/value-parsers"
-import {
-  IMPORT_FIELD_LABELS,
-  type DisciplineOption,
-  type ImportField,
-  type ImportPreviewResult,
-  type ParseReport,
-} from "@/features/importacao/lib/types"
-import { toCompact, type SubjectImportMap } from "@/features/importacao/lib/import-contract"
-import {
-  ORIGIN_OPTIONS,
-  normalizeOrigin,
-  originDisplayName,
-  type ImportOrigin,
-} from "@/features/importacao/lib/origin"
-import type { OriginSource } from "@/domain/study-history/study-history.types"
+import { toast } from "sonner"
+
 import {
   beginImportAction,
   importHistoryChunkAction,
   listDisciplinesForImportAction,
   previewImportAction,
 } from "@/application/import-history/import-history.actions"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
+import type { OriginSource } from "@/domain/study-history/study-history.types"
+import { IMPORT_FIELDS } from "@/features/importacao/lib/column-detector"
+import {
+  type RawSheet,
+  fileToArrayBuffer,
+  readWorkbook,
+} from "@/features/importacao/lib/excel-reader"
+import { type SubjectImportMap, toCompact } from "@/features/importacao/lib/import-contract"
+import { parseFileSheets } from "@/features/importacao/lib/normalize"
+import {
+  type ImportOrigin,
+  ORIGIN_OPTIONS,
+  normalizeOrigin,
+  originDisplayName,
+} from "@/features/importacao/lib/origin"
+import { detectStudyType } from "@/features/importacao/lib/study-map"
+import { suggestDisciplines } from "@/features/importacao/lib/subject-matcher"
+import {
+  type DisciplineOption,
+  IMPORT_FIELD_LABELS,
+  type ImportField,
+  type ImportPreviewResult,
+  type ParseReport,
+} from "@/features/importacao/lib/types"
+import { formatDuration } from "@/features/importacao/lib/value-parsers"
 
 type Step = "select" | "parsing" | "review" | "confirm" | "importing" | "done"
 
@@ -124,7 +130,10 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
 
   const suggestions = useMemo(() => {
     if (!parsedReport || disciplines.length === 0) return {}
-    return suggestDisciplines(parsedReport.subjects.map((s) => s.name), disciplines)
+    return suggestDisciplines(
+      parsedReport.subjects.map((s) => s.name),
+      disciplines,
+    )
   }, [parsedReport, disciplines])
 
   const effectiveSubjectMap = useMemo<SubjectImportMap>(() => {
@@ -193,50 +202,41 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
     [onOpenChange, step, reset, onImported],
   )
 
-  const handleFile = useCallback(
-    async (file: File | null) => {
-      if (!file) return
-      setFileName(file.name)
-      setStep("parsing")
-      setPreview(null)
-      try {
-        const buffer = await fileToArrayBuffer(file)
-        const parsedSheets = readWorkbook(buffer)
-        setSheets(parsedSheets)
-        const { data, error } = await listDisciplinesForImportAction()
-        if (error) throw new Error(error)
-        setDisciplines(data ?? [])
-        setStep("review")
-      } catch (err) {
-        toast.error("Não foi possível analisar o arquivo: " + (err as { message?: string }).message)
-        setStep("select")
-      }
-    },
-    [],
-  )
+  const handleFile = useCallback(async (file: File | null) => {
+    if (!file) return
+    setFileName(file.name)
+    setStep("parsing")
+    setPreview(null)
+    try {
+      const buffer = await fileToArrayBuffer(file)
+      const parsedSheets = readWorkbook(buffer)
+      setSheets(parsedSheets)
+      const { data, error } = await listDisciplinesForImportAction()
+      if (error) throw new Error(error)
+      setDisciplines(data ?? [])
+      setStep("review")
+    } catch (err) {
+      toast.error("Não foi possível analisar o arquivo: " + (err as { message?: string }).message)
+      setStep("select")
+    }
+  }, [])
 
-  const handleColumnChange = useCallback(
-    (index: number, field: string) => {
-      setOverrides((prev) => ({ ...prev, [index]: field === "" ? null : (field as ImportField) }))
-      setPreview(null)
-    },
-    [],
-  )
+  const handleColumnChange = useCallback((index: number, field: string) => {
+    setOverrides((prev) => ({ ...prev, [index]: field === "" ? null : (field as ImportField) }))
+    setPreview(null)
+  }, [])
 
-  const handleSubjectChange = useCallback(
-    (subjectName: string, value: string) => {
-      if (value === "create" || value === "ignore") {
-        setSubjectMap((prev) => ({ ...prev, [subjectName]: { mode: value } }))
-      } else if (value.startsWith("existing:")) {
-        setSubjectMap((prev) => ({
-          ...prev,
-          [subjectName]: { mode: "existing", disciplineId: value.slice("existing:".length) },
-        }))
-      }
-      setPreview(null)
-    },
-    [],
-  )
+  const handleSubjectChange = useCallback((subjectName: string, value: string) => {
+    if (value === "create" || value === "ignore") {
+      setSubjectMap((prev) => ({ ...prev, [subjectName]: { mode: value } }))
+    } else if (value.startsWith("existing:")) {
+      setSubjectMap((prev) => ({
+        ...prev,
+        [subjectName]: { mode: "existing", disciplineId: value.slice("existing:".length) },
+      }))
+    }
+    setPreview(null)
+  }, [])
 
   const handlePreview = useCallback(async () => {
     if (!parsedReport || importableRecords.length === 0 || !importOrigin) return
@@ -265,11 +265,11 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
     setImporting(true)
     setStep("importing")
 
-    const { success: began, importId, error: beginError } = await beginImportAction(
-      importOrigin,
-      fileName,
-      importableRecords.length,
-    )
+    const {
+      success: began,
+      importId,
+      error: beginError,
+    } = await beginImportAction(importOrigin, fileName, importableRecords.length)
     if (!began || !importId) {
       toast.error(beginError ?? "Não foi possível registrar a plataforma de origem.")
       setImporting(false)
@@ -312,9 +312,19 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
     if (!failed && imported > 0) {
       importedRef.current = true
       onImported?.()
-      toast.success(`${imported} registro${imported !== 1 ? "s" : ""} importado${imported !== 1 ? "s" : ""}!`)
+      toast.success(
+        `${imported} registro${imported !== 1 ? "s" : ""} importado${imported !== 1 ? "s" : ""}!`,
+      )
     }
-  }, [parsedReport, preview, importableRecords, effectiveSubjectMap, importOrigin, fileName, onImported])
+  }, [
+    parsedReport,
+    preview,
+    importableRecords,
+    effectiveSubjectMap,
+    importOrigin,
+    fileName,
+    onImported,
+  ])
 
   const progressPercent =
     progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
@@ -354,11 +364,11 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
           {step === "select" && (
             <div className="space-y-5">
               <p className="text-sm font-extrabold text-foreground">
-                Traga seu histórico de estudos de outra plataforma para o Mentor IA.
+                Traga seu histórico de estudos de outra plataforma para o Nomeia.
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Envie o arquivo exportado pela sua conta. O Mentor IA analisará o arquivo,
-                identificará as informações disponíveis e mostrará uma prévia antes de importar.
+                Envie o arquivo exportado pela sua conta. O Nomeia analisará o arquivo, identificará
+                as informações disponíveis e mostrará uma prévia antes de importar.
               </p>
               <p className="text-[11px] text-muted-foreground">
                 Formatos aceitos: <span className="font-bold text-foreground">.xlsx</span>,{" "}
@@ -446,8 +456,8 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
               <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3">
                 <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  O arquivo é processado no seu navegador. Nada é enviado antes de você
-                  confirmar a importação. Registros repetidos são ignorados automaticamente.
+                  O arquivo é processado no seu navegador. Nada é enviado antes de você confirmar a
+                  importação. Registros repetidos são ignorados automaticamente.
                 </p>
               </div>
             </div>
@@ -465,8 +475,8 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
             <div className="space-y-5">
               {parsedReport.totalRows === 0 && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
-                  Nenhum registro encontrado no arquivo. Verifique se o arquivo contém
-                  linhas de dados abaixo do cabeçalho.
+                  Nenhum registro encontrado no arquivo. Verifique se o arquivo contém linhas de
+                  dados abaixo do cabeçalho.
                 </div>
               )}
 
@@ -478,7 +488,9 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 <ul className="space-y-1.5 text-[11px]">
                   <CheckRow label={`${parsedReport.totalRows} registros encontrados`} />
                   <CheckRow label={`${parsedReport.subjects.length} matérias identificadas`} />
-                  <CheckRow label={`${formatDuration(parsedReport.totalDurationSeconds)} de estudo`} />
+                  <CheckRow
+                    label={`${formatDuration(parsedReport.totalDurationSeconds)} de estudo`}
+                  />
                   <CheckRow label={`${parsedReport.withQuestions} registros com questões`} />
                   <CheckRow label={`${parsedReport.withCorrect} registros com acertos`} />
                 </ul>
@@ -490,10 +502,22 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                     Qualidade do arquivo
                   </h3>
                   <ul className="space-y-1 text-[11px]">
-                    <QualityRow ok={parsedReport.quality.noDate === 0} label={`Registros sem data: ${parsedReport.quality.noDate}`} />
-                    <QualityRow ok={parsedReport.quality.noSubject === 0} label={`Registros sem disciplina: ${parsedReport.quality.noSubject}`} />
-                    <QualityRow ok={parsedReport.quality.noDuration === 0} label={`Registros sem duração: ${parsedReport.quality.noDuration}`} />
-                    <QualityRow ok={parsedReport.quality.duplicatesInFile === 0} label={`Duplicados no arquivo: ${parsedReport.quality.duplicatesInFile} (serão ignorados)`} />
+                    <QualityRow
+                      ok={parsedReport.quality.noDate === 0}
+                      label={`Registros sem data: ${parsedReport.quality.noDate}`}
+                    />
+                    <QualityRow
+                      ok={parsedReport.quality.noSubject === 0}
+                      label={`Registros sem disciplina: ${parsedReport.quality.noSubject}`}
+                    />
+                    <QualityRow
+                      ok={parsedReport.quality.noDuration === 0}
+                      label={`Registros sem duração: ${parsedReport.quality.noDuration}`}
+                    />
+                    <QualityRow
+                      ok={parsedReport.quality.duplicatesInFile === 0}
+                      label={`Duplicados no arquivo: ${parsedReport.quality.duplicatesInFile} (serão ignorados)`}
+                    />
                   </ul>
                 </div>
 
@@ -502,7 +526,9 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                     Tipos de estudo detectados
                   </h3>
                   {distinctTypes.length === 0 ? (
-                    <p className="text-[11px] text-muted-foreground">Nenhum tipo detectado — registros entram como &quot;Outro&quot;.</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Nenhum tipo detectado — registros entram como &quot;Outro&quot;.
+                    </p>
                   ) : (
                     <ul className="space-y-1 text-[11px]">
                       {distinctTypes.map(([raw, label]) => (
@@ -535,7 +561,8 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {parsedReport.columns.map((column) => {
                     const override = overrides[column.index]
-                    const field: ImportField | null = override !== undefined ? override : column.field
+                    const field: ImportField | null =
+                      override !== undefined ? override : column.field
                     const isRecognized = field !== null
                     const usedElsewhere = new Set(
                       parsedReport.columns
@@ -560,7 +587,10 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                           <span className="text-[10px] text-muted-foreground shrink-0">
                             {IMPORT_FIELD_LABELS[field]}
                             {column.sample?.[0] !== undefined && (
-                              <span className="text-muted-foreground/60"> · {column.sample[0]}</span>
+                              <span className="text-muted-foreground/60">
+                                {" "}
+                                · {column.sample[0]}
+                              </span>
                             )}
                           </span>
                         ) : (
@@ -594,8 +624,8 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 </h3>
                 {parsedReport.subjects.length === 0 && (
                   <p className="text-[11px] text-muted-foreground">
-                    Nenhuma disciplina detectada — os registros serão importados como
-                    &quot;Estudo Livre&quot; se alguma coluna for atribuída manualmente.
+                    Nenhuma disciplina detectada — os registros serão importados como &quot;Estudo
+                    Livre&quot; se alguma coluna for atribuída manualmente.
                   </p>
                 )}
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
@@ -615,7 +645,10 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                       <div key={subject.name} className="flex items-center gap-2">
                         <span className="text-[11px] font-bold text-foreground truncate min-w-0 flex-1">
                           {subject.name}
-                          <span className="text-muted-foreground font-normal"> ({subject.count})</span>
+                          <span className="text-muted-foreground font-normal">
+                            {" "}
+                            ({subject.count})
+                          </span>
                         </span>
                         <select
                           value={value}
@@ -631,7 +664,8 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                               {suggested.map((s) => (
                                 <option key={s.disciplineId} value={`existing:${s.disciplineId}`}>
                                   {s.disciplineId
-                                    ? disciplines.find((d) => d.id === s.disciplineId)?.name ?? s.disciplineId
+                                    ? (disciplines.find((d) => d.id === s.disciplineId)?.name ??
+                                      s.disciplineId)
                                     : s.disciplineId}
                                   {s.auto ? " (sugerida)" : ` (${Math.round(s.score * 100)}%)`}
                                 </option>
@@ -687,9 +721,17 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
             <div className="space-y-5">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <SummaryCard value={String(preview.newCount)} label="Novos registros" tone="blue" />
-                <SummaryCard value={String(preview.duplicateCount)} label="Já existentes" tone="muted" />
+                <SummaryCard
+                  value={String(preview.duplicateCount)}
+                  label="Já existentes"
+                  tone="muted"
+                />
                 <SummaryCard value={String(preview.ignoredCount)} label="Ignoradas" tone="muted" />
-                <SummaryCard value={String(preview.errorCount)} label="Com problemas" tone="amber" />
+                <SummaryCard
+                  value={String(preview.errorCount)}
+                  label="Com problemas"
+                  tone="amber"
+                />
               </div>
 
               {preview.errors.length > 0 && (
@@ -698,7 +740,10 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                     Avisos
                   </p>
                   {preview.errors.slice(0, 5).map((e, i) => (
-                    <p key={i} className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                    <p
+                      key={i}
+                      className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed"
+                    >
                       • {e}
                     </p>
                   ))}
@@ -714,14 +759,18 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 {preview.newCount} registro{preview.newCount !== 1 ? "s" : ""} será
                 {preview.newCount !== 1 ? "o" : ""} adicionado
                 {preview.newCount !== 1 ? "s" : ""} ao seu histórico
-                {preview.duplicateCount > 0 && ` e ${preview.duplicateCount} já existente${preview.duplicateCount !== 1 ? "s" : ""} serão ignorado${preview.duplicateCount !== 1 ? "s" : ""}`}
-                {preview.ignoredCount > 0 && `; ${preview.ignoredCount} registro${preview.ignoredCount !== 1 ? "s" : ""} de disciplina${preview.ignoredCount !== 1 ? "s" : ""} marcada${preview.ignoredCount !== 1 ? "s" : ""} para ignorar não entram`}.
+                {preview.duplicateCount > 0 &&
+                  ` e ${preview.duplicateCount} já existente${preview.duplicateCount !== 1 ? "s" : ""} serão ignorado${preview.duplicateCount !== 1 ? "s" : ""}`}
+                {preview.ignoredCount > 0 &&
+                  `; ${preview.ignoredCount} registro${preview.ignoredCount !== 1 ? "s" : ""} de disciplina${preview.ignoredCount !== 1 ? "s" : ""} marcada${preview.ignoredCount !== 1 ? "s" : ""} para ignorar não entram`}
+                .
               </p>
 
               <div className="rounded-xl border bg-[#2563EB]/5 border-[#2563EB]/30 p-4 space-y-2">
                 <h3 className="text-sm font-black text-[#2563EB]">Pronto para importar</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Serão adicionados {preview.newCount} novo{preview.newCount !== 1 ? "s" : ""} registro
+                  Serão adicionados {preview.newCount} novo{preview.newCount !== 1 ? "s" : ""}{" "}
+                  registro
                   {preview.newCount !== 1 ? "s" : ""} ao seu histórico.
                 </p>
                 {importOrigin && (
@@ -749,7 +798,9 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                   className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs h-10"
                 >
                   <Download className="h-4 w-4" />
-                  {preview.newCount === 0 ? "Nada a importar" : `Importar ${preview.newCount} registro${preview.newCount !== 1 ? "s" : ""}`}
+                  {preview.newCount === 0
+                    ? "Nada a importar"
+                    : `Importar ${preview.newCount} registro${preview.newCount !== 1 ? "s" : ""}`}
                 </Button>
               </div>
             </div>
@@ -759,9 +810,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
             <div className="space-y-5 py-6">
               <div className="text-center space-y-2">
                 <Loader2 className="h-8 w-8 animate-spin text-[#2563EB] mx-auto" />
-                <p className="text-sm font-extrabold text-foreground">
-                  Importando histórico...
-                </p>
+                <p className="text-sm font-extrabold text-foreground">Importando histórico...</p>
                 <p className="text-xs text-muted-foreground font-mono">
                   {progress.done.toLocaleString("pt-BR")} / {progress.total.toLocaleString("pt-BR")}
                 </p>
@@ -786,8 +835,16 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
 
               <div className="grid grid-cols-3 gap-3">
                 <SummaryCard value={String(finalSummary.imported)} label="Importados" tone="blue" />
-                <SummaryCard value={String(finalSummary.duplicates)} label="Já existentes" tone="muted" />
-                <SummaryCard value={String(finalSummary.errors)} label="Com problemas" tone="amber" />
+                <SummaryCard
+                  value={String(finalSummary.duplicates)}
+                  label="Já existentes"
+                  tone="muted"
+                />
+                <SummaryCard
+                  value={String(finalSummary.errors)}
+                  label="Com problemas"
+                  tone="amber"
+                />
               </div>
 
               {finalSummary.createdSubjects.length > 0 && (
@@ -797,7 +854,8 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                   </p>
                   <p className="text-[11px] text-foreground leading-relaxed">
                     {finalSummary.createdSubjects.slice(0, 8).join(", ")}
-                    {finalSummary.createdSubjects.length > 8 && ` e mais ${finalSummary.createdSubjects.length - 8}`}
+                    {finalSummary.createdSubjects.length > 8 &&
+                      ` e mais ${finalSummary.createdSubjects.length - 8}`}
                   </p>
                 </div>
               )}
@@ -814,11 +872,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
               )}
 
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={reset}
-                  className="flex-1 text-xs font-bold"
-                >
+                <Button variant="outline" onClick={reset} className="flex-1 text-xs font-bold">
                   Importar outro arquivo
                 </Button>
                 <Button
@@ -836,7 +890,15 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
   )
 }
 
-function SummaryCard({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "blue" | "muted" | "amber" }) {
+function SummaryCard({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: string
+  tone?: "default" | "blue" | "muted" | "amber"
+}) {
   let toneClass = "text-foreground"
   if (tone === "blue") toneClass = "text-[#2563EB]"
   else if (tone === "amber") toneClass = "text-amber-600"
@@ -859,7 +921,9 @@ function QualityRow({ ok, label }: { ok: boolean; label: string }) {
       ) : (
         <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
       )}
-      <span className={ok ? "text-muted-foreground" : "text-amber-700 dark:text-amber-300"}>{label}</span>
+      <span className={ok ? "text-muted-foreground" : "text-amber-700 dark:text-amber-300"}>
+        {label}
+      </span>
     </li>
   )
 }

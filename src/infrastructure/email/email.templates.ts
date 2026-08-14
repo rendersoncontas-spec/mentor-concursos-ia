@@ -1,4 +1,4 @@
-import type { WeeklySummaryStats, ImportCompletedStats, StudyReminderDetails } from "./email.types"
+import type { ImportCompletedStats, StudyReminderDetails, WeeklySummaryStats } from "./email.types"
 
 interface BaseTemplateOptions {
   title: string
@@ -11,12 +11,12 @@ interface BaseTemplateOptions {
 }
 
 /**
- * Layout Base compartilhado por todos os e-mails do Mentor IA.
+ * Layout Base compartilhado por todos os e-mails do Nomeia.
  * Estrutura 100% responsiva (HTML table-based), com estilo profissional e clean.
  */
 export function getBaseEmailLayout({
   title,
-  preheader = "Mentor IA — Sua plataforma inteligente de preparação",
+  preheader = "Nomeia — Sua preparação rumo à nomeação",
   contentHtml,
   ctaText,
   ctaUrl,
@@ -61,64 +61,64 @@ export function getBaseEmailLayout({
       margin: 0 auto;
       width: 100%;
       max-width: 600px;
-      border: 1px solid #e2e8f0;
-      border-radius: 16px;
+      border-spacing: 0;
+      border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
     }
     .header {
       background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
-      padding: 32px 32px;
+      padding: 32px 24px;
       text-align: center;
+      color: #ffffff;
     }
     .header-logo {
-      color: #ffffff;
-      font-size: 24px;
+      font-size: 26px;
       font-weight: 900;
       letter-spacing: -0.5px;
-      margin: 0;
+      color: #ffffff;
       text-decoration: none;
       display: inline-block;
     }
     .header-tagline {
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 500;
+      color: #bfdbfe;
       margin-top: 4px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.2px;
     }
     .content {
-      padding: 36px 32px;
+      padding: 32px 28px;
       font-size: 15px;
       line-height: 1.6;
       color: #334155;
     }
     .btn-container {
       text-align: center;
-      margin: 32px 0 20px;
+      margin: 30px 0;
     }
     .btn {
       background-color: #2563eb;
       color: #ffffff !important;
-      padding: 14px 32px;
-      border-radius: 10px;
+      padding: 13px 28px;
       text-decoration: none;
+      border-radius: 8px;
       font-weight: 700;
       font-size: 14px;
       display: inline-block;
-      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
     }
     .stats-card {
-      background-color: #f8fafc;
+      background-color: #f1f5f9;
+      border-radius: 8px;
+      padding: 18px;
+      margin: 20px 0;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 20px;
-      margin: 24px 0;
     }
     .footer {
       text-align: center;
-      padding: 24px 32px 10px;
+      padding: 24px 20px;
       font-size: 12px;
       color: #64748b;
       line-height: 1.5;
@@ -126,27 +126,26 @@ export function getBaseEmailLayout({
     .footer a {
       color: #2563eb;
       text-decoration: none;
-      font-weight: 600;
     }
     .security-badge {
-      background-color: #f1f5f9;
-      border-radius: 8px;
-      padding: 12px 16px;
+      background-color: #f8fafc;
+      border-left: 3px solid #2563eb;
+      padding: 10px 14px;
       margin-top: 24px;
       font-size: 12px;
-      color: #64748b;
+      color: #475569;
+      border-radius: 0 6px 6px 0;
     }
     @media only screen and (max-width: 600px) {
       .content {
-        padding: 24px 20px !important;
+        padding: 24px 18px !important;
       }
       .header {
-        padding: 24px 20px !important;
+        padding: 24px 16px !important;
       }
-      .main {
-        border-radius: 0 !important;
-        border-left: none !important;
-        border-right: none !important;
+      .btn {
+        width: 85% !important;
+        text-align: center !important;
       }
     }
   </style>
@@ -164,8 +163,8 @@ export function getBaseEmailLayout({
           <div class="main">
             <!-- Header -->
             <div class="header">
-              <div class="header-logo">⚡ Mentor IA</div>
-              <div class="header-tagline">Inteligência para Concursos</div>
+              <div class="header-logo">⚡ Nomeia</div>
+              <div class="header-tagline">Sua preparação rumo à nomeação.</div>
             </div>
 
             <!-- Content Body -->
@@ -197,15 +196,15 @@ export function getBaseEmailLayout({
           <!-- Footer -->
           <div class="footer">
             <p style="margin: 0 0 8px 0;">
-              Você recebeu este e-mail porque possui uma conta ativa no <strong>Mentor IA</strong>.
+              Você recebeu este e-mail porque possui uma conta ativa no <strong>Nomeia</strong>.
             </p>
             <p style="margin: 0 0 12px 0;">
               <a href="${appUrl}/profile">Preferências de Notificação</a> &nbsp;•&nbsp; 
               <a href="${appUrl}/dashboard">Acessar Painel</a> &nbsp;•&nbsp; 
-              <a href="${appUrl}">mentorconcursos.com.br</a>
+              <a href="${appUrl}">Nomeia</a>
             </p>
             <p style="margin: 0; color: #94a3b8; font-size: 11px;">
-              © ${currentYear} Mentor IA. Todos os direitos reservados.
+              © ${currentYear} Nomeia. Todos os direitos reservados.
             </p>
           </div>
         </td>
@@ -229,14 +228,14 @@ export function getTestEmailTemplate({
   email: string
   appUrl: string
 }): { subject: string; html: string; text: string } {
-  const subject = "⚡ Teste de e-mail — Mentor IA"
+  const subject = "⚡ Teste de e-mail — Nomeia"
 
   const contentHtml = `
     <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 800; color: #0f172a;">
       Olá, ${name}!
     </h2>
     <p style="margin: 0 0 16px 0;">
-      Este é um e-mail de teste para confirmar que a integração do <strong>Resend</strong> com o <strong>Mentor IA</strong> está funcionando com sucesso.
+      Este é um e-mail de teste para confirmar que a integração do <strong>Resend</strong> com o <strong>Nomeia</strong> está funcionando com sucesso.
     </p>
     <div class="stats-card">
       <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">
@@ -264,15 +263,15 @@ export function getTestEmailTemplate({
 
   const html = getBaseEmailLayout({
     title: subject,
-    preheader: "Seu sistema de e-mails do Mentor IA está funcionando corretamente.",
+    preheader: "Seu sistema de e-mails do Nomeia está funcionando corretamente.",
     contentHtml,
-    ctaText: "Abrir o Mentor IA",
+    ctaText: "Abrir o Nomeia",
     ctaUrl: `${appUrl}/dashboard`,
     appUrl,
-    securityNotice: "Este teste foi disparado a partir da sua conta de usuário no Mentor IA.",
+    securityNotice: "Este teste foi disparado a partir da sua conta de usuário no Nomeia.",
   })
 
-  const text = `Olá, ${name}!\n\nEste é um e-mail de teste confirmando que a infraestrutura do Resend no Mentor IA está funcionando.\nDestinatário: ${email}\nData: ${new Date().toISOString()}\n\nAcesse: ${appUrl}/dashboard`
+  const text = `Olá, ${name}!\n\nEste é um e-mail de teste confirmando que a infraestrutura do Resend no Nomeia está funcionando.\nDestinatário: ${email}\nData: ${new Date().toISOString()}\n\nAcesse: ${appUrl}/dashboard`
 
   return { subject, html, text }
 }
@@ -287,14 +286,14 @@ export function getWelcomeEmailTemplate({
   name?: string
   appUrl: string
 }): { subject: string; html: string; text: string } {
-  const subject = "Bem-vindo ao Mentor IA! 🚀 Sua preparação começa agora"
+  const subject = "Bem-vindo ao Nomeia! 🚀 Sua preparação começa agora"
 
   const contentHtml = `
     <h2 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 800; color: #0f172a;">
-      Bem-vindo ao Mentor IA, ${name}!
+      Bem-vindo ao Nomeia, ${name}!
     </h2>
     <p style="margin: 0 0 16px 0;">
-      Sua conta foi criada com sucesso. A partir de agora, você conta com um ecossistema completo para acelerar sua aprovação em concursos públicos.
+      Sua conta foi criada com sucesso. A partir de agora, você conta com um ecossistema completo para acelerar sua preparação rumo à nomeação.
     </p>
     
     <div class="stats-card">
@@ -316,14 +315,14 @@ export function getWelcomeEmailTemplate({
 
   const html = getBaseEmailLayout({
     title: subject,
-    preheader: "Sua conta no Mentor IA está pronta. Acesse e comece a estudar com estratégia.",
+    preheader: "Sua conta no Nomeia está pronta. Acesse e comece a estudar com estratégia.",
     contentHtml,
-    ctaText: "Acessar o Mentor IA",
+    ctaText: "Acessar o Nomeia",
     ctaUrl: `${appUrl}/dashboard`,
     appUrl,
   })
 
-  const text = `Bem-vindo ao Mentor IA, ${name}!\n\nSua conta foi criada com sucesso. Acesse ${appUrl}/dashboard para planejar seus estudos e acompanhar seu desempenho.`
+  const text = `Bem-vindo ao Nomeia, ${name}!\n\nSua conta foi criada com sucesso. Acesse ${appUrl}/dashboard para planejar seus estudos e acompanhar seu desempenho.`
 
   return { subject, html, text }
 }
@@ -393,20 +392,20 @@ export function getWeeklySummaryEmailTemplate({
     </div>
 
     <p style="margin: 0;">
-      A constância é a chave para a aprovação. Continue firme na próxima semana!
+      A constância é a chave para a nomeação. Continue firme na próxima semana!
     </p>
   `
 
   const html = getBaseEmailLayout({
     title: subject,
-    preheader: `Você estudou ${timeFormatted} e fez ${stats.totalQuestions} questões esta semana no Mentor IA.`,
+    preheader: `Você estudou ${timeFormatted} e fez ${stats.totalQuestions} questões esta semana no Nomeia.`,
     contentHtml,
     ctaText: "Ver Relatório Completo",
     ctaUrl: `${appUrl}/estatisticas`,
     appUrl,
   })
 
-  const text = `Relatório Semanal de Estudos — Mentor IA\n\nOlá, ${name}!\nTempo estudado: ${timeFormatted}\nQuestões: ${stats.totalQuestions} (${stats.correctQuestions} acertos, ${accuracy}%)\nDisciplinas: ${stats.disciplinesCount}\nSequência: ${stats.consecutiveDays} dias\n\nVer estatísticas: ${appUrl}/estatisticas`
+  const text = `Relatório Semanal de Estudos — Nomeia\n\nOlá, ${name}!\nTempo estudado: ${timeFormatted}\nQuestões: ${stats.totalQuestions} (${stats.correctQuestions} acertos, ${accuracy}%)\nDisciplinas: ${stats.disciplinesCount}\nSequência: ${stats.consecutiveDays} dias\n\nVer estatísticas: ${appUrl}/estatisticas`
 
   return { subject, html, text }
 }
@@ -430,7 +429,7 @@ export function getImportCompletedEmailTemplate({
       Olá, ${name}!
     </h2>
     <p style="margin: 0 0 16px 0;">
-      A importação do seu histórico de estudos da plataforma <strong>${stats.platformName}</strong> foi concluída e processada no Mentor IA.
+      A importação do seu histórico de estudos da plataforma <strong>${stats.platformName}</strong> foi concluída e processada no Nomeia.
     </p>
 
     <div class="stats-card">
@@ -478,12 +477,12 @@ export function getImportCompletedEmailTemplate({
     title: subject,
     preheader: `Importação de ${stats.importedCount} sessões do ${stats.platformName} concluída com sucesso.`,
     contentHtml,
-    ctaText: "Ver Histórico no Mentor IA",
+    ctaText: "Ver Histórico no Nomeia",
     ctaUrl: `${appUrl}/dashboard/history`,
     appUrl,
   })
 
-  const text = `Importação Concluída — Mentor IA\n\nOlá, ${name}!\nSua importação do ${stats.platformName} terminou com sucesso.\nSessões importadas: ${stats.importedCount}\n\nAcesse: ${appUrl}/dashboard/history`
+  const text = `Importação Concluída — Nomeia\n\nOlá, ${name}!\nSua importação do ${stats.platformName} terminou com sucesso.\nSessões importadas: ${stats.importedCount}\n\nAcesse: ${appUrl}/dashboard/history`
 
   return { subject, html, text }
 }
@@ -500,19 +499,20 @@ export function getStudyReminderEmailTemplate({
   details: StudyReminderDetails
   appUrl: string
 }): { subject: string; html: string; text: string } {
-  let subject = "⏰ Lembrete de Estudo — Mentor IA"
+  let subject = "⏰ Lembrete de Estudo — Nomeia"
   let message = "Sua meta de estudos de hoje está pronta no seu plano semanal."
   let ctaText = "Iniciar Sessão de Estudo"
   let ctaUrl = `${appUrl}/dashboard/study-session`
 
   if (details.reason === "pending_review") {
-    subject = `📚 Você tem ${details.pendingCount || "revisões"} pendentes no Mentor IA`
+    subject = `📚 Você tem ${details.pendingCount || "revisões"} pendentes no Nomeia`
     message = `Você possui <strong>${details.pendingCount ?? "alguns"} flashcards/tópicos</strong> aguardando revisão hoje para fixação na memória de longo prazo.`
     ctaText = "Fazer Revisões Agora"
     ctaUrl = `${appUrl}/dashboard/reviews`
   } else if (details.reason === "streak_protection") {
-    subject = "🔥 Não perca sua sequência de estudos no Mentor IA!"
-    message = "Você ainda não registrou estudos hoje. Dedique alguns minutos para manter sua constância e ritmo de preparação."
+    subject = "🔥 Não perca sua sequência de estudos no Nomeia!"
+    message =
+      "Você ainda não registrou estudos hoje. Dedique alguns minutos para manter sua constância e ritmo de preparação."
   } else if (details.reason === "inactive_discipline" && details.disciplineName) {
     subject = `🎯 Atenção: você não estuda ${details.disciplineName} há ${details.daysInactive ?? 3} dias`
     message = `Para manter o equilíbrio do seu edital, reserve uma sessão para <strong>${details.disciplineName}</strong>.`
@@ -527,7 +527,7 @@ export function getStudyReminderEmailTemplate({
     </p>
     <div class="stats-card">
       <p style="margin: 0; font-size: 13px; color: #475569;">
-        💡 <em>Dica do Mentor:</em> Sessões curtas e diárias têm retenção superior a maratonas esporádicas. 25 a 50 minutos de estudo focado já fazem toda a diferença.
+        💡 <em>Dica de Estudo:</em> Sessões curtas e diárias têm retenção superior a maratonas esporádicas. 25 a 50 minutos de estudo focado já fazem toda a diferença.
       </p>
     </div>
   `
@@ -541,7 +541,7 @@ export function getStudyReminderEmailTemplate({
     appUrl,
   })
 
-  const text = `Lembrete — Mentor IA\n\nOlá, ${name}!\n${message.replace(/<[^>]*>?/gm, "")}\n\nAcesse: ${ctaUrl}`
+  const text = `Lembrete — Nomeia\n\nOlá, ${name}!\n${message.replace(/<[^>]*>?/gm, "")}\n\nAcesse: ${ctaUrl}`
 
   return { subject, html, text }
 }

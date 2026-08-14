@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useState } from "react"
-import { AppSidebar } from "@/components/layout/sidebar"
-import { AppHeader } from "@/components/layout/header"
-import { FloatingActionButton } from "@/components/layout/floating-action-button"
+
 import { Menu } from "lucide-react"
+
+import { FloatingActionButton } from "@/components/layout/floating-action-button"
+import { AppHeader } from "@/components/layout/header"
+import { AppSidebar } from "@/components/layout/sidebar"
 
 interface ProtectedLayoutClientProps {
   userEmail: string
@@ -27,10 +29,10 @@ export function ProtectedLayoutClient({
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsSidebarOpen(false)
+      if (e.key === "Escape") setIsSidebarOpen(false)
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
   return (
@@ -53,16 +55,7 @@ export function ProtectedLayoutClient({
       )}
 
       {/* Sidebar (Fixo no Desktop / Flutuante no Mobile) */}
-      <AppSidebar
-        logoutAction={logoutAction}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        userEmail={userEmail}
-        userName={userName}
-        userId={userId}
-        avatarUrl={avatarUrl}
-      />
-
+      <AppSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Área de conteúdo que expande para 100% da largura */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">

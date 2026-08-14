@@ -18,7 +18,7 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       const { data: existingDisc, error: findError } = await supabase
         .from("disciplines")
         .select("id")
-        .ilike("name", String(data["discipline_name"]))
+        .ilike("name", String(data["discipline_name"]).trim())
         .maybeSingle()
 
       if (findError) {
@@ -30,7 +30,7 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       } else {
         return {
           success: false,
-          error: "Disciplina não encontrada no sistema. Selecione uma disciplina existente na lista.",
+          error: `Disciplina "${data["discipline_name"]}" não encontrada no sistema. Selecione uma disciplina existente na lista.`,
         }
       }
     }

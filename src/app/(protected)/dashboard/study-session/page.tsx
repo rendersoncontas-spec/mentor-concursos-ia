@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/infrastructure/supabase/server"
-import { ActiveSessionRunner } from "@/features/study-session/components/active-session-runner"
+
 import { type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
+import { ActiveSessionRunner } from "@/features/study-session/components/active-session-runner"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
-  title: "Sessão Inteligente | Mentor Concursos IA",
+  title: "Sessão de Estudo",
+  description: "Registre e execute sua sessão de estudo no Nomeia.",
 }
 
 interface PageProps {
@@ -15,7 +17,9 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams
   const { planId, disciplineId } = resolvedParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user) {
     redirect("/login")
@@ -26,14 +30,16 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
   if (planId) {
     const { data: item } = await supabase
       .from("study_plan_items")
-      .select(`
+      .select(
+        `
         id, study_plan_id, discipline_id, day_of_week,
         duration_minutes, priority, priority_score, recommended_sessions, created_at,
         disciplines ( id, name, area )
-      `)
+      `,
+      )
       .eq("id", planId)
       .single()
-      
+
     if (item) {
       const discipline = Array.isArray(item.disciplines) ? item.disciplines[0] : item.disciplines
       if (discipline) {
@@ -49,7 +55,7 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
       .select("id, name, area")
       .eq("id", disciplineId)
       .single()
-      
+
     if (disc) {
       // Item de planejamento temporário por disciplina selecionada
       planItem = {
@@ -62,19 +68,14 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
         priority_score: 0,
         recommended_sessions: 0,
         created_at: "",
-        discipline: disc
+        discipline: disc,
       }
     }
   }
 
   return (
     <div className="min-h-[80vh] flex flex-col justify-center py-10 px-4 md:px-8">
-      {planItem ? (
-        <ActiveSessionRunner planItem={planItem} />
-      ) : (
-        <ActiveSessionRunner />
-      )}
+      {planItem ? <ActiveSessionRunner planItem={planItem} /> : <ActiveSessionRunner />}
     </div>
   )
 }
-

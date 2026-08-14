@@ -1,5 +1,6 @@
+import { AlertCircle, Brain, Clock, Target, TrendingUp } from "lucide-react"
+
 import type { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
-import { Brain, Target, TrendingUp, AlertCircle, Clock } from "lucide-react"
 
 interface MentorFeedProps {
   response: MentorResponse
@@ -17,16 +18,18 @@ export function MentorFeed({ response }: MentorFeedProps) {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
-      
       {/* Header Estilo Documento */}
       <div className="flex items-center gap-4 mb-10">
         <div className="bg-primary/10 text-primary p-4 rounded-2xl">
           <Brain className="h-10 w-10" />
         </div>
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-foreground">Mentor IA</h1>
+          <h1 className="text-4xl font-black tracking-tight text-foreground">
+            Análise Inteligente Nomeia
+          </h1>
           <p className="text-muted-foreground text-lg mt-1 flex items-center gap-2">
-            Índice Geral de Aprendizado: <strong className="text-foreground">{globalScore.score}</strong>
+            Índice Geral de Aprendizado:{" "}
+            <strong className="text-foreground">{globalScore.score}</strong>
             <span className="text-sm font-medium bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
               {trendLabel}
             </span>
@@ -43,7 +46,10 @@ export function MentorFeed({ response }: MentorFeedProps) {
             </h2>
             <div className="space-y-4">
               {feed.now.map((item, i) => (
-                <div key={i} className="text-lg font-medium text-foreground leading-relaxed pl-7 border-l-2 border-red-500/30">
+                <div
+                  key={i}
+                  className="text-lg font-medium text-foreground leading-relaxed pl-7 border-l-2 border-red-500/30"
+                >
                   {item.message}
                 </div>
               ))}
@@ -60,7 +66,10 @@ export function MentorFeed({ response }: MentorFeedProps) {
             </h2>
             <div className="space-y-4">
               {feed.today.map((item, i) => (
-                <div key={i} className="text-lg text-foreground leading-relaxed pl-7 border-l-2 border-orange-500/30">
+                <div
+                  key={i}
+                  className="text-lg text-foreground leading-relaxed pl-7 border-l-2 border-orange-500/30"
+                >
                   {item.message}
                 </div>
               ))}

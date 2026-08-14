@@ -1,12 +1,13 @@
 import { RotateCcw } from "lucide-react"
-import { createClient } from "@/infrastructure/supabase/server"
+
 import { getCycleOverviewData } from "@/application/study-plan/study-plan.service"
-import { PlanejamentoClient } from "@/features/planejamento/components/planejamento-client"
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
+import { PlanejamentoClient } from "@/features/planejamento/components/planejamento-client"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
-  title: "Ciclo de Estudos - Mentor Concursos IA",
-  description: "Gerencie seu ciclo de estudos rotativo e contínuo.",
+  title: "Planejamento de Estudos",
+  description: "Gerencie seu ciclo de estudos rotativo e contínuo no Nomeia.",
 }
 
 export default async function PlanejamentoPage() {
@@ -14,7 +15,9 @@ export default async function PlanejamentoPage() {
 
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (user) {
       cycleData = await getCycleOverviewData(supabase, user.id)

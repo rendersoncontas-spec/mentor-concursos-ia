@@ -1,10 +1,12 @@
-﻿"use client"
+"use client"
 
-import { useState, useEffect } from "react"
-import { Heart, Copy, Check, Sparkles, ShieldCheck } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState } from "react"
+
+import { Check, Copy, Heart, ShieldCheck, Sparkles } from "lucide-react"
 import { toast } from "sonner"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { LogoutButton } from "@/features/auth/components/logout-button"
 import { createClient } from "@/infrastructure/supabase/client"
 
@@ -36,7 +38,9 @@ export default function DoacaoPage() {
             <Heart className="h-7 w-7 fill-rose-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-foreground">Apoie o Projeto Mentor IA</h1>
+            <h1 className="text-2xl font-black tracking-tight text-foreground">
+              Apoie o Projeto Nomeia
+            </h1>
             <p className="text-xs text-muted-foreground font-semibold">
               Ajude a manter a plataforma no ar e evoluindo para a comunidade de concurseiros
             </p>
@@ -52,14 +56,17 @@ export default function DoacaoPage() {
               <Sparkles className="h-3 w-3 mr-1 inline" /> Doação Voluntária
             </Badge>
             <h2 className="text-xl font-extrabold text-foreground">
-              O Mentor IA é um projeto feito de concurseiro para concurseiro! 🚀
+              O Nomeia é um projeto feito de concurseiro para concurseiro! 🚀
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-              O <strong>Mentor IA</strong> nasceu com o objetivo de oferecer uma ferramenta completa, moderna e 100% focada na aprovação:
-              com edital verticalizado, gestão por ciclos de estudo, estatísticas de desempenho, cronômetro inteligente e controle de constância.
+              O <strong>Nomeia</strong> nasceu com o objetivo de oferecer uma ferramenta completa,
+              moderna e 100% focada na aprovação: com edital verticalizado, gestão por ciclos de
+              estudo, estatísticas de desempenho, cronômetro inteligente e controle de constância.
             </p>
             <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-              Se a plataforma tem ajudado na sua rotina diária e você deseja apoiar a manutenção do servidor e a criação de novas funcionalidades, qualquer contribuição é imensamente bem-vinda! ❤️
+              Se a plataforma tem ajudado na sua rotina diária e você deseja apoiar a manutenção do
+              servidor e a criação de novas funcionalidades, qualquer contribuição é imensamente
+              bem-vinda! ❤️
             </p>
           </div>
 
@@ -122,4 +129,3 @@ export default function DoacaoPage() {
     </div>
   )
 }
-

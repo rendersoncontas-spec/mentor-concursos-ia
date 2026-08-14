@@ -1,22 +1,21 @@
-﻿"use client"
+"use client"
 
-import { useCallback, useState, useEffect } from "react"
-import { Upload, Trash2, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog"
+import { useCallback, useEffect, useState } from "react"
+
+import { Loader2, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
+
 import {
-  listEditalRequestsAction,
+  type EditalRequestItem,
   createEditalRequestAction,
   deleteEditalRequestAction,
-  type EditalRequestItem,
+  listEditalRequestsAction,
 } from "@/application/editais/edital-request.action"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
-export function EstudeiPedirEditalView() {
+export function PedirEditalView() {
   const [requests, setRequests] = useState<EditalRequestItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -25,7 +24,6 @@ export function EstudeiPedirEditalView() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
-  // Modal Form States — 100% Paridade Estudei
   const [editalName, setEditalName] = useState("")
   const [cargo, setCargo] = useState("")
   const [linkUrl, setLinkUrl] = useState("")
@@ -78,7 +76,9 @@ export function EstudeiPedirEditalView() {
         return
       }
 
-      toast.success("Pedido de edital enviado com sucesso! Nosso time analisará em até 5 dias úteis.")
+      toast.success(
+        "Pedido de edital enviado com sucesso! Nosso time analisará em até 5 dias úteis.",
+      )
       setEditalName("")
       setCargo("")
       setLinkUrl("")
@@ -134,7 +134,9 @@ export function EstudeiPedirEditalView() {
     if (loadError) {
       return (
         <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
-          <h3 className="text-lg font-bold text-foreground">Não foi possível carregar os pedidos</h3>
+          <h3 className="text-lg font-bold text-foreground">
+            Não foi possível carregar os pedidos
+          </h3>
           <p className="text-xs text-muted-foreground font-medium">{loadError}</p>
           <Button
             onClick={loadRequests}
@@ -227,7 +229,6 @@ export function EstudeiPedirEditalView() {
 
   return (
     <div className="space-y-6">
-      {/* Header Actions — 100% Estudei */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-black text-foreground">Pedidos de Editais</h1>
 
@@ -239,7 +240,6 @@ export function EstudeiPedirEditalView() {
         </Button>
       </div>
 
-      {/* Select Filter STATUS */}
       <div className="max-w-xs space-y-1">
         <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
           STATUS
@@ -256,17 +256,16 @@ export function EstudeiPedirEditalView() {
         </select>
       </div>
 
-      {/* Main Content Area (Empty State or Requests Table 100% Estudei) */}
       {renderContent()}
 
-      {/* Modal Pedir Edital — 100% Paridade com a Imagem 2 do Estudei */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-xl p-6 rounded-2xl">
           <div className="space-y-4">
             <h2 className="text-xl font-black text-foreground tracking-tight">Pedir edital</h2>
 
             <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-              Não encontrou seu edital? Envie os dados abaixo. Nosso time analisa seu pedido em até 5 dias úteis e avisaremos quando ele for cadastrado.
+              Não encontrou seu edital? Envie os dados abaixo. Nosso time analisa seu pedido em até
+              5 dias úteis e avisaremos quando ele for cadastrado.
             </p>
 
             <form onSubmit={handleSendRequest} className="space-y-4 pt-1">
@@ -353,10 +352,12 @@ export function EstudeiPedirEditalView() {
               </div>
 
               <p className="text-[11px] text-muted-foreground font-medium leading-relaxed pt-1">
-                Preencha o nome do edital e informe ao menos o link ou um PDF. Isso ajuda nosso time a localizar o edital correto com mais rapidez e precisão. O prazo de análise é de até 5 dias úteis.
+                Preencha o nome do edital e informe ao menos o link ou um PDF. Isso ajuda nosso time
+                a localizar o edital correto com mais rapidez e precisão. O prazo de análise é de
+                até 5 dias úteis.
               </p>
 
-              {/* Modal Buttons (Cancelar & Enviar 100% Estudei) */}
+              {/* Modal Buttons (Cancelar & Enviar) */}
               <div className="flex items-center justify-end gap-3 pt-3">
                 <Button
                   type="button"
@@ -389,3 +390,5 @@ export function EstudeiPedirEditalView() {
     </div>
   )
 }
+
+export { PedirEditalView as EstudeiPedirEditalView }

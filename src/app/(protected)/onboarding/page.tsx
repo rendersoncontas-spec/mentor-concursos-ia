@@ -1,9 +1,9 @@
-
-import { OnboardingWizard } from "@/features/onboarding/components/onboarding-wizard"
 import { Logo } from "@/components/ui/logo"
+import { OnboardingWizard } from "@/features/onboarding/components/onboarding-wizard"
 
 export const metadata = {
-  title: "Onboarding - Mentor Concursos IA",
+  title: "Onboarding",
+  description: "Configure seu plano de estudos no Nomeia.",
 }
 
 export default async function OnboardingPage() {
@@ -12,13 +12,16 @@ export default async function OnboardingPage() {
       <header className="mb-8 flex w-full max-w-3xl items-center justify-between">
         <Logo href="/dashboard" />
       </header>
-      
+
       <main className="w-full max-w-3xl flex-1">
         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
           <div className="p-6 md:p-10">
-            <h1 className="text-2xl font-bold tracking-tight mb-2">Configure seu Plano de Estudos</h1>
+            <h1 className="text-2xl font-bold tracking-tight mb-2">
+              Configure seu Plano de Estudos
+            </h1>
             <p className="text-muted-foreground mb-8">
-              Precisamos de algumas informações para personalizar a Inteligência Artificial exclusivamente para o seu objetivo.
+              Precisamos de algumas informações para personalizar a Inteligência Artificial
+              exclusivamente para o seu objetivo.
             </p>
             <OnboardingWizard />
           </div>
@@ -27,4 +30,3 @@ export default async function OnboardingPage() {
     </div>
   )
 }
-

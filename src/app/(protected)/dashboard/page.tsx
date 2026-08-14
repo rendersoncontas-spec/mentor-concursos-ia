@@ -1,12 +1,14 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { createClient } from "@/infrastructure/supabase/server"
+
+import { getDashboardLayoutAction } from "@/application/dashboard/dashboard-layout.action"
 import { getDashboardData } from "@/application/dashboard/dashboard.service"
 import { DashboardLayout } from "@/features/dashboard/components/dashboard-layout"
-import { getDashboardLayoutAction } from "@/application/dashboard/dashboard-layout.action"
-import type { Metadata } from "next"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata: Metadata = {
-  title: "Home - Mentor Concursos IA",
+  title: "Dashboard",
+  description: "Acompanhe seu progresso e planejamento de estudos no Nomeia.",
 }
 
 export default async function DashboardPage() {

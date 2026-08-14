@@ -1,9 +1,10 @@
 import { CreditCard } from "lucide-react"
-import { EstudeiSubscriptionView } from "@/features/subscription/components/estudei-subscription-view"
+
+import { SubscriptionView } from "@/features/subscription/components/estudei-subscription-view"
 
 export const metadata = {
-  title: "Assinatura - Mentor Concursos IA",
-  description: "Gerencie sua assinatura e histórico de pagamentos.",
+  title: "Assinatura & Planos",
+  description: "Gerencie sua assinatura e plano no Nomeia.",
 }
 
 export default function AssinaturaPage() {
@@ -14,12 +15,14 @@ export default function AssinaturaPage() {
         <CreditCard className="h-5 w-5 text-emerald-500" />
         <div>
           <h1 className="text-lg font-bold leading-none">Assinatura & Planos</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Detalhes da sua conta e histórico de compras</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Detalhes da sua conta e histórico de compras
+          </p>
         </div>
       </div>
 
       <div className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
-        <EstudeiSubscriptionView />
+        <SubscriptionView />
       </div>
     </div>
   )

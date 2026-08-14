@@ -1,22 +1,32 @@
 import { redirect } from "next/navigation"
-import { RefreshCcw, Brain } from "lucide-react"
 
-import { createClient } from "@/infrastructure/supabase/server"
+import { Brain, RefreshCcw } from "lucide-react"
+
 import {
-  getReviewBacklog,
-  getMemoryStages,
   getAverageRetention,
+  getMemoryStages,
+  getReviewBacklog,
 } from "@/application/review-engine/review-analytics.service"
 import { ReviewTabs, type TabReviewItem } from "@/features/reviews/components/review-tabs"
 import { StartReviewButton } from "@/features/reviews/components/start-review-button"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
-  title: "Revisões - Mentor Concursos IA",
+  title: "Revisões",
+  description: "Gerencie suas revisões espaçadas no Nomeia.",
 }
 
 const DISC_PALETTE = [
-  "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
-  "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#ef4444",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#06b6d4",
+  "#f97316",
+  "#84cc16",
+  "#6366f1",
+  "#ef4444",
 ]
 
 function intervalLabel(days: number): TabReviewItem["interval"] {
@@ -50,7 +60,7 @@ export default async function ReviewsDashboardPage() {
     supabase
       .from("review_items")
       .select(
-        "id, card_front, discipline_id, review_stage, next_review_at, last_review_at, lapses_count, last_interval_days, is_suspended, source_type"
+        "id, card_front, discipline_id, review_stage, next_review_at, last_review_at, lapses_count, last_interval_days, is_suspended, source_type",
       )
       .eq("user_id", user.id)
       .is("deleted_at", null),
@@ -58,7 +68,7 @@ export default async function ReviewsDashboardPage() {
   ])
 
   const discNameMap = new Map<string, string>(
-    (discRes.data ?? []).map((d) => [String(d.id), String(d.name ?? "")])
+    (discRes.data ?? []).map((d) => [String(d.id), String(d.name ?? "")]),
   )
   const nowIso = new Date().toISOString()
 
@@ -75,7 +85,9 @@ export default async function ReviewsDashboardPage() {
 
       return {
         id: String(r.id),
-        topic: String(r.card_front || (r.source_type === "QUESTION" ? "Questão revisada" : "Cartão de revisão")),
+        topic: String(
+          r.card_front || (r.source_type === "QUESTION" ? "Questão revisada" : "Cartão de revisão"),
+        ),
         discipline: discNameMap.get(String(r.discipline_id ?? "")) || "Disciplina",
         disciplineColor: discColor(r.discipline_id),
         dueDate: String(r.next_review_at || r.last_review_at || nowIso),
@@ -96,7 +108,9 @@ export default async function ReviewsDashboardPage() {
         <RefreshCcw className="h-5 w-5 text-primary" />
         <div>
           <h1 className="text-lg font-bold leading-none">Painel de Revisões</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Repetição espaçada: 24h · 7d · 15d · 30d · 60d</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Repetição espaçada: 24h · 7d · 15d · 30d · 60d
+          </p>
         </div>
       </div>
 
@@ -109,7 +123,9 @@ export default async function ReviewsDashboardPage() {
               <Brain className="h-32 w-32" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fila de Hoje</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Fila de Hoje
+              </p>
               <p className="text-4xl font-bold text-orange-600 mt-1">{backlogCount}</p>
               <p className="text-xs text-muted-foreground mt-1">cartões pendentes</p>
             </div>
@@ -118,7 +134,9 @@ export default async function ReviewsDashboardPage() {
 
           {/* Retention */}
           <div className="rounded-xl border bg-card p-5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Retenção</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Retenção
+            </p>
             <p className="text-3xl font-bold">{retentionData.retentionRate}%</p>
             <div className="w-full bg-muted rounded-full h-1.5 mt-3 overflow-hidden">
               <div
@@ -130,10 +148,20 @@ export default async function ReviewsDashboardPage() {
 
           {/* Mastered */}
           <div className="rounded-xl border bg-card p-5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Dominados</p>
-            <p className="text-3xl font-bold text-green-600 dark:text-green-400">{memoryStages.mastered}</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Dominados
+            </p>
+            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+              {memoryStages.mastered}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
-              de {memoryStages.new + memoryStages.learning + memoryStages.review + memoryStages.mastered + memoryStages.lapsed} total
+              de{" "}
+              {memoryStages.new +
+                memoryStages.learning +
+                memoryStages.review +
+                memoryStages.mastered +
+                memoryStages.lapsed}{" "}
+              total
             </p>
           </div>
         </div>
@@ -144,10 +172,26 @@ export default async function ReviewsDashboardPage() {
           <div className="grid grid-cols-5 gap-3 text-center">
             {[
               { label: "Novos", value: memoryStages.new, className: "bg-muted/50" },
-              { label: "Aprendendo", value: memoryStages.learning, className: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
-              { label: "Revisando", value: memoryStages.review, className: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
-              { label: "Dominados", value: memoryStages.mastered, className: "bg-green-500/10 text-green-700 dark:text-green-400" },
-              { label: "Lapsos", value: memoryStages.lapsed, className: "bg-red-500/10 text-red-700 dark:text-red-400" },
+              {
+                label: "Aprendendo",
+                value: memoryStages.learning,
+                className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+              },
+              {
+                label: "Revisando",
+                value: memoryStages.review,
+                className: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+              },
+              {
+                label: "Dominados",
+                value: memoryStages.mastered,
+                className: "bg-green-500/10 text-green-700 dark:text-green-400",
+              },
+              {
+                label: "Lapsos",
+                value: memoryStages.lapsed,
+                className: "bg-red-500/10 text-red-700 dark:text-red-400",
+              },
             ].map((stage, i, arr) => (
               <div key={stage.label} className="flex items-center gap-2">
                 <div className={`flex-1 rounded-lg p-3 ${stage.className}`}>

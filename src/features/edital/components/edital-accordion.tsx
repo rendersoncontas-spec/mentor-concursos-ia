@@ -1,32 +1,37 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+
 import { useRouter } from "next/navigation"
+
+import { Check, ChevronDown, ChevronUp, Edit, ExternalLink, Plus } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+
 import {
-  ChevronDown,
-  ChevronUp,
-  Plus,
-  Edit,
-  ExternalLink,
-  Check,
-} from "lucide-react"
+  addCustomDisciplineAction,
+  removeCustomTopicAction,
+  removeDisciplineAction,
+  saveCustomTopicsAction,
+  searchDisciplinesAction,
+} from "@/application/edital/edital.action"
+import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
-import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
+import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
-import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
-import { addCustomDisciplineAction, saveCustomTopicsAction, searchDisciplinesAction, removeDisciplineAction, removeCustomTopicAction } from "@/application/edital/edital.action"
-import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
-import { TopicAutocomplete, type TopicCommit } from "@/features/topic-catalog/components/topic-autocomplete"
-import { Loader2, Trash2 } from "lucide-react"
+import {
+  TopicAutocomplete,
+  type TopicCommit,
+} from "@/features/topic-catalog/components/topic-autocomplete"
 
 export interface TopicItem {
   id: string
@@ -50,11 +55,21 @@ export interface DisciplineData {
 
 const DEFAULT_EDITAL_DATA: DisciplineData[] = []
 
-export function EditalAccordion({ initialDisciplines, activeTargetName, activeTargetId }: { initialDisciplines?: DisciplineData[], activeTargetName?: string, activeTargetId?: string }) {
+export function EditalAccordion({
+  initialDisciplines,
+  activeTargetName,
+  activeTargetId,
+}: {
+  initialDisciplines?: DisciplineData[]
+  activeTargetName?: string
+  activeTargetId?: string
+}) {
   const router = useRouter()
   const [data, setData] = useState<DisciplineData[]>(initialDisciplines || DEFAULT_EDITAL_DATA)
   const [completedTopics, setCompletedTopics] = useState<Record<string, boolean>>({})
-  const [openDisciplineId, setOpenDisciplineId] = useState<string | null>(data.length > 0 ? (data[0]?.id ?? null) : null)
+  const [openDisciplineId, setOpenDisciplineId] = useState<string | null>(
+    data.length > 0 ? (data[0]?.id ?? null) : null,
+  )
   const [linkModalTopic, setLinkModalTopic] = useState<TopicItem | null>(null)
   const [inputUrl, setInputUrl] = useState("")
 
@@ -112,7 +127,9 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
   const toggleCheck = (topicId: string) => {
     const updated = { ...completedTopics, [topicId]: !completedTopics[topicId] }
     setCompletedTopics(updated)
-    const storageKey = activeTargetId ? `mentor_edital_checked_topics_${activeTargetId}` : "mentor_edital_checked_topics"
+    const storageKey = activeTargetId
+      ? `mentor_edital_checked_topics_${activeTargetId}`
+      : "mentor_edital_checked_topics"
     localStorage.setItem(storageKey, JSON.stringify(updated))
   }
 
@@ -121,7 +138,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     const updatedData = data.map((disc) => ({
       ...disc,
       topics: disc.topics.map((t) =>
-        t.id === linkModalTopic.id ? { ...t, link: inputUrl.trim() || null } : t
+        t.id === linkModalTopic.id ? { ...t, link: inputUrl.trim() || null } : t,
       ),
     }))
     setData(updatedData)
@@ -132,16 +149,17 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
 
   const totalTopicsCount = data.reduce((acc, d) => acc + d.topics.length, 0) || 0
   const completedTopicsCount = Object.values(completedTopics).filter(Boolean).length
-  const overallProgressPercentage = totalTopicsCount > 0 ? Math.round((completedTopicsCount / totalTopicsCount) * 100) : 0
+  const overallProgressPercentage =
+    totalTopicsCount > 0 ? Math.round((completedTopicsCount / totalTopicsCount) * 100) : 0
 
   const handleAddDiscipline = async () => {
     if (!newDisciplineName.trim()) return
-      if (!activeTargetId) {
-        toast.error("Nenhum concurso ativo.")
-        return
-      }
-      setIsSaving(true)
-      const res = await addCustomDisciplineAction(newDisciplineName, activeTargetId)
+    if (!activeTargetId) {
+      toast.error("Nenhum concurso ativo.")
+      return
+    }
+    setIsSaving(true)
+    const res = await addCustomDisciplineAction(newDisciplineName, activeTargetId)
     if (res.success && res.data) {
       const addedDiscipline = res.data
       setData((prev) => [
@@ -150,8 +168,8 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
           id: addedDiscipline.id,
           name: addedDiscipline.name,
           color: "#2563EB",
-          topics: []
-        }
+          topics: [],
+        },
       ])
       setNewDisciplineName("")
       setIsAddingDiscipline(false)
@@ -166,8 +184,8 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     const topicName = (name ?? newTopicName).trim()
     if (!topicName || !activeTargetId) return
     setIsSaving(true)
-    
-    const disc = data.find(d => d.id === discId)
+
+    const disc = data.find((d) => d.id === discId)
     if (!disc) return setIsSaving(false)
 
     // Registra no catálogo de tópicos (dedupe-safe) quando o nome não veio do catálogo nem foi criado agora
@@ -185,14 +203,14 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
       accuracy: 0,
       lastStudy: null,
       studyCount: 0,
-      link: null
+      link: null,
     }
 
     const updatedTopics = [...disc.topics, newTopic]
-    
+
     // Atualiza localmente
-    setData(prev => prev.map(d => d.id === discId ? { ...d, topics: updatedTopics } : d))
-    
+    setData((prev) => prev.map((d) => (d.id === discId ? { ...d, topics: updatedTopics } : d)))
+
     // Salva no backend
     const res = await saveCustomTopicsAction(activeTargetId, discId, updatedTopics)
     if (res.success) {
@@ -206,7 +224,12 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
   }
 
   const handleDeleteDiscipline = async (discId: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta matéria? Ela também será removida do seu planejamento e estatísticas.")) return
+    if (
+      !confirm(
+        "Tem certeza que deseja excluir esta matéria? Ela também será removida do seu planejamento e estatísticas.",
+      )
+    )
+      return
     setIsSaving(true)
     if (!activeTargetId) {
       toast.error("Nenhum concurso ativo.")
@@ -214,7 +237,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     }
     const res = await removeDisciplineAction(discId, activeTargetId)
     if (res.success) {
-      setData(prev => prev.filter(d => d.id !== discId))
+      setData((prev) => prev.filter((d) => d.id !== discId))
       toast.success("Matéria removida!")
       router.refresh()
     } else {
@@ -229,9 +252,11 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     setIsSaving(true)
     const res = await removeCustomTopicAction(activeTargetId, discId, topicId)
     if (res.success) {
-      setData(prev => prev.map(d => 
-        d.id === discId ? { ...d, topics: d.topics.filter(t => t.id !== topicId) } : d
-      ))
+      setData((prev) =>
+        prev.map((d) =>
+          d.id === discId ? { ...d, topics: d.topics.filter((t) => t.id !== topicId) } : d,
+        ),
+      )
       toast.success("Tópico removido!")
       router.refresh()
     } else {
@@ -242,7 +267,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
 
   return (
     <div className="space-y-6">
-      {/* Top Header Buttons — Paridade 100% com o Estudei */}
+      {/* Top Header Buttons */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-foreground">Edital Verticalizado</h1>
@@ -263,7 +288,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
         </div>
       </div>
 
-      {/* Card PROGRESSO NO EDITAL — Paridade 100% com o Estudei */}
+      {/* Card PROGRESSO NO EDITAL */}
       <div className="rounded-xl border bg-card p-6 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
@@ -294,16 +319,19 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
           const totalCorrect = disc.topics.reduce((acc, t) => acc + t.correct, 0)
           const totalWrong = disc.topics.reduce((acc, t) => acc + t.wrong, 0)
           const totalQuestions = disc.topics.reduce((acc, t) => acc + t.questions, 0)
-          const avgAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0
+          const avgAccuracy =
+            totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0
 
           const checkedCount = disc.topics.filter((t) => completedTopics[t.id]).length
-          const progressPercentage = disc.topics.length > 0
-            ? Math.round((checkedCount / disc.topics.length) * 100)
-            : 0
+          const progressPercentage =
+            disc.topics.length > 0 ? Math.round((checkedCount / disc.topics.length) * 100) : 0
 
           return (
-            <div key={disc.id} className="rounded-xl border bg-card shadow-sm overflow-hidden transition-all">
-              {/* Cabeçalho da Disciplina (100% Paridade Estudei Foto 1) */}
+            <div
+              key={disc.id}
+              className="rounded-xl border bg-card shadow-sm overflow-hidden transition-all"
+            >
+              {/* Cabeçalho da Disciplina */}
               <div
                 onClick={() => setOpenDisciplineId(isOpen ? null : disc.id)}
                 className="group flex items-center justify-between p-4 bg-card hover:bg-muted/20 cursor-pointer border-b transition-colors"
@@ -326,7 +354,9 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
 
                   {/* Barra de Progresso da Matéria (ex: 3% + Barra Verde-Água) */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black font-mono text-foreground">{progressPercentage}%</span>
+                    <span className="text-xs font-black font-mono text-foreground">
+                      {progressPercentage}%
+                    </span>
                     <div className="w-24 h-2.5 rounded-full bg-muted overflow-hidden">
                       <div
                         className="h-full bg-[#2563EB] rounded-full transition-all duration-300"
@@ -362,7 +392,11 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
                   </div>
 
                   <button className="text-muted-foreground ml-2">
-                    {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {isOpen ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -375,12 +409,36 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
                       <thead>
                         <tr className="border-b bg-muted/20 text-muted-foreground font-semibold">
                           <th className="px-3 py-3 font-bold text-foreground">Tópicos</th>
-                          <th className="px-2 py-3 text-center text-emerald-600 font-bold" title="Acertos">✔</th>
-                          <th className="px-2 py-3 text-center text-rose-500 font-bold" title="Erros">✖</th>
-                          <th className="px-2 py-3 text-center text-blue-600 font-bold" title="Total de questões">📝</th>
-                          <th className="px-2 py-3 text-center font-bold text-foreground" title="Desempenho">%</th>
-                          <th className="px-3 py-3 text-center" title="Data do último estudo">📅</th>
-                          <th className="px-2 py-3 text-center" title="Quantidade de vezes estudou">🧮</th>
+                          <th
+                            className="px-2 py-3 text-center text-emerald-600 font-bold"
+                            title="Acertos"
+                          >
+                            ✔
+                          </th>
+                          <th
+                            className="px-2 py-3 text-center text-rose-500 font-bold"
+                            title="Erros"
+                          >
+                            ✖
+                          </th>
+                          <th
+                            className="px-2 py-3 text-center text-blue-600 font-bold"
+                            title="Total de questões"
+                          >
+                            📝
+                          </th>
+                          <th
+                            className="px-2 py-3 text-center font-bold text-foreground"
+                            title="Desempenho"
+                          >
+                            %
+                          </th>
+                          <th className="px-3 py-3 text-center" title="Data do último estudo">
+                            📅
+                          </th>
+                          <th className="px-2 py-3 text-center" title="Quantidade de vezes estudou">
+                            🧮
+                          </th>
                           <th className="px-3 py-3 text-center">Link</th>
                         </tr>
                       </thead>
@@ -404,11 +462,17 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
                                     {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
                                   </button>
 
-                                  <span className={isChecked ? "line-through opacity-70 text-foreground" : "text-foreground"}>
+                                  <span
+                                    className={
+                                      isChecked
+                                        ? "line-through opacity-70 text-foreground"
+                                        : "text-foreground"
+                                    }
+                                  >
                                     {topic.number}. {topic.title}
                                   </span>
 
-                                  {topic.id.startsWith('custom-') && (
+                                  {topic.id.startsWith("custom-") && (
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteTopic(disc.id, topic.id)}
@@ -494,7 +558,11 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
                                   onClick={() => handleAddTopic(disc.id)}
                                   disabled={isSaving}
                                 >
-                                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar"}
+                                  {isSaving ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    "Salvar"
+                                  )}
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -511,7 +579,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
                       </tbody>
                     </table>
                   </div>
-                  
+
                   {!addingTopicDiscId && (
                     <div className="flex justify-start">
                       <Button
@@ -529,8 +597,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
                     </div>
                   )}
 
-
-                  {/* Rodapé da Tabela: TOTAL pill + PROGRESSO bar — 100% de Paridade Estudei */}
+                  {/* Rodapé da Tabela: TOTAL pill + PROGRESSO bar */}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t">
                     {/* TOTAL pill */}
                     <div className="flex items-center gap-3">
@@ -639,7 +706,8 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
 
           <div className="space-y-3 pt-2">
             <p className="text-xs text-muted-foreground">
-              Insira o link (URL) do seu caderno de questões no QConcursos, TEC Concursos ou PDF para o tópico:
+              Insira o link (URL) do seu caderno de questões no QConcursos, TEC Concursos ou PDF
+              para o tópico:
             </p>
             <p className="text-xs font-bold text-foreground bg-muted p-2 rounded">
               {linkModalTopic?.number}. {linkModalTopic?.title}
@@ -656,7 +724,10 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
             <Button variant="outline" onClick={() => setLinkModalTopic(null)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveLink} className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold">
+            <Button
+              onClick={handleSaveLink}
+              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold"
+            >
               Salvar Link
             </Button>
           </DialogFooter>
@@ -664,10 +735,7 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
       </Dialog>
 
       {/* Modal Registrar Estudo (Sua Foto 1) */}
-      <StudyRegisterModal
-        open={isRegisterModalOpen}
-        onOpenChange={setIsRegisterModalOpen}
-      />
+      <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
 
       {/* Modal Editar Disciplina (Sua Foto 2) */}
       <EditDisciplineModal
@@ -687,4 +755,3 @@ export function EditalAccordion({ initialDisciplines, activeTargetName, activeTa
     </div>
   )
 }
-

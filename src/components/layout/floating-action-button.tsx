@@ -1,9 +1,11 @@
-﻿"use client"
+"use client"
 
-import { useState, useEffect } from "react"
-import { Timer, StickyNote } from "lucide-react"
-import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+import { useEffect, useState } from "react"
+
+import { StickyNote, Timer } from "lucide-react"
+
 import { StickyNotesWidget } from "@/features/dashboard/components/sticky-notes-widget"
+import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
 export function FloatingActionButton() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
@@ -30,18 +32,12 @@ export function FloatingActionButton() {
   return (
     <>
       {/* Bloco de Notas Post-it Modal */}
-      <StickyNotesWidget
-        isOpen={isNotesOpen}
-        onClose={() => setIsNotesOpen(false)}
-      />
+      <StickyNotesWidget isOpen={isNotesOpen} onClose={() => setIsNotesOpen(false)} />
 
       {/* Registrar Estudo Modal */}
-      <StudyRegisterModal
-        open={isRegisterOpen}
-        onOpenChange={setIsRegisterOpen}
-      />
+      <StudyRegisterModal open={isRegisterOpen} onOpenChange={setIsRegisterOpen} />
 
-      {/* Botões Flutuantes Circulares Empilhados (100% Paridade Estudei) */}
+      {/* Botões Flutuantes de Ação Rápida */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-3">
         {/* Botão 1 (Superior): Bloco de Notas — Círculo Branco com Borda Verde-Água */}
         <button
@@ -68,4 +64,3 @@ export function FloatingActionButton() {
     </>
   )
 }
-

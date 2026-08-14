@@ -1,23 +1,24 @@
-import { redirect } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/infrastructure/supabase/server"
-import { Logo } from "@/components/ui/logo"
-import { 
-  Activity,
-  History,
-  ShieldAlert
-} from "lucide-react"
+import { redirect } from "next/navigation"
+
+import { Activity, History, ShieldAlert } from "lucide-react"
+
 import { calculateLearningHealthScore } from "@/application/adaptive-learning/adaptive-learning.service"
 import type { AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
+import { Logo } from "@/components/ui/logo"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
-  title: "Aprendizado Adaptativo (ALE) - Mentor Concursos IA",
+  title: "Aprendizado Adaptativo",
+  description: "Sistema de aprendizado adaptativo no Nomeia.",
 }
 
 export default async function AdaptiveDashboardPage() {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
   // Buscar perfil e disciplinas reais do usuário
@@ -29,10 +30,12 @@ export default async function AdaptiveDashboardPage() {
 
   const { data: userDisciplines } = await supabase
     .from("user_disciplines")
-    .select(`
+    .select(
+      `
       discipline_id,
       disciplines ( id, name )
-    `)
+    `,
+    )
     .eq("user_id", user.id)
 
   const realDisciplines = (userDisciplines || []).map((ud) => {
@@ -44,7 +47,7 @@ export default async function AdaptiveDashboardPage() {
       performanceScore: 70,
       retentionRate: 75,
       lapsesCount: 0,
-      daysSinceLastStudy: 0
+      daysSinceLastStudy: 0,
     }
   })
 
@@ -55,8 +58,8 @@ export default async function AdaptiveDashboardPage() {
       averageEnergy: 3,
       weeklyHoursStudied: profile?.weekly_study_hours || 0,
       currentStreak: profile?.streak_days || 0,
-      totalBacklogReviews: 0
-    }
+      totalBacklogReviews: 0,
+    },
   }
 
   const lhs = calculateLearningHealthScore(realContext)
@@ -69,13 +72,15 @@ export default async function AdaptiveDashboardPage() {
 
   // Busca o histórico real da tabela adaptive_history
   const { data: history } = await supabase
-    .from('adaptive_history')
-    .select(`
+    .from("adaptive_history")
+    .select(
+      `
       *,
       disciplines ( name )
-    `)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+    `,
+    )
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
     .limit(10)
 
   const displayHistory = history || []
@@ -85,29 +90,55 @@ export default async function AdaptiveDashboardPage() {
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
         <Logo href="/dashboard" />
       </header>
-      
+
       <main className="flex-1 space-y-6 p-4 md:p-8 pt-6">
         <div className="flex flex-col space-y-4">
           <h2 className="text-3xl font-bold tracking-tight">Painel de Estudos</h2>
-          
+
           <nav className="flex space-x-4 border-b pb-2 text-sm overflow-x-auto">
-            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">Visão Geral</Link>
-            <Link href="/dashboard/performance" className="text-muted-foreground hover:text-foreground">Performance</Link>
-            <Link href="/dashboard/questions" className="text-muted-foreground hover:text-foreground">Questões</Link>
-            <Link href="/dashboard/reviews" className="text-muted-foreground hover:text-foreground">Revisões</Link>
-            <Link href="/dashboard/adaptive" className="font-semibold text-primary border-b-2 border-primary pb-2">Adaptativo (ALE)</Link>
-            <Link href="/dashboard/history" className="text-muted-foreground hover:text-foreground">Histórico</Link>
-            <Link href="/dashboard/analytics" className="text-muted-foreground hover:text-foreground">Analytics</Link>
+            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
+              Visão Geral
+            </Link>
+            <Link
+              href="/dashboard/performance"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Performance
+            </Link>
+            <Link
+              href="/dashboard/questions"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Questões
+            </Link>
+            <Link href="/dashboard/reviews" className="text-muted-foreground hover:text-foreground">
+              Revisões
+            </Link>
+            <Link
+              href="/dashboard/adaptive"
+              className="font-semibold text-primary border-b-2 border-primary pb-2"
+            >
+              Adaptativo (ALE)
+            </Link>
+            <Link href="/dashboard/history" className="text-muted-foreground hover:text-foreground">
+              Histórico
+            </Link>
+            <Link
+              href="/dashboard/analytics"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Analytics
+            </Link>
           </nav>
         </div>
-        
+
         {/* Termômetro LHS */}
         <div className="grid gap-4 md:grid-cols-3">
           <div className="border rounded-lg p-6 bg-card flex flex-col justify-between shadow-sm md:col-span-2 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Activity className="h-48 w-48" />
             </div>
-            
+
             <div>
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Activity className="h-5 w-5 text-indigo-500" /> Learning Health Score (LHS)
@@ -116,12 +147,10 @@ export default async function AdaptiveDashboardPage() {
                 Índice unificado de saúde do seu ecossistema de aprendizado.
               </p>
             </div>
-            
+
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-baseline gap-3">
-                <p className={`text-6xl font-black ${scoreColor(lhs.score)}`}>
-                  {lhs.score}
-                </p>
+                <p className={`text-6xl font-black ${scoreColor(lhs.score)}`}>{lhs.score}</p>
                 <p className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full uppercase tracking-wider">
                   {lhs.statusLabel}
                 </p>
@@ -143,7 +172,7 @@ export default async function AdaptiveDashboardPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Energia (Burnout)</p>
-                <p className={`font-semibold ${lhs.burnoutRisk === 'HIGH' ? 'text-red-500' : ''}`}>
+                <p className={`font-semibold ${lhs.burnoutRisk === "HIGH" ? "text-red-500" : ""}`}>
                   {lhs.burnoutRisk}
                 </p>
               </div>
@@ -154,13 +183,16 @@ export default async function AdaptiveDashboardPage() {
             <h3 className="font-semibold flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-red-500" /> Detecção de Risco
             </h3>
-            {lhs.burnoutRisk === 'HIGH' ? (
+            {lhs.burnoutRisk === "HIGH" ? (
               <div className="bg-red-50 text-red-900 p-4 rounded-md border border-red-100 text-sm">
                 <p className="font-bold mb-1">Risco Crítico de Burnout</p>
-                <p>Volume de estudos excede sua capacidade atual de recuperação energética. O motor cortou 20% da carga horária gerada.</p>
+                <p>
+                  Volume de estudos excede sua capacidade atual de recuperação energética. O motor
+                  cortou 20% da carga horária gerada.
+                </p>
               </div>
             ) : (
-               <div className="bg-green-50 text-green-900 p-4 rounded-md border border-green-100 text-sm">
+              <div className="bg-green-50 text-green-900 p-4 rounded-md border border-green-100 text-sm">
                 <p className="font-bold mb-1">Risco Baixo</p>
                 <p>Níveis de energia compatíveis com a carga horária atual.</p>
               </div>
@@ -192,7 +224,8 @@ export default async function AdaptiveDashboardPage() {
                 {displayHistory.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-xs text-muted-foreground">
-                      Nenhuma intervenção registrada ainda. O motor executará adaptações conforme você estuda.
+                      Nenhuma intervenção registrada ainda. O motor executará adaptações conforme
+                      você estuda.
                     </td>
                   </tr>
                 ) : (
@@ -202,18 +235,21 @@ export default async function AdaptiveDashboardPage() {
                         {log.engine}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          log.delta > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {log.delta > 0 ? '+' : ''}{Math.round((log.delta || 0) * 100)}% Peso
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            log.delta > 0
+                              ? "bg-indigo-100 text-indigo-700"
+                              : "bg-rose-100 text-rose-700"
+                          }`}
+                        >
+                          {log.delta > 0 ? "+" : ""}
+                          {Math.round((log.delta || 0) * 100)}% Peso
                         </span>
                       </td>
                       <td className="px-6 py-4 font-medium">
-                        {log.disciplines?.name || 'Cronograma Global'}
+                        {log.disciplines?.name || "Cronograma Global"}
                       </td>
-                      <td className="px-6 py-4 text-muted-foreground">
-                        {log.reason}
-                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">{log.reason}</td>
                     </tr>
                   ))
                 )}
@@ -221,7 +257,6 @@ export default async function AdaptiveDashboardPage() {
             </table>
           </div>
         </div>
-
       </main>
     </div>
   )

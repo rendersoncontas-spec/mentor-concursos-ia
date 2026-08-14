@@ -1,44 +1,54 @@
-﻿"use client"
+"use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+
 import { Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import {
-  getSubscriptionDataAction,
-  type SubscriptionData,
-} from "@/application/subscription/subscription.action"
 
-export function EstudeiSubscriptionView() {
+import {
+  type SubscriptionData,
+  getSubscriptionDataAction,
+} from "@/application/subscription/subscription.action"
+import { Button } from "@/components/ui/button"
+
+export function SubscriptionView() {
   const [data, setData] = useState<SubscriptionData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    getSubscriptionDataAction().then((res) => {
-      if (cancelled) return
-      if (res.success && res.data) {
-        setData(res.data)
-      } else {
-        setError(res.error || "Erro ao carregar assinatura.")
-      }
-      setIsLoading(false)
-    }).catch(() => {
-      if (!cancelled) setIsLoading(false)
-    })
-    return () => { cancelled = true }
+    getSubscriptionDataAction()
+      .then((res) => {
+        if (cancelled) return
+        if (res.success && res.data) {
+          setData(res.data)
+        } else {
+          setError(res.error || "Erro ao carregar assinatura.")
+        }
+        setIsLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleManageSubscription = () => {
-    toast.info("Você está utilizando a versão Free do Mentor Concursos IA. Não há assinatura paga ativa para gerenciar.")
+    toast.info(
+      "Você está utilizando a versão Free do Nomeia. Não há assinatura paga ativa para gerenciar.",
+    )
   }
 
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-3">
         <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
-        <p className="text-xs text-muted-foreground font-medium">Carregando dados da assinatura...</p>
+        <p className="text-xs text-muted-foreground font-medium">
+          Carregando dados da assinatura...
+        </p>
       </div>
     )
   }
@@ -46,8 +56,12 @@ export function EstudeiSubscriptionView() {
   if (error || !data) {
     return (
       <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
-        <h3 className="text-lg font-bold text-foreground">Não foi possível carregar a assinatura</h3>
-        <p className="text-xs text-muted-foreground font-medium">{error || "Tente novamente mais tarde."}</p>
+        <h3 className="text-lg font-bold text-foreground">
+          Não foi possível carregar a assinatura
+        </h3>
+        <p className="text-xs text-muted-foreground font-medium">
+          {error || "Tente novamente mais tarde."}
+        </p>
       </div>
     )
   }
@@ -56,7 +70,7 @@ export function EstudeiSubscriptionView() {
 
   return (
     <div className="space-y-6">
-      {/* Header Actions — 100% Estudei */}
+      {/* Header Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-black text-foreground">Assinatura</h1>
 
@@ -85,27 +99,27 @@ export function EstudeiSubscriptionView() {
               </span>
             </p>
             <p className="text-muted-foreground">
-              <strong className="text-foreground">Adesão:</strong>{" "}
-              {data.adhesionDate ?? "—"}
+              <strong className="text-foreground">Adesão:</strong> {data.adhesionDate ?? "—"}
             </p>
             <p className="text-muted-foreground">
               <strong className="text-foreground">Vencimento:</strong>{" "}
-              <span className="text-muted-foreground">{isFree ? "Sem vencimento (gratuito)" : "—"}</span>
+              <span className="text-muted-foreground">
+                {isFree ? "Sem vencimento (gratuito)" : "—"}
+              </span>
             </p>
           </div>
 
           <div className="space-y-2">
             <p className="text-muted-foreground">
               <strong className="text-foreground">Próximo pagamento:</strong>{" "}
-              {isFree ? "Isento" : data.nextPayment ?? "—"}
+              {isFree ? "Isento" : (data.nextPayment ?? "—")}
             </p>
             <p className="text-muted-foreground">
-              <strong className="text-foreground">Valor:</strong>{" "}
-              {data.amount ?? "R$ 0,00"}
+              <strong className="text-foreground">Valor:</strong> {data.amount ?? "R$ 0,00"}
             </p>
             <p className="text-muted-foreground">
               <strong className="text-foreground">Forma de pagamento:</strong>{" "}
-              {isFree ? "Plano Gratuito (Versão Free)" : data.paymentMethod ?? "—"}
+              {isFree ? "Plano Gratuito (Versão Free)" : (data.paymentMethod ?? "—")}
             </p>
           </div>
         </div>
@@ -114,8 +128,8 @@ export function EstudeiSubscriptionView() {
       {/* Aviso honesto sobre assinatura paga */}
       {isFree && (
         <div className="rounded-xl border border-amber-300/50 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-xs text-foreground">
-          <strong>Você está no plano gratuito.</strong>{" "}
-          A funcionalidade de assinatura paga ainda não está disponível nesta versão do aplicativo. Nenhum valor é cobrado da sua conta.
+          <strong>Você está no plano gratuito.</strong> A funcionalidade de assinatura paga ainda
+          não está disponível nesta versão do aplicativo. Nenhum valor é cobrado da sua conta.
         </div>
       )}
 
@@ -129,7 +143,9 @@ export function EstudeiSubscriptionView() {
 
         {data.purchaseHistory.length === 0 ? (
           <div className="p-10 flex flex-col items-center justify-center text-center space-y-2">
-            <h4 className="text-sm font-bold text-foreground">Você ainda não possui histórico de compras</h4>
+            <h4 className="text-sm font-bold text-foreground">
+              Você ainda não possui histórico de compras
+            </h4>
             <p className="text-xs text-muted-foreground font-medium max-w-md">
               Quando houver compras ou renovações de assinatura, elas aparecerão aqui.
             </p>
@@ -162,8 +178,12 @@ export function EstudeiSubscriptionView() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{purchase.paymentMethod}</td>
-                    <td className="px-3 py-3 text-center text-muted-foreground font-mono">{purchase.recurring}</td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-foreground">{purchase.amount}</td>
+                    <td className="px-3 py-3 text-center text-muted-foreground font-mono">
+                      {purchase.recurring}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
+                      {purchase.amount}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -174,3 +194,5 @@ export function EstudeiSubscriptionView() {
     </div>
   )
 }
+
+export { SubscriptionView as EstudeiSubscriptionView }

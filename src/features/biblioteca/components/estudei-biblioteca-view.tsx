@@ -1,35 +1,30 @@
-﻿"use client"
+"use client"
 
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
+
+import { Download, ExternalLink, Library, Loader2, Search, Trash2 } from "lucide-react"
+import { Import } from "lucide-react"
+import { toast } from "sonner"
+
 import {
-  Library,
-  ExternalLink,
-  Trash2,
-  Search,
-  Loader2,
-  Download,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
+  type LibraryMaterialItem,
+  createLibraryMaterialAction,
+  deleteLibraryMaterialAction,
+  listLibraryMaterialsAction,
+} from "@/application/library/library.action"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
-import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
 import { ImportHistoryModal } from "@/features/importacao/components/import-history-modal"
-import { Import } from "lucide-react"
-import {
-  listLibraryMaterialsAction,
-  createLibraryMaterialAction,
-  deleteLibraryMaterialAction,
-  type LibraryMaterialItem,
-} from "@/application/library/library.action"
 
-export function EstudeiBibliotecaView() {
+export function BibliotecaView() {
   const [materials, setMaterials] = useState<LibraryMaterialItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -137,7 +132,9 @@ export function EstudeiBibliotecaView() {
     if (loadError) {
       return (
         <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
-          <h3 className="text-lg font-bold text-foreground">Não foi possível carregar a biblioteca</h3>
+          <h3 className="text-lg font-bold text-foreground">
+            Não foi possível carregar a biblioteca
+          </h3>
           <p className="text-xs text-muted-foreground font-medium">{loadError}</p>
           <Button
             onClick={loadMaterials}
@@ -188,10 +185,15 @@ export function EstudeiBibliotecaView() {
           >
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="text-[10px] font-bold bg-[#2563EB]/10 text-[#2563EB]">
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] font-bold bg-[#2563EB]/10 text-[#2563EB]"
+                >
                   {item.type}
                 </Badge>
-                <span className="text-[10px] text-muted-foreground font-mono">{item.dateAdded}</span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {item.dateAdded}
+                </span>
               </div>
 
               <h3 className="font-bold text-sm text-foreground line-clamp-2">{item.title}</h3>
@@ -210,7 +212,9 @@ export function EstudeiBibliotecaView() {
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               ) : (
-                <span className="text-xs text-muted-foreground font-medium">Sem link cadastrado</span>
+                <span className="text-xs text-muted-foreground font-medium">
+                  Sem link cadastrado
+                </span>
               )}
 
               <div className="flex items-center gap-1">
@@ -248,7 +252,7 @@ export function EstudeiBibliotecaView() {
 
   return (
     <div className="space-y-6">
-      {/* Header Actions — 100% Estudei */}
+      {/* Header Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-black text-foreground">Biblioteca</h1>
 
@@ -267,7 +271,7 @@ export function EstudeiBibliotecaView() {
             Importar dados
           </h3>
           <p className="text-sm font-extrabold text-foreground">
-            Traga seu histórico de estudos para o Mentor IA.
+            Traga seu histórico de estudos para o Nomeia.
           </p>
           <p className="text-[11px] text-muted-foreground">
             Compatível com arquivos Excel (.xlsx).
@@ -325,7 +329,9 @@ export function EstudeiBibliotecaView() {
       {renderContent()}
 
       {/* Modal Adicionar Material */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>        <DialogContent className="sm:max-w-md">
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        {" "}
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-[#2563EB]">
               Adicionar Material de Estudo
@@ -334,7 +340,9 @@ export function EstudeiBibliotecaView() {
 
           <form onSubmit={handleAddMaterial} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Título do Material *</label>
+              <label className="text-xs font-semibold text-muted-foreground">
+                Título do Material *
+              </label>
               <Input
                 placeholder="Ex: Apostila Resumida de Direito Tributário..."
                 value={titleInput}
@@ -368,7 +376,9 @@ export function EstudeiBibliotecaView() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Link (URL ou Drive)</label>
+              <label className="text-xs font-semibold text-muted-foreground">
+                Link (URL ou Drive)
+              </label>
               <Input
                 placeholder="https://drive.google.com/file/..."
                 value={urlInput}
@@ -380,7 +390,11 @@ export function EstudeiBibliotecaView() {
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold"
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -399,3 +413,5 @@ export function EstudeiBibliotecaView() {
     </div>
   )
 }
+
+export { BibliotecaView as EstudeiBibliotecaView }

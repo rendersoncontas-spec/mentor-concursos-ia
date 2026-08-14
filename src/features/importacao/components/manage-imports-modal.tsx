@@ -1,24 +1,20 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
-import {
-  AlertTriangle,
-  Database,
-  Eye,
-  Loader2,
-  Trash2,
-} from "lucide-react"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+
+import { AlertTriangle, Database, Eye, Loader2, Trash2 } from "lucide-react"
 import { Upload } from "lucide-react"
-import { originDisplayName } from "@/features/importacao/lib/origin"
+import { toast } from "sonner"
+
 import {
+  type ImportBatchItem,
   deleteAllImportedAction,
   deleteImportBatchAction,
   listImportsAction,
-  type ImportBatchItem,
 } from "@/application/import-history/import-history.actions"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { originDisplayName } from "@/features/importacao/lib/origin"
 
 interface ManageImportsModalProps {
   open: boolean
@@ -33,7 +29,12 @@ function formatImportDate(value: string): string {
   return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()} • ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
 }
 
-export function ManageImportsModal({ open, onOpenChange, onChanged, onImportClick }: ManageImportsModalProps) {
+export function ManageImportsModal({
+  open,
+  onOpenChange,
+  onChanged,
+  onImportClick,
+}: ManageImportsModalProps) {
   const [imports, setImports] = useState<ImportBatchItem[]>([])
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -129,8 +130,8 @@ export function ManageImportsModal({ open, onOpenChange, onChanged, onImportClic
 
         <div className="px-6 py-5 space-y-5">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Importações realizadas para a sua conta. Excluir uma importação remove apenas as
-            sessões importadas — estudos criados normalmente no Mentor IA não são afetados.
+            Importações realizadas para a sua conta. Excluir uma importação remove apenas as sessões
+            importadas — estudos criados normalmente no Nomeia não são afetados.
           </p>
 
           {loading && (
@@ -173,7 +174,9 @@ export function ManageImportsModal({ open, onOpenChange, onChanged, onImportClic
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {formatImportDate(item.createdAt)} •{" "}
-                        <span className="font-bold">{item.sessionCount} registro{item.sessionCount !== 1 ? "s" : ""}</span>
+                        <span className="font-bold">
+                          {item.sessionCount} registro{item.sessionCount !== 1 ? "s" : ""}
+                        </span>
                         {item.fileName ? ` • ${item.fileName}` : ""}
                       </p>
                     </div>
@@ -207,9 +210,11 @@ export function ManageImportsModal({ open, onOpenChange, onChanged, onImportClic
                         EXCLUIR IMPORTAÇÃO?
                       </p>
                       <p className="text-[11px] text-rose-700 dark:text-rose-300 leading-relaxed">
-                        Você está prestes a excluir {item.sessionCount} registro{item.sessionCount !== 1 ? "s" : ""}{" "}
-                        importado{item.sessionCount !== 1 ? "s" : ""} do {originDisplayName(item.source as never, item.sourceName)}.
-                        Essa ação NÃO afetará seus estudos criados diretamente no Mentor IA.
+                        Você está prestes a excluir {item.sessionCount} registro
+                        {item.sessionCount !== 1 ? "s" : ""} importado
+                        {item.sessionCount !== 1 ? "s" : ""} do{" "}
+                        {originDisplayName(item.source as never, item.sourceName)}. Essa ação NÃO
+                        afetará seus estudos criados diretamente no Nomeia.
                       </p>
                       <div className="flex gap-2 pt-1">
                         <Button
@@ -283,11 +288,12 @@ export function ManageImportsModal({ open, onOpenChange, onChanged, onImportClic
               {confirmAllStep === 1 && (
                 <div className="space-y-2">
                   <p className="text-xs font-extrabold text-rose-700 dark:text-rose-300">
-                    Esta ação removerá todas as sessões importadas da sua conta e não poderá ser desfeita.
+                    Esta ação removerá todas as sessões importadas da sua conta e não poderá ser
+                    desfeita.
                   </p>
                   <p className="text-[11px] text-rose-700 dark:text-rose-300 leading-relaxed">
-                    Estudos criados normalmente no Mentor IA, sessões do cronômetro e dados de
-                    outros usuários não serão afetados.
+                    Estudos criados normalmente no Nomeia, sessões do cronômetro e dados de outros
+                    usuários não serão afetados.
                   </p>
                   <div className="flex gap-2 pt-1">
                     <Button

@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation"
+
 import { BarChart3 } from "lucide-react"
 
-import { createClient } from "@/infrastructure/supabase/server"
-import { PerformanceChart } from "@/features/analytics/components/performance-chart"
-import { HoursDistributionChart } from "@/features/analytics/components/hours-distribution-chart"
 import { getDashboardData } from "@/application/dashboard/dashboard.service"
+import { HoursDistributionChart } from "@/features/analytics/components/hours-distribution-chart"
+import { PerformanceChart } from "@/features/analytics/components/performance-chart"
+import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
-  title: "Estatísticas - Mentor Concursos IA",
+  title: "Análise de Desempenho",
+  description: "Gráficos e estatísticas de evolução no Nomeia.",
 }
 
 export default async function AnalyticsDashboardPage() {
@@ -28,7 +30,9 @@ export default async function AnalyticsDashboardPage() {
         <BarChart3 className="h-5 w-5 text-primary" />
         <div>
           <h1 className="text-lg font-bold leading-none">Estatísticas</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Análise detalhada do seu desempenho</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Análise detalhada do seu desempenho
+          </p>
         </div>
       </div>
 

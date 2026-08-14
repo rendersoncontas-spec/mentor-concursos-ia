@@ -1,21 +1,17 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
-import {
-  RotateCcw,
-  Calendar,
-  HelpCircle,
-  Sparkles,
-  Search,
-  X
-} from "lucide-react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useCallback, useEffect, useMemo, useState } from "react"
+
+import { Calendar, HelpCircle, RotateCcw, Search, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
-import { type StudyCycleBlock } from "./estudei-planning-view"
+
 import { generateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
 import { getDisciplinesForAutocomplete } from "@/application/study-session/get-disciplines.action"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+
+import { type StudyCycleBlock } from "./estudei-planning-view"
 
 export interface EditPlanningWizardModalProps {
   open: boolean
@@ -88,7 +84,15 @@ export function EditPlanningWizardModal({
 
   // Step 4 State: Horários & Escala de Trabalho
   const [weeklyHours, setWeeklyHours] = useState("25")
-  const [selectedDays, setSelectedDays] = useState<string[]>(["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"])
+  const [selectedDays, setSelectedDays] = useState<string[]>([
+    "Domingo",
+    "Segunda",
+    "Terça",
+    "Quarta",
+    "Quinta",
+    "Sexta",
+    "Sábado",
+  ])
   const [minTime, setMinTime] = useState("45min")
   const [maxTime, setMaxTime] = useState("1h30min")
   const [dayConfigMode, setDayConfigMode] = useState<"semana" | "escala">(() => {
@@ -117,38 +121,38 @@ export function EditPlanningWizardModal({
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
-      if (initialBlocks && initialBlocks.length > 0) {
-        const uniqueNames = Array.from(new Set(initialBlocks.map(b => b.disciplineName)))
-        setSelectedDisciplines(uniqueNames)
+        if (initialBlocks && initialBlocks.length > 0) {
+          const uniqueNames = Array.from(new Set(initialBlocks.map((b) => b.disciplineName)))
+          setSelectedDisciplines(uniqueNames)
 
-        const impMap: Record<string, number> = {}
-        const knowMap: Record<string, number> = {}
+          const impMap: Record<string, number> = {}
+          const knowMap: Record<string, number> = {}
 
-        initialBlocks.forEach(b => {
-          if (!impMap[b.disciplineName]) {
-            const priorityScore = (b as PrioritizedStudyCycleBlock).priorityScore ?? 3
-            impMap[b.disciplineName] = Math.min(5, Math.max(1, Math.round(priorityScore)))
-            knowMap[b.disciplineName] = 2.5
+          initialBlocks.forEach((b) => {
+            if (!impMap[b.disciplineName]) {
+              const priorityScore = (b as PrioritizedStudyCycleBlock).priorityScore ?? 3
+              impMap[b.disciplineName] = Math.min(5, Math.max(1, Math.round(priorityScore)))
+              knowMap[b.disciplineName] = 2.5
+            }
+          })
+
+          setImportanceMap(impMap)
+          setKnowledgeMap(knowMap)
+
+          const totalMins = initialBlocks.reduce((acc, b) => acc + b.durationMinutes, 0)
+          if (totalMins > 0) {
+            setWeeklyHours(Math.round(totalMins / 60).toString())
           }
-        })
-
-        setImportanceMap(impMap)
-        setKnowledgeMap(knowMap)
-
-        const totalMins = initialBlocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-        if (totalMins > 0) {
-          setWeeklyHours(Math.round(totalMins / 60).toString())
         }
-      }
 
-      getDisciplinesForAutocomplete()
-        .then(res => {
-          if (res?.allDisciplines && res.allDisciplines.length > 0) {
-            const dbNames = res.allDisciplines.map(d => d.name)
-            setAllDbDisciplines(Array.from(new Set([...dbNames, ...ALL_DISCIPLINES])))
-          }
-        })
-        .catch(() => {})
+        getDisciplinesForAutocomplete()
+          .then((res) => {
+            if (res?.allDisciplines && res.allDisciplines.length > 0) {
+              const dbNames = res.allDisciplines.map((d) => d.name)
+              setAllDbDisciplines(Array.from(new Set([...dbNames, ...ALL_DISCIPLINES])))
+            }
+          })
+          .catch(() => {})
       }, 0)
       return () => clearTimeout(timer)
     }
@@ -170,9 +174,9 @@ export function EditPlanningWizardModal({
       return
     }
 
-    setSelectedDisciplines(prev => [trimmed, ...prev])
-    setImportanceMap(prev => ({ ...prev, [trimmed]: 2.5 }))
-    setKnowledgeMap(prev => ({ ...prev, [trimmed]: 2.5 }))
+    setSelectedDisciplines((prev) => [trimmed, ...prev])
+    setImportanceMap((prev) => ({ ...prev, [trimmed]: 2.5 }))
+    setKnowledgeMap((prev) => ({ ...prev, [trimmed]: 2.5 }))
     toast.success(`Matéria "${trimmed}" adicionada!`)
   }
 
@@ -201,7 +205,7 @@ export function EditPlanningWizardModal({
     else if (currentStep === 2) setCurrentStep(3)
     else if (currentStep === 3) setCurrentStep(4)
     else if (currentStep === 4) {
-        try {
+      try {
         if (typeof window !== "undefined") {
           if (dayConfigMode === "escala") {
             localStorage.setItem("mentor_user_work_scale", escalaTrabalho)
@@ -211,15 +215,15 @@ export function EditPlanningWizardModal({
           }
 
           const dayMapShort: Record<string, string> = {
-            "Domingo": "dom",
-            "Segunda": "seg",
-            "Terça": "ter",
-            "Quarta": "qua",
-            "Quinta": "qui",
-            "Sexta": "sex",
-            "Sábado": "sab"
+            Domingo: "dom",
+            Segunda: "seg",
+            Terça: "ter",
+            Quarta: "qua",
+            Quinta: "qui",
+            Sexta: "sex",
+            Sábado: "sab",
           }
-          const shortDays = selectedDays.map(d => dayMapShort[d] || d.toLowerCase().slice(0, 3))
+          const shortDays = selectedDays.map((d) => dayMapShort[d] || d.toLowerCase().slice(0, 3))
           localStorage.setItem("mentor_user_study_days", JSON.stringify(shortDays))
           window.dispatchEvent(new Event("mentor_scale_updated"))
         }
@@ -228,7 +232,7 @@ export function EditPlanningWizardModal({
         const finalImportanceMap: Record<string, number> = {}
         const finalKnowledgeMap: Record<string, number> = {}
 
-        selectedDisciplines.forEach(disc => {
+        selectedDisciplines.forEach((disc) => {
           finalImportanceMap[disc] = importanceMap[disc] ?? 2.5
           finalKnowledgeMap[disc] = knowledgeMap[disc] ?? 2.5
         })
@@ -236,7 +240,7 @@ export function EditPlanningWizardModal({
         const res = await generateStudyPlanAction("replan", {
           horasSemana: parseInt(weeklyHours) || 25,
           importanceMap: finalImportanceMap,
-          knowledgeMap: finalKnowledgeMap
+          knowledgeMap: finalKnowledgeMap,
         })
 
         if (res.success) {
@@ -259,11 +263,14 @@ export function EditPlanningWizardModal({
     else if (currentStep === 4) setCurrentStep(3)
   }
 
-  const calculateDisciplineScore = useCallback((disc: string) => {
-    const imp = importanceMap[disc] ?? 2.5
-    const know = knowledgeMap[disc] ?? 2.5
-    return imp * (6 - know)
-  }, [importanceMap, knowledgeMap])
+  const calculateDisciplineScore = useCallback(
+    (disc: string) => {
+      const imp = importanceMap[disc] ?? 2.5
+      const know = knowledgeMap[disc] ?? 2.5
+      return imp * (6 - know)
+    },
+    [importanceMap, knowledgeMap],
+  )
 
   const totalCalculatedScore = useMemo(() => {
     return selectedDisciplines.reduce((sum, d) => sum + calculateDisciplineScore(d), 0)
@@ -289,16 +296,16 @@ export function EditPlanningWizardModal({
           <div className="space-y-4">
             <h2 className="text-2xl font-black text-foreground tracking-tight">{modalTitle}</h2>
 
-            {/* Stepper dos 4 Passos (100% Paridade Estudei) */}
+            {/* Stepper dos 4 Passos */}
             <div className="flex items-center justify-between relative max-w-xl mx-auto py-2">
               <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-muted -translate-y-1/2 z-0" />
 
               {/* Passo 1: Organização */}
               <div className="flex flex-col items-center relative z-10 space-y-1">
                 <div
-                  className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${
-                    getStepClass(1)
-                  }`}
+                  className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${getStepClass(
+                    1,
+                  )}`}
                 >
                   01
                 </div>
@@ -308,9 +315,9 @@ export function EditPlanningWizardModal({
               {/* Passo 2: Disciplinas */}
               <div className="flex flex-col items-center relative z-10 space-y-1">
                 <div
-                  className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${
-                    getStepClass(2)
-                  }`}
+                  className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${getStepClass(
+                    2,
+                  )}`}
                 >
                   02
                 </div>
@@ -320,9 +327,9 @@ export function EditPlanningWizardModal({
               {/* Passo 3: Relevância */}
               <div className="flex flex-col items-center relative z-10 space-y-1">
                 <div
-                  className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${
-                    getStepClass(3)
-                  }`}
+                  className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center border-2 transition-all ${getStepClass(
+                    3,
+                  )}`}
                 >
                   03
                 </div>
@@ -367,7 +374,8 @@ export function EditPlanningWizardModal({
                   <div className="space-y-2">
                     <h3 className="font-extrabold text-sm text-foreground">Ciclo de Estudos</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Estude as disciplinas em uma ordem rotativa, sem depender de dias fixos. Ideal para quem precisa de flexibilidade na rotina.
+                      Estude as disciplinas em uma ordem rotativa, sem depender de dias fixos. Ideal
+                      para quem precisa de flexibilidade na rotina.
                     </p>
                   </div>
                 </div>
@@ -386,7 +394,8 @@ export function EditPlanningWizardModal({
                   <div className="space-y-2">
                     <h3 className="font-extrabold text-sm text-foreground">Planejamento Semanal</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Define quais matérias estudar em cada dia da semana. Ótimo para quem prefere uma rotina fixa e estruturada.
+                      Define quais matérias estudar em cada dia da semana. Ótimo para quem prefere
+                      uma rotina fixa e estruturada.
                     </p>
                   </div>
                 </div>
@@ -408,7 +417,9 @@ export function EditPlanningWizardModal({
             <div className="space-y-5 pt-2">
               <div className="text-center space-y-1">
                 <p className="text-xs font-semibold text-muted-foreground">
-                  Selecione quais das <strong className="text-foreground">suas disciplinas</strong> você deseja colocar no seu <strong className="text-foreground">planejamento</strong>.
+                  Selecione quais das <strong className="text-foreground">suas disciplinas</strong>{" "}
+                  você deseja colocar no seu{" "}
+                  <strong className="text-foreground">planejamento</strong>.
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   Você poderá adicionar outras disciplinas a qualquer momento.
@@ -451,7 +462,10 @@ export function EditPlanningWizardModal({
                       {searchTerm && (
                         <button
                           type="button"
-                          onClick={() => { setSearchTerm(""); setShowAutocomplete(false) }}
+                          onClick={() => {
+                            setSearchTerm("")
+                            setShowAutocomplete(false)
+                          }}
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs p-1"
                         >
                           <X className="h-3 w-3" />
@@ -486,7 +500,8 @@ export function EditPlanningWizardModal({
 
                       {filteredDbDisciplines.length === 0 ? (
                         <div className="p-3 text-xs text-muted-foreground text-center">
-                          Nenhuma matéria exata no banco. Pressione <strong>+ Adicionar</strong> para criar &quot;{searchTerm}&quot;!
+                          Nenhuma matéria exata no banco. Pressione <strong>+ Adicionar</strong>{" "}
+                          para criar &quot;{searchTerm}&quot;!
                         </div>
                       ) : (
                         filteredDbDisciplines.map((item) => {
@@ -568,7 +583,9 @@ export function EditPlanningWizardModal({
           {currentStep === 3 && (
             <div className="space-y-5 pt-2">
               <p className="text-xs font-semibold text-center text-muted-foreground">
-                Para cada disciplina, selecione a <strong className="text-foreground">importância</strong> (ou peso) para sua prova e seu <strong className="text-foreground">grau de conhecimento</strong>:
+                Para cada disciplina, selecione a{" "}
+                <strong className="text-foreground">importância</strong> (ou peso) para sua prova e
+                seu <strong className="text-foreground">grau de conhecimento</strong>:
               </p>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -580,7 +597,9 @@ export function EditPlanningWizardModal({
                         <div className="space-y-1">
                           <div className="flex justify-between text-muted-foreground">
                             <span>IMPORTÂNCIA</span>
-                            <span className="text-foreground font-black">{importanceMap[disc] ?? 2.5}</span>
+                            <span className="text-foreground font-black">
+                              {importanceMap[disc] ?? 2.5}
+                            </span>
                           </div>
                           <input
                             type="range"
@@ -589,7 +608,10 @@ export function EditPlanningWizardModal({
                             step="0.5"
                             value={importanceMap[disc] ?? 2.5}
                             onChange={(e) =>
-                              setImportanceMap({ ...importanceMap, [disc]: parseFloat(e.target.value) })
+                              setImportanceMap({
+                                ...importanceMap,
+                                [disc]: parseFloat(e.target.value),
+                              })
                             }
                             className="w-full accent-[#2563EB]"
                           />
@@ -598,7 +620,9 @@ export function EditPlanningWizardModal({
                         <div className="space-y-1">
                           <div className="flex justify-between text-muted-foreground">
                             <span>CONHECIMENTO</span>
-                            <span className="text-foreground font-black">{knowledgeMap[disc] ?? 2.5}</span>
+                            <span className="text-foreground font-black">
+                              {knowledgeMap[disc] ?? 2.5}
+                            </span>
                           </div>
                           <input
                             type="range"
@@ -607,7 +631,10 @@ export function EditPlanningWizardModal({
                             step="0.5"
                             value={knowledgeMap[disc] ?? 2.5}
                             onChange={(e) =>
-                              setKnowledgeMap({ ...knowledgeMap, [disc]: parseFloat(e.target.value) })
+                              setKnowledgeMap({
+                                ...knowledgeMap,
+                                [disc]: parseFloat(e.target.value),
+                              })
                             }
                             className="w-full accent-[#2563EB]"
                           />
@@ -666,14 +693,15 @@ export function EditPlanningWizardModal({
             </div>
           )}
 
-          {/* PASSO 4: Horários (Diferenciado por Ciclo de Estudos vs Planejamento Semanal 100% Estudei Imagem 1) */}
+          {/* PASSO 4: Horários (Ciclo de Estudos vs Planejamento Semanal) */}
           {currentStep === 4 && (
             <div className="space-y-6 pt-2">
               {mode === "semanal" ? (
-                /* Layout Planejamento Semanal (Sua Foto 1 100% Estudei) */
+                /* Layout Planejamento Semanal */
                 <div className="space-y-5">
-                  <p className="text-xs font-semibold text-center text-muted-foreground">
-                    Quais <strong className="text-foreground">dias</strong> e quantas <strong className="text-foreground">horas</strong> pretende estudar?
+                  <p className="text-xs font-semibold center text-muted-foreground">
+                    Quais <strong className="text-foreground">dias</strong> e quantas{" "}
+                    <strong className="text-foreground">horas</strong> pretende estudar?
                   </p>
 
                   {/* Grid de Dias com Checkboxes e Inputs de Horas Diárias */}
@@ -687,9 +715,15 @@ export function EditPlanningWizardModal({
                       { key: "SÁB", label: "SÁB" },
                       { key: "QUA", label: "QUA" },
                     ].map((d) => (
-                      <div key={d.key} className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-card">
+                      <div
+                        key={d.key}
+                        className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-card"
+                      >
                         <label className="flex items-center gap-2 text-xs font-bold text-foreground cursor-pointer">
-                          <input type="checkbox" className="rounded text-[#2563EB] focus:ring-[#2563EB]" />
+                          <input
+                            type="checkbox"
+                            className="rounded text-[#2563EB] focus:ring-[#2563EB]"
+                          />
                           <span className="px-2.5 py-1 bg-slate-500 text-white rounded-md text-[10px] font-black">
                             {d.label}
                           </span>
@@ -701,7 +735,9 @@ export function EditPlanningWizardModal({
                             defaultValue="00:00"
                             className="w-16 h-7 text-xs font-mono text-center"
                           />
-                          <span className="text-[10px] text-muted-foreground font-semibold">horas diárias</span>
+                          <span className="text-[10px] text-muted-foreground font-semibold">
+                            horas diárias
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -715,7 +751,9 @@ export function EditPlanningWizardModal({
                   {/* Seletor Mínimo e Máximo de Tempo */}
                   <div className="space-y-2 text-center pt-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center justify-center gap-1">
-                      Qual <strong className="text-foreground">mínimo</strong> e <strong className="text-foreground">máximo</strong> de tempo que deseja estudar uma mesma disciplina?
+                      Qual <strong className="text-foreground">mínimo</strong> e{" "}
+                      <strong className="text-foreground">máximo</strong> de tempo que deseja
+                      estudar uma mesma disciplina?
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </label>
                     <div className="flex items-center justify-center gap-3">
@@ -749,7 +787,8 @@ export function EditPlanningWizardModal({
                   {/* Campo 1: Horas semanais */}
                   <div className="space-y-2 max-w-sm mx-auto">
                     <label className="text-xs font-semibold text-muted-foreground block text-center">
-                      Quantas horas, em média, pretende estudar <strong className="text-foreground">por semana</strong>?
+                      Quantas horas, em média, pretende estudar{" "}
+                      <strong className="text-foreground">por semana</strong>?
                     </label>
                     <div className="flex justify-center">
                       <input
@@ -764,20 +803,30 @@ export function EditPlanningWizardModal({
                   {/* Banner Informativo Explicito da Carga Horaria */}
                   <div className="max-w-md mx-auto rounded-xl bg-[#2563EB]/10 border border-[#2563EB]/30 p-3 text-center space-y-1">
                     <p className="text-xs font-extrabold text-[#2563EB]">
-                      Carga semanal planejada: <span className="text-sm font-black underline">{weeklyHours || 25}h</span>
+                      Carga semanal planejada:{" "}
+                      <span className="text-sm font-black underline">{weeklyHours || 25}h</span>
                     </p>
 
                     {dayConfigMode === "escala" ? (
                       <div className="text-[11px] text-muted-foreground pt-1.5 border-t border-[#2563EB]/20 space-y-0.5">
-                        <p>Carga desejada: <strong className="text-foreground">{weeklyHours || 25}h</strong></p>
-                        <p>Carga programada: <strong className="text-[#2563EB]">{weeklyHours || 25}h</strong></p>
+                        <p>
+                          Carga desejada:{" "}
+                          <strong className="text-foreground">{weeklyHours || 25}h</strong>
+                        </p>
+                        <p>
+                          Carga programada:{" "}
+                          <strong className="text-[#2563EB]">{weeklyHours || 25}h</strong>
+                        </p>
                         <p className="text-[10px] text-[#2563EB] font-bold">
-                          Motivo: distribuída proporcionalmente de acordo com a escala ({escalaTrabalho})
+                          Motivo: distribuída proporcionalmente de acordo com a escala (
+                          {escalaTrabalho})
                         </p>
                       </div>
                     ) : (
                       <p className="text-[11px] text-muted-foreground">
-                        Carga programada: <strong className="text-[#2563EB]">{weeklyHours || 25}h</strong> (distribuição completa da semana)
+                        Carga programada:{" "}
+                        <strong className="text-[#2563EB]">{weeklyHours || 25}h</strong>{" "}
+                        (distribuição completa da semana)
                       </p>
                     )}
                   </div>
@@ -785,7 +834,8 @@ export function EditPlanningWizardModal({
                   {/* Toggle: Dias da Semana vs Escala de Trabalho */}
                   <div className="space-y-3 text-center">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center justify-center gap-1">
-                      Como você organiza seus <strong className="text-foreground">dias de estudo</strong>?
+                      Como você organiza seus{" "}
+                      <strong className="text-foreground">dias de estudo</strong>?
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </label>
                     <div className="flex justify-center">
@@ -818,23 +868,25 @@ export function EditPlanningWizardModal({
                     {dayConfigMode === "semana" ? (
                       /* Pílulas de Dias da Semana */
                       <div className="flex items-center justify-center rounded-xl border border-[#2563EB] overflow-hidden max-w-xl mx-auto mt-2">
-                        {["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"].map((day) => {
-                          const isSelected = selectedDays.includes(day)
-                          return (
-                            <button
-                              key={day}
-                              type="button"
-                              onClick={() => toggleDaySelection(day)}
-                              className={`flex-1 py-2 text-xs font-bold transition-all border-r last:border-r-0 cursor-pointer ${
-                                isSelected
-                                  ? "bg-[#2563EB] text-white"
-                                  : "bg-card text-[#2563EB] hover:bg-[#dbeafe]/20"
-                              }`}
-                            >
-                              {day}
-                            </button>
-                          )
-                        })}
+                        {["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"].map(
+                          (day) => {
+                            const isSelected = selectedDays.includes(day)
+                            return (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={() => toggleDaySelection(day)}
+                                className={`flex-1 py-2 text-xs font-bold transition-all border-r last:border-r-0 cursor-pointer ${
+                                  isSelected
+                                    ? "bg-[#2563EB] text-white"
+                                    : "bg-card text-[#2563EB] hover:bg-[#dbeafe]/20"
+                                }`}
+                              >
+                                {day}
+                              </button>
+                            )
+                          },
+                        )}
                       </div>
                     ) : (
                       /* Grid de Escala de Trabalho / Plantão */
@@ -858,8 +910,12 @@ export function EditPlanningWizardModal({
                                   : "border-muted bg-card hover:border-[#2563EB]/40 text-muted-foreground"
                               }`}
                             >
-                              <div className="font-extrabold text-xs text-foreground">{esc.label}</div>
-                              <div className="text-[10px] text-muted-foreground font-medium">{esc.desc}</div>
+                              <div className="font-extrabold text-xs text-foreground">
+                                {esc.label}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground font-medium">
+                                {esc.desc}
+                              </div>
                             </button>
                           ))}
                         </div>
@@ -867,7 +923,8 @@ export function EditPlanningWizardModal({
                         {/* Seleção do dia do 1º Plantão */}
                         <div className="space-y-1.5 text-center pt-2">
                           <label className="text-xs font-semibold text-muted-foreground block">
-                            Em qual dia da semana cai o seu <strong className="text-foreground">1º Plantão</strong>?
+                            Em qual dia da semana cai o seu{" "}
+                            <strong className="text-foreground">1º Plantão</strong>?
                           </label>
                           <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d, idx) => (
@@ -893,7 +950,9 @@ export function EditPlanningWizardModal({
                   {/* Campo 3: Duração Mínima e Máxima */}
                   <div className="space-y-2 text-center pt-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center justify-center gap-1">
-                      Qual duração <strong className="text-foreground">mínima</strong> e <strong className="text-foreground">máxima</strong> você deseja para uma sessão de estudos (disciplina)?
+                      Qual duração <strong className="text-foreground">mínima</strong> e{" "}
+                      <strong className="text-foreground">máxima</strong> você deseja para uma
+                      sessão de estudos (disciplina)?
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </label>
                     <div className="flex items-center justify-center gap-3">
@@ -944,4 +1003,3 @@ export function EditPlanningWizardModal({
     </Dialog>
   )
 }
-

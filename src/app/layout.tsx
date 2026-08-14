@@ -1,8 +1,9 @@
-﻿import type { Metadata, Viewport } from "next"
-import { isMaintenanceMode } from "@/lib/maintenance"
-import { MaintenancePage } from "@/components/system/maintenance-page"
+import type { Metadata, Viewport } from "next"
 
 import { Providers } from "@/components/providers"
+import { MaintenancePage } from "@/components/system/maintenance-page"
+import { BRAND } from "@/config/brand"
+import { isMaintenanceMode } from "@/lib/maintenance"
 import { cn } from "@/lib/utils"
 
 import { fontMono, fontSans } from "./fonts"
@@ -16,12 +17,19 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Mentor Concursos IA",
-    default: "Mentor Concursos IA — Mentoria Inteligente para Concursos",
+    template: "%s — Nomeia",
+    default: "Nomeia — Sua preparação rumo à nomeação",
   },
-  description: "A melhor e mais avançada plataforma de mentoria inteligente e preparação para concursos públicos do Brasil.",
-  keywords: ["concursos públicos", "mentoria ia", "cronograma de estudo", "questões", "edital sintetizado"],
-  authors: [{ name: "Mentor IA Team" }],
+  description: "Plataforma inteligente de preparação para concursos.",
+  keywords: [
+    "concursos públicos",
+    "nomeia",
+    "cronograma de estudo",
+    "questões",
+    "edital verticalizado",
+    "mentoria",
+  ],
+  authors: [{ name: "Equipe Nomeia" }],
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },
@@ -32,31 +40,29 @@ export const metadata: Metadata = {
       { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
     shortcut: "/favicon.ico",
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    url: "https://mentorconcursos.ia",
-    title: "Mentor Concursos IA",
-    description: "Mentoria inteligente com inteligência artificial para sua aprovação em concursos públicos.",
-    siteName: "Mentor Concursos IA",
+    url: "https://nomeia.concursos",
+    title: "Nomeia — Sua preparação rumo à nomeação",
+    description: "Plataforma inteligente de preparação para concursos públicos.",
+    siteName: "Nomeia",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Mentor Concursos IA Logo",
+        alt: "Nomeia Logo",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Mentor Concursos IA",
-    description: "Mentoria inteligente com IA para sua aprovação.",
+    title: "Nomeia — Sua preparação rumo à nomeação",
+    description: "Plataforma inteligente de preparação para concursos públicos.",
     images: ["/og-image.png"],
   },
 }
@@ -84,4 +90,3 @@ export default function RootLayout({
     </html>
   )
 }
-

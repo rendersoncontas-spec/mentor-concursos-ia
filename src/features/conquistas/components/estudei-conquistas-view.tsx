@@ -1,14 +1,12 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useState } from "react"
+
+import { Award, Loader2, Lock } from "lucide-react"
+
 import {
-  Award,
-  Lock,
-  Loader2,
-} from "lucide-react"
-import {
-  getAchievementsAction,
   type AchievementsFacts,
+  getAchievementsAction,
 } from "@/application/achievements/achievements.action"
 
 export interface AchievementItem {
@@ -34,7 +32,7 @@ const CATEGORIES_DATA: AchievementCategory[] = [
   {
     id: "trilha-inicial",
     title: "TRILHA INICIAL",
-    subtitle: "Primeiras ações que marcam o início da sua jornada no Mentor IA.",
+    subtitle: "Primeiras ações que marcam o início da sua jornada no Nomeia.",
     totalCount: 6,
     color: "#2563EB",
     items: [
@@ -129,11 +127,31 @@ const CATEGORIES_DATA: AchievementCategory[] = [
     totalCount: 6,
     color: "#fb923c",
     items: [
-      { id: "c-1", title: "Primeiro Ritmo", description: "7 dias seguidos de estudo.", iconType: "shield" },
-      { id: "c-2", title: "Sem Falhar", description: "15 dias de consistência.", iconType: "shield" },
-      { id: "c-3", title: "Corrente Forte", description: "30 dias seguidos de estudo.", iconType: "shield" },
+      {
+        id: "c-1",
+        title: "Primeiro Ritmo",
+        description: "7 dias seguidos de estudo.",
+        iconType: "shield",
+      },
+      {
+        id: "c-2",
+        title: "Sem Falhar",
+        description: "15 dias de consistência.",
+        iconType: "shield",
+      },
+      {
+        id: "c-3",
+        title: "Corrente Forte",
+        description: "30 dias seguidos de estudo.",
+        iconType: "shield",
+      },
       { id: "c-4", title: "Imparável", description: "100 dias de constância.", iconType: "shield" },
-      { id: "c-5", title: "Inquebrável", description: "180 dias seguidos de estudo.", iconType: "shield" },
+      {
+        id: "c-5",
+        title: "Inquebrável",
+        description: "180 dias seguidos de estudo.",
+        iconType: "shield",
+      },
       { id: "c-6", title: "Lendário", description: "365 dias de constância.", iconType: "shield" },
     ],
   },
@@ -158,12 +176,42 @@ const CATEGORIES_DATA: AchievementCategory[] = [
     totalCount: 6,
     color: "#4ade80",
     items: [
-      { id: "q-1", title: "Primeiro Alvo", description: "50 questões resolvidas.", iconType: "target" },
-      { id: "q-2", title: "Mira Certa", description: "250 questões concluídas.", iconType: "target" },
-      { id: "q-3", title: "Ritmo de Prova", description: "1.000 questões resolvidas.", iconType: "target" },
-      { id: "q-4", title: "Bateria Forte", description: "2.500 questões concluídas.", iconType: "target" },
-      { id: "q-5", title: "Máquina de Questões", description: "5.000 questões resolvidas.", iconType: "target" },
-      { id: "q-6", title: "Mestre das Questões", description: "10.000 questões concluídas.", iconType: "target" },
+      {
+        id: "q-1",
+        title: "Primeiro Alvo",
+        description: "50 questões resolvidas.",
+        iconType: "target",
+      },
+      {
+        id: "q-2",
+        title: "Mira Certa",
+        description: "250 questões concluídas.",
+        iconType: "target",
+      },
+      {
+        id: "q-3",
+        title: "Ritmo de Prova",
+        description: "1.000 questões resolvidas.",
+        iconType: "target",
+      },
+      {
+        id: "q-4",
+        title: "Bateria Forte",
+        description: "2.500 questões concluídas.",
+        iconType: "target",
+      },
+      {
+        id: "q-5",
+        title: "Máquina de Questões",
+        description: "5.000 questões resolvidas.",
+        iconType: "target",
+      },
+      {
+        id: "q-6",
+        title: "Mestre das Questões",
+        description: "10.000 questões concluídas.",
+        iconType: "target",
+      },
     ],
   },
   {
@@ -175,9 +223,24 @@ const CATEGORIES_DATA: AchievementCategory[] = [
     items: [
       { id: "p-1", title: "Primeira Página", description: "50 páginas lidas.", iconType: "book" },
       { id: "p-2", title: "Leitor em Curso", description: "250 páginas lidas.", iconType: "book" },
-      { id: "p-3", title: "Virador de Páginas", description: "500 páginas lidas.", iconType: "book" },
-      { id: "p-4", title: "Repertório Forte", description: "1.000 páginas lidas.", iconType: "book" },
-      { id: "p-5", title: "Biblioteca Viva", description: "2.500 páginas lidas.", iconType: "book" },
+      {
+        id: "p-3",
+        title: "Virador de Páginas",
+        description: "500 páginas lidas.",
+        iconType: "book",
+      },
+      {
+        id: "p-4",
+        title: "Repertório Forte",
+        description: "1.000 páginas lidas.",
+        iconType: "book",
+      },
+      {
+        id: "p-5",
+        title: "Biblioteca Viva",
+        description: "2.500 páginas lidas.",
+        iconType: "book",
+      },
     ],
   },
   {
@@ -187,11 +250,36 @@ const CATEGORIES_DATA: AchievementCategory[] = [
     totalCount: 5,
     color: "#f87171",
     items: [
-      { id: "r-1", title: "Primeira Retomada", description: "10 revisões concluídas.", iconType: "clock" },
-      { id: "r-2", title: "Memória em Treino", description: "50 revisões concluídas.", iconType: "clock" },
-      { id: "r-3", title: "Fixação Sólida", description: "100 revisões concluídas.", iconType: "clock" },
-      { id: "r-4", title: "Ciclo Fechado", description: "250 revisões concluídas.", iconType: "clock" },
-      { id: "r-5", title: "Memória de Ferro", description: "500 revisões concluídas.", iconType: "clock" },
+      {
+        id: "r-1",
+        title: "Primeira Retomada",
+        description: "10 revisões concluídas.",
+        iconType: "clock",
+      },
+      {
+        id: "r-2",
+        title: "Memória em Treino",
+        description: "50 revisões concluídas.",
+        iconType: "clock",
+      },
+      {
+        id: "r-3",
+        title: "Fixação Sólida",
+        description: "100 revisões concluídas.",
+        iconType: "clock",
+      },
+      {
+        id: "r-4",
+        title: "Ciclo Fechado",
+        description: "250 revisões concluídas.",
+        iconType: "clock",
+      },
+      {
+        id: "r-5",
+        title: "Memória de Ferro",
+        description: "500 revisões concluídas.",
+        iconType: "clock",
+      },
     ],
   },
 ]
@@ -220,15 +308,24 @@ function evaluateAchievement(id: string, f: AchievementsFacts): AchievementState
     case "ti-1":
       return f.streak >= 7
         ? { unlocked: true }
-        : { unlocked: false, progressText: `Sua sequência atual: ${f.streak} dia${f.streak === 1 ? "" : "s"}.` }
+        : {
+            unlocked: false,
+            progressText: `Sua sequência atual: ${f.streak} dia${f.streak === 1 ? "" : "s"}.`,
+          }
     case "ti-2":
       return f.attempts >= 1
         ? { unlocked: true }
-        : { unlocked: false, progressText: `${f.attempts} questão${f.attempts === 1 ? "" : "es"} respondida${f.attempts === 1 ? "" : "s"}.` }
+        : {
+            unlocked: false,
+            progressText: `${f.attempts} questão${f.attempts === 1 ? "" : "es"} respondida${f.attempts === 1 ? "" : "s"}.`,
+          }
     case "ti-3":
       return f.reviews >= 1
         ? { unlocked: true }
-        : { unlocked: false, progressText: `${f.reviews} revisão${f.reviews === 1 ? "" : "ões"} concluída${f.reviews === 1 ? "" : "s"}.` }
+        : {
+            unlocked: false,
+            progressText: `${f.reviews} revisão${f.reviews === 1 ? "" : "ões"} concluída${f.reviews === 1 ? "" : "s"}.`,
+          }
     case "ti-4":
       return f.plans >= 1
         ? { unlocked: true }
@@ -264,11 +361,17 @@ function evaluateAchievement(id: string, f: AchievementsFacts): AchievementState
     case "med-3":
       return f.simulados >= 1
         ? { unlocked: true }
-        : { unlocked: false, progressText: `${f.simulados} simulado${f.simulados === 1 ? "" : "s"} realizado${f.simulados === 1 ? "" : "s"}.` }
+        : {
+            unlocked: false,
+            progressText: `${f.simulados} simulado${f.simulados === 1 ? "" : "s"} realizado${f.simulados === 1 ? "" : "s"}.`,
+          }
     case "med-4":
       return f.maxDayMinutes >= 480
         ? { unlocked: true }
-        : { unlocked: false, progressText: `Seu melhor dia: ${formatHours(f.maxDayMinutes)} de estudo.` }
+        : {
+            unlocked: false,
+            progressText: `Seu melhor dia: ${formatHours(f.maxDayMinutes)} de estudo.`,
+          }
     case "med-5":
       return f.hasLateNightSession
         ? { unlocked: true }
@@ -278,65 +381,143 @@ function evaluateAchievement(id: string, f: AchievementsFacts): AchievementState
         ? { unlocked: true }
         : { unlocked: false, progressText: "Estude cedo pela manhã (5h às 8h)." }
     case "c-1":
-      return f.streak >= 7 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${7 - f.streak} dia${7 - f.streak === 1 ? "" : "s"} para conquistar.` }
+      return f.streak >= 7
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Faltam ${7 - f.streak} dia${7 - f.streak === 1 ? "" : "s"} para conquistar.`,
+          }
     case "c-2":
-      return f.streak >= 15 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${15 - f.streak} dias para conquistar.` }
+      return f.streak >= 15
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${15 - f.streak} dias para conquistar.` }
     case "c-3":
-      return f.streak >= 30 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${30 - f.streak} dias para conquistar.` }
+      return f.streak >= 30
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${30 - f.streak} dias para conquistar.` }
     case "c-4":
-      return f.streak >= 100 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${100 - f.streak} dias para conquistar.` }
+      return f.streak >= 100
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${100 - f.streak} dias para conquistar.` }
     case "c-5":
-      return f.streak >= 180 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${180 - f.streak} dias para conquistar.` }
+      return f.streak >= 180
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${180 - f.streak} dias para conquistar.` }
     case "c-6":
-      return f.streak >= 365 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${365 - f.streak} dias para conquistar.` }
+      return f.streak >= 365
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${365 - f.streak} dias para conquistar.` }
     case "h-1":
-      return f.totalMinutes >= 1200 ? { unlocked: true } : { unlocked: false, progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.` }
+      return f.totalMinutes >= 1200
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.`,
+          }
     case "h-2":
-      return f.totalMinutes >= 6000 ? { unlocked: true } : { unlocked: false, progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.` }
+      return f.totalMinutes >= 6000
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.`,
+          }
     case "h-3":
-      return f.totalMinutes >= 18000 ? { unlocked: true } : { unlocked: false, progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.` }
+      return f.totalMinutes >= 18000
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.`,
+          }
     case "h-4":
-      return f.totalMinutes >= 30000 ? { unlocked: true } : { unlocked: false, progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.` }
+      return f.totalMinutes >= 30000
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.`,
+          }
     case "h-5":
-      return f.totalMinutes >= 60000 ? { unlocked: true } : { unlocked: false, progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.` }
+      return f.totalMinutes >= 60000
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Você já acumulou ${formatHours(f.totalMinutes)} de estudo.`,
+          }
     case "q-1":
-      return f.attempts >= 50 ? { unlocked: true } : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questão${f.attempts === 1 ? "" : "es"}.` }
+      return f.attempts >= 50
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Você já resolveu ${f.attempts} questão${f.attempts === 1 ? "" : "es"}.`,
+          }
     case "q-2":
-      return f.attempts >= 250 ? { unlocked: true } : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
+      return f.attempts >= 250
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
     case "q-3":
-      return f.attempts >= 1000 ? { unlocked: true } : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
+      return f.attempts >= 1000
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
     case "q-4":
-      return f.attempts >= 2500 ? { unlocked: true } : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
+      return f.attempts >= 2500
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
     case "q-5":
-      return f.attempts >= 5000 ? { unlocked: true } : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
+      return f.attempts >= 5000
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
     case "q-6":
-      return f.attempts >= 10000 ? { unlocked: true } : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
+      return f.attempts >= 10000
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já resolveu ${f.attempts} questões.` }
     case "p-1":
-      return f.pages >= 50 ? { unlocked: true } : { unlocked: false, progressText: `Você já leu ${f.pages} página${f.pages === 1 ? "" : "s"}.` }
+      return f.pages >= 50
+        ? { unlocked: true }
+        : {
+            unlocked: false,
+            progressText: `Você já leu ${f.pages} página${f.pages === 1 ? "" : "s"}.`,
+          }
     case "p-2":
-      return f.pages >= 250 ? { unlocked: true } : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
+      return f.pages >= 250
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
     case "p-3":
-      return f.pages >= 500 ? { unlocked: true } : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
+      return f.pages >= 500
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
     case "p-4":
-      return f.pages >= 1000 ? { unlocked: true } : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
+      return f.pages >= 1000
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
     case "p-5":
-      return f.pages >= 2500 ? { unlocked: true } : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
+      return f.pages >= 2500
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Você já leu ${f.pages} páginas.` }
     case "r-1":
-      return f.reviews >= 10 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${10 - f.reviews} revisões para conquistar.` }
+      return f.reviews >= 10
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${10 - f.reviews} revisões para conquistar.` }
     case "r-2":
-      return f.reviews >= 50 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${50 - f.reviews} revisões para conquistar.` }
+      return f.reviews >= 50
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${50 - f.reviews} revisões para conquistar.` }
     case "r-3":
-      return f.reviews >= 100 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${100 - f.reviews} revisões para conquistar.` }
+      return f.reviews >= 100
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${100 - f.reviews} revisões para conquistar.` }
     case "r-4":
-      return f.reviews >= 250 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${250 - f.reviews} revisões para conquistar.` }
+      return f.reviews >= 250
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${250 - f.reviews} revisões para conquistar.` }
     case "r-5":
-      return f.reviews >= 500 ? { unlocked: true } : { unlocked: false, progressText: `Faltam ${500 - f.reviews} revisões para conquistar.` }
+      return f.reviews >= 500
+        ? { unlocked: true }
+        : { unlocked: false, progressText: `Faltam ${500 - f.reviews} revisões para conquistar.` }
     default:
       return { unlocked: false }
   }
 }
 
-export function EstudeiConquistasView() {
+export function ConquistasView() {
   const [facts, setFacts] = useState<AchievementsFacts | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -466,7 +647,9 @@ export function EstudeiConquistasView() {
                           </span>
                         ) : (
                           <span className="text-[11px] font-medium text-muted-foreground/70 block pt-1">
-                            {state.progressText || item.progressText || "Continue estudando para desbloquear."}
+                            {state.progressText ||
+                              item.progressText ||
+                              "Continue estudando para desbloquear."}
                           </span>
                         )}
                       </div>
@@ -481,3 +664,5 @@ export function EstudeiConquistasView() {
     </div>
   )
 }
+
+export { ConquistasView as EstudeiConquistasView }

@@ -1,6 +1,8 @@
 import React from "react"
+
 import Image from "next/image"
 import Link from "next/link"
+
 import { cn } from "@/lib/utils"
 
 type LogoProps = Omit<React.ComponentPropsWithoutRef<typeof Link>, "href"> & {
@@ -11,15 +13,18 @@ type LogoProps = Omit<React.ComponentPropsWithoutRef<typeof Link>, "href"> & {
 
 export function Logo({ className, href = "/", size = 32, showText = true, ...props }: LogoProps) {
   return (
-    <Link 
-      href={href} 
-      className={cn("flex items-center gap-2.5 font-display text-xl font-bold tracking-tight", className)}
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2.5 font-display text-xl font-bold tracking-tight",
+        className,
+      )}
       {...props}
     >
       <div className="relative shrink-0 flex items-center justify-center">
         <Image
           src="/logo.png"
-          alt="Mentor IA Concursos"
+          alt="Nomeia Logo"
           width={size}
           height={size}
           className="object-contain rounded-xl"
@@ -28,7 +33,7 @@ export function Logo({ className, href = "/", size = 32, showText = true, ...pro
       </div>
       {showText && (
         <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          Mentor IA
+          Nomeia
         </span>
       )}
     </Link>

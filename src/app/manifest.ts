@@ -1,10 +1,11 @@
-﻿import type { MetadataRoute } from "next"
+import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Mentor Concursos IA",
-    short_name: "Mentor IA",
-    description: "A melhor e mais avançada plataforma de mentoria inteligente e preparação para concursos públicos do Brasil.",
+    name: "Nomeia",
+    short_name: "Nomeia",
+    description:
+      "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#0f172a",
@@ -38,4 +39,3 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
   }
 }
-

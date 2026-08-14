@@ -1,29 +1,34 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+
 import { useRouter } from "next/navigation"
+
 import {
-  RotateCcw,
-  RefreshCw,
-  Clock,
+  CalendarDays,
   CheckSquare,
-  Square,
+  Clock,
   PlayCircle,
   PlusCircle,
-  CalendarDays,
+  RefreshCw,
+  RotateCcw,
+  Square,
 } from "lucide-react"
+import { Bot, BrainCircuit, Calendar, Settings2, Sparkles, Target } from "lucide-react"
+import { toast } from "sonner"
+
+import { deactivateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { toast } from "sonner"
-import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
-import { EditPlanningWizardModal } from "./edit-planning-wizard-modal"
-import { WeeklyPlanningView } from "./weekly-planning-view"
-import { DailyPlanningView } from "./daily-planning-view"
-import { StudyCalendarView } from "./study-calendar-view"
-import { AiPlanningWizard } from "./ai-planning-wizard"
-import { Sparkles, Settings2, BrainCircuit, Bot, Calendar, Target } from "lucide-react"
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
-import { deactivateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
+import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+
+import { AiPlanningWizard } from "./ai-planning-wizard"
+import { DailyPlanningView } from "./daily-planning-view"
+import { EditPlanningWizardModal } from "./edit-planning-wizard-modal"
+import { PlanningGoalsProgressCard } from "./planning-goals-progress-card"
+import { StudyCalendarView } from "./study-calendar-view"
+import { WeeklyPlanningView } from "./weekly-planning-view"
 
 export interface StudyCycleBlock {
   id: string
@@ -35,16 +40,18 @@ export interface StudyCycleBlock {
   completed: boolean
 }
 
-interface EstudeiPlanningViewProps {
+interface PlanningViewProps {
   initialData?: CycleOverviewData | null
 }
 
-import { PlanningGoalsProgressCard } from "./planning-goals-progress-card"
-
-export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
+export function PlanningView({ initialData }: PlanningViewProps) {
   const router = useRouter()
-  const [hasPlanning, setHasPlanning] = useState(() => Boolean(initialData && initialData.blocks && initialData.blocks.length > 0))
-  const [planningType, setPlanningType] = useState<"ciclo" | "diario" | "semanal" | "mensal" | "metas">("ciclo")
+  const [hasPlanning, setHasPlanning] = useState(() =>
+    Boolean(initialData && initialData.blocks && initialData.blocks.length > 0),
+  )
+  const [planningType, setPlanningType] = useState<
+    "ciclo" | "diario" | "semanal" | "mensal" | "metas"
+  >("ciclo")
   const [isManualCreation, setIsManualCreation] = useState(false)
 
   const [blocks, setBlocks] = useState<StudyCycleBlock[]>(() => {
@@ -54,7 +61,10 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
         disciplineName: b.disciplineName,
         disciplineId: b.disciplineId,
         durationMinutes: b.durationMinutes,
-        studiedMinutes: (initialData?.history || []).reduce((sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0), 0),
+        studiedMinutes: (initialData?.history || []).reduce(
+          (sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0),
+          0,
+        ),
         color: b.color || "#2563EB",
         completed: false, // Always start as pending, completed is calculated per-day by the view
       }))
@@ -75,7 +85,10 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
           disciplineName: b.disciplineName,
           disciplineId: b.disciplineId,
           durationMinutes: b.durationMinutes,
-          studiedMinutes: historyData.reduce((sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0), 0),
+          studiedMinutes: historyData.reduce(
+            (sum, h) => sum + (h.disciplineId === b.disciplineId ? h.minutes : 0),
+            0,
+          ),
           color: b.color || "#2563EB",
           completed: false,
         }))
@@ -103,8 +116,12 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
 
   // Cálculo de estatísticas
   const totalMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-  const studiedMinutes = blocks.reduce((acc, b) => acc + b.studiedMinutes + (b.completed ? b.durationMinutes : 0), 0)
-  const progressPercentage = totalMinutes > 0 ? Math.min(100, Math.round((studiedMinutes / totalMinutes) * 100)) : 0
+  const studiedMinutes = blocks.reduce(
+    (acc, b) => acc + b.studiedMinutes + (b.completed ? b.durationMinutes : 0),
+    0,
+  )
+  const progressPercentage =
+    totalMinutes > 0 ? Math.min(100, Math.round((studiedMinutes / totalMinutes) * 100)) : 0
 
   const formatHoursMinutes = (min: number) => {
     const h = Math.floor(min / 60)
@@ -134,8 +151,6 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
       toast.error("Erro de conexão ao desativar o planejamento.")
     }
   }
-
-
 
   const handleStartStudy = (block: StudyCycleBlock) => {
     toast.success(`Iniciando sessão de estudo para ${block.disciplineName}!`)
@@ -201,7 +216,6 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
         </div>
 
         <div className="min-h-[500px] flex flex-col items-center justify-center text-center p-8 bg-card rounded-2xl border shadow-xs space-y-12 my-4">
-          
           <div className="space-y-4 max-w-lg">
             <div className="flex items-center justify-center gap-3 text-[#2563EB] mb-2">
               <BrainCircuit className="w-8 h-8" />
@@ -214,7 +228,7 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
             {/* AI Option */}
-            <div 
+            <div
               onClick={() => {
                 setWizardTitle("Criar Planejamento com IA")
                 setIsWizardModalOpen(true)
@@ -226,10 +240,11 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
               </div>
               <div className="space-y-3 flex-1">
                 <h3 className="text-lg font-bold text-foreground flex items-center justify-center gap-2">
-                  Mentor IA <Sparkles className="w-4 h-4 text-[#2563EB]" />
+                  Nomeia Inteligente <Sparkles className="w-4 h-4 text-[#2563EB]" />
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  O Mentor monta todo o seu planejamento automaticamente com base no seu perfil, escala de trabalho e carga horária.
+                  O Nomeia monta todo o seu planejamento automaticamente com base no seu perfil,
+                  escala de trabalho e carga horária.
                 </p>
                 <div className="inline-flex items-center text-[10px] font-bold text-[#2563EB] bg-[#2563EB]/10 px-2 py-1 rounded-full uppercase tracking-wider">
                   Tempo: ~2 minutos
@@ -241,7 +256,7 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
             </div>
 
             {/* Manual Option */}
-            <div 
+            <div
               onClick={() => {
                 setWizardTitle("Criar Planejamento Manual")
                 setIsWizardModalOpen(true)
@@ -252,17 +267,19 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
                 <Settings2 className="w-8 h-8 text-foreground/70" />
               </div>
               <div className="space-y-3 flex-1">
-                <h3 className="text-lg font-bold text-foreground">
-                  Criar Manualmente
-                </h3>
+                <h3 className="text-lg font-bold text-foreground">Criar Manualmente</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Monte disciplina por disciplina, configurando sua escala e relevâncias em 4 passos.
+                  Monte disciplina por disciplina, configurando sua escala e relevâncias em 4
+                  passos.
                 </p>
                 <div className="inline-flex items-center text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded-full uppercase tracking-wider">
                   Para Usuários Avançados
                 </div>
               </div>
-              <Button variant="outline" className="w-full border-2 h-12 font-bold rounded-xl text-foreground hover:bg-muted">
+              <Button
+                variant="outline"
+                className="w-full border-2 h-12 font-bold rounded-xl text-foreground hover:bg-muted"
+              >
                 Criar Manualmente
               </Button>
             </div>
@@ -270,8 +287,8 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
         </div>
 
         {/* Wizard Modal */}
-        <AiPlanningWizard 
-          open={isChoiceModalOpen} 
+        <AiPlanningWizard
+          open={isChoiceModalOpen}
           onOpenChange={setIsChoiceModalOpen}
           onSuccess={() => {
             // Apenas aciona um router refresh pra view buscar dados novos
@@ -285,7 +302,9 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
           <DialogContent className="sm:max-w-xl p-6 rounded-2xl">
             <div className="space-y-6">
               <div className="space-y-1 text-center">
-                <h2 className="text-2xl font-black text-foreground tracking-tight">Criar Planejamento</h2>
+                <h2 className="text-2xl font-black text-foreground tracking-tight">
+                  Criar Planejamento
+                </h2>
                 <p className="text-xs font-semibold text-muted-foreground">
                   Para iniciar o seu planejamento, escolha a melhor forma de visualização para você:
                 </p>
@@ -309,7 +328,8 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
                   <div className="space-y-2">
                     <h3 className="font-extrabold text-sm text-foreground">Ciclo de Estudos</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Estude as disciplinas em uma ordem rotativa, sem depender de dias fixos. Ideal para quem precisa de flexibilidade na rotina.
+                      Estude as disciplinas em uma ordem rotativa, sem depender de dias fixos. Ideal
+                      para quem precisa de flexibilidade na rotina.
                     </p>
                   </div>
                 </div>
@@ -330,7 +350,8 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
                   <div className="space-y-2">
                     <h3 className="font-extrabold text-sm text-foreground">Planejamento Semanal</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Define quais matérias estudar em cada dia da semana. Ótimo para quem prefere uma rotina fixa e estruturada.
+                      Define quais matérias estudar em cada dia da semana. Ótimo para quem prefere
+                      uma rotina fixa e estruturada.
                     </p>
                   </div>
                 </div>
@@ -352,8 +373,6 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
       </div>
     )
   }
-
-
 
   // VISTA 2.B: CICLO DE ESTUDOS (Modo Criar Manual / Populado)
   return (
@@ -589,161 +608,174 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
                   )
                 }
 
-            return (
-              /* VISTA DE LEITURA (Modo Padrão) */
-              <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-10">
-              {visibleBlocks.map((block) => {
-                const isSelected = activeBlockId === block.id
-                const progressPct = block.durationMinutes > 0 ? (block.studiedMinutes / block.durationMinutes) * 100 : 0
-                const isCompleted = progressPct >= 100
-                const remaining = block.durationMinutes - block.studiedMinutes
-                const isOver = remaining < 0
-
                 return (
-                  <div
-                    key={block.id}
-                    onMouseEnter={() => setActiveBlockId(block.id)}
-                    className={`rounded-xl border transition-all ${
-                      isSelected
-                        ? "bg-card border-[#2563EB] shadow-md ring-2 ring-[#2563EB]/10 scale-[1.01]"
-                        : "bg-card border-border hover:border-[#2563EB]/50"
-                    }`}
-                  >
-                    <div className="p-4 cursor-pointer space-y-3">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <h4 className="font-black text-sm text-foreground">{block.disciplineName}</h4>
-                          <div className="flex items-center gap-2 text-[11px] font-bold">
-                            {isOver ? (
-                              <span className="text-emerald-500">Extra: {formatHoursMinutes(Math.abs(remaining))}</span>
-                            ) : (
-                              <span className="text-orange-500">Falta: {formatHoursMinutes(remaining)}</span>
-                            )}
-                            <span className="text-muted-foreground">- Meta: {formatHoursMinutes(block.durationMinutes)}</span>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className={`text-sm font-black ${isCompleted ? 'text-emerald-500' : 'text-[#2563EB]'}`}>
-                            {progressPct.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
+                  /* VISTA DE LEITURA (Modo Padrão) */
+                  <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-10">
+                    {visibleBlocks.map((block) => {
+                      const isSelected = activeBlockId === block.id
+                      const progressPct =
+                        block.durationMinutes > 0
+                          ? (block.studiedMinutes / block.durationMinutes) * 100
+                          : 0
+                      const isCompleted = progressPct >= 100
+                      const remaining = block.durationMinutes - block.studiedMinutes
+                      const isOver = remaining < 0
 
-                      <div className="w-full bg-muted rounded-full h-3 overflow-hidden relative">
+                      return (
                         <div
-                          className={`h-full rounded-full transition-all duration-700 ${isCompleted ? 'bg-emerald-500' : 'bg-[#2563EB]'}`}
-                          style={{ width: `${Math.min(progressPct, 100)}%`, backgroundColor: isCompleted ? undefined : block.color }}
-                        />
-                      </div>
-                    </div>
-
-                    {isSelected && (
-                      <div className="flex items-center gap-4 px-4 py-2.5 bg-muted/40 border-t text-[11px] font-bold text-muted-foreground">
-                        <button
-                          onClick={() => handleStartStudy(block)}
-                          className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-[#2563EB] transition-colors"
+                          key={block.id}
+                          onMouseEnter={() => setActiveBlockId(block.id)}
+                          className={`rounded-xl border transition-all ${
+                            isSelected
+                              ? "bg-card border-[#2563EB] shadow-md ring-2 ring-[#2563EB]/10 scale-[1.01]"
+                              : "bg-card border-border hover:border-[#2563EB]/50"
+                          }`}
                         >
-                          <PlayCircle className="h-3.5 w-3.5 text-[#2563EB]" />
-                          <span>Iniciar Estudo</span>
-                        </button>
+                          <div className="p-4 cursor-pointer space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="space-y-1">
+                                <h4 className="font-black text-sm text-foreground">
+                                  {block.disciplineName}
+                                </h4>
+                                <div className="flex items-center gap-2 text-[11px] font-bold">
+                                  {isOver ? (
+                                    <span className="text-emerald-500">
+                                      Extra: {formatHoursMinutes(Math.abs(remaining))}
+                                    </span>
+                                  ) : (
+                                    <span className="text-orange-500">
+                                      Falta: {formatHoursMinutes(remaining)}
+                                    </span>
+                                  )}
+                                  <span className="text-muted-foreground">
+                                    - Meta: {formatHoursMinutes(block.durationMinutes)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span
+                                  className={`text-sm font-black ${isCompleted ? "text-emerald-500" : "text-[#2563EB]"}`}
+                                >
+                                  {progressPct.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
 
-                        <button
-                          onClick={() => setIsRegisterModalOpen(true)}
-                          className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-[#2563EB] transition-colors"
-                        >
-                          <PlusCircle className="h-3.5 w-3.5 text-[#2563EB]" />
-                          <span>Adicionar Estudo Manualmente</span>
-                        </button>
-                      </div>
-                    )}
+                            <div className="w-full bg-muted rounded-full h-3 overflow-hidden relative">
+                              <div
+                                className={`h-full rounded-full transition-all duration-700 ${isCompleted ? "bg-emerald-500" : "bg-[#2563EB]"}`}
+                                style={{
+                                  width: `${Math.min(progressPct, 100)}%`,
+                                  backgroundColor: isCompleted ? undefined : block.color,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {isSelected && (
+                            <div className="flex items-center gap-4 px-4 py-2.5 bg-muted/40 border-t text-[11px] font-bold text-muted-foreground">
+                              <button
+                                onClick={() => handleStartStudy(block)}
+                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-[#2563EB] transition-colors"
+                              >
+                                <PlayCircle className="h-3.5 w-3.5 text-[#2563EB]" />
+                                <span>Iniciar Estudo</span>
+                              </button>
+
+                              <button
+                                onClick={() => setIsRegisterModalOpen(true)}
+                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-[#2563EB] transition-colors"
+                              >
+                                <PlusCircle className="h-3.5 w-3.5 text-[#2563EB]" />
+                                <span>Adicionar Estudo Manualmente</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )
-              })}
-              </div>
-            )
-          })()}
+              })()}
 
-          {!isEditMode && !isManualCreation && blocks.length > 0 && (
-            <div className="flex justify-end pt-2">
-              <Button
-                onClick={() => {
-                  setWizardTitle("Editar Planejamento")
-                  setIsWizardModalOpen(true)
-                }}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs"
-              >
-                Editar Ciclo
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Coluna Direita: CICLO */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between items-center text-center space-y-6">
-          <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider block border-b pb-3 w-full text-left">
-            CICLO
-          </span>
-
-          {blocks.length === 0 ? (
-            <div className="my-auto py-16 text-muted-foreground text-xs font-semibold">
-              Nenhuma disciplina no ciclo
-            </div>
-          ) : (
-            <>
-              <div className="relative w-64 h-64 flex items-center justify-center my-auto">
-                <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-                  {donutSegments.map((seg) => (
-                    <path
-                      key={seg.id}
-                      d={seg.path}
-                      fill={seg.color}
-                      className="transition-all duration-300 hover:opacity-80 cursor-pointer"
-                    />
-                  ))}
-                  <circle cx="100" cy="100" r="60" className="fill-card" />
-                </svg>
-
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-foreground tracking-tight">
-                    {formatHoursMinutes(totalMinutes)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="w-full h-3 rounded-full overflow-hidden flex">
-                {blocks.map((b) => (
-                  <div
-                    key={b.id}
-                    style={{
-                      width: `${(b.durationMinutes / (totalMinutes || 1)) * 100}%`,
-                      backgroundColor: b.color,
+              {!isEditMode && !isManualCreation && blocks.length > 0 && (
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={() => {
+                      setWizardTitle("Editar Planejamento")
+                      setIsWizardModalOpen(true)
                     }}
-                    className="h-full"
-                    title={`${b.disciplineName}: ${b.durationMinutes}min`}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs"
+                  >
+                    Editar Ciclo
+                  </Button>
+                </div>
+              )}
+            </div>
 
-      {/* Card de Metas & Progresso por Período (Semana / Mês / Ano / Total) */}
-      <PlanningGoalsProgressCard
-        blocks={blocks}
-        onStartSession={(id) => {
-          setActiveBlockId(id)
-          setIsRegisterModalOpen(true)
-        }}
-      />
-    </div>
-  )}
+            {/* Coluna Direita: CICLO */}
+            <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between items-center text-center space-y-6">
+              <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider block border-b pb-3 w-full text-left">
+                CICLO
+              </span>
+
+              {blocks.length === 0 ? (
+                <div className="my-auto py-16 text-muted-foreground text-xs font-semibold">
+                  Nenhuma disciplina no ciclo
+                </div>
+              ) : (
+                <>
+                  <div className="relative w-64 h-64 flex items-center justify-center my-auto">
+                    <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
+                      {donutSegments.map((seg) => (
+                        <path
+                          key={seg.id}
+                          d={seg.path}
+                          fill={seg.color}
+                          className="transition-all duration-300 hover:opacity-80 cursor-pointer"
+                        />
+                      ))}
+                      <circle cx="100" cy="100" r="60" className="fill-card" />
+                    </svg>
+
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-black text-foreground tracking-tight">
+                        {formatHoursMinutes(totalMinutes)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="w-full h-3 rounded-full overflow-hidden flex">
+                    {blocks.map((b) => (
+                      <div
+                        key={b.id}
+                        style={{
+                          width: `${(b.durationMinutes / (totalMinutes || 1)) * 100}%`,
+                          backgroundColor: b.color,
+                        }}
+                        className="h-full"
+                        title={`${b.disciplineName}: ${b.durationMinutes}min`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Card de Metas & Progresso por Período (Semana / Mês / Ano / Total) */}
+          <PlanningGoalsProgressCard
+            blocks={blocks}
+            onStartSession={(id) => {
+              setActiveBlockId(id)
+              setIsRegisterModalOpen(true)
+            }}
+          />
+        </div>
+      )}
 
       {/* Modal Registrar Estudo Manual */}
-      <StudyRegisterModal
-        open={isRegisterModalOpen}
-        onOpenChange={setIsRegisterModalOpen}
-      />
+      <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
 
       {/* Modal Assistente 4 Passos Editar Planejamento */}
       <EditPlanningWizardModal
@@ -761,3 +793,4 @@ export function EstudeiPlanningView({ initialData }: EstudeiPlanningViewProps) {
   )
 }
 
+export { PlanningView as EstudeiPlanningView }

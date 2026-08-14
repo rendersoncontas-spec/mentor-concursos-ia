@@ -1,20 +1,13 @@
-﻿"use client"
+"use client"
 
-import { useState, useEffect } from "react"
-import {
-  X,
-  Plus,
-  ArrowUpDown,
-  ChevronUp,
-  ChevronDown,
-  Edit2,
-  Trash2,
-  Check,
-} from "lucide-react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState } from "react"
+
+import { ArrowUpDown, Check, ChevronDown, ChevronUp, Edit2, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 
 export interface DisciplineTopicItem {
   id: string
@@ -145,7 +138,9 @@ export function EditDisciplineModal({
       <DialogContent className="sm:max-w-2xl p-6 rounded-2xl">
         <div className="space-y-5">
           {/* Header com Título da Disciplina */}
-          <h2 className="text-xl font-black text-foreground tracking-tight">{name || "Editar Disciplina"}</h2>
+          <h2 className="text-xl font-black text-foreground tracking-tight">
+            {name || "Editar Disciplina"}
+          </h2>
 
           {/* Formulário de Nome & Cor */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -223,16 +218,23 @@ export function EditDisciplineModal({
                   className="h-8 text-xs flex-1"
                   autoFocus
                 />
-                <Button size="sm" onClick={handleAddTopic} className="h-8 bg-[#2563EB] text-white font-bold text-xs">
+                <Button
+                  size="sm"
+                  onClick={handleAddTopic}
+                  className="h-8 bg-[#2563EB] text-white font-bold text-xs"
+                >
                   Adicionar
                 </Button>
-                <button onClick={() => setShowAddTopicInput(false)} className="text-muted-foreground p-1">
+                <button
+                  onClick={() => setShowAddTopicInput(false)}
+                  className="text-muted-foreground p-1"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
             )}
 
-            {/* Lista Scrollável de Tópicos (100% Paridade Estudei) */}
+            {/* Lista Scrollável de Tópicos */}
             <div className="border rounded-xl max-h-64 overflow-y-auto divide-y bg-card">
               {topics.length === 0 && (
                 <div className="p-6 text-center text-xs text-muted-foreground font-medium">
@@ -318,7 +320,7 @@ export function EditDisciplineModal({
             </div>
           </div>
 
-          {/* Rodapé do Modal (Remover & Salvar 100% Estudei) */}
+          {/* Rodapé do Modal (Remover & Salvar) */}
           <div className="flex items-center justify-between pt-3 border-t">
             <Button
               type="button"
@@ -342,4 +344,3 @@ export function EditDisciplineModal({
     </Dialog>
   )
 }
-

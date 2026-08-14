@@ -1,18 +1,24 @@
-import { getResendClient, getDefaultFromEmail, getAppUrl, isResendConfigured } from "./resend.client"
-import type {
-  SendEmailOptions,
-  SendEmailResult,
-  WeeklySummaryStats,
-  ImportCompletedStats,
-  StudyReminderDetails,
-} from "./email.types"
 import {
-  getTestEmailTemplate,
-  getWelcomeEmailTemplate,
-  getWeeklySummaryEmailTemplate,
   getImportCompletedEmailTemplate,
   getStudyReminderEmailTemplate,
+  getTestEmailTemplate,
+  getWeeklySummaryEmailTemplate,
+  getWelcomeEmailTemplate,
 } from "./email.templates"
+import type {
+  ImportCompletedStats,
+  SendEmailOptions,
+  SendEmailResult,
+  StudyReminderDetails,
+  WeeklySummaryStats,
+} from "./email.types"
+import {
+  getAppUrl,
+  getDefaultFromEmail,
+  getResendClient,
+  getResendDiagnosticInfo,
+  isResendConfigured,
+} from "./resend.client"
 
 // Rate limit em memória: máximo de 5 e-mails por destinatário a cada 60 segundos
 const rateLimitMap = new Map<string, number[]>()
@@ -55,7 +61,7 @@ function cleanupMaps() {
 
 /**
  * Envia um e-mail transacional via Resend com tratamento centralizado de erros,
- * rate limit, logs seguros e suporte a simulação em ambiente de desenvolvimento.
+ * rate limit, logs estruturados e proteção contra duplicidade.
  */
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   cleanupMaps()
@@ -66,49 +72,52 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
   }
 
   const primaryRecipient = toAddress.trim().toLowerCase()
+  const timestamp = new Date().toISOString()
+  const categoryTag = options.tags?.find((t) => t.name === "category")?.value || "general"
+  const diagnostic = getResendDiagnosticInfo()
 
-  // 1. Verificação de idempotência (previne duplo clique)
-  const idempotencyKey =
-    options.idempotencyKey || `${primaryRecipient}:${options.subject.trim()}`
+  // 1. Verificação de idempotência (previne duplo clique e reenvios acidentais em 30s)
+  const idempotencyKey = options.idempotencyKey || `${primaryRecipient}:${options.subject.trim()}`
   const existing = idempotencyMap.get(idempotencyKey)
   if (existing && Date.now() - existing.timestamp < IDEMPOTENCY_WINDOW_MS) {
     console.log(
-      `[EmailService] Idempotência ativa. Disparo duplicado ignorado para ${maskEmail(primaryRecipient)}.`
+      `[EmailService] [${timestamp}] [IDEMPOTENCIA] Disparo duplicado bloqueado para ${maskEmail(primaryRecipient)} (categoria: ${categoryTag}).`,
     )
     return existing.result
   }
 
-  // 2. Verificação de Rate Limit
+  // 2. Verificação de Rate Limit (5 e-mails/minuto por destinatário)
   if (!checkRateLimit(primaryRecipient)) {
     console.warn(
-      `[EmailService] Rate limit excedido para ${maskEmail(primaryRecipient)}. Limite de ${RATE_LIMIT_MAX_EMAILS} emails/minuto.`
+      `[EmailService] [${timestamp}] [RATE_LIMIT_EXCEEDED] Limite de 5 envios/min excedido para ${maskEmail(primaryRecipient)}.`,
     )
     return {
       success: false,
-      error: "Muitos e-mails enviados recentemente para este endereço. Aguarde um momento.",
+      error:
+        "Limite de envios excedido para este e-mail (máximo 5 por minuto). Aguarde antes de tentar novamente.",
     }
   }
 
   const client = getResendClient()
   const from = options.from || getDefaultFromEmail()
 
-  // Se o Resend não estiver configurado (sem API key), registra log e simula sucesso em dev
+  // 3. Verificação de API Key no servidor (process.env.RESEND_API_KEY)
   if (!client || !isResendConfigured()) {
-    console.log(`\n================== [EMAIL SIMULADO (RESEND_API_KEY AUSENTE)] ==================`)
-    console.log(`Para: ${maskEmail(primaryRecipient)}`)
-    console.log(`De: ${from}`)
-    console.log(`Assunto: ${options.subject}`)
-    console.log(`===============================================================================\n`)
+    console.error(
+      `[EmailService] [${timestamp}] [CONFIG_ERROR] Falha no disparo para ${maskEmail(primaryRecipient)}: RESEND_API_KEY não encontrada no process.env.`,
+      JSON.stringify(diagnostic),
+    )
 
-    const simulatedResult: SendEmailResult = {
-      success: true,
-      id: `sim_${Date.now()}`,
+    const unconfiguredResult: SendEmailResult = {
+      success: false,
+      error:
+        "Serviço de e-mail não configurado no servidor. A variável RESEND_API_KEY precisa ser adicionada ao ambiente (Vercel ou .env.local).",
       simulated: true,
     }
-    idempotencyMap.set(idempotencyKey, { timestamp: Date.now(), result: simulatedResult })
-    return simulatedResult
+    return unconfiguredResult
   }
 
+  // 4. Disparo Real via API Resend
   try {
     const startTime = Date.now()
 
@@ -123,34 +132,36 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
     }
 
     const response = await client.emails.send(emailPayload)
-
     const durationMs = Date.now() - startTime
 
     if (response.error) {
       console.error(
-        `[EmailService] Falha ao enviar e-mail para ${maskEmail(primaryRecipient)}:`,
-        response.error.message
+        `[EmailService] [${timestamp}] [RESEND_ERROR] Falha para ${maskEmail(primaryRecipient)} | Categoria: ${categoryTag} | Erro: ${response.error.message} (${durationMs}ms)`,
       )
       return {
         success: false,
-        error: response.error.message || "Erro desconhecido ao enviar e-mail via Resend.",
+        error: response.error.message || "Erro retornado pela API do Resend.",
       }
     }
 
+    const messageId = response.data?.id
     console.log(
-      `[EmailService] E-mail enviado com sucesso para ${maskEmail(primaryRecipient)} | ID: ${response.data?.id} (${durationMs}ms)`
+      `[EmailService] [${timestamp}] [SUCCESS] E-mail entregue ao Resend para ${maskEmail(primaryRecipient)} | Categoria: ${categoryTag} | Message ID: ${messageId} (${durationMs}ms)`,
     )
 
     const result: SendEmailResult = {
       success: true,
-      ...(response.data?.id ? { id: response.data.id } : {}),
+      ...(messageId ? { id: messageId } : {}),
     }
 
     idempotencyMap.set(idempotencyKey, { timestamp: Date.now(), result })
     return result
   } catch (err: unknown) {
-    const errorMsg = (err as { message?: string })?.message || "Erro de conexão com o serviço de e-mail."
-    console.error(`[EmailService] Exceção no envio para ${maskEmail(primaryRecipient)}:`, errorMsg)
+    const errorMsg =
+      (err as { message?: string })?.message || "Erro de conexão com o servidor do Resend."
+    console.error(
+      `[EmailService] [${timestamp}] [EXCEPTION] Exceção ao enviar para ${maskEmail(primaryRecipient)}: ${errorMsg}`,
+    )
     return {
       success: false,
       error: errorMsg,

@@ -1,36 +1,36 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
+
 import { useRouter, useSearchParams } from "next/navigation"
+
+import { Edit, Folder, Plus, ShieldCheck, Target, Trash2, Trophy } from "lucide-react"
+import { toast } from "sonner"
+
 import {
-  Folder,
-  Edit3,
-  Trash2,
-  Plus,
-  Archive,
-  Edit,
-  ShieldCheck,
-} from "lucide-react"
+  addUserDisciplineAction,
+  getDisciplineCatalogTopicsAction,
+  getDisciplineDetailStatsAction,
+  removeUserDisciplineAction,
+} from "@/application/disciplines/discipline-actions"
+import { type DisciplineDetailStats } from "@/application/disciplines/discipline-actions"
+import { type DisciplinesPageData } from "@/application/disciplines/disciplines.service"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
-
-import { EstudeiDisciplineDetailView } from "@/features/disciplines/components/estudei-discipline-detail-view"
-import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
-import { addUserDisciplineAction, removeUserDisciplineAction, getDisciplineCatalogTopicsAction, getDisciplineDetailStatsAction } from "@/application/disciplines/discipline-actions"
-import { type DisciplineDetailStats } from "@/application/disciplines/discipline-actions"
-import { type DisciplinesPageData } from "@/application/disciplines/disciplines.service"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
+import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
+import { DisciplineDetailView } from "@/features/disciplines/components/estudei-discipline-detail-view"
 
 export interface DisciplineCardData {
   id: string
+  disciplineId?: string
   name: string
   topicsStudied: number
   topicsTotal: number
@@ -39,6 +39,7 @@ export interface DisciplineCardData {
   accuracy?: number | null
   area?: string | null
   totalMinutes?: number
+  status?: string
 }
 
 // Função auxiliar para determinar classificação
@@ -46,7 +47,7 @@ function getClassification(
   topicsStudied: number,
   topicsTotal: number,
   questionsSolved: number,
-  accuracy: number | null
+  accuracy: number | null,
 ): "DOMINIO" | "ATENCAO" | "PRIORIDADE" | "SEM_DADOS" {
   if (topicsTotal === 0 && questionsSolved === 0) return "SEM_DADOS"
   const progresso = topicsTotal > 0 ? topicsStudied / topicsTotal : 0
@@ -65,7 +66,13 @@ function StatusBadge({ status }: { status: "DOMINIO" | "ATENCAO" | "PRIORIDADE" 
     SEM_DADOS: { color: "bg-slate-400", label: "SEM DADOS" },
   }
   const c = configs[status]
-  return <span className={`${c.color} text-white font-black text-[9px] px-2 py-0.5 rounded-full tracking-widest`}>{c.label}</span>
+  return (
+    <span
+      className={`${c.color} text-white font-black text-[9px] px-2 py-0.5 rounded-full tracking-widest`}
+    >
+      {c.label}
+    </span>
+  )
 }
 
 function formatHours(min: number): string {
@@ -75,11 +82,11 @@ function formatHours(min: number): string {
   return h > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${m}min`
 }
 
-interface EstudeiDisciplinesViewProps {
+interface DisciplinesViewProps {
   initialData?: DisciplinesPageData | null
 }
 
-export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewProps) {
+export function DisciplinesView({ initialData }: DisciplinesViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const nameParam = searchParams.get("name")
@@ -107,6 +114,9 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
     studyTimeFormatted: "0h00min",
     totalQuestions: 0,
     accuracyPercentage: 0,
+    disciplinesCount: 0,
+    topicsTotal: 0,
+    topicsConcluded: 0,
   }
 
   const [viewingDiscipline, setViewingDiscipline] = useState<DisciplineCardData | null>(null)
@@ -163,7 +173,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
 
     if (editingDisc) {
       setDisciplines(
-        disciplines.map((d) => (d.id === editingDisc.id ? { ...d, name: nameClean } : d))
+        disciplines.map((d) => (d.id === editingDisc.id ? { ...d, name: nameClean } : d)),
       )
       toast.success("Disciplina atualizada com sucesso!")
     } else {
@@ -176,7 +186,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
         color: "#fef08a",
       }
       setDisciplines([...disciplines, newDisc])
-      
+
       const res = await addUserDisciplineAction(nameClean)
       if (res.success) {
         toast.success("Nova disciplina adicionada no banco de dados!")
@@ -206,32 +216,42 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   }
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState<"prioridade" | "progresso" | "desempenho" | "tempo" | "nome">("prioridade")
-  const [filterStatus, setFilterStatus] = useState<"todas" | "dominio" | "atencao" | "prioridade">("todas")
+  const [sortBy, setSortBy] = useState<
+    "prioridade" | "progresso" | "desempenho" | "tempo" | "nome"
+  >("prioridade")
+  const [filterStatus, setFilterStatus] = useState<
+    "todas" | "dominio" | "atencao" | "prioridade" | "sem_dados"
+  >("todas")
 
   // Ordenação e Filtros
-  const processedDisciplines = useMemo(() => {
-    const enriched = disciplines.map(d => {
+  const enriched = useMemo(() => {
+    return disciplines.map((d) => {
       const accuracy = d.accuracy ?? null
       const progress = d.topicsTotal > 0 ? (d.topicsStudied / d.topicsTotal) * 100 : 0
-      const classification = getClassification(d.topicsStudied, d.topicsTotal, d.questionsSolved, accuracy)
+      const classification = getClassification(
+        d.topicsStudied,
+        d.topicsTotal,
+        d.questionsSolved,
+        accuracy,
+      )
       return { ...d, progress, classification }
     })
+  }, [disciplines])
 
+  const processedDisciplines = useMemo(() => {
     let list = enriched
 
     // Buscar
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      list = list.filter(d =>
-        d.name.toLowerCase().includes(q) ||
-        (d.area && d.area.toLowerCase().includes(q))
+      list = list.filter(
+        (d) => d.name.toLowerCase().includes(q) || (d.area && d.area.toLowerCase().includes(q)),
       )
     }
 
     // Filtrar
     if (filterStatus !== "todas") {
-      list = list.filter(d => d.classification.toLowerCase() === filterStatus)
+      list = list.filter((d) => d.classification.toLowerCase() === filterStatus)
     }
 
     // Ordenar
@@ -248,7 +268,29 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
       const priorityOrder = { PRIORIDADE: 0, ATENCAO: 1, DOMINIO: 2, SEM_DADOS: 3 }
       return priorityOrder[a.classification] - priorityOrder[b.classification]
     })
-  }, [disciplines, searchQuery, sortBy, filterStatus])
+  }, [enriched, searchQuery, sortBy, filterStatus])
+
+  // PRÓXIMA PRIORIDADE: primeira com classificação PRIORIDADE, senão ATENCAO,
+  // senão a de menor progresso. Amostra mínima de questões é regra do getClassification.
+  const nextPriority = useMemo(() => {
+    const sorted = [...enriched].sort((a, b) => {
+      const priorityOrder = { PRIORIDADE: 0, ATENCAO: 1, DOMINIO: 2, SEM_DADOS: 3 }
+      if (priorityOrder[a.classification] !== priorityOrder[b.classification]) {
+        return priorityOrder[a.classification] - priorityOrder[b.classification]
+      }
+      return a.progress - b.progress
+    })
+    return sorted[0] || null
+  }, [enriched])
+
+  // MELHOR DESEMPENHO: maior acerto entre disciplinas com amostra mínima de 5 questões
+  const bestDiscipline = useMemo(() => {
+    const candidates = enriched.filter(
+      (d) => d.questionsSolved >= 5 && d.accuracy !== null && d.accuracy !== undefined,
+    )
+    if (candidates.length === 0) return null
+    return [...candidates].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))[0] || null
+  }, [enriched])
 
   const totalTopics = disciplines.reduce((acc, d) => acc + d.topicsTotal, 0)
   const totalStudied = disciplines.reduce((acc, d) => acc + d.topicsStudied, 0)
@@ -257,7 +299,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   if (viewingDiscipline) {
     const targetRole = initialData?.target ? targetInfo.role : undefined
     return (
-      <EstudeiDisciplineDetailView
+      <DisciplineDetailView
         disciplineName={viewingDiscipline.name}
         topicsTotal={viewingDiscipline.topicsTotal}
         catalogTopics={catalogTopics}
@@ -317,48 +359,50 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Concurso / Edital Atual
             </span>
-            <h2 className="text-xl font-black text-foreground tracking-tight">
-              {targetInfo.name}
-            </h2>
+            <h2 className="text-xl font-black text-foreground tracking-tight">{targetInfo.name}</h2>
             <p className="text-xs text-muted-foreground font-medium">
               Edital Próprio · Cargo: {targetInfo.role}
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <button className="p-2 hover:text-foreground transition-colors" title="Arquivar">
-            <Archive className="h-4 w-4" />
-          </button>
-          <button className="p-2 hover:text-foreground transition-colors" title="Editar">
-            <Edit className="h-4 w-4" />
-          </button>
-          <button className="p-2 hover:text-rose-500 transition-colors" title="Excluir">
-            <Trash2 className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
       {/* RESUMO GERAL */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Tempo de Estudo</span>
-          <span className="text-base font-black text-foreground block">{totalStats.studyTimeFormatted}</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+            Tempo de Estudo
+          </span>
+          <span className="text-base font-black text-foreground block">
+            {totalStats.studyTimeFormatted}
+          </span>
         </div>
         <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Questões</span>
-          <span className="text-base font-black text-[#2563EB] block">{totalStats.totalQuestions}</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+            Questões
+          </span>
+          <span className="text-base font-black text-[#2563EB] block">
+            {totalStats.totalQuestions}
+          </span>
         </div>
         <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Acerto</span>
-          <span className="text-base font-black text-emerald-500 block">{totalStats.accuracyPercentage}%</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+            Acerto
+          </span>
+          <span className="text-base font-black text-emerald-500 block">
+            {totalStats.accuracyPercentage}%
+          </span>
         </div>
         <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Disciplinas</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+            Disciplinas
+          </span>
           <span className="text-base font-black text-foreground block">{disciplines.length}</span>
         </div>
         <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Progresso Edital</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+            Progresso Edital
+          </span>
           <span className="text-base font-black text-amber-500 block">{totalProgress}%</span>
         </div>
       </div>
@@ -369,12 +413,111 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
           <span className="text-[10px] font-black uppercase tracking-widest opacity-80">
             Progresso da Preparação
           </span>
-          <span className="text-xs font-black">{totalStudied} / {totalTopics} tópicos</span>
+          <span className="text-xs font-black">
+            {totalStudied} / {totalTopics} tópicos
+          </span>
         </div>
         <div className="w-full h-2 bg-slate-800 dark:bg-slate-200 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${totalProgress}%` }} />
+          <div
+            className="h-full bg-emerald-500 transition-all duration-500"
+            style={{ width: `${totalProgress}%` }}
+          />
         </div>
         <p className="text-xs font-bold opacity-90">{totalProgress}% do conteúdo concluído</p>
+      </div>
+
+      {/* PAINÉIS DE PRIORIDADE E DESEMPENHO */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Target className="h-4 w-4 text-rose-500" />
+              Próxima Prioridade
+            </span>
+            {nextPriority && <StatusBadge status={nextPriority.classification} />}
+          </div>
+          {nextPriority ? (
+            <div className="space-y-3">
+              <h3 className="font-black text-lg text-foreground truncate" title={nextPriority.name}>
+                {nextPriority.name}
+              </h3>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-muted-foreground">Progresso</span>
+                  <span className="text-foreground">{Math.round(nextPriority.progress)}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-rose-500 transition-all"
+                    style={{ width: `${nextPriority.progress}%` }}
+                  />
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground">
+                  {nextPriority.topicsStudied} / {nextPriority.topicsTotal} tópicos ·{" "}
+                  {nextPriority.questionsSolved} questões ·{" "}
+                  {formatHours(nextPriority.totalMinutes || 0)} estudados
+                </p>
+              </div>
+              <Button
+                onClick={() => openDiscipline(nextPriority)}
+                variant="outline"
+                className="w-full h-9 text-xs font-bold rounded-xl"
+              >
+                Ver Disciplina
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground font-medium">
+              Nenhuma disciplina com prioridade no momento. Bons estudos!
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-amber-500" />
+            Melhor Desempenho
+          </span>
+          {bestDiscipline ? (
+            <div className="space-y-3">
+              <h3
+                className="font-black text-lg text-foreground truncate"
+                title={bestDiscipline.name}
+              >
+                {bestDiscipline.name}
+              </h3>
+              <div className="flex items-end gap-6">
+                <div>
+                  <span className="text-3xl font-black text-emerald-500 block leading-none">
+                    {bestDiscipline.accuracy ?? 0}%
+                  </span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                    Acerto
+                  </span>
+                </div>
+                <div>
+                  <span className="text-3xl font-black text-foreground block leading-none">
+                    {bestDiscipline.questionsSolved}
+                  </span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                    Questões
+                  </span>
+                </div>
+              </div>
+              <Button
+                onClick={() => openDiscipline(bestDiscipline)}
+                variant="outline"
+                className="w-full h-9 text-xs font-bold rounded-xl"
+              >
+                Ver Disciplina
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground font-medium">
+              Responda pelo menos 5 questões em uma disciplina para revelar seu melhor desempenho.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* FILTROS E BUSCA MOBILE */}
@@ -389,17 +532,25 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
       </div>
 
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {(["todas", "dominio", "atencao", "prioridade"] as const).map(s => (
+        {(
+          [
+            ["todas", "Todas"],
+            ["dominio", "Domínio"],
+            ["atencao", "Atenção"],
+            ["prioridade", "Prioridade"],
+            ["sem_dados", "Sem Dados"],
+          ] as const
+        ).map(([value, label]) => (
           <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
+            key={value}
+            onClick={() => setFilterStatus(value)}
             className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${
-              filterStatus === s
+              filterStatus === value
                 ? "bg-foreground text-background"
                 : "bg-muted/40 text-muted-foreground hover:bg-muted"
             }`}
           >
-            {s}
+            {label}
           </button>
         ))}
         <div className="flex-1" />
@@ -410,6 +561,9 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
         >
           <option value="prioridade">Prioridade</option>
           <option value="progresso">Progresso</option>
+          <option value="desempenho">Desempenho</option>
+          <option value="tempo">Tempo</option>
+          <option value="nome">Nome</option>
         </select>
       </div>
 
@@ -454,21 +608,70 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
                     <span className="text-foreground">{Math.round(disc.progress)}%</span>
                   </div>
                   <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-foreground transition-all" style={{ width: `${disc.progress}%` }} />
+                    <div
+                      className="h-full bg-foreground transition-all"
+                      style={{ width: `${disc.progress}%` }}
+                    />
                   </div>
                   <p className="text-[10px] font-bold text-muted-foreground text-right">
                     {disc.topicsStudied} / {disc.topicsTotal} tópicos
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t">
                   <div>
-                    <span className="text-sm font-black text-foreground block">{disc.questionsSolved}</span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Questões</span>
+                    <span className="text-sm font-black text-foreground block">
+                      {disc.questionsSolved}
+                    </span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Questões
+                    </span>
                   </div>
                   <div className="border-l pl-3">
-                    <span className="text-sm font-black text-foreground block">—</span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Desempenho</span>
+                    <span className="text-sm font-black text-foreground block">
+                      {disc.accuracy !== null && disc.accuracy !== undefined
+                        ? `${disc.accuracy}%`
+                        : "—"}
+                    </span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Desempenho
+                    </span>
+                  </div>
+                  <div className="border-l pl-3">
+                    <span className="text-sm font-black text-foreground block">
+                      {formatHours(disc.totalMinutes || 0)}
+                    </span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Tempo
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase truncate">
+                    {disc.area || "Geral"}
+                  </span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenEdit(disc)
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      title="Editar disciplina"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveDiscipline(disc.id, disc.name)
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"
+                      title="Remover disciplina"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -505,7 +708,10 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold">
+              <Button
+                type="submit"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
+              >
                 Salvar Disciplina
               </Button>
             </DialogFooter>
@@ -513,7 +719,7 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
         </DialogContent>
       </Dialog>
 
-      {/* Modal Editar Disciplina (100% Paridade Estudei com Tópicos, Cor e Reordenação) */}
+      {/* Modal Editar Disciplina */}
       <EditDisciplineModal
         open={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
@@ -523,8 +729,8 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
           if (editingDisc) {
             setDisciplines(
               disciplines.map((d) =>
-                d.id === editingDisc.id ? { ...d, name: data.name, color: data.color } : d
-              )
+                d.id === editingDisc.id ? { ...d, name: data.name, color: data.color } : d,
+              ),
             )
             toast.success(`Disciplina "${data.name}" atualizada!`)
           }
@@ -539,3 +745,4 @@ export function EstudeiDisciplinesView({ initialData }: EstudeiDisciplinesViewPr
   )
 }
 
+export { DisciplinesView as EstudeiDisciplinesView }

@@ -1,47 +1,62 @@
 import { Resend } from "resend"
 
-const resendApiKey = process.env["RESEND_API_KEY"]
-
 /**
  * Cliente Resend inicializado no servidor.
- * Retorna uma instância do Resend se a chave estiver presente, ou null com aviso em dev.
+ * Retorna uma instância do Resend se a chave estiver presente no process.env.
  */
-let resendInstance: Resend | null = null
+let cachedClient: Resend | null = null
+let cachedKey: string | null = null
 
 export function getResendClient(): Resend | null {
-  if (resendInstance) return resendInstance
-
-  const key = process.env["RESEND_API_KEY"]
-  if (!key || key.trim() === "") {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        "[Resend] Variável RESEND_API_KEY não configurada. O serviço de e-mail funcionará em modo simulação/log."
-      )
-    }
+  const key = process.env["RESEND_API_KEY"]?.trim()
+  if (!key) {
+    cachedClient = null
+    cachedKey = null
     return null
   }
 
-  resendInstance = new Resend(key.trim())
-  return resendInstance
+  if (cachedClient && cachedKey === key) {
+    return cachedClient
+  }
+
+  cachedClient = new Resend(key)
+  cachedKey = key
+  return cachedClient
 }
 
 export function isResendConfigured(): boolean {
-  const key = process.env["RESEND_API_KEY"]
-  return Boolean(key && key.trim().length > 0)
+  const key = process.env["RESEND_API_KEY"]?.trim()
+  return Boolean(key && key.length > 0)
 }
 
 export function getDefaultFromEmail(): string {
   return (
-    process.env["EMAIL_FROM"] ||
-    process.env["NEXT_PUBLIC_EMAIL_FROM"] ||
-    "Mentor IA <onboarding@resend.dev>"
+    process.env["EMAIL_FROM"]?.trim() ||
+    process.env["NEXT_PUBLIC_EMAIL_FROM"]?.trim() ||
+    "Nomeia <onboarding@resend.dev>"
   )
 }
 
 export function getAppUrl(): string {
   return (
-    process.env["NEXT_PUBLIC_APP_URL"] ||
-    process.env["NEXT_PUBLIC_SITE_URL"] ||
-    "https://mentor-ia.vercel.app"
+    process.env["NEXT_PUBLIC_APP_URL"]?.trim() ||
+    process.env["NEXT_PUBLIC_SITE_URL"]?.trim() ||
+    (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : "http://localhost:3000")
   )
+}
+
+export function getResendDiagnosticInfo(): {
+  resendConfigured: boolean
+  hasEmailFrom: boolean
+  hasAppUrl: boolean
+  environment: string
+  appUrl: string
+} {
+  return {
+    resendConfigured: isResendConfigured(),
+    hasEmailFrom: Boolean(process.env["EMAIL_FROM"]?.trim()),
+    hasAppUrl: Boolean(process.env["NEXT_PUBLIC_APP_URL"]?.trim()),
+    environment: process.env.NODE_ENV || "development",
+    appUrl: getAppUrl(),
+  }
 }

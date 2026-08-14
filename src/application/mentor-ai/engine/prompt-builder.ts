@@ -5,7 +5,7 @@ export class PromptBuilder {
    * Constrói uma representação legível para humanos e para telemetria heurística.
    */
   static buildHuman(context: IntelligenceContext): string {
-    return `Você é o Mentor IA.
+    return `Você é o assistente inteligente do Nomeia.
 Contexto do Aluno:
 Versão Snapshot: ${context.snapshotId}
 
@@ -30,7 +30,7 @@ Atrasadas Críticas: ${context.reviews.criticalOverdue}`
       ctxId: context.snapshotId,
       perf: context.performance,
       rev: context.reviews,
-      std: context.studyHistory
+      std: context.studyHistory,
     })
   }
 }

@@ -1,13 +1,15 @@
-import { redirect } from "next/navigation"
-import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { env } from "@/config/env"
+import { redirect } from "next/navigation"
+
+import { createServerClient } from "@supabase/ssr"
+
 import { MentorAIService } from "@/application/mentor-ai/mentor-ai.service"
+import { env } from "@/config/env"
 import { MentorFeed } from "@/features/mentor-ai/components/mentor-feed"
 
 export const metadata = {
-  title: "Mentor IA | Mentor Concursos",
-  description: "Seu copiloto de estudos",
+  title: "Análise Inteligente",
+  description: "Análise inteligente e copiloto de estudos no Nomeia.",
 }
 
 export default async function MentorPage() {
@@ -23,14 +25,14 @@ export default async function MentorPage() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options),
             )
           } catch {
             // Ignore in server components
           }
         },
       },
-    }
+    },
   )
 
   const {

@@ -1,30 +1,33 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
+
+import Image from "next/image"
 import { useRouter } from "next/navigation"
+
 import {
-  User,
-  Settings,
-  Trophy,
-  Tag,
   Bell,
-  Shield,
-  LogOut,
-  Volume2,
   Check,
   Loader2,
-  Trash2,
+  LogOut,
   Mail,
   Send,
+  Settings,
+  Shield,
+  Tag,
+  Trash2,
+  Trophy,
+  User,
+  Volume2,
 } from "lucide-react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import Image from "next/image"
-import { getProfileAction, updateProfileAction } from "@/application/profile/profile.action"
+
 import { sendTestEmailAction } from "@/application/email/email.action"
+import { getProfileAction, updateProfileAction } from "@/application/profile/profile.action"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { createClient } from "@/infrastructure/supabase/client"
 import { clearUserLocalData } from "@/utils/user-data"
 
@@ -126,7 +129,9 @@ export function AccountSettingsModal({
   const [email, setEmail] = useState(userEmail)
 
   // Form States - Preferencias
-  const [diasEstudo, setDiasEstudo] = useState<string[]>(DEFAULT_PREFERENCES["studyDays"] as string[])
+  const [diasEstudo, setDiasEstudo] = useState<string[]>(
+    DEFAULT_PREFERENCES["studyDays"] as string[],
+  )
   const [primeiroDia, setPrimeiroDia] = useState("Domingo")
   const [somTimer, setSomTimer] = useState("Melodia 1")
   const [fusoHorario, setFusoHorario] = useState("(UTC-03:00) Brasília")
@@ -162,49 +167,55 @@ export function AccountSettingsModal({
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoadingProfile(true)
-    getProfileAction().then((res) => {
-      if (cancelled) return
-      if (res.success && res.data) {
-        const profile = res.data
-        const fullName = profile.name ?? profile.full_name ?? ""
-        const nameParts = fullName.trim().split(/\s+/)
-        const firstName = nameParts[0] || ""
-        const lastName = nameParts.slice(1).join(" ") || ""
-        setNome(firstName)
-        setSobrenome(lastName)
-        setApelido(profile.nickname ?? "")
-        setAniversario(profile.birthday ?? "")
-        setGenero(profile.gender ?? "Não Informado")
-        setCidade(profile.city ?? "")
-        setUf(profile.uf ?? "")
-        setEmail(profile.email ?? userEmail)
-        if (profile.avatar_url) {
-          setAvatarImg(profile.avatar_url)
-          setAvatarDirty(false)
+    getProfileAction()
+      .then((res) => {
+        if (cancelled) return
+        if (res.success && res.data) {
+          const profile = res.data
+          const fullName = profile.name ?? profile.full_name ?? ""
+          const nameParts = fullName.trim().split(/\s+/)
+          const firstName = nameParts[0] || ""
+          const lastName = nameParts.slice(1).join(" ") || ""
+          setNome(firstName)
+          setSobrenome(lastName)
+          setApelido(profile.nickname ?? "")
+          setAniversario(profile.birthday ?? "")
+          setGenero(profile.gender ?? "Não Informado")
+          setCidade(profile.city ?? "")
+          setUf(profile.uf ?? "")
+          setEmail(profile.email ?? userEmail)
+          if (profile.avatar_url) {
+            setAvatarImg(profile.avatar_url)
+            setAvatarDirty(false)
+          }
+          const prefs = profile.preferences
+          setDiasEstudo(
+            prefsValue<string[]>(prefs, "studyDays", DEFAULT_PREFERENCES["studyDays"] as string[]),
+          )
+          setPrimeiroDia(prefsValue<string>(prefs, "firstDayOfWeek", "Domingo"))
+          setSomTimer(prefsValue<string>(prefs, "timerSound", "Melodia 1"))
+          setFusoHorario(prefsValue<string>(prefs, "timezone", "(UTC-03:00) Brasília"))
+          setPerfilPublico(prefsValue<boolean>(prefs, "publicProfile", true))
+          setTipoFoto(prefsValue<"foto" | "iniciais">(prefs, "avatarType", "foto"))
+          setTipoNome(prefsValue<"nome" | "apelido">(prefs, "nameType", "nome"))
+          setNotifConstancia(prefsValue<boolean>(prefs, "notifyConstancia", true))
+          setNotifRevisao(prefsValue<boolean>(prefs, "notifyRevisao", true))
+          setNotifFeedback(prefsValue<boolean>(prefs, "notifyFeedback", true))
+          setNotifResumoSemanal(prefsValue<boolean>(prefs, "notifyResumoSemanal", true))
+          setNotifImportacoes(prefsValue<boolean>(prefs, "notifyImportacoes", true))
+          setNotifRanking(prefsValue<boolean>(prefs, "notifyRanking", false))
+          setCustomCategories(prefsValue<string[]>(prefs, "customCategories", []))
+        } else if (res.error) {
+          toast.error(res.error)
         }
-        const prefs = profile.preferences
-        setDiasEstudo(prefsValue<string[]>(prefs, "studyDays", DEFAULT_PREFERENCES["studyDays"] as string[]))
-        setPrimeiroDia(prefsValue<string>(prefs, "firstDayOfWeek", "Domingo"))
-        setSomTimer(prefsValue<string>(prefs, "timerSound", "Melodia 1"))
-        setFusoHorario(prefsValue<string>(prefs, "timezone", "(UTC-03:00) Brasília"))
-        setPerfilPublico(prefsValue<boolean>(prefs, "publicProfile", true))
-        setTipoFoto(prefsValue<"foto" | "iniciais">(prefs, "avatarType", "foto"))
-        setTipoNome(prefsValue<"nome" | "apelido">(prefs, "nameType", "nome"))
-        setNotifConstancia(prefsValue<boolean>(prefs, "notifyConstancia", true))
-        setNotifRevisao(prefsValue<boolean>(prefs, "notifyRevisao", true))
-        setNotifFeedback(prefsValue<boolean>(prefs, "notifyFeedback", true))
-        setNotifResumoSemanal(prefsValue<boolean>(prefs, "notifyResumoSemanal", true))
-        setNotifImportacoes(prefsValue<boolean>(prefs, "notifyImportacoes", true))
-        setNotifRanking(prefsValue<boolean>(prefs, "notifyRanking", false))
-        setCustomCategories(prefsValue<string[]>(prefs, "customCategories", []))
-      } else if (res.error) {
-        toast.error(res.error)
-      }
-      setIsLoadingProfile(false)
-    }).catch(() => {
-      if (!cancelled) setIsLoadingProfile(false)
-    })
-    return () => { cancelled = true }
+        setIsLoadingProfile(false)
+      })
+      .catch(() => {
+        if (!cancelled) setIsLoadingProfile(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChangePassword = async () => {
@@ -354,7 +365,7 @@ export function AccountSettingsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
         <div className="flex flex-col sm:flex-row min-h-[520px] bg-card text-foreground">
-          {/* Painel Esquerdo (Sidebar do Modal 100% Estudei) */}
+          {/* Painel Esquerdo (Sidebar de Configurações) */}
           <div className="w-full sm:w-64 bg-muted/40 p-5 border-r flex flex-col justify-between space-y-6">
             <div className="space-y-6">
               {/* Header Minha Conta */}
@@ -364,7 +375,14 @@ export function AccountSettingsModal({
               <div className="flex items-center gap-3">
                 <div className="relative w-14 h-14 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
                   {avatarImg ? (
-                    <Image src={avatarImg} alt="Avatar" fill sizes="56px" className="object-cover" unoptimized />
+                    <Image
+                      src={avatarImg}
+                      alt="Avatar"
+                      fill
+                      sizes="56px"
+                      className="object-cover"
+                      unoptimized
+                    />
                   ) : (
                     <User className="h-8 w-8 stroke-[2]" />
                   )}
@@ -507,31 +525,45 @@ export function AccountSettingsModal({
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">NOME</label>
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          NOME
+                        </label>
                         <Input value={nome} onChange={(e) => setNome(e.target.value)} />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">SOBRENOME</label>
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          SOBRENOME
+                        </label>
                         <Input value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">APELIDO</label>
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          APELIDO
+                        </label>
                         <Input value={apelido} onChange={(e) => setApelido(e.target.value)} />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">ANIVERSÁRIO</label>
-                        <Input type="date" value={aniversario} onChange={(e) => setAniversario(e.target.value)} />
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          ANIVERSÁRIO
+                        </label>
+                        <Input
+                          type="date"
+                          value={aniversario}
+                          onChange={(e) => setAniversario(e.target.value)}
+                        />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1 col-span-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">GÊNERO</label>
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          GÊNERO
+                        </label>
                         <select
                           value={genero}
                           onChange={(e) => setGenero(e.target.value)}
@@ -544,12 +576,20 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1 col-span-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">CIDADE</label>
-                        <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex: Vitória" />
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          CIDADE
+                        </label>
+                        <Input
+                          value={cidade}
+                          onChange={(e) => setCidade(e.target.value)}
+                          placeholder="Ex: Vitória"
+                        />
                       </div>
 
                       <div className="space-y-1 col-span-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">UF</label>
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          UF
+                        </label>
                         <select
                           value={uf}
                           onChange={(e) => setUf(e.target.value)}
@@ -566,8 +606,14 @@ export function AccountSettingsModal({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">E-MAIL</label>
-                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        E-MAIL
+                      </label>
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
                       <p className="text-[10px] text-muted-foreground">
                         Ao alterar, você receberá um link de confirmação no novo e-mail.
                       </p>
@@ -610,9 +656,15 @@ export function AccountSettingsModal({
                         CLASSIFICAÇÃO DE DESEMPENHO
                       </label>
                       <div className="flex h-5 rounded-md overflow-hidden font-bold text-[10px] text-white text-center">
-                        <div className="w-[65%] bg-rose-500 flex items-center justify-center">Ruim</div>
-                        <div className="w-[10%] bg-amber-400 text-amber-950 flex items-center justify-center">Regular</div>
-                        <div className="w-[25%] bg-emerald-500 flex items-center justify-center">Bom</div>
+                        <div className="w-[65%] bg-rose-500 flex items-center justify-center">
+                          Ruim
+                        </div>
+                        <div className="w-[10%] bg-amber-400 text-amber-950 flex items-center justify-center">
+                          Regular
+                        </div>
+                        <div className="w-[25%] bg-emerald-500 flex items-center justify-center">
+                          Bom
+                        </div>
                       </div>
                       <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
                         <span>0%</span>
@@ -629,18 +681,25 @@ export function AccountSettingsModal({
                       </label>
                       <div className="flex items-center gap-2">
                         {["1d", "7d", "30d", "60d", "120d"].map((r) => (
-                          <span key={r} className="px-3 py-1 rounded-md border text-xs font-bold text-muted-foreground bg-muted/20">
+                          <span
+                            key={r}
+                            className="px-3 py-1 rounded-md border text-xs font-bold text-muted-foreground bg-muted/20"
+                          >
                             {r}
                           </span>
                         ))}
-                        <button className="p-1 rounded-md border text-xs font-bold hover:text-[#2563EB]">+</button>
+                        <button className="p-1 rounded-md border text-xs font-bold hover:text-[#2563EB]">
+                          +
+                        </button>
                       </div>
                     </div>
 
                     {/* Primeiro dia da semana & Som do Timer */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">PRIMEIRO DIA DA SEMANA</label>
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          PRIMEIRO DIA DA SEMANA
+                        </label>
                         <select
                           value={primeiroDia}
                           onChange={(e) => setPrimeiroDia(e.target.value)}
@@ -652,7 +711,9 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">SOM DO TIMER</label>
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          SOM DO TIMER
+                        </label>
                         <div className="flex items-center gap-2">
                           <select
                             value={somTimer}
@@ -672,7 +733,9 @@ export function AccountSettingsModal({
 
                     {/* Fuso Horário */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">FUSO HORÁRIO</label>
+                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        FUSO HORÁRIO
+                      </label>
                       <select
                         value={fusoHorario}
                         onChange={(e) => setFusoHorario(e.target.value)}
@@ -732,7 +795,8 @@ export function AccountSettingsModal({
                             className="text-[#2563EB]"
                           />
                           <div className="w-7 h-7 rounded-full bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center">
-                            {(nome?.[0] || "?")}{(sobrenome?.[0] || "")}
+                            {nome?.[0] || "?"}
+                            {sobrenome?.[0] || ""}
                           </div>
                           <span>Usar minhas iniciais</span>
                         </label>
@@ -768,7 +832,11 @@ export function AccountSettingsModal({
                         </label>
                       </div>
                       {tipoNome === "apelido" && (
-                        <Input value={apelido} onChange={(e) => setApelido(e.target.value)} className="mt-1" />
+                        <Input
+                          value={apelido}
+                          onChange={(e) => setApelido(e.target.value)}
+                          className="mt-1"
+                        />
                       )}
                     </div>
                   </div>
@@ -782,10 +850,18 @@ export function AccountSettingsModal({
                         CATEGORIAS FIXAS
                       </label>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className="bg-purple-600 text-white font-bold text-xs px-3 py-1">TEORIA</Badge>
-                        <Badge className="bg-rose-500 text-white font-bold text-xs px-3 py-1">REVISÃO</Badge>
-                        <Badge className="bg-emerald-500 text-white font-bold text-xs px-3 py-1">QUESTÕES</Badge>
-                        <Badge className="bg-sky-500 text-white font-bold text-xs px-3 py-1">SIMULADOS</Badge>
+                        <Badge className="bg-purple-600 text-white font-bold text-xs px-3 py-1">
+                          TEORIA
+                        </Badge>
+                        <Badge className="bg-rose-500 text-white font-bold text-xs px-3 py-1">
+                          REVISÃO
+                        </Badge>
+                        <Badge className="bg-emerald-500 text-white font-bold text-xs px-3 py-1">
+                          QUESTÕES
+                        </Badge>
+                        <Badge className="bg-sky-500 text-white font-bold text-xs px-3 py-1">
+                          SIMULADOS
+                        </Badge>
                       </div>
                     </div>
 
@@ -816,7 +892,11 @@ export function AccountSettingsModal({
                                 }
                               }}
                             />
-                            <Button size="sm" onClick={handleAddCategory} className="bg-[#2563EB] text-white h-8 text-xs">
+                            <Button
+                              size="sm"
+                              onClick={handleAddCategory}
+                              className="bg-[#2563EB] text-white h-8 text-xs"
+                            >
                               <Check className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -851,7 +931,8 @@ export function AccountSettingsModal({
                       <div>
                         <h4 className="font-bold text-xs text-foreground">Resumo Semanal</h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Relatório semanal consolidado com horas estudadas, questões respondidas e taxa de acerto.
+                          Relatório semanal consolidado com horas estudadas, questões respondidas e
+                          taxa de acerto.
                         </p>
                       </div>
                     </div>
@@ -865,9 +946,12 @@ export function AccountSettingsModal({
                         className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
                       />
                       <div>
-                        <h4 className="font-bold text-xs text-foreground">Lembretes de Estudo & Constância</h4>
+                        <h4 className="font-bold text-xs text-foreground">
+                          Lembretes de Estudo & Constância
+                        </h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Lembretes para manter o ritmo dos seus estudos e proteger sua sequência de dias consecutivos.
+                          Lembretes para manter o ritmo dos seus estudos e proteger sua sequência de
+                          dias consecutivos.
                         </p>
                       </div>
                     </div>
@@ -883,7 +967,8 @@ export function AccountSettingsModal({
                       <div>
                         <h4 className="font-bold text-xs text-foreground">Alertas de Revisão</h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Avisos quando houver flashcards e matérias agendadas pelo algoritmo de repetição espaçada.
+                          Avisos quando houver flashcards e matérias agendadas pelo algoritmo de
+                          repetição espaçada.
                         </p>
                       </div>
                     </div>
@@ -897,9 +982,12 @@ export function AccountSettingsModal({
                         className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
                       />
                       <div>
-                        <h4 className="font-bold text-xs text-foreground">Importações de Histórico</h4>
+                        <h4 className="font-bold text-xs text-foreground">
+                          Importações de Histórico
+                        </h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          E-mail de confirmação e resumo de processamento ao importar dados externos.
+                          E-mail de confirmação e resumo de processamento ao importar dados
+                          externos.
                         </p>
                       </div>
                     </div>
@@ -915,7 +1003,8 @@ export function AccountSettingsModal({
                       <div>
                         <h4 className="font-bold text-xs text-foreground">Ranking & Conquistas</h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Notificações sobre evolução de posição no ranking geral e novos troféus conquistados.
+                          Notificações sobre evolução de posição no ranking geral e novos troféus
+                          conquistados.
                         </p>
                       </div>
                     </div>
@@ -940,10 +1029,15 @@ export function AccountSettingsModal({
                     <div className="rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 p-4 space-y-3">
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4 text-[#2563EB]" />
-                        <h4 className="font-bold text-xs text-foreground">Teste do Serviço Resend</h4>
+                        <h4 className="font-bold text-xs text-foreground">
+                          Teste do Serviço Resend
+                        </h4>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Envie um e-mail de validação para a sua caixa postal ({email || userEmail || "seu e-mail"}) para verificar a entrega em tempo real.
+                        Enviaremos um e-mail de teste para:{" "}
+                        <strong className="text-foreground font-bold">
+                          {email || userEmail || "sua conta"}
+                        </strong>
                       </p>
                       <Button
                         type="button"
@@ -987,18 +1081,36 @@ export function AccountSettingsModal({
 
                     <div className="space-y-3 max-w-sm">
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground">Senha Atual</label>
-                        <Input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} />
+                        <label className="text-xs font-semibold text-muted-foreground">
+                          Senha Atual
+                        </label>
+                        <Input
+                          type="password"
+                          value={senhaAtual}
+                          onChange={(e) => setSenhaAtual(e.target.value)}
+                        />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground">Nova Senha</label>
-                        <Input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} />
+                        <label className="text-xs font-semibold text-muted-foreground">
+                          Nova Senha
+                        </label>
+                        <Input
+                          type="password"
+                          value={novaSenha}
+                          onChange={(e) => setNovaSenha(e.target.value)}
+                        />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground">Confirmar Nova Senha</label>
-                        <Input type="password" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} />
+                        <label className="text-xs font-semibold text-muted-foreground">
+                          Confirmar Nova Senha
+                        </label>
+                        <Input
+                          type="password"
+                          value={confirmarSenha}
+                          onChange={(e) => setConfirmarSenha(e.target.value)}
+                        />
                       </div>
 
                       <Button
@@ -1021,7 +1133,7 @@ export function AccountSettingsModal({
               </>
             )}
 
-            {/* Botões do Rodapé: Cancelar & Salvar (100% Estudei) */}
+            {/* Botões do Rodapé: Cancelar & Salvar */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t">
               <Button
                 variant="outline"
