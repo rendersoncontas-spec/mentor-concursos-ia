@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Sparkles,
   Undo2,
+  Wrench,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -179,6 +180,9 @@ export function DailyPlanningView({
       } else if (res.data?.ran) {
         toast.success(res.data.message)
         setShowPendencies(false)
+        await loadReplanInfo()
+      } else if (res.data?.reason === "maintenance_paused") {
+        toast.info(res.data.message)
         await loadReplanInfo()
       } else {
         toast.info("Nenhuma pendência identificada. Cronograma já está em dia!")
@@ -424,11 +428,19 @@ export function DailyPlanningView({
 
   const totalMinutes = dayBlocks.reduce((acc, b) => acc + b.durationMinutes, 0)
 
+  const pendingLabel = (() => {
+    if (!replanInfo) return "—"
+    if (replanInfo.sanityInvalid) return "em análise"
+    return formatMinutes(replanInfo.totalPendingMinutes)
+  })()
+
   const hasAdjustments = scheduledTasks.some((t) => t.origin !== "BASE")
   const lastEvent = replanInfo?.lastEvent
   const showBanner = lastEvent && !lastEvent.revertedAt
   const showPendencyPanel =
-    (replanInfo?.totalPendingMinutes ?? 0) > 0 && (showPendencies || !replanInfo?.enabled)
+    (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
+    (showPendencies || !replanInfo?.enabled) &&
+    !replanInfo?.sanityInvalid
 
   const renderEmptyState = () => {
     if (blocks.length > 0) {
@@ -538,6 +550,17 @@ export function DailyPlanningView({
         </div>
       </div>
 
+      {/* REGRA 0 — Aviso de manutenção (replanejamento pausado) */}
+      {replanInfo?.replanPaused && (
+        <div className="flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-xl px-3.5 py-2.5">
+          <p className="text-xs font-bold text-sky-600 flex items-center gap-1.5">
+            <Wrench className="w-3.5 h-3.5 shrink-0" />
+            Replanejamento automático pausado para manutenção. Nenhum novo reajuste será gerado até
+            a validação concluir.
+          </p>
+        </div>
+      )}
+
       {/* Aviso de reajuste automático */}
       {showBanner && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#2563EB]/10 border border-[#2563EB]/20 rounded-xl px-3.5 py-2.5">
@@ -609,11 +632,11 @@ export function DailyPlanningView({
               <Button
                 size="sm"
                 onClick={() => void handleManualReplan()}
-                disabled={busy}
+                disabled={busy || replanInfo?.replanPaused}
                 className="h-8 px-3 text-[11px] font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-lg cursor-pointer"
               >
                 <RefreshCw className={`w-3 h-3 mr-1 ${busy ? "animate-spin" : ""}`} />
-                Recalcular cronograma
+                {replanInfo?.replanPaused ? "Pausado" : "Recalcular cronograma"}
               </Button>
             )}
           </div>
@@ -645,7 +668,7 @@ export function DailyPlanningView({
             Pendente
           </span>
           <span className="text-xs sm:text-sm font-black text-amber-700 font-mono">
-            {replanInfo ? formatMinutes(replanInfo.totalPendingMinutes) : "—"}
+            {pendingLabel}
           </span>
         </div>
       </div>

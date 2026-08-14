@@ -7,6 +7,7 @@ import {
   type ReplanContext,
   type ReplanInput,
   type ReplanSession,
+  addDaysToKey,
   buildAdjustedDay,
   classifyDay,
   computeDayStatuses,
@@ -74,7 +75,7 @@ function input(partial: Partial<ReplanInput> = {}): ReplanInput {
     sessions: [],
     futureDays: futureDays(),
     futureBlocksByDate: new Map<string, ReplanBlock[]>(),
-    alreadyDistributedBlockIds: new Set<string>(),
+    futureBlocks: [],
     context: context(),
     ...partial,
   }
@@ -271,19 +272,28 @@ test("TESTE 7: replanejar duas vezes não duplica atividades", () => {
   // 1ª execução: pendência vai para a fila
   const first = computeReplan(baseInput)
   assert.equal(first.ran, true)
-  const assignedIds = Object.values(first.assignmentsByDate)
-    .flat()
-    .map((a) => a.pendingBlockId)
+  const assigned = Object.values(first.assignmentsByDate).flat()
+  assert.ok(assigned.length > 0, "pendência precisa ser distribuída")
 
-  // 2ª execução: a mesma pendência JÁ foi distribuída → não pode ser agendada de novo
-  const second = computeReplan(
-    input({
-      pastBlocks,
-      sessions: [],
-      alreadyDistributedBlockIds: new Set(assignedIds),
+  // Simula a persistência: os blocos REAJUSTE agora existem no futuro,
+  // apontando para o bloco raiz (sourceBlockId).
+  const futureBlocks = assigned.map((a, i) =>
+    block({
+      blockId: `b-1-f${i}`,
+      itemId: a.itemId,
+      disciplineId: a.disciplineId,
+      scheduledDate: TOMORROW,
+      durationMinutes: a.minutes,
+      sourceBlockId: a.pendingBlockId,
+      origin: "REAJUSTE",
     }),
   )
-  assert.equal(second.ran, true, "pendência ainda existe, mas não pode ser duplicada")
+
+  // 2ª execução: a pendência JÁ foi redistribuída → não pode ser contada nem
+  // agendada de novo (idempotência).
+  const second = computeReplan(input({ pastBlocks, sessions: [], futureBlocks }))
+  assert.equal(second.ran, false, "pendência já redistribuída não gera nova pendência")
+  assert.equal(second.totalPendingMinutes, 0)
   const secondAssigned = Object.values(second.assignmentsByDate).flat()
   assert.equal(secondAssigned.length, 0, "pendência já distribuída não pode ser agendada novamente")
 })
@@ -382,7 +392,7 @@ test("tolerância: 59m58s vs 60min não é atraso", () => {
   const sessions: ReplanSession[] = [
     session({ id: "s-1", studyPlanItemId: "item-1", durationMinutes: 60 }),
   ]
-  const pendings = computePendingBlocks(pastBlocks, sessions, 1)
+  const pendings = computePendingBlocks(pastBlocks, sessions, [], 1)
   assert.equal(pendings.length, 0)
 })
 
@@ -486,7 +496,6 @@ test("distribuição respeita limite diário mesmo com pendência enorme", () =>
     pendingBlocks: pendings,
     futureDays: days,
     futureBlocksByDate: new Map(days.map((d) => [d.date, []])),
-    alreadyDistributedBlockIds: new Set(),
     horizonDays: 2,
   })
   const totalAssigned = Object.values(assignmentsByDate)
@@ -595,4 +604,268 @@ test("bloco manualmente fechado não contribui com pendência quando misturado a
   assert.equal(result.pendingBlocks[0]?.blockId, "b-open")
   assert.equal(result.pendingBlocks[0]?.pendingMinutes, 29)
   assert.equal(result.totalPendingMinutes, 29)
+})
+
+// ============================================================================
+// ESPEC — PENDÊNCIA NUNCA DUPLICA (regressão do bug 460h24min)
+// ============================================================================
+
+test("espec 16: 2 blocos de 60 não realizados → 120; reexecutar NUNCA dá 240", () => {
+  const past = [
+    block({ blockId: "b1", itemId: "i1", disciplineId: "d1", durationMinutes: 60 }),
+    block({
+      blockId: "b2",
+      itemId: "i2",
+      disciplineId: "d2",
+      durationMinutes: 60,
+      executionOrder: 2,
+    }),
+  ]
+  const base = input({ pastBlocks: past, sessions: [], toleranceMinutes: 0 })
+
+  // 1ª execução: pendência real = 120
+  const r1 = computeReplan(base)
+  assert.equal(r1.totalPendingMinutes, 120)
+
+  // Persiste a redistribuição no futuro (REAJUSTE apontando para as raízes)
+  const future = Object.values(r1.assignmentsByDate)
+    .flat()
+    .map((a, i) =>
+      block({
+        blockId: `f${i}`,
+        itemId: a.itemId,
+        disciplineId: a.disciplineId,
+        scheduledDate: TOMORROW,
+        durationMinutes: a.minutes,
+        sourceBlockId: a.pendingBlockId,
+        origin: "REAJUSTE",
+      }),
+    )
+  assert.ok(future.length > 0)
+
+  // 2ª execução: pendência já redistribuída → 0 (NUNCA 240)
+  const r2 = computeReplan(
+    input({ pastBlocks: past, sessions: [], futureBlocks: future, toleranceMinutes: 0 }),
+  )
+  assert.equal(r2.totalPendingMinutes, 0)
+  assert.ok(r2.totalPendingMinutes <= 120)
+
+  // 3ª execução: ainda 0 (idempotente)
+  const r3 = computeReplan(
+    input({ pastBlocks: past, sessions: [], futureBlocks: future, toleranceMinutes: 0 }),
+  )
+  assert.equal(r3.totalPendingMinutes, 0)
+})
+
+test("espec 17: 2 blocos de 60 com 90 realizados → pendência 30, nunca 90/120", () => {
+  const past = [
+    block({ blockId: "b1", itemId: "i1", disciplineId: "d1", durationMinutes: 60 }),
+    block({
+      blockId: "b2",
+      itemId: "i2",
+      disciplineId: "d2",
+      durationMinutes: 60,
+      executionOrder: 2,
+    }),
+  ]
+  const sessions: ReplanSession[] = [
+    session({ id: "s1", studyPlanItemId: "i1", durationMinutes: 60 }),
+    session({ id: "s2", studyPlanItemId: "i2", durationMinutes: 30 }),
+  ]
+
+  const result = computeReplan(input({ pastBlocks: past, sessions, toleranceMinutes: 0 }))
+  assert.equal(result.totalPendingMinutes, 30)
+  assert.notEqual(result.totalPendingMinutes, 90)
+  assert.notEqual(result.totalPendingMinutes, 120)
+
+  // Redistribuição persistida → reexecutar não recria pendência
+  const future = Object.values(result.assignmentsByDate)
+    .flat()
+    .map((a, i) =>
+      block({
+        blockId: `f${i}`,
+        itemId: a.itemId,
+        disciplineId: a.disciplineId,
+        scheduledDate: TOMORROW,
+        durationMinutes: a.minutes,
+        sourceBlockId: a.pendingBlockId,
+        origin: "REAJUSTE",
+      }),
+    )
+  const again = computeReplan(
+    input({ pastBlocks: past, sessions, futureBlocks: future, toleranceMinutes: 0 }),
+  )
+  assert.equal(again.totalPendingMinutes, 0)
+})
+
+test("espec 18: 5 dias de 2h — só o dia 1 vencido conta (2h, nunca 10h)", () => {
+  const past = [block({ blockId: "d1-b", itemId: "i1", disciplineId: "d1", durationMinutes: 120 })]
+  const futureBase = [1, 2, 3, 4].map((d) =>
+    block({
+      blockId: `d${d + 1}-b`,
+      itemId: `i${d + 1}`,
+      disciplineId: `d${d + 1}`,
+      scheduledDate: addDaysToKey(TODAY, d),
+      durationMinutes: 120,
+    }),
+  )
+
+  const result = computeReplan(
+    input({
+      pastBlocks: past,
+      sessions: [],
+      futureBlocks: futureBase,
+      toleranceMinutes: 0,
+    }),
+  )
+  assert.equal(result.totalPendingMinutes, 120)
+  assert.notEqual(result.totalPendingMinutes, 600)
+})
+
+test("redistribuição parcial: 60 não realizados, 30 já no futuro → pendência restante 30", () => {
+  const past = [block({ blockId: "b1", itemId: "i1", disciplineId: "d1", durationMinutes: 60 })]
+  const future = [
+    block({
+      blockId: "f1",
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: TOMORROW,
+      durationMinutes: 30,
+      sourceBlockId: "b1",
+      origin: "REAJUSTE",
+    }),
+  ]
+
+  const result = computeReplan(
+    input({ pastBlocks: past, sessions: [], futureBlocks: future, toleranceMinutes: 0 }),
+  )
+  assert.equal(result.totalPendingMinutes, 30)
+})
+
+test("redistribuição que vence sem ser feita retorna como pendência ÚNICA (sem somar)", () => {
+  // b1 60min → redistribuído 30 (f1). f1 venceu sem ser feito: ambos agora passado.
+  const past = [
+    block({ blockId: "b1", itemId: "i1", disciplineId: "d1", durationMinutes: 60 }),
+    block({
+      blockId: "f1",
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: YESTERDAY,
+      durationMinutes: 30,
+      sourceBlockId: "b1",
+      origin: "REAJUSTE",
+    }),
+  ]
+
+  const result = computeReplan(input({ pastBlocks: past, sessions: [], toleranceMinutes: 0 }))
+  // pendência = 60 (o original), NUNCA 60 + 30
+  assert.equal(result.totalPendingMinutes, 60)
+  assert.equal(result.pendingBlocks.length, 1)
+  assert.equal(result.pendingBlocks[0]?.blockId, "b1")
+})
+
+test("estudo parcial sobre a redistribuição abate o saldo do bloco raiz", () => {
+  // b1 60min; f1 (30min, redistribuído) venceu e o aluno estudou 20min dele.
+  const past = [
+    block({ blockId: "b1", itemId: "i1", disciplineId: "d1", durationMinutes: 60 }),
+    block({
+      blockId: "f1",
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: YESTERDAY,
+      durationMinutes: 30,
+      sourceBlockId: "b1",
+      origin: "REAJUSTE",
+    }),
+  ]
+  const sessions: ReplanSession[] = [
+    session({ id: "s1", studyPlanItemId: "i1", durationMinutes: 20 }),
+  ]
+
+  const result = computeReplan(input({ pastBlocks: past, sessions, toleranceMinutes: 0 }))
+  // 60 planejado - 20 realizado = 40 (NUNCA 60 + 40, nunca 90 - 20)
+  assert.equal(result.totalPendingMinutes, 40)
+})
+
+// ============================================================================
+// REGRA 6/7 — REAJUSTE/CRITICO órfão (sem source_block_id) NUNCA é raiz
+// ============================================================================
+test("REAJUSTE órfão (sem source_block_id) nunca gera pendência própria", () => {
+  // Dados corrompidos pelo bug: bloco REAJUSTE solto no passado, 60min, sem
+  // referência ao bloco original. Só o bloco BASE legítimo (b1) pode contar.
+  const past = [
+    block({ blockId: "b1", itemId: "i1", disciplineId: "d1", durationMinutes: 60 }),
+    block({
+      blockId: "orphan1",
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: YESTERDAY,
+      durationMinutes: 60,
+      origin: "REAJUSTE",
+    }),
+    block({
+      blockId: "orphan2",
+      itemId: "i2",
+      disciplineId: "d1",
+      scheduledDate: YESTERDAY,
+      durationMinutes: 120,
+      origin: "CRITICO",
+    }),
+  ]
+
+  const result = computeReplan(input({ pastBlocks: past, sessions: [], toleranceMinutes: 0 }))
+  // 60 (b1) + 0 (órfãos) — NUNCA 60 + 60 + 120 = 240
+  assert.equal(result.totalPendingMinutes, 60)
+  assert.equal(result.pendingBlocks.length, 1)
+  assert.equal(result.pendingBlocks[0]?.blockId, "b1")
+})
+
+test("REAJUSTE com source pendurado (bloco original fora da janela) nunca é raiz", () => {
+  const past = [
+    block({
+      blockId: "orphan1",
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: YESTERDAY,
+      durationMinutes: 300,
+      origin: "REAJUSTE",
+    }),
+  ]
+
+  const result = computeReplan(input({ pastBlocks: past, sessions: [], toleranceMinutes: 0 }))
+  assert.equal(result.totalPendingMinutes, 0)
+  assert.equal(result.pendingBlocks.length, 0)
+})
+
+test("REAJUSTE órfão não infla o total quando há raiz legítima pendente", () => {
+  const past = [
+    block({ blockId: "b1", itemId: "i1", disciplineId: "d1", durationMinutes: 120 }),
+    block({
+      blockId: "orphan1",
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: YESTERDAY,
+      durationMinutes: 300,
+      origin: "REAJUSTE",
+    }),
+  ]
+  const future = [
+    block({
+      blockId: "f1",
+      itemId: "i1",
+      disciplineId: "d1",
+      scheduledDate: TOMORROW,
+      durationMinutes: 30,
+      sourceBlockId: "b1",
+      origin: "REAJUSTE",
+    }),
+  ]
+
+  const result = computeReplan(
+    input({ pastBlocks: past, sessions: [], futureBlocks: future, toleranceMinutes: 0 }),
+  )
+  // 120 - 30 (já redistribuído) = 90. O órfão de 300min NÃO entra.
+  assert.equal(result.totalPendingMinutes, 90)
+  assert.equal(result.pendingBlocks.length, 1)
+  assert.equal(result.pendingBlocks[0]?.blockId, "b1")
 })

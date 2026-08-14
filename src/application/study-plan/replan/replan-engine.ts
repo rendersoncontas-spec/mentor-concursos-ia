@@ -35,6 +35,11 @@ export interface ReplanBlock {
   executionOrder: number
   origin: ReplanBlockOrigin
   status: ReplanBlockStatus
+  /** Bloco original (BASE) que deu origem a esta redistribuição. Blocos sem
+   *  sourceBlockId são RAÍZES (planejamento original) e as únicas que geram
+   *  pendência. Redistribuições são continuação da mesma unidade de trabalho —
+   *  nunca devem ser contadas como pendência nova. */
+  sourceBlockId?: string | null
   /** Bloco encerrado voluntariamente pelo aluno ("Marcar como concluído hoje").
    *  Sua pendência restante é perdoada e nunca é reprogramada para o futuro. */
   manuallyClosed?: boolean
@@ -124,7 +129,9 @@ export interface ReplanInput {
   sessions: ReplanSession[]
   futureDays: ReplanCapacityDay[] // dias futuros (hoje+1 .. hoje+horizonte) com capacidade
   futureBlocksByDate: Map<string, ReplanBlock[]> // blocos BASE futuros por data
-  alreadyDistributedBlockIds: Set<string> // pendências já reintroduzidas (anti-duplicação)
+  /** Todos os blocos futuros (BASE + REAJUSTE/CRITICO já persistidos). Usados
+   *  para abater o saldo de pendência já redistribuída (anti-duplicação). */
+  futureBlocks?: ReplanBlock[]
   context: ReplanContext
   toleranceMinutes?: number
   maxDailyMinutesCap?: number
@@ -195,12 +202,31 @@ export function realizedMinutesMap(
 ): Map<string, number> {
   const realized = new Map<string, number>()
 
-  // Passo 1: vínculo direto (study_plan_item_id)
-  for (const b of blocks) {
-    const direct = sessions
-      .filter((s) => s.studyPlanItemId !== null && s.studyPlanItemId === b.itemId)
-      .reduce((acc, s) => acc + Math.max(0, s.durationMinutes), 0)
-    realized.set(b.blockId, direct)
+  // Passo 1: vínculo direto (study_plan_item_id).
+  // Cada sessão abate UM bloco por vez (o mais antigo primeiro). Bloco original
+  // e suas redistribuições compartilham o mesmo itemId; sem consumo, uma única
+  // sessão creditaria o mesmo tempo em vários blocos (crédito duplo).
+  const consumed = new Map<string, number>() // sessionId → minutos já abatidos
+  const ordered = [...blocks].sort(
+    (a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || a.executionOrder - b.executionOrder,
+  )
+  for (const b of ordered) {
+    const directSessions = sessions.filter(
+      (s) => s.studyPlanItemId !== null && s.studyPlanItemId === b.itemId,
+    )
+    let credited = 0
+    for (const s of directSessions) {
+      const used = consumed.get(s.id) ?? 0
+      const left = Math.max(0, s.durationMinutes - used)
+      if (left <= 0) continue
+      const room = b.durationMinutes - credited
+      if (room <= 0) break
+      const take = Math.min(left, room)
+      credited += take
+      consumed.set(s.id, used + take)
+      if (credited >= b.durationMinutes) break
+    }
+    realized.set(b.blockId, credited)
   }
 
   // Passo 2: sessões manuais (sem vínculo) da disciplina na data, distribuídas
@@ -234,22 +260,79 @@ export function realizedMinutesMap(
   return realized
 }
 
+/**
+ * Pendência REAL por bloco raiz (planejamento original):
+ *
+ *   pending = max(planned - realized - redistributed, 0)
+ *
+ * - Somente blocos RAÍZES (origin BASE, sem sourceBlockId) geram pendência.
+ * - Blocos REAJUSTE/CRITICO são continuação de um bloco original: contar cada
+ *   um como pendência nova inflaria o total a cada replanejamento
+ *   (duplicação). O tempo REALIZADO sobre eles abate o saldo da raiz; o tempo
+ *   já redistribuído para o FUTURO também abate o saldo (a pendência foi
+ *   movida — voltará a contar apenas quando o bloco redistribuído vencer).
+ * - Blocos do FUTURO nunca entram como pendência (só dias vencidos).
+ */
 export function computePendingBlocks(
   pastBlocks: ReplanBlock[],
   sessions: ReplanSession[],
+  futureBlocks: ReplanBlock[] = [],
   toleranceMinutes = DEFAULT_TOLERANCE_MINUTES,
 ): ReplanPending[] {
   const realized = realizedMinutesMap(pastBlocks, sessions)
+  const all = [...pastBlocks, ...futureBlocks]
+  const pastIds = new Set(pastBlocks.map((b) => b.blockId))
+  const futureIds = new Set(futureBlocks.map((b) => b.blockId))
+
+  // Resolve a raiz (bloco BASE) de uma cadeia de redistribuição (A → A1 → A2).
+  // Somente blocos do planejamento ORIGINAL (origin BASE) podem ser raízes:
+  // um REAJUSTE/CRITICO órfão (sem source_block_id ou com source pendurado)
+  // NUNCA gera pendência própria — impede inflação por dados corrompidos.
+  const rootOf = (b: ReplanBlock): ReplanBlock | undefined => {
+    const seen = new Set<string>()
+    let cur: ReplanBlock | undefined = b
+    while (cur && cur.sourceBlockId && !seen.has(cur.blockId)) {
+      seen.add(cur.blockId)
+      const next = all.find((x) => x.blockId === cur?.sourceBlockId)
+      if (!next) break
+      cur = next
+    }
+    if (cur && cur.origin === "BASE") return cur
+    return undefined
+  }
+
+  const groupByRoot = new Map<string, ReplanBlock[]>()
+  for (const b of all) {
+    const root = rootOf(b)
+    if (!root) continue
+    const list = groupByRoot.get(root.blockId) ?? []
+    list.push(b)
+    groupByRoot.set(root.blockId, list)
+  }
+
   const pendings: ReplanPending[] = []
   const sorted = [...pastBlocks].sort(
     (x, y) => x.scheduledDate.localeCompare(y.scheduledDate) || x.executionOrder - y.executionOrder,
   )
 
   for (const block of sorted) {
-    // Bloco encerrado manualmente: pendência perdoada (não gera reajuste futuro).
+    if (block.sourceBlockId) continue // continuação — nunca gera pendência própria
     if (block.manuallyClosed) continue
-    const realizedMinutes = realized.get(block.blockId) ?? 0
-    const pending = pendingOf(block.durationMinutes, realizedMinutes, toleranceMinutes)
+    if (block.origin !== "BASE") continue // REAJUSTE/CRITICO órfão nunca é raiz
+
+    const group = groupByRoot.get(block.blockId) ?? []
+    const realizedMinutes = group
+      .filter((d) => pastIds.has(d.blockId))
+      .reduce((acc, d) => acc + (realized.get(d.blockId) ?? 0), 0)
+    const redistributed = group
+      .filter((d) => futureIds.has(d.blockId))
+      .reduce((acc, d) => acc + d.durationMinutes, 0)
+
+    const pending = Math.max(
+      0,
+      pendingOf(block.durationMinutes, realizedMinutes, toleranceMinutes) - redistributed,
+    )
+
     if (pending > 0) {
       pendings.push({
         blockId: block.blockId,
@@ -443,10 +526,9 @@ export function pickRecoveryHorizon(args: {
 // 5. DISTRIBUIÇÃO (NÃO CRIAR BOLA DE NEVE)
 // ----------------------------------------------------------------------------
 export function distributePendencies(args: {
-  pendingBlocks: ReplanPending[] // parcelas: um bloco pendente do passado
+  pendingBlocks: ReplanPending[] // parcelas: saldo pendente de um bloco raiz do passado
   futureDays: ReplanCapacityDay[]
   futureBlocksByDate: Map<string, ReplanBlock[]>
-  alreadyDistributedBlockIds: Set<string>
   horizonDays: number
   maxDailyMinutesCap?: number
 }): { assignmentsByDate: Record<string, ReplanAssignment[]>; unscheduledMinutes: number } {
@@ -465,7 +547,6 @@ export function distributePendencies(args: {
   let unscheduled = 0
 
   for (const parcel of args.pendingBlocks) {
-    if (args.alreadyDistributedBlockIds.has(parcel.blockId)) continue
     let remaining = parcel.pendingMinutes
 
     for (const day of days) {
@@ -553,7 +634,12 @@ export function buildAdjustedDay(args: {
 export function computeReplan(input: ReplanInput): ReplanResult {
   const tolerance = input.toleranceMinutes ?? DEFAULT_TOLERANCE_MINUTES
 
-  const pendingBlocks = computePendingBlocks(input.pastBlocks, input.sessions, tolerance)
+  const pendingBlocks = computePendingBlocks(
+    input.pastBlocks,
+    input.sessions,
+    input.futureBlocks ?? [],
+    tolerance,
+  )
   const dayStatuses = computeDayStatuses(input.pastBlocks, input.sessions, tolerance)
 
   if (pendingBlocks.length === 0) {
@@ -599,7 +685,6 @@ export function computeReplan(input: ReplanInput): ReplanResult {
     pendingBlocks: orderedParcels,
     futureDays: input.futureDays,
     futureBlocksByDate: input.futureBlocksByDate,
-    alreadyDistributedBlockIds: input.alreadyDistributedBlockIds,
     horizonDays,
     ...(input.maxDailyMinutesCap !== undefined
       ? { maxDailyMinutesCap: input.maxDailyMinutesCap }

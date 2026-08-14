@@ -35,6 +35,15 @@ export const REPLAN_FORWARD_DAYS = 7
 export const FEATURE = "adaptive-planning"
 
 // ---------------------------------------------------------------------------
+// REGRA 0 — KILL-SWITCH DE MANUTENÇÃO
+// ---------------------------------------------------------------------------
+// Pausado POR PADRÃO até a validação de idempotência passar. Com o replan
+// pausado NENHUM novo bloco é criado e NENHUMA pendência é redistribuída
+// (apenas leitura/auditoria). Reativar definindo ADAPTIVE_REPLAN_MAINTENANCE
+// como "false" no ambiente.
+export const REPLAN_MAINTENANCE_PAUSED = process.env["ADAPTIVE_REPLAN_MAINTENANCE"] !== "false"
+
+// ---------------------------------------------------------------------------
 // Tipos de apoio
 // ---------------------------------------------------------------------------
 
@@ -371,6 +380,22 @@ export async function runAdaptiveReplanning(
   userId: string,
   args: RunReplanArgs,
 ): Promise<ReplanSummary> {
+  // REGRA 0 — manutenção: NÃO gerar blocos, NÃO redistribuir, NÃO alterar o
+  // planejamento futuro. Apenas leitura/auditoria continua ativa.
+  if (REPLAN_MAINTENANCE_PAUSED) {
+    return {
+      ran: false,
+      reason: "maintenance_paused",
+      eventId: null,
+      pendingMinutes: 0,
+      pendingBlocks: 0,
+      distributedDays: 0,
+      unscheduledMinutes: 0,
+      critical: false,
+      message: "Replanejamento automático pausado para manutenção.",
+    }
+  }
+
   const todayKey = todayKeyInSaoPaulo()
   const availability = args.availability ?? DEFAULT_AVAILABILITY
 
@@ -401,9 +426,9 @@ export async function runAdaptiveReplanning(
     )
 
     const pastBlocks: ReplanBlock[] = []
-    const futureBaseBlocks = new Map<string, ReplanBlock[]>()
+    const futureBlocks: ReplanBlock[] = []
     const futureDays: ReplanCapacityDay[] = []
-    const alreadyDistributedBlockIds = new Set<string>()
+    const futureBaseBlocks = new Map<string, ReplanBlock[]>()
 
     for (const row of windowBlocks) {
       const block: ReplanBlock = {
@@ -417,16 +442,16 @@ export async function runAdaptiveReplanning(
         origin: row.origin as ReplanBlock["origin"],
         status: row.status as ReplanBlockStatus,
         manuallyClosed: row.status === "CONCLUIDO_MANUAL",
+        sourceBlockId: row.source_block_id,
       }
       if (row.scheduled_date < todayKey) {
         pastBlocks.push(block)
       } else if (row.scheduled_date > todayKey) {
+        futureBlocks.push(block)
         if (row.origin === "BASE") {
           const list = futureBaseBlocks.get(row.scheduled_date) ?? []
           list.push(block)
           futureBaseBlocks.set(row.scheduled_date, list)
-        } else if (row.source_block_id) {
-          alreadyDistributedBlockIds.add(row.source_block_id)
         }
       }
     }
@@ -502,9 +527,41 @@ export async function runAdaptiveReplanning(
       sessions,
       futureDays,
       futureBlocksByDate: futureBaseBlocks,
-      alreadyDistributedBlockIds,
+      futureBlocks,
       context,
     })
+
+    // -------------------------------------------------------------------
+    // Guarda de sanidade: pendência NUNCA pode exceder o total planejado no
+    // passado (soma dos blocos raiz). Se exceder, algo está duplicando —
+    // falha segura: não distribui, registra em Sentry e avisa o usuário.
+    // -------------------------------------------------------------------
+    const plausibleMaxPending = pastBlocks
+      .filter((b) => b.origin === "BASE" && !b.sourceBlockId)
+      .reduce((acc, b) => acc + b.durationMinutes, 0)
+    if (result.ran && result.totalPendingMinutes > plausibleMaxPending) {
+      Sentry.captureMessage("Replan: pendência impossível detectada (não distribuída)", {
+        level: "error",
+        extra: {
+          feature: FEATURE,
+          userId,
+          pendingMinutes: result.totalPendingMinutes,
+          plausibleMaxPending,
+          pastRootBlocks: pastBlocks.filter((b) => b.origin === "BASE" && !b.sourceBlockId).length,
+        },
+      })
+      return {
+        ran: false,
+        reason: "invalid_pendency",
+        eventId: null,
+        pendingMinutes: 0,
+        pendingBlocks: 0,
+        distributedDays: 0,
+        unscheduledMinutes: 0,
+        critical: false,
+        message: "Não foi possível recalcular o cronograma com segurança.",
+      }
+    }
 
     if (!result.ran) {
       return {
@@ -574,18 +631,32 @@ export async function runAdaptiveReplanning(
       })
     }
 
-    // Cria (ou mescla) blocos REAJUSTE nos dias futuros
+    // Cria (ou mescla) blocos REAJUSTE nos dias futuros.
+    // REGRA DE OURO: toda redistribuição possui source_block_id apontando para
+    // o bloco ORIGINAL — NUNCA é mesclada em um bloco BASE (isso apagava o
+    // rastreio e fazia a pendência renascer como nova origem). Re-execuções do
+    // algoritmo mesclam no mesmo bloco REAJUSTE (source_block_id + data),
+    // garantindo IDEMPOTÊNCIA: uma pendência nunca gera outra pendência.
     for (const [date, assignments] of Object.entries(result.assignmentsByDate)) {
       for (const assignment of assignments) {
-        const existingBlock = windowBlocks.find(
+        const existingRedist = windowBlocks.find(
           (b) =>
-            b.item_id === assignment.itemId && b.scheduled_date === date && b.origin === "BASE",
+            b.source_block_id === assignment.pendingBlockId &&
+            b.scheduled_date === date &&
+            (b.origin === "REAJUSTE" || b.origin === "CRITICO"),
         )
-        if (existingBlock) {
-          await supabase
+        if (existingRedist) {
+          const { error } = await supabase
             .from("study_plan_daily_blocks")
-            .update({ duration_minutes: existingBlock.duration_minutes + assignment.minutes })
-            .eq("id", existingBlock.id)
+            .update({
+              duration_minutes: existingRedist.duration_minutes + assignment.minutes,
+            })
+            .eq("id", existingRedist.id)
+          if (error) {
+            Sentry.captureException(error, {
+              extra: { feature: FEATURE, step: "assignment_merge", date },
+            })
+          }
         } else {
           const { error } = await supabase.from("study_plan_daily_blocks").insert({
             user_id: userId,
@@ -751,6 +822,8 @@ export async function undoLastReplanning(
 
 export interface ReplanInfoPayload {
   enabled: boolean
+  replanPaused: boolean
+  sanityInvalid: boolean
   todayStr: string
   dailyBlocks: Record<string, ReplanUiBlock[]>
   pendingByDiscipline: { disciplineId: string; disciplineName: string; pendingMinutes: number }[]
@@ -790,6 +863,8 @@ export async function getReplanInfo(
   const todayKey = todayKeyInSaoPaulo()
   const empty: ReplanInfoPayload = {
     enabled: autoEnabled,
+    replanPaused: REPLAN_MAINTENANCE_PAUSED,
+    sanityInvalid: false,
     todayStr: todayKey,
     dailyBlocks: {},
     pendingByDiscipline: [],
@@ -846,10 +921,27 @@ export async function getReplanInfo(
         origin: row.origin as ReplanBlock["origin"],
         status: row.status as ReplanBlockStatus,
         manuallyClosed: row.status === "CONCLUIDO_MANUAL",
+        sourceBlockId: row.source_block_id,
+      }))
+
+    const futureBlocks: ReplanBlock[] = windowBlocks
+      .filter((r) => r.scheduled_date > todayKey)
+      .map((row) => ({
+        blockId: row.id,
+        itemId: row.item_id,
+        disciplineId: row.discipline_id,
+        disciplineName: disciplineNameById.get(row.discipline_id) ?? "Disciplina",
+        scheduledDate: row.scheduled_date,
+        durationMinutes: row.duration_minutes,
+        executionOrder: row.execution_order,
+        origin: row.origin as ReplanBlock["origin"],
+        status: row.status as ReplanBlockStatus,
+        manuallyClosed: row.status === "CONCLUIDO_MANUAL",
+        sourceBlockId: row.source_block_id,
       }))
 
     const sessions = await loadSessions(supabase, userId, plan.generated_at || plan.created_at)
-    const pendings = computePendingBlocks(pastBlocks, sessions)
+    const pendings = computePendingBlocks(pastBlocks, sessions, futureBlocks)
 
     const { data: event } = await supabase
       .from("study_plan_replan_events")
@@ -876,14 +968,63 @@ export async function getReplanInfo(
 
     const totalPending = [...byDiscipline.values()].reduce((acc, d) => acc + d.pendingMinutes, 0)
 
+    // -----------------------------------------------------------------------
+    // SANITY CHECK (exibição): a pendência exibida NUNCA pode exceder o total
+    // planejado dos blocos raiz no passado (soma de planejado − realizado de
+    // cada obrigação original). Se exceder, os dados estão duplicados/corrompidos:
+    // NÃO exibimos o número absurdo — mostramos "Pendências em análise" e
+    // registramos a auditoria NO SERVIDOR (contagens e IDs de blocos; sem
+    // dados pessoais além do id interno do usuário).
+    // -----------------------------------------------------------------------
+    const roots = pastBlocks.filter(
+      (b) => b.origin === "BASE" && !b.sourceBlockId && !b.manuallyClosed,
+    )
+    const plausibleMaxPending = roots.reduce((acc, b) => acc + b.durationMinutes, 0)
+    const sanityInvalid =
+      totalPending > plausibleMaxPending || totalPending < 0 || plausibleMaxPending < 0
+
+    if (sanityInvalid) {
+      const duplicatedSources = new Map<string, number>()
+      for (const b of windowBlocks) {
+        if (!b.source_block_id) continue
+        duplicatedSources.set(
+          b.source_block_id,
+          (duplicatedSources.get(b.source_block_id) ?? 0) + 1,
+        )
+      }
+      const orphanRedist = windowBlocks.filter((b) => b.origin !== "BASE" && !b.source_block_id)
+      Sentry.captureMessage("Replan: pendência exibida inconsistente (auditoria)", {
+        level: "error",
+        extra: {
+          feature: FEATURE,
+          userId,
+          totalPendingMinutes: totalPending,
+          plausibleMaxPending,
+          plannedTotalMinutes: roots.reduce((acc, b) => acc + b.durationMinutes, 0),
+          pastBlockCount: pastBlocks.length,
+          rootBlockCount: roots.length,
+          futureBlockCount: futureBlocks.length,
+          orphanRedistBlocks: orphanRedist.length,
+          redistBlocksWithDuplicateSource: [...duplicatedSources.values()].filter((n) => n > 1)
+            .length,
+          duplicatedSourceBlockIds: [...duplicatedSources.entries()]
+            .filter(([, n]) => n > 1)
+            .map(([id]) => id),
+          orphanRedistBlockIds: orphanRedist.map((b) => b.id),
+        },
+      })
+    }
+
     return {
       enabled: autoEnabled,
+      replanPaused: REPLAN_MAINTENANCE_PAUSED,
+      sanityInvalid,
       todayStr: todayKey,
       dailyBlocks,
-      pendingByDiscipline: [...byDiscipline.values()].sort(
-        (a, b) => b.pendingMinutes - a.pendingMinutes,
-      ),
-      totalPendingMinutes: totalPending,
+      pendingByDiscipline: sanityInvalid
+        ? []
+        : [...byDiscipline.values()].sort((a, b) => b.pendingMinutes - a.pendingMinutes),
+      totalPendingMinutes: sanityInvalid ? 0 : totalPending,
       unscheduledMinutes: 0,
       lastEvent: event
         ? {

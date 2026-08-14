@@ -8,6 +8,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 import {
   DEFAULT_AVAILABILITY,
+  REPLAN_MAINTENANCE_PAUSED,
   type ReplanAvailability,
   type ReplanInfoPayload,
   type ReplanSummary,
@@ -59,7 +60,9 @@ export async function getReplanInfoAction(
     const availability = normalizeAvailability(availabilityInput)
     const autoEnabled = await getAutoReplanPreference(supabase, user.id)
 
-    if (autoEnabled) {
+    // REGRA 0 — manutenção: não disparar o replanejamento em leitura
+    // (abrir página, dashboard, trocar data, F5, salvar sessão).
+    if (autoEnabled && !REPLAN_MAINTENANCE_PAUSED) {
       await runAdaptiveReplanning(supabase, user.id, { trigger: "AUTO", autoEnabled, availability })
     }
 
