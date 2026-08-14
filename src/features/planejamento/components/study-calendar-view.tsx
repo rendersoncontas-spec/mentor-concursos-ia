@@ -1,35 +1,47 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+
 import { useRouter } from "next/navigation"
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Calendar as CalendarIcon, 
-  Clock, 
-  PlayCircle,
+
+import {
   BookOpen,
   Briefcase,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  PlayCircle,
 } from "lucide-react"
+import { toast } from "sonner"
+
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { toast } from "sonner"
+import { getStudyDaysCount, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
+
 import { type StudyCycleBlock } from "./estudei-planning-view"
 
 type ScheduleMode = "normal" | "12x36" | "24x72" | "24x48" | "5x1" | "6x1" | "4x2"
 
-const SCHEDULE_MODES: readonly ScheduleMode[] = ["normal", "12x36", "24x72", "24x48", "5x1", "6x1", "4x2"]
+const SCHEDULE_MODES: readonly ScheduleMode[] = [
+  "normal",
+  "12x36",
+  "24x72",
+  "24x48",
+  "5x1",
+  "6x1",
+  "4x2",
+]
 const WEEKDAY_KEYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const
 
-function isScheduleMode(value: string | null): value is ScheduleMode {
-  return value !== null && SCHEDULE_MODES.includes(value as ScheduleMode)
-}
+const CUSTOM_SCALE_RE = /^custom_(\d+)x(\d+)$/
 
-function getStudyDaysCount(scheduleMode: ScheduleMode, studyDays: string[]): number {
-  if (scheduleMode === "normal") return studyDays.length || 6
-  if (scheduleMode === "24x72") return 5
-  if (scheduleMode === "12x36") return 3.5
-  return 6
+/** Aceita as escalas fixas e também o formato custom_XxY salvo pelo wizard. */
+function isScheduleMode(value: string | null): value is ScheduleMode {
+  return (
+    value !== null &&
+    (SCHEDULE_MODES.includes(value as ScheduleMode) || CUSTOM_SCALE_RE.test(value))
+  )
 }
 
 function getDayCellClass(isToday: boolean, onShift: boolean): string {
@@ -44,7 +56,11 @@ function getDayNumberClass(isToday: boolean, onShift: boolean): string {
   return "text-foreground group-hover:text-primary"
 }
 
-function getDaySummary(onShift: boolean, scheduleMode: ScheduleMode, disciplinesCount: number): string {
+function getDaySummary(
+  onShift: boolean,
+  scheduleMode: ScheduleMode,
+  disciplinesCount: number,
+): string {
   if (onShift && scheduleMode !== "normal") return "Escala 24h"
   if (disciplinesCount > 0) return `${disciplinesCount} matérias`
   return "Folga"
@@ -58,7 +74,10 @@ interface StudyCalendarViewProps {
 export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendarViewProps) {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDayDetail, setSelectedDayDetail] = useState<{ dayNum: number; fullDate: Date } | null>(null)
+  const [selectedDayDetail, setSelectedDayDetail] = useState<{
+    dayNum: number
+    fullDate: Date
+  } | null>(null)
 
   // Escala de Trabalho (Normal | 12x36 | 24x72 | 24x48 | 5x1 | 6x1 | 4x2)
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(() => {
@@ -76,7 +95,9 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     }
     return 2
   }) // Primeiro plantão padrão dia 2
-  const [customShiftDays, setCustomShiftDays] = useState<Record<string, "PLANTAO" | "FOLGA_ESTUDO" | "FOLGA_TOTAL">>({})
+  const [customShiftDays, setCustomShiftDays] = useState<
+    Record<string, "PLANTAO" | "FOLGA_ESTUDO" | "FOLGA_TOTAL">
+  >({})
 
   const [studyDays, setStudyDays] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
@@ -157,39 +178,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     if (customShiftDays[key] === "PLANTAO") return true
     if (customShiftDays[key] === "FOLGA_ESTUDO") return false
 
-    const dayDiff = dayNum - firstShiftDay
-
-    if (scheduleMode === "12x36") {
-      // 12x36: Plantão a cada 2 dias
-      return dayDiff >= 0 && dayDiff % 2 === 0
-    }
-
-    if (scheduleMode === "24x72") {
-      // 24x72: Plantão a cada 4 dias
-      return dayDiff >= 0 && dayDiff % 4 === 0
-    }
-
-    if (scheduleMode === "24x48") {
-      // 24x48: Plantão a cada 3 dias
-      return dayDiff >= 0 && dayDiff % 3 === 0
-    }
-
-    if (scheduleMode === "5x1") {
-      // 5x1: Folga a cada 6 dias
-      return dayDiff >= 0 && dayDiff % 6 === 0
-    }
-
-    if (scheduleMode === "6x1") {
-      // 6x1: Folga a cada 7 dias
-      return dayDiff >= 0 && dayDiff % 7 === 0
-    }
-
-    if (scheduleMode === "4x2") {
-      // 4x2: Folga de 2 dias a cada 6 dias
-      return dayDiff >= 0 && (dayDiff % 6 === 0 || (dayDiff - 1) % 6 === 0)
-    }
-
-    return false
+    return isShiftDayForScale(dayNum, firstShiftDay, scheduleMode)
   }
 
   // Helper para buscar disciplinas agendadas no dia
@@ -236,20 +225,31 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     const key = `${year}-${month}-${dayNum}`
     setCustomShiftDays((prev) => ({
       ...prev,
-      [key]: prev[key] === status ? "FOLGA_ESTUDO" : status
+      [key]: prev[key] === status ? "FOLGA_ESTUDO" : status,
     }))
-    toast.success(`Dia ${dayNum} atualizado para ${status === "PLANTAO" ? "Plantão 🚨" : "Estudo 📚"}`)
+    toast.success(
+      `Dia ${dayNum} atualizado para ${status === "PLANTAO" ? "Plantão 🚨" : "Estudo 📚"}`,
+    )
   }
 
   const getScaleLabel = (mode: string) => {
+    const custom = CUSTOM_SCALE_RE.exec(mode)
+    if (custom) return `Escala personalizada (Trabalha ${custom[1]}d / Folga ${custom[2]}d)`
     switch (mode) {
-      case "12x36": return "Escala 12x36 (Plantão 12h / Folga 36h)"
-      case "24x72": return "Escala 24x72 (Plantão 24h / Folga 72h)"
-      case "24x48": return "Escala 24x48 (Plantão 24h / Folga 48h)"
-      case "5x1": return "Escala 5x1 (Trabalha 5d / Folga 1d)"
-      case "6x1": return "Escala 6x1 (Trabalha 6d / Folga 1d)"
-      case "4x2": return "Escala 4x2 (Trabalha 4d / Folga 2d)"
-      default: return "Padrão (Folga aos Domingos)"
+      case "12x36":
+        return "Escala 12x36 (Plantão 12h / Folga 36h)"
+      case "24x72":
+        return "Escala 24x72 (Plantão 24h / Folga 72h)"
+      case "24x48":
+        return "Escala 24x48 (Plantão 24h / Folga 48h)"
+      case "5x1":
+        return "Escala 5x1 (Trabalha 5d / Folga 1d)"
+      case "6x1":
+        return "Escala 6x1 (Trabalha 6d / Folga 1d)"
+      case "4x2":
+        return "Escala 4x2 (Trabalha 4d / Folga 2d)"
+      default:
+        return "Padrão (Folga aos Domingos)"
     }
   }
 
@@ -291,13 +291,28 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
           </div>
 
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={handlePrevMonth} className="h-9 w-9 rounded-xl">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePrevMonth}
+              className="h-9 w-9 rounded-xl"
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={handleGoToday} className="h-9 rounded-xl text-xs font-bold">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGoToday}
+              className="h-9 rounded-xl text-xs font-bold"
+            >
               Hoje
             </Button>
-            <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-9 w-9 rounded-xl">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleNextMonth}
+              className="h-9 w-9 rounded-xl"
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -310,7 +325,8 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
-              <strong>{getScaleLabel(scheduleMode)}:</strong> Os estudos são zerados nos dias de plantão/trabalho e concentrados nas folgas!
+              <strong>{getScaleLabel(scheduleMode)}:</strong> Os estudos são zerados nos dias de
+              plantão/trabalho e concentrados nas folgas!
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -342,8 +358,8 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
         {/* Days of Week Header */}
         <div className="grid grid-cols-7 gap-1 mb-2 text-center">
           {daysOfWeek.map((day, idx) => (
-            <div 
-              key={day} 
+            <div
+              key={day}
               className={`py-2 text-xs font-extrabold uppercase tracking-wider ${
                 idx === 0 ? "text-rose-500" : "text-muted-foreground"
               }`}
@@ -357,32 +373,54 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
         <div className="grid grid-cols-7 gap-2">
           {calendarCells.map((cell) => {
             if (cell.isPadding) {
-              return <div key={cell.key} className="h-28 rounded-xl bg-muted/10 border border-transparent" />
+              return (
+                <div
+                  key={cell.key}
+                  className="h-28 rounded-xl bg-muted/10 border border-transparent"
+                />
+              )
             }
 
             const dayNum = cell.dayNum
             const isToday = isCurrentMonth && today.getDate() === dayNum
             const onShift = isShiftDay(dayNum)
             const dayDisciplines = getDisciplinesForDay(dayNum)
-            const totalMinutes = dayDisciplines.reduce((acc, b) => acc + (b?.durationMinutes || 0), 0)
-            const isScheduledBreak = scheduleMode === "normal" && !studyDays.includes(WEEKDAY_KEYS[new Date(year, month, dayNum).getDay()] ?? "")
-            let dayBadge = <span className="text-[9px] font-semibold text-muted-foreground">Folga</span>
+            const totalMinutes = dayDisciplines.reduce(
+              (acc, b) => acc + (b?.durationMinutes || 0),
+              0,
+            )
+            const isScheduledBreak =
+              scheduleMode === "normal" &&
+              !studyDays.includes(WEEKDAY_KEYS[new Date(year, month, dayNum).getDay()] ?? "")
+            let dayBadge = (
+              <span className="text-[9px] font-semibold text-muted-foreground">Folga</span>
+            )
             if (totalMinutes > 0) {
-              dayBadge = <span className="text-[10px] font-extrabold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">{formatHoursClean(totalMinutes)}</span>
+              dayBadge = (
+                <span className="text-[10px] font-extrabold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                  {formatHoursClean(totalMinutes)}
+                </span>
+              )
             }
             if (onShift && scheduleMode !== "normal") {
-              dayBadge = <span className="text-[9px] font-extrabold text-rose-500 bg-rose-500/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">🚨 Plantão</span>
+              dayBadge = (
+                <span className="text-[9px] font-extrabold text-rose-500 bg-rose-500/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                  🚨 Plantão
+                </span>
+              )
             }
 
             return (
               <div
                 key={cell.key}
-                onClick={() => setSelectedDayDetail({ dayNum, fullDate: new Date(year, month, dayNum) })}
+                onClick={() =>
+                  setSelectedDayDetail({ dayNum, fullDate: new Date(year, month, dayNum) })
+                }
                 className={`h-28 rounded-xl p-2 border transition-all cursor-pointer flex flex-col justify-between group ${getDayCellClass(isToday, onShift)}`}
               >
                 <div className="flex items-center justify-between">
                   <span
-                      className={`text-xs font-black w-6 h-6 rounded-full flex items-center justify-center ${getDayNumberClass(isToday, onShift)}`}
+                    className={`text-xs font-black w-6 h-6 rounded-full flex items-center justify-center ${getDayNumberClass(isToday, onShift)}`}
                   >
                     {dayNum}
                   </span>
@@ -440,7 +478,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               {selectedDayDetail?.fullDate.toLocaleDateString("pt-BR", {
                 weekday: "long",
                 day: "numeric",
-                month: "long"
+                month: "long",
               })}
             </DialogTitle>
           </DialogHeader>
@@ -450,7 +488,9 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               <>
                 {/* Botões de Alteração Rápida de Plantão / Folga */}
                 <div className="flex items-center gap-2 bg-muted p-2 rounded-xl">
-                  <span className="text-xs font-bold text-muted-foreground flex-1">Status deste Dia:</span>
+                  <span className="text-xs font-bold text-muted-foreground flex-1">
+                    Status deste Dia:
+                  </span>
                   <Button
                     size="sm"
                     variant={isShiftDay(selectedDayDetail.dayNum) ? "destructive" : "outline"}
@@ -472,55 +512,68 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                 {isShiftDay(selectedDayDetail.dayNum) && (
                   <div className="py-8 text-center space-y-2 bg-rose-500/10 rounded-2xl border border-rose-500/20">
                     <Briefcase className="w-8 h-8 text-rose-500 mx-auto" />
-                    <p className="text-sm font-bold text-rose-600 dark:text-rose-400">Dia de Plantão de 24 horas</p>
+                    <p className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                      Dia de Plantão de 24 horas
+                    </p>
                     <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                      Suas matérias de estudo foram remanejadas para os seus dias de folga da escala.
+                      Suas matérias de estudo foram remanejadas para os seus dias de folga da
+                      escala.
                     </p>
                   </div>
                 )}
-                {!isShiftDay(selectedDayDetail.dayNum) && getDisciplinesForDay(selectedDayDetail.dayNum).length === 0 && (
-                  <div className="py-8 text-center space-y-2">
-                    <BookOpen className="w-8 h-8 text-muted-foreground/40 mx-auto" />
-                    <p className="text-sm font-bold text-muted-foreground">Dia livre de estudos agendados!</p>
-                  </div>
-                )}
-                {!isShiftDay(selectedDayDetail.dayNum) && getDisciplinesForDay(selectedDayDetail.dayNum).length > 0 && (
-                  <div className="space-y-3">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-                      Disciplinas Programadas
-                    </span>
-                    {getDisciplinesForDay(selectedDayDetail.dayNum).map((disc) => (
-                      <div
-                        key={disc.id}
-                        className="p-3 border rounded-xl flex items-center justify-between bg-muted/20"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-2.5 h-8 rounded-full" style={{ backgroundColor: disc.color }} />
-                          <div>
-                            <h4 className="font-bold text-sm text-foreground">{disc.disciplineName}</h4>
-                            <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {disc.durationMinutes} minutos ({formatHoursClean(disc.durationMinutes)})
-                            </span>
-                          </div>
-                        </div>
-
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedDayDetail(null)
-                            toast.success(`Iniciando ${disc.disciplineName}`)
-                            router.push(`/dashboard/study-session?planId=${disc.id}`)
-                          }}
-                          className="font-bold text-xs rounded-xl"
+                {!isShiftDay(selectedDayDetail.dayNum) &&
+                  getDisciplinesForDay(selectedDayDetail.dayNum).length === 0 && (
+                    <div className="py-8 text-center space-y-2">
+                      <BookOpen className="w-8 h-8 text-muted-foreground/40 mx-auto" />
+                      <p className="text-sm font-bold text-muted-foreground">
+                        Dia livre de estudos agendados!
+                      </p>
+                    </div>
+                  )}
+                {!isShiftDay(selectedDayDetail.dayNum) &&
+                  getDisciplinesForDay(selectedDayDetail.dayNum).length > 0 && (
+                    <div className="space-y-3">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                        Disciplinas Programadas
+                      </span>
+                      {getDisciplinesForDay(selectedDayDetail.dayNum).map((disc) => (
+                        <div
+                          key={disc.id}
+                          className="p-3 border rounded-xl flex items-center justify-between bg-muted/20"
                         >
-                          <PlayCircle className="w-4 h-4 mr-1" />
-                          Estudar
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-2.5 h-8 rounded-full"
+                              style={{ backgroundColor: disc.color }}
+                            />
+                            <div>
+                              <h4 className="font-bold text-sm text-foreground">
+                                {disc.disciplineName}
+                              </h4>
+                              <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {disc.durationMinutes} minutos (
+                                {formatHoursClean(disc.durationMinutes)})
+                              </span>
+                            </div>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedDayDetail(null)
+                              toast.success(`Iniciando ${disc.disciplineName}`)
+                              router.push(`/dashboard/study-session?planId=${disc.id}`)
+                            }}
+                            className="font-bold text-xs rounded-xl"
+                          >
+                            <PlayCircle className="w-4 h-4 mr-1" />
+                            Estudar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
               </>
             )}
           </div>
@@ -529,4 +582,3 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     </div>
   )
 }
-

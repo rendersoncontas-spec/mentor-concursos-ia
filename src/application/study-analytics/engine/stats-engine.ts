@@ -369,15 +369,7 @@ export const STUDY_TYPE_LABELS: Record<string, string> = {
   OUTRO: "Outro",
 }
 
-export const WEEKDAY_LABELS = [
-  "Domingo",
-  "Segunda",
-  "Terça",
-  "Quarta",
-  "Quinta",
-  "Sexta",
-  "Sábado",
-]
+export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
 
 export const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 
@@ -396,7 +388,7 @@ export function dateKeyFromYmd(year: number, month: number, day: number): string
 /** Extrai { ano, mês, dia, hora, minuto } de um ISO em um timezone. */
 export function localParts(
   iso: string | null | undefined,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): { year: number; month: number; day: number; hour: number; minute: number } | null {
   if (!iso) return null
   const d = new Date(iso)
@@ -427,7 +419,7 @@ export function localParts(
 /** "YYYY-MM-DD" no timezone indicado. */
 export function dateKeyOf(
   iso: string | null | undefined,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): string | null {
   const p = localParts(iso, timezone)
   if (!p) return null
@@ -540,7 +532,10 @@ function safeStr(v: unknown): string | null {
   return s.length > 0 ? s : null
 }
 
-export function sanitizeSession(raw: Record<string, unknown>, isImported: boolean = false): SessionRecord | null {
+export function sanitizeSession(
+  raw: Record<string, unknown>,
+  isImported: boolean = false,
+): SessionRecord | null {
   const startedAt = safeStr(raw["started_at"])
   if (!startedAt || isNaN(new Date(startedAt).getTime())) return null
   const duration = safeInt(raw["duration_minutes"] ?? raw["active_minutes"] ?? 0)
@@ -550,18 +545,23 @@ export function sanitizeSession(raw: Record<string, unknown>, isImported: boolea
   let focusScore: number | null = null
   let focusPercentage: number | null = null
 
+  const meta = (raw["metadata"] as Record<string, unknown> | null) ?? {}
+  const rawFocusPct =
+    raw["focus_percentage"] !== undefined && raw["focus_percentage"] !== null
+      ? raw["focus_percentage"]
+      : meta["focus_percentage"]
+
+  if (rawFocusPct !== null && rawFocusPct !== undefined && rawFocusPct !== "") {
+    focusPercentage = Math.min(100, Math.max(0, safeInt(rawFocusPct)))
+  }
+
   if (!isImported) {
-    focusScore = raw["focus_score"] === null || raw["focus_score"] === undefined
-      ? null
-      : Math.min(5, Math.max(1, safeInt(raw["focus_score"]) || 3))
-    focusPercentage = raw["focus_percentage"] === null || raw["focus_percentage"] === undefined
-      ? null
-      : Math.min(100, safeInt(raw["focus_percentage"]))
-  } else {
-    // Para sessões importadas, apenas aceitamos se vier explicitamente no metadata
-    const meta = (raw["metadata"] as Record<string, unknown> | null) ?? {}
-    if (meta["focus_percentage"] !== undefined && meta["focus_percentage"] !== null) {
-      focusPercentage = Math.min(100, Math.max(0, safeInt(meta["focus_percentage"])))
+    const rawScore = raw["focus_score"]
+    if (rawScore !== null && rawScore !== undefined && rawScore !== "") {
+      const parsedScore = safeInt(rawScore)
+      if (parsedScore >= 1) {
+        focusScore = Math.min(5, Math.max(1, parsedScore))
+      }
     }
   }
 
@@ -573,13 +573,26 @@ export function sanitizeSession(raw: Record<string, unknown>, isImported: boolea
     startedAt,
     finishedAt: safeStr(raw["finished_at"]),
     durationMinutes: duration,
-    activeMinutes: raw["active_minutes"] === null || raw["active_minutes"] === undefined ? null : safeInt(raw["active_minutes"]),
-    pausedMinutes: raw["paused_minutes"] === null || raw["paused_minutes"] === undefined ? null : safeInt(raw["paused_minutes"]),
+    activeMinutes:
+      raw["active_minutes"] === null || raw["active_minutes"] === undefined
+        ? null
+        : safeInt(raw["active_minutes"]),
+    pausedMinutes:
+      raw["paused_minutes"] === null || raw["paused_minutes"] === undefined
+        ? null
+        : safeInt(raw["paused_minutes"]),
     completed: raw["completed"] === true || raw["completed"] === "true" || raw["completed"] === 1,
-    interrupted: raw["interrupted"] === true || raw["interrupted"] === "true" || raw["interrupted"] === 1,
+    interrupted:
+      raw["interrupted"] === true || raw["interrupted"] === "true" || raw["interrupted"] === 1,
     focusScore,
-    energyLevel: raw["energy_level"] === null || raw["energy_level"] === undefined ? null : safeInt(raw["energy_level"]),
-    difficulty: raw["difficulty"] === null || raw["difficulty"] === undefined ? null : safeInt(raw["difficulty"]),
+    energyLevel:
+      raw["energy_level"] === null || raw["energy_level"] === undefined
+        ? null
+        : safeInt(raw["energy_level"]),
+    difficulty:
+      raw["difficulty"] === null || raw["difficulty"] === undefined
+        ? null
+        : safeInt(raw["difficulty"]),
     studyType: safeStr(raw["study_type"]),
     studySource: safeStr(raw["study_source"]),
     pagesRead: safeInt(raw["pages_read"]),
@@ -588,7 +601,10 @@ export function sanitizeSession(raw: Record<string, unknown>, isImported: boolea
     flashcardsReviewed: safeInt(raw["flashcards_reviewed"]),
     topicName: safeStr(raw["topic_name"]),
     focusPercentage,
-    plannedMinutes: raw["planned_minutes"] === null || raw["planned_minutes"] === undefined ? null : safeInt(raw["planned_minutes"]),
+    plannedMinutes:
+      raw["planned_minutes"] === null || raw["planned_minutes"] === undefined
+        ? null
+        : safeInt(raw["planned_minutes"]),
     notes: safeStr(raw["notes"]),
     focusSound: safeStr(raw["focus_sound"]) || null,
   }
@@ -656,8 +672,10 @@ export function pausedMinutesOf(s: SessionRecord): number {
  *   2. focus_score (1-5) convertido: score * 20
  */
 export function focusPercentOf(s: SessionRecord): number | null {
-  if (s.focusPercentage !== null && s.focusPercentage !== undefined) return Math.min(100, Math.max(0, s.focusPercentage))
-  if (s.focusScore !== null && s.focusScore !== undefined) return Math.min(100, Math.max(0, s.focusScore * 20))
+  if (s.focusPercentage !== null && s.focusPercentage !== undefined)
+    return Math.min(100, Math.max(0, s.focusPercentage))
+  if (s.focusScore !== null && s.focusScore !== undefined)
+    return Math.min(100, Math.max(0, s.focusScore * 20))
   return null
 }
 
@@ -707,7 +725,11 @@ export function emptyAggregatedTotals(): AggregatedTotals {
   }
 }
 
-export function addSessionToTotals(t: AggregatedTotals, s: SessionRecord, dateKey: string | null): void {
+export function addSessionToTotals(
+  t: AggregatedTotals,
+  s: SessionRecord,
+  dateKey: string | null,
+): void {
   t.minutes += s.durationMinutes
   t.activeMinutes += activeMinutesOf(s)
   t.pausedMinutes += pausedMinutesOf(s)
@@ -754,7 +776,7 @@ export function buildDayBuckets(
   attempts: QuestionAttemptRecord[],
   days: number,
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): DailyBucket[] {
   const keys = lastNDays(days, now, timezone)
   return buildDayBucketsFromKeys(sessions, attempts, keys, timezone)
@@ -769,7 +791,7 @@ export function buildDayBucketsFromKeys(
   sessions: SessionRecord[],
   attempts: QuestionAttemptRecord[],
   keys: string[],
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): DailyBucket[] {
   const byDate = new Map<string, DailyBucket>()
   const base: Omit<DailyBucket, "date"> = {
@@ -889,7 +911,7 @@ export function slicesOfBuckets(buckets: DailyBucket[], days: number): DailyBuck
 export function computeTimeCards(
   buckets: DailyBucket[],
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): TimeCardStatistics {
   const today = todayKey(now, timezone)
   const total = aggregateBuckets(buckets)
@@ -981,7 +1003,7 @@ export interface QuestionStatistics {
 
 export function computeQuestionStatistics(
   sessions: SessionRecord[],
-  attempts: QuestionAttemptRecord[]
+  attempts: QuestionAttemptRecord[],
 ): QuestionStatistics {
   const fromSessions = sessions.reduce((acc, s) => acc + s.questionsAnswered, 0)
   const correctSessions = sessions.reduce((acc, s) => acc + s.questionsCorrect, 0)
@@ -1068,7 +1090,11 @@ export function computePagesStatistics(sessions: SessionRecord[]): PagesStatisti
  * ontem (um dia ainda sem estudo não quebra a sequência de hoje). Sequência
  * máxima = maior corrida de dias seguidos no período.
  */
-export function computeStreaks(days: Set<string>, now: Date, timezone: string = DEFAULT_TIMEZONE): StreakStatistics {
+export function computeStreaks(
+  days: Set<string>,
+  now: Date,
+  timezone: string = DEFAULT_TIMEZONE,
+): StreakStatistics {
   const today = todayKey(now, timezone)
   const yesterday = addDaysToKey(today, -1)
   const anchors: string[] = []
@@ -1105,17 +1131,39 @@ export function computeStreaks(days: Set<string>, now: Date, timezone: string = 
   return { current, currentEndsToday: todayStudied, longest }
 }
 
-export function computeFrequency(buckets: DailyBucket[], now: Date, timezone: string = DEFAULT_TIMEZONE) {
-  const last7 = new Set(buckets.slice(-7).filter((b) => b.minutes > 0).map((b) => b.date))
-  const last30 = new Set(buckets.slice(-30).filter((b) => b.minutes > 0).map((b) => b.date))
-  const last90 = new Set(buckets.slice(-90).filter((b) => b.minutes > 0).map((b) => b.date))
+export function computeFrequency(
+  buckets: DailyBucket[],
+  now: Date,
+  timezone: string = DEFAULT_TIMEZONE,
+) {
+  const last7 = new Set(
+    buckets
+      .slice(-7)
+      .filter((b) => b.minutes > 0)
+      .map((b) => b.date),
+  )
+  const last30 = new Set(
+    buckets
+      .slice(-30)
+      .filter((b) => b.minutes > 0)
+      .map((b) => b.date),
+  )
+  const last90 = new Set(
+    buckets
+      .slice(-90)
+      .filter((b) => b.minutes > 0)
+      .map((b) => b.date),
+  )
   const total = new Set(buckets.filter((b) => b.minutes > 0).map((b) => b.date))
   const today = todayKey(now, timezone)
   const gapDays: string[] = []
   const keys = lastNDays(14, now, timezone)
   let lastStudy: string | null = null
-  const studied = buckets.filter((b) => b.minutes > 0).map((b) => b.date).sort()
-  lastStudy = studied.length > 0 ? studied[studied.length - 1] ?? null : null
+  const studied = buckets
+    .filter((b) => b.minutes > 0)
+    .map((b) => b.date)
+    .sort()
+  lastStudy = studied.length > 0 ? (studied[studied.length - 1] ?? null) : null
 
   keys.forEach((k) => {
     if (!total.has(k)) gapDays.push(k)
@@ -1181,7 +1229,13 @@ export function classifyDiscipline(d: {
   const q = d.questions
   const acc = d.accuracy
   const days = d.daysSince
-  if (q >= DOMINADO_MIN_QUESTIONS && acc !== null && acc >= DOMINADO_MIN_ACCURACY && days !== null && days <= DOMINADO_MAX_DAYS_SINCE) {
+  if (
+    q >= DOMINADO_MIN_QUESTIONS &&
+    acc !== null &&
+    acc >= DOMINADO_MIN_ACCURACY &&
+    days !== null &&
+    days <= DOMINADO_MAX_DAYS_SINCE
+  ) {
     return "DOMINADO"
   }
   if (!d.studied) return "CRITICO"
@@ -1214,7 +1268,8 @@ export function computeAttentionScore(d: {
 
   const accScore = d.accuracy === null ? 0.5 : 1 - d.accuracy / 100
   score += accScore * 30
-  if (d.accuracy !== null && d.accuracy < ATENCAO_MIN_ACCURACY) reasons.push(`Acurácia de ${Math.round(d.accuracy)}% abaixo de ${ATENCAO_MIN_ACCURACY}%`)
+  if (d.accuracy !== null && d.accuracy < ATENCAO_MIN_ACCURACY)
+    reasons.push(`Acurácia de ${Math.round(d.accuracy)}% abaixo de ${ATENCAO_MIN_ACCURACY}%`)
 
   const errScore = Math.min(d.wrong / 25, 1)
   score += errScore * 15
@@ -1270,7 +1325,7 @@ export function computeDisciplineStats(
   overdueByDiscipline: Map<string, number>,
   totalMinutesAll: number,
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): DisciplineStat[] {
   const statusByDiscipline = new Map(userDisciplines.map((u) => [u.disciplineId, u.status]))
   const groups = new Map<string, SessionRecord[]>()
@@ -1285,8 +1340,14 @@ export function computeDisciplineStats(
   const result: DisciplineStat[] = []
 
   groups.forEach((list, key) => {
-    const name = (disciplineRegistry.get(key)?.name ?? list.find((s) => s.disciplineName)?.disciplineName) ?? "Sem disciplina"
-    const area = disciplineRegistry.get(key)?.area ?? list.find((s) => s.disciplineArea)?.disciplineArea ?? null
+    const name =
+      disciplineRegistry.get(key)?.name ??
+      list.find((s) => s.disciplineName)?.disciplineName ??
+      "Sem disciplina"
+    const area =
+      disciplineRegistry.get(key)?.area ??
+      list.find((s) => s.disciplineArea)?.disciplineArea ??
+      null
     const minutes = list.reduce((acc, s) => acc + s.durationMinutes, 0)
     const activeMinutes = list.reduce((acc, s) => acc + activeMinutesOf(s), 0)
     const questions = list.reduce((acc, s) => acc + s.questionsAnswered, 0)
@@ -1299,9 +1360,11 @@ export function computeDisciplineStats(
     const dated = list
       .map((s) => ({ iso: s.startedAt, minutes: s.durationMinutes }))
       .sort((a, b) => a.iso.localeCompare(b.iso))
-    const lastStudiedIso = dated.length > 0 ? dated[dated.length - 1]?.iso ?? null : null
+    const lastStudiedIso = dated.length > 0 ? (dated[dated.length - 1]?.iso ?? null) : null
     const lastStudiedDate = lastStudiedIso ? dateKeyOf(lastStudiedIso, timezone) : null
-    const daysSince = lastStudiedDate ? daysBetweenKeys(lastStudiedDate, todayKey(now, timezone)) : null
+    const daysSince = lastStudiedDate
+      ? daysBetweenKeys(lastStudiedDate, todayKey(now, timezone))
+      : null
 
     const half = Math.floor(dated.length / 2)
     const firstHalfMinutes = dated.slice(0, half).reduce((acc, d) => acc + d.minutes, 0)
@@ -1368,7 +1431,7 @@ export function computeDisciplineStats(
 export function computeTopicStats(
   sessions: SessionRecord[],
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): TopicStat[] {
   const groups = new Map<string, SessionRecord[]>()
   sessions.forEach((s) => {
@@ -1388,9 +1451,15 @@ export function computeTopicStats(
     const focusSum = list.reduce((acc, s) => acc + (focusPercentOf(s) ?? 0), 0)
     const focusCount = list.reduce((acc, s) => acc + (focusPercentOf(s) !== null ? 1 : 0), 0)
     const pages = list.reduce((acc, s) => acc + s.pagesRead, 0)
-    const lastIso = list.map((s) => s.startedAt).sort().slice(-1)[0] ?? null
+    const lastIso =
+      list
+        .map((s) => s.startedAt)
+        .sort()
+        .slice(-1)[0] ?? null
     const lastStudiedDate = lastIso ? dateKeyOf(lastIso, timezone) : null
-    const daysSince = lastStudiedDate ? daysBetweenKeys(lastStudiedDate, todayKey(now, timezone)) : null
+    const daysSince = lastStudiedDate
+      ? daysBetweenKeys(lastStudiedDate, todayKey(now, timezone))
+      : null
     const accuracy = questions > 0 ? (correct / questions) * 100 : null
 
     result.push({
@@ -1407,7 +1476,12 @@ export function computeTopicStats(
       pages,
       lastStudiedDate,
       daysSinceLastStudy: daysSince,
-      classification: classifyDiscipline({ questions, accuracy, daysSince, studied: list.length > 0 }),
+      classification: classifyDiscipline({
+        questions,
+        accuracy,
+        daysSince,
+        studied: list.length > 0,
+      }),
     })
   })
 
@@ -1421,13 +1495,61 @@ export function computeTopicStats(
 export function computeHoursOfDay(
   sessions: SessionRecord[],
   attempts: QuestionAttemptRecord[],
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): HourBucket[] {
   const buckets: HourBucket[] = [
-    { period: "MADRUGADA", label: "Madrugada (00h-06h)", minutes: 0, activeMinutes: 0, sessions: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, focusAvg: null, best: false },
-    { period: "MANHA", label: "Manhã (06h-12h)", minutes: 0, activeMinutes: 0, sessions: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, focusAvg: null, best: false },
-    { period: "TARDE", label: "Tarde (12h-18h)", minutes: 0, activeMinutes: 0, sessions: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, focusAvg: null, best: false },
-    { period: "NOITE", label: "Noite (18h-00h)", minutes: 0, activeMinutes: 0, sessions: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, focusAvg: null, best: false },
+    {
+      period: "MADRUGADA",
+      label: "Madrugada (00h-06h)",
+      minutes: 0,
+      activeMinutes: 0,
+      sessions: 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      focusAvg: null,
+      best: false,
+    },
+    {
+      period: "MANHA",
+      label: "Manhã (06h-12h)",
+      minutes: 0,
+      activeMinutes: 0,
+      sessions: 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      focusAvg: null,
+      best: false,
+    },
+    {
+      period: "TARDE",
+      label: "Tarde (12h-18h)",
+      minutes: 0,
+      activeMinutes: 0,
+      sessions: 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      focusAvg: null,
+      best: false,
+    },
+    {
+      period: "NOITE",
+      label: "Noite (18h-00h)",
+      minutes: 0,
+      activeMinutes: 0,
+      sessions: 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      focusAvg: null,
+      best: false,
+    },
   ]
   const index = (hour: number): number => {
     if (hour >= 18) return 3
@@ -1535,7 +1657,7 @@ const MIN_MINUTES_FOR_BEST = 60
 export function computeTimeOfDayAnalysis(
   sessions: SessionRecord[],
   attempts: QuestionAttemptRecord[],
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): TimeOfDayAnalysis {
   const buckets: TimeOfDayBucket[] = TIME_OF_DAY_PERIODS.map((p) => ({
     period: p.period,
@@ -1626,12 +1748,16 @@ export function computeTimeOfDayAnalysis(
   if (!anyWithSessions) {
     notEnoughDataMessage = "Ainda não temos dados suficientes para identificar seu melhor horário."
   } else if (eligibleForBest.length === 0) {
-    notEnoughDataMessage = "Continue estudando. Assim que tivermos dados suficientes, identificaremos seu melhor horário."
+    notEnoughDataMessage =
+      "Continue estudando. Assim que tivermos dados suficientes, identificaremos seu melhor horário."
   } else {
     hasEnoughData = true
   }
 
-  const sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions = (a: TimeOfDayBucket, b: TimeOfDayBucket): number => {
+  const sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions = (
+    a: TimeOfDayBucket,
+    b: TimeOfDayBucket,
+  ): number => {
     const aFocus = a.focusAvg ?? -1
     const bFocus = b.focusAvg ?? -1
     const focusClose = Math.abs(aFocus - bFocus) <= 2
@@ -1644,7 +1770,10 @@ export function computeTimeOfDayAnalysis(
     return b.sessions - a.sessions
   }
 
-  const sortByAccuracyThenQuestionsThenTimeThenSessions = (a: TimeOfDayBucket, b: TimeOfDayBucket): number => {
+  const sortByAccuracyThenQuestionsThenTimeThenSessions = (
+    a: TimeOfDayBucket,
+    b: TimeOfDayBucket,
+  ): number => {
     const aAcc = a.accuracy ?? -1
     const bAcc = b.accuracy ?? -1
     if (aAcc !== bAcc) return bAcc - aAcc
@@ -1660,7 +1789,9 @@ export function computeTimeOfDayAnalysis(
   if (hasEnoughData) {
     const focusEligible = eligibleForBest.filter((b) => b.focusAvg !== null)
     if (focusEligible.length > 0) {
-      const sorted = [...focusEligible].sort(sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions)
+      const sorted = [...focusEligible].sort(
+        sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions,
+      )
       bestByFocus = sorted[0] ?? null
     }
 
@@ -1670,7 +1801,9 @@ export function computeTimeOfDayAnalysis(
       bestByAccuracy = sorted[0] ?? null
     }
 
-    const overallSorted = [...eligibleForBest].sort(sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions)
+    const overallSorted = [...eligibleForBest].sort(
+      sortByFocusThenAccuracyThenQuestionsThenTimeThenSessions,
+    )
     overallBest = overallSorted[0] ?? null
   }
 
@@ -1714,11 +1847,9 @@ export function computeTimeOfDayAnalysis(
 // EU VS EU (COMPARAÇÕES)
 // ---------------------------------------------------------------------------
 
-function cmp(
-  current: number | null,
-  previous: number | null
-): MetricComparison {
-  if (current === null && previous === null) return { current: null, previous: null, delta: null, deltaPct: null }
+function cmp(current: number | null, previous: number | null): MetricComparison {
+  if (current === null && previous === null)
+    return { current: null, previous: null, delta: null, deltaPct: null }
   const c = current ?? 0
   const p = previous ?? 0
   const delta = c - p
@@ -1727,14 +1858,15 @@ function cmp(
 }
 
 function cmpPp(current: number | null, previous: number | null): MetricComparison {
-  if (current === null || previous === null) return { current, previous, delta: null, deltaPct: null }
+  if (current === null || previous === null)
+    return { current, previous, delta: null, deltaPct: null }
   return { current, previous, delta: current - previous, deltaPct: null }
 }
 
 export function computeComparisons(
   buckets: DailyBucket[],
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): ComparisonRow[] {
   const rows: ComparisonRow[] = []
   const today = todayKey(now, timezone)
@@ -1746,24 +1878,39 @@ export function computeComparisons(
     detail: string,
     curKeys: string[],
     prevKeys: string[],
-    avgDaily: boolean
+    avgDaily: boolean,
   ) => {
-    const a = curKeys.length > 0 ? aggregateBuckets(curKeys.map((k) => byDate.get(k)).filter((b): b is DailyBucket => !!b)) : null
-    const b = prevKeys.length > 0 ? aggregateBuckets(prevKeys.map((k) => byDate.get(k)).filter((x): x is DailyBucket => !!x)) : null
-    const curMin = avgDaily && a && a.studiedDays.size > 0 ? a.minutes / a.studiedDays.size : a?.minutes ?? null
-    const prevMin = avgDaily && b && b.studiedDays.size > 0 ? b.minutes / b.studiedDays.size : b?.minutes ?? null
+    const a =
+      curKeys.length > 0
+        ? aggregateBuckets(curKeys.map((k) => byDate.get(k)).filter((b): b is DailyBucket => !!b))
+        : null
+    const b =
+      prevKeys.length > 0
+        ? aggregateBuckets(prevKeys.map((k) => byDate.get(k)).filter((x): x is DailyBucket => !!x))
+        : null
+    const curMin =
+      avgDaily && a && a.studiedDays.size > 0
+        ? a.minutes / a.studiedDays.size
+        : (a?.minutes ?? null)
+    const prevMin =
+      avgDaily && b && b.studiedDays.size > 0
+        ? b.minutes / b.studiedDays.size
+        : (b?.minutes ?? null)
     rows.push({
       id,
       label,
       detail,
       metrics: {
         minutes: cmp(curMin, prevMin),
-        questions: avgDaily && a && b
-          ? cmp(
-              a.studiedDays.size > 0 && b.studiedDays.size > 0 ? a.questions / (a.studiedDays.size || 1) : null,
-              b.questions / (b.studiedDays.size || 1)
-            )
-          : cmp(a?.questions ?? null, b?.questions ?? null),
+        questions:
+          avgDaily && a && b
+            ? cmp(
+                a.studiedDays.size > 0 && b.studiedDays.size > 0
+                  ? a.questions / (a.studiedDays.size || 1)
+                  : null,
+                b.questions / (b.studiedDays.size || 1),
+              )
+            : cmp(a?.questions ?? null, b?.questions ?? null),
         accuracy: a && b ? cmpPp(a.accuracy, b.accuracy) : cmpPp(null, null),
         focus: a && b ? cmpPp(a.focusAvg, b.focusAvg) : cmpPp(null, null),
         pages: cmp(a?.pages ?? null, b?.pages ?? null),
@@ -1774,7 +1921,14 @@ export function computeComparisons(
   }
 
   const studiedKeys = buckets.filter((b) => b.minutes > 0).map((b) => b.date)
-  addRow("today_vs_avg", "Hoje", "Hoje (parcial) vs média por dia estudado no período", [today], studiedKeys, true)
+  addRow(
+    "today_vs_avg",
+    "Hoje",
+    "Hoje (parcial) vs média por dia estudado no período",
+    [today],
+    studiedKeys,
+    true,
+  )
 
   const monday = mondayKeyOf(today)
   const weekKeys = monday ? keysBetween(monday, today) : [today]
@@ -1786,19 +1940,35 @@ export function computeComparisons(
     "Segunda até hoje vs os 7 dias anteriores",
     weekKeys,
     prevWeekStart && prevWeekEnd ? keysBetween(prevWeekStart, prevWeekEnd) : [],
-    false
+    false,
   )
 
   const parts = localParts(now.toISOString(), timezone)
   const curMonthKey = parts ? monthKeyFromYmd(parts.year, parts.month) : monthKeyOf(today)
   const prevMonthKey = addMonthsToKey(curMonthKey, -1)
   const curMonthKeys = buckets.filter((b) => monthKeyOf(b.date) === curMonthKey).map((b) => b.date)
-  const prevMonthKeys = buckets.filter((b) => monthKeyOf(b.date) === prevMonthKey).map((b) => b.date)
-  addRow("month_vs_prev", "Mês atual", "Mês corrido vs mês anterior completo", curMonthKeys, prevMonthKeys, false)
+  const prevMonthKeys = buckets
+    .filter((b) => monthKeyOf(b.date) === prevMonthKey)
+    .map((b) => b.date)
+  addRow(
+    "month_vs_prev",
+    "Mês atual",
+    "Mês corrido vs mês anterior completo",
+    curMonthKeys,
+    prevMonthKeys,
+    false,
+  )
 
   const last30Keys = buckets.slice(-30).map((b) => b.date)
   const prev30Keys = buckets.slice(-60, -30).map((b) => b.date)
-  addRow("30_vs_prev30", "Últimos 30 dias", "Janela móvel de 30 dias vs os 30 anteriores", last30Keys, prev30Keys, false)
+  addRow(
+    "30_vs_prev30",
+    "Últimos 30 dias",
+    "Janela móvel de 30 dias vs os 30 anteriores",
+    last30Keys,
+    prev30Keys,
+    false,
+  )
 
   return rows
 }
@@ -1811,7 +1981,7 @@ export function computePlanning(
   plan: ActivePlan | null,
   buckets: DailyBucket[],
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): PlanningStatistics {
   if (!plan || plan.items.length === 0) {
     return {
@@ -1897,7 +2067,7 @@ export function computeRevisionStatistics(
   items: ReviewItemRow[],
   completedLast30: number,
   now: Date,
-  disciplineRegistry: Map<string, DisciplineMeta>
+  disciplineRegistry: Map<string, DisciplineMeta>,
 ): RevisionStatistics {
   const todayIso = now.toISOString().slice(0, 10)
   let total = 0
@@ -1907,7 +2077,10 @@ export function computeRevisionStatistics(
 
   const byDiscipline = new Map<string, RevisionDisciplineStat>()
 
-  const addToDiscipline = (disciplineId: string | null, key: "overdue" | "dueToday" | "upcoming") => {
+  const addToDiscipline = (
+    disciplineId: string | null,
+    key: "overdue" | "dueToday" | "upcoming",
+  ) => {
     const id = disciplineId ?? ""
     let entry = byDiscipline.get(id)
     if (!entry) {
@@ -1951,7 +2124,9 @@ export function computeRevisionStatistics(
     upcoming,
     completedLast30: done,
     completionRate,
-    byDiscipline: [...byDiscipline.values()].sort((a, b) => b.overdue - a.overdue || b.dueSoon - a.dueSoon),
+    byDiscipline: [...byDiscipline.values()].sort(
+      (a, b) => b.overdue - a.overdue || b.dueSoon - a.dueSoon,
+    ),
   }
 }
 
@@ -1963,7 +2138,7 @@ export function computeEditalCoverage(
   userDisciplines: UserDisciplineInput[],
   disciplineStats: DisciplineStat[],
   disciplineRegistry: Map<string, DisciplineMeta>,
-  _now: Date
+  _now: Date,
 ): EditalCoverage {
   const statsByDiscipline = new Map(disciplineStats.map((d) => [d.disciplineId, d]))
 
@@ -1978,23 +2153,31 @@ export function computeEditalCoverage(
     return true
   })
 
-  const byDiscipline: EditalDisciplineStat[] = uniqueUserDisciplines.map((u) => {
-    const meta = disciplineRegistry.get(u.disciplineId)
-    const stats = statsByDiscipline.get(u.disciplineId)
-    return {
-      disciplineId: u.disciplineId,
-      name: meta?.name ?? stats?.name ?? "Sem disciplina",
-      area: meta?.area ?? stats?.area ?? null,
-      status: u.status ?? "NOT_STARTED",
-      studiedMinutes: stats?.minutes ?? 0,
-      daysSinceLastStudy: stats?.daysSinceLastStudy ?? null,
-    }
-  }).sort((a, b) => (b.studiedMinutes - a.studiedMinutes) || (a.name.localeCompare(b.name)))
+  const byDiscipline: EditalDisciplineStat[] = uniqueUserDisciplines
+    .map((u) => {
+      const meta = disciplineRegistry.get(u.disciplineId)
+      const stats = statsByDiscipline.get(u.disciplineId)
+      return {
+        disciplineId: u.disciplineId,
+        name: meta?.name ?? stats?.name ?? "Sem disciplina",
+        area: meta?.area ?? stats?.area ?? null,
+        status: u.status ?? "NOT_STARTED",
+        studiedMinutes: stats?.minutes ?? 0,
+        daysSinceLastStudy: stats?.daysSinceLastStudy ?? null,
+      }
+    })
+    .sort((a, b) => b.studiedMinutes - a.studiedMinutes || a.name.localeCompare(b.name))
 
   const total = byDiscipline.length
-  const completed = byDiscipline.filter((d) => d.status === "CONCLUIDA" || d.status === "COMPLETED" || d.status === "CONCLUÍDA").length
-  const studying = byDiscipline.filter((d) => d.status === "EM_ESTUDO" || d.status === "STUDYING").length
-  const revising = byDiscipline.filter((d) => d.status === "EM_REVISAO" || d.status === "REVISING").length
+  const completed = byDiscipline.filter(
+    (d) => d.status === "CONCLUIDA" || d.status === "COMPLETED" || d.status === "CONCLUÍDA",
+  ).length
+  const studying = byDiscipline.filter(
+    (d) => d.status === "EM_ESTUDO" || d.status === "STUDYING",
+  ).length
+  const revising = byDiscipline.filter(
+    (d) => d.status === "EM_REVISAO" || d.status === "REVISING",
+  ).length
   const notStarted = byDiscipline.filter((d) => d.status === "NOT_STARTED").length
 
   return {
@@ -2026,10 +2209,13 @@ export function computeProductivity(
   sessions: SessionRecord[],
   questionStats: QuestionStatistics,
   focusPct: number | null,
-  studiedDaysLast7: number
+  studiedDaysLast7: number,
 ): ProductivityStatistics {
   if (sessions.length === 0) {
-    return { score: null, breakdown: { activeRatioScore: 0, accuracyScore: 0, focusScore: 0, consistencyScore: 0 } }
+    return {
+      score: null,
+      breakdown: { activeRatioScore: 0, accuracyScore: 0, focusScore: 0, consistencyScore: 0 },
+    }
   }
 
   const totalDuration = sessions.reduce((acc, s) => acc + s.durationMinutes, 0)
@@ -2037,7 +2223,8 @@ export function computeProductivity(
   const activeRatioScore = totalDuration > 0 ? totalActive / totalDuration : 0
 
   const hasAccuracy = questionStats.total >= 5
-  const accuracyScore = hasAccuracy && questionStats.accuracy !== null ? questionStats.accuracy / 100 : null
+  const accuracyScore =
+    hasAccuracy && questionStats.accuracy !== null ? questionStats.accuracy / 100 : null
   const focusScore = focusPct !== null ? focusPct / 100 : null
   const consistencyScore = studiedDaysLast7 / 7
 
@@ -2045,7 +2232,11 @@ export function computeProductivity(
   if (sessions.length < 3) {
     score = null
   } else if (hasAccuracy) {
-    score = activeRatioScore * 40 + (accuracyScore ?? 0) * 30 + (focusScore ?? 0) * 20 + consistencyScore * 10
+    score =
+      activeRatioScore * 40 +
+      (accuracyScore ?? 0) * 30 +
+      (focusScore ?? 0) * 20 +
+      consistencyScore * 10
   } else {
     score = activeRatioScore * 40 + (focusScore ?? 0) * 45 + consistencyScore * 15
   }
@@ -2095,13 +2286,19 @@ export function generateInsights(input: InsightInput): Insight[] {
       id: "poucas_sessoes",
       severity: "info",
       title: "Ainda poucos dados",
-      message: "Complete ao menos 3 sessões de estudo para que a análise comece a produzir recomendações personalizadas.",
+      message:
+        "Complete ao menos 3 sessões de estudo para que a análise comece a produzir recomendações personalizadas.",
     })
     return insights
   }
 
   const minToday = todayRow?.metrics.minutes
-  if (minToday && minToday.current !== null && minToday.previous !== null && minToday.previous > 0) {
+  if (
+    minToday &&
+    minToday.current !== null &&
+    minToday.previous !== null &&
+    minToday.previous > 0
+  ) {
     if (minToday.current >= minToday.previous * 1.2) {
       insights.push({
         id: "hoje_acima",
@@ -2114,7 +2311,8 @@ export function generateInsights(input: InsightInput): Insight[] {
         id: "hoje_abaixo",
         severity: "warning",
         title: "Começo de dia lento",
-        message: "Você está abaixo de 50% da sua média diária. Uma sessão de 25 minutos já recoloca o ritmo.",
+        message:
+          "Você está abaixo de 50% da sua média diária. Uma sessão de 25 minutos já recoloca o ritmo.",
       })
     }
   }
@@ -2124,10 +2322,9 @@ export function generateInsights(input: InsightInput): Insight[] {
       id: "streak",
       severity: "positive",
       title: `Sequência de ${input.streaks.current} dias`,
-      message:
-        input.streaks.currentEndsToday
-          ? "Você está em plena sequência de estudos. Mantenha o hábito hoje!"
-          : `Você manteve ${input.streaks.current} dias consecutivos. Sua maior sequência foi de ${input.streaks.longest} dias.`,
+      message: input.streaks.currentEndsToday
+        ? "Você está em plena sequência de estudos. Mantenha o hábito hoje!"
+        : `Você manteve ${input.streaks.current} dias consecutivos. Sua maior sequência foi de ${input.streaks.longest} dias.`,
     })
   }
 
@@ -2226,7 +2423,8 @@ export function generateInsights(input: InsightInput): Insight[] {
       id: "revisoes_atrasadas",
       severity: "danger",
       title: `${input.revision.overdue} revisões atrasadas`,
-      message: "Revisões atrasadas aceleram o esquecimento. Reserve 15 minutos para zerar a fila de revisões.",
+      message:
+        "Revisões atrasadas aceleram o esquecimento. Reserve 15 minutos para zerar a fila de revisões.",
     })
   } else if (input.revision.totalPending > 0) {
     insights.push({
@@ -2237,7 +2435,9 @@ export function generateInsights(input: InsightInput): Insight[] {
     })
   }
 
-  const priority = input.disciplineStats.slice().sort((a, b) => b.attentionScore - a.attentionScore)[0]
+  const priority = input.disciplineStats
+    .slice()
+    .sort((a, b) => b.attentionScore - a.attentionScore)[0]
   if (priority && priority.attentionScore >= 40) {
     insights.push({
       id: "prioridade",
@@ -2256,7 +2456,9 @@ export function generateInsights(input: InsightInput): Insight[] {
     })
   }
 
-  const bestPeriod = input.hoursOfDay.filter((h) => h.minutes > 0).sort((a, b) => b.accuracy ?? -1 - (a.accuracy ?? -1))
+  const bestPeriod = input.hoursOfDay
+    .filter((h) => h.minutes > 0)
+    .sort((a, b) => b.accuracy ?? -1 - (a.accuracy ?? -1))
   void bestPeriod
 
   if (input.productivity.score !== null && monthRow) {
@@ -2287,7 +2489,7 @@ export function generateInsights(input: InsightInput): Insight[] {
 
 export function computePriorities(
   disciplineStats: DisciplineStat[],
-  _revisionStats: RevisionStatistics
+  _revisionStats: RevisionStatistics,
 ): PriorityItem[] {
   return disciplineStats
     .map((d) => {
@@ -2335,7 +2537,7 @@ function reportDeltaText(delta: number | null, isPct: boolean, invert: boolean):
 export function computeWeeklyReport(
   buckets: DailyBucket[],
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): ReportRow[] {
   const today = todayKey(now, timezone)
   const last7Start = addDaysToKey(today, -6)
@@ -2343,7 +2545,8 @@ export function computeWeeklyReport(
   const prevEnd = last7Start ? addDaysToKey(last7Start, -1) : null
 
   const cur = last7Start ? buckets.filter((b) => b.date >= last7Start && b.date <= today) : []
-  const prev = prevStart && prevEnd ? buckets.filter((b) => b.date >= prevStart && b.date <= prevEnd) : []
+  const prev =
+    prevStart && prevEnd ? buckets.filter((b) => b.date >= prevStart && b.date <= prevEnd) : []
   const a = aggregateBuckets(cur)
   const b = aggregateBuckets(prev)
 
@@ -2382,7 +2585,7 @@ export function computeWeeklyReport(
     deltaLabel: reportDeltaText(
       accCur !== null && accPrev !== null ? accCur - accPrev : null,
       true,
-      false
+      false,
     ),
     positive: accCur !== null && accPrev !== null && accCur >= accPrev,
   })
@@ -2407,10 +2610,12 @@ export function computeWeeklyReport(
 export function computeMonthlyReport(
   buckets: DailyBucket[],
   now: Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
 ): ReportRow[] {
   const parts = localParts(now.toISOString(), timezone)
-  const curMonth = parts ? monthKeyFromYmd(parts.year, parts.month) : monthKeyOf(todayKey(now, timezone))
+  const curMonth = parts
+    ? monthKeyFromYmd(parts.year, parts.month)
+    : monthKeyOf(todayKey(now, timezone))
   const prevMonth = addMonthsToKey(curMonth, -1)
   const cur = buckets.filter((b) => monthKeyOf(b.date) === curMonth)
   const prev = buckets.filter((b) => monthKeyOf(b.date) === prevMonth)
@@ -2460,7 +2665,7 @@ export function computeMonthlyReport(
     deltaLabel: reportDeltaText(
       a.accuracy !== null && b.accuracy !== null ? a.accuracy - b.accuracy : null,
       true,
-      false
+      false,
     ),
     positive: a.accuracy !== null && b.accuracy !== null && a.accuracy >= b.accuracy,
   })
@@ -2469,7 +2674,11 @@ export function computeMonthlyReport(
     label: "Foco médio",
     current: a.focusAvg !== null ? `${Math.round(a.focusAvg)}%` : "—",
     previous: b.focusAvg !== null ? `${Math.round(b.focusAvg)}%` : "—",
-    deltaLabel: reportDeltaText(a.focusAvg !== null && b.focusAvg !== null ? a.focusAvg - b.focusAvg : null, true, false),
+    deltaLabel: reportDeltaText(
+      a.focusAvg !== null && b.focusAvg !== null ? a.focusAvg - b.focusAvg : null,
+      true,
+      false,
+    ),
     positive: a.focusAvg !== null && b.focusAvg !== null && a.focusAvg >= b.focusAvg,
   })
   rows.push({
@@ -2508,7 +2717,10 @@ export interface HeatmapCell {
  */
 export function buildHeatmap(buckets: DailyBucket[], days: number): HeatmapCell[] {
   const slice = slicesOfBuckets(buckets, days)
-  const values = slice.filter((b) => b.minutes > 0).map((b) => b.minutes).sort((a, b) => a - b)
+  const values = slice
+    .filter((b) => b.minutes > 0)
+    .map((b) => b.minutes)
+    .sort((a, b) => a - b)
   const q25 = values[Math.floor(values.length * 0.25)] ?? 0
   const q50 = values[Math.floor(values.length * 0.5)] ?? 0
   const q75 = values[Math.floor(values.length * 0.75)] ?? 0
@@ -2549,14 +2761,18 @@ export function formatBRDate(key: string): string {
   return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`
 }
 
-export function formatSmartDate(key: string, now: Date, timezone: string = DEFAULT_TIMEZONE): string {
+export function formatSmartDate(
+  key: string,
+  now: Date,
+  timezone: string = DEFAULT_TIMEZONE,
+): string {
   const today = todayKey(now, timezone)
   const diff = daysBetweenKeys(key, today)
   if (diff === 0) return "Hoje"
   if (diff === 1) return "Ontem"
   if (diff > 1 && diff <= 6) {
     const dow = weekdayOfKey(key)
-    return dow !== null ? WEEKDAY_LABELS[dow] ?? key : key
+    return dow !== null ? (WEEKDAY_LABELS[dow] ?? key) : key
   }
   return formatBRDate(key)
 }

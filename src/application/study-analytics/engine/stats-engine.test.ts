@@ -1,7 +1,19 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { test } from "node:test"
 import assert from "node:assert/strict"
+import { test } from "node:test"
+
 import {
+  type ActivePlan,
+  type DailyBucket,
+  type DisciplineMeta,
+  type DisciplineStat,
+  type InsightInput,
+  type QuestionAttemptRecord,
+  type ReviewItemRow,
+  type RevisionStatistics,
+  type SessionRecord,
+  type UserDisciplineInput,
+  activeMinutesOf,
   addDaysToKey,
   aggregateBuckets,
   buildDayBuckets,
@@ -11,6 +23,7 @@ import {
   computeComparisons,
   computeDisciplineStats,
   computeEditalCoverage,
+  computeFocusStatistics,
   computeFrequency,
   computeHoursOfDay,
   computeMonthlyReport,
@@ -37,21 +50,10 @@ import {
   mondayKeyOf,
   monthKeyOf,
   pausedMinutesOf,
-  activeMinutesOf,
   sanitizeAttempt,
   sanitizeSession,
   todayKey,
   weekdayOfKey,
-  type DailyBucket,
-  type SessionRecord,
-  type QuestionAttemptRecord,
-  type UserDisciplineInput,
-  type ReviewItemRow,
-  type ActivePlan,
-  type DisciplineMeta,
-  type InsightInput,
-  type DisciplineStat,
-  type RevisionStatistics,
 } from "./stats-engine.ts"
 
 const TZ = "UTC"
@@ -165,13 +167,22 @@ test("sanitizeAttempt normaliza corret/answered_at", () => {
 
 test("activeMinutesOf usa active_minutes ou desconta pausa", () => {
   assert.equal(activeMinutesOf(session({ durationMinutes: 60, activeMinutes: 45 })), 45)
-  assert.equal(activeMinutesOf(session({ durationMinutes: 60, activeMinutes: null, pausedMinutes: 15 })), 45)
-  assert.equal(activeMinutesOf(session({ durationMinutes: 60, activeMinutes: null, pausedMinutes: 70 })), 0)
+  assert.equal(
+    activeMinutesOf(session({ durationMinutes: 60, activeMinutes: null, pausedMinutes: 15 })),
+    45,
+  )
+  assert.equal(
+    activeMinutesOf(session({ durationMinutes: 60, activeMinutes: null, pausedMinutes: 70 })),
+    0,
+  )
 })
 
 test("pausedMinutesOf usa pausa explícita ou duração - ativo", () => {
   assert.equal(pausedMinutesOf(session({ durationMinutes: 60, pausedMinutes: 20 })), 20)
-  assert.equal(pausedMinutesOf(session({ durationMinutes: 60, activeMinutes: 50, pausedMinutes: null })), 10)
+  assert.equal(
+    pausedMinutesOf(session({ durationMinutes: 60, activeMinutes: 50, pausedMinutes: null })),
+    10,
+  )
 })
 
 test("focusPercentOf prioriza focus_percentage", () => {
@@ -188,8 +199,20 @@ test("buildDayBuckets aloca sessões e tentativas no dia certo", () => {
     session({ startedAt: "2026-08-11T10:00:00Z", questionsAnswered: 0 }),
   ]
   const attempts: QuestionAttemptRecord[] = [
-    { id: "a1", questionId: "q1", disciplineId: "d1", correct: true, answeredAt: "2026-08-11T11:00:00Z" },
-    { id: "a2", questionId: "q2", disciplineId: "d1", correct: false, answeredAt: "2026-08-11T12:00:00Z" },
+    {
+      id: "a1",
+      questionId: "q1",
+      disciplineId: "d1",
+      correct: true,
+      answeredAt: "2026-08-11T11:00:00Z",
+    },
+    {
+      id: "a2",
+      questionId: "q2",
+      disciplineId: "d1",
+      correct: false,
+      answeredAt: "2026-08-11T12:00:00Z",
+    },
   ]
   const buckets = buildDayBuckets(sessions, attempts, 5, NOW, TZ)
   const today = buckets[buckets.length - 1]!
@@ -205,8 +228,44 @@ test("buildDayBuckets aloca sessões e tentativas no dia certo", () => {
 
 test("aggregateBuckets só conta dias estudados com minutos", () => {
   const buckets: DailyBucket[] = [
-    { date: "2026-08-10", minutes: 30, activeMinutes: 30, pausedMinutes: 0, sessions: 1, completedSessions: 1, interruptedSessions: 0, pages: 5, questions: 2, correct: 2, wrong: 0, accuracy: 100, flashcards: 0, focusSum: 80, focusCount: 1, focusAvg: 80, attempts: 0 },
-    { date: "2026-08-11", minutes: 0, activeMinutes: 0, pausedMinutes: 0, sessions: 0, completedSessions: 0, interruptedSessions: 0, pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0 },
+    {
+      date: "2026-08-10",
+      minutes: 30,
+      activeMinutes: 30,
+      pausedMinutes: 0,
+      sessions: 1,
+      completedSessions: 1,
+      interruptedSessions: 0,
+      pages: 5,
+      questions: 2,
+      correct: 2,
+      wrong: 0,
+      accuracy: 100,
+      flashcards: 0,
+      focusSum: 80,
+      focusCount: 1,
+      focusAvg: 80,
+      attempts: 0,
+    },
+    {
+      date: "2026-08-11",
+      minutes: 0,
+      activeMinutes: 0,
+      pausedMinutes: 0,
+      sessions: 0,
+      completedSessions: 0,
+      interruptedSessions: 0,
+      pages: 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      flashcards: 0,
+      focusSum: 0,
+      focusCount: 0,
+      focusAvg: null,
+      attempts: 0,
+    },
   ]
   const t = aggregateBuckets(buckets)
   assert.equal(t.minutes, 30)
@@ -226,10 +285,23 @@ test("computeTimeCards soma hoje, semana (seg→hoje) e mês", () => {
   const buckets: DailyBucket[] = lastNDays(20, NOW, TZ).map((date) => {
     const m = mins.find(([d]) => d === date)?.[1] ?? 0
     return {
-      date, minutes: m, activeMinutes: m, pausedMinutes: 0,
-      sessions: m > 0 ? 1 : 0, completedSessions: m > 0 ? 1 : 0, interruptedSessions: 0,
-      pages: m > 0 ? 2 : 0, questions: 0, correct: 0, wrong: 0, accuracy: null,
-      flashcards: 0, focusSum: m > 0 ? 60 : 0, focusCount: m > 0 ? 1 : 0, focusAvg: m > 0 ? 60 : null, attempts: 0,
+      date,
+      minutes: m,
+      activeMinutes: m,
+      pausedMinutes: 0,
+      sessions: m > 0 ? 1 : 0,
+      completedSessions: m > 0 ? 1 : 0,
+      interruptedSessions: 0,
+      pages: m > 0 ? 2 : 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      flashcards: 0,
+      focusSum: m > 0 ? 60 : 0,
+      focusCount: m > 0 ? 1 : 0,
+      focusAvg: m > 0 ? 60 : null,
+      attempts: 0,
     }
   })
   const t = computeTimeCards(buckets, NOW, TZ)
@@ -271,8 +343,20 @@ test("computeStreaks: quebra zera a atual, longest mantém", () => {
 test("computeQuestionStatistics soma sessões + tentativas", () => {
   const sessions = [session({ questionsAnswered: 5, questionsCorrect: 4 })]
   const attempts: QuestionAttemptRecord[] = [
-    { id: "a", questionId: "q", disciplineId: "d", correct: true, answeredAt: "2026-08-11T12:00:00Z" },
-    { id: "b", questionId: "q", disciplineId: "d", correct: false, answeredAt: "2026-08-11T13:00:00Z" },
+    {
+      id: "a",
+      questionId: "q",
+      disciplineId: "d",
+      correct: true,
+      answeredAt: "2026-08-11T12:00:00Z",
+    },
+    {
+      id: "b",
+      questionId: "q",
+      disciplineId: "d",
+      correct: false,
+      answeredAt: "2026-08-11T13:00:00Z",
+    },
   ]
   const q = computeQuestionStatistics(sessions, attempts)
   assert.equal(q.total, 7)
@@ -283,26 +367,65 @@ test("computeQuestionStatistics soma sessões + tentativas", () => {
 // ─── Disciplinas ────────────────────────────────────────────────────────────
 
 test("classifyDiscipline: dominado exige acurácia e recência", () => {
-  assert.equal(classifyDiscipline({ questions: 10, accuracy: 90, daysSince: 2, studied: true }), "DOMINADO")
-  assert.equal(classifyDiscipline({ questions: 10, accuracy: 70, daysSince: 2, studied: true }), "EM_DESENVOLVIMENTO")
-  assert.equal(classifyDiscipline({ questions: 10, accuracy: 50, daysSince: 2, studied: true }), "ATENCAO")
-  assert.equal(classifyDiscipline({ questions: 10, accuracy: 35, daysSince: 2, studied: true }), "CRITICO")
-  assert.equal(classifyDiscipline({ questions: 0, accuracy: null, daysSince: 70, studied: true }), "CRITICO")
-  assert.equal(classifyDiscipline({ questions: 0, accuracy: null, daysSince: 5, studied: true }), "EM_DESENVOLVIMENTO")
+  assert.equal(
+    classifyDiscipline({ questions: 10, accuracy: 90, daysSince: 2, studied: true }),
+    "DOMINADO",
+  )
+  assert.equal(
+    classifyDiscipline({ questions: 10, accuracy: 70, daysSince: 2, studied: true }),
+    "EM_DESENVOLVIMENTO",
+  )
+  assert.equal(
+    classifyDiscipline({ questions: 10, accuracy: 50, daysSince: 2, studied: true }),
+    "ATENCAO",
+  )
+  assert.equal(
+    classifyDiscipline({ questions: 10, accuracy: 35, daysSince: 2, studied: true }),
+    "CRITICO",
+  )
+  assert.equal(
+    classifyDiscipline({ questions: 0, accuracy: null, daysSince: 70, studied: true }),
+    "CRITICO",
+  )
+  assert.equal(
+    classifyDiscipline({ questions: 0, accuracy: null, daysSince: 5, studied: true }),
+    "EM_DESENVOLVIMENTO",
+  )
 })
 
 test("computeAttentionScore: pesos documentados", () => {
-  const r = computeAttentionScore({ accuracy: 50, wrong: 40, daysSince: 40, overdue: 20, status: "NOT_STARTED", trendDirection: "DOWN" })
+  const r = computeAttentionScore({
+    accuracy: 50,
+    wrong: 40,
+    daysSince: 40,
+    overdue: 20,
+    status: "NOT_STARTED",
+    trendDirection: "DOWN",
+  })
   assert.equal(r.score, 85)
   assert.equal(r.reasons.length, 3)
-  const ok = computeAttentionScore({ accuracy: 95, wrong: 1, daysSince: 0, overdue: 0, status: "CONCLUIDA", trendDirection: "UP" })
+  const ok = computeAttentionScore({
+    accuracy: 95,
+    wrong: 1,
+    daysSince: 0,
+    overdue: 0,
+    status: "CONCLUIDA",
+    trendDirection: "UP",
+  })
   assert.ok(ok.score < 10)
 })
 
 test("computeDisciplineStats agrupa por disciplina com tendência", () => {
-  const registry = new Map<string, DisciplineMeta>([["d1", { id: "d1", name: "Constitucional", area: "Direito" }]])
+  const registry = new Map<string, DisciplineMeta>([
+    ["d1", { id: "d1", name: "Constitucional", area: "Direito" }],
+  ])
   const sessions: SessionRecord[] = [
-    session({ startedAt: "2026-08-01T10:00:00Z", durationMinutes: 30, questionsAnswered: 10, questionsCorrect: 9 }),
+    session({
+      startedAt: "2026-08-01T10:00:00Z",
+      durationMinutes: 30,
+      questionsAnswered: 10,
+      questionsCorrect: 9,
+    }),
     session({ startedAt: "2026-08-11T10:00:00Z", durationMinutes: 30, questionsAnswered: 0 }),
   ]
   const stats = computeDisciplineStats(sessions, [], registry, [], new Map(), 60, NOW, TZ)
@@ -354,10 +477,23 @@ test("computeComparisons: semana atual vs anterior e deltas", () => {
     const isWeek = date >= "2026-08-10" && date <= "2026-08-11"
     const minutes = isWeek ? 40 : 10
     return {
-      date, minutes, activeMinutes: minutes, pausedMinutes: 0,
-      sessions: minutes > 0 ? 1 : 0, completedSessions: minutes > 0 ? 1 : 0, interruptedSessions: 0,
-      pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null,
-      flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0,
+      date,
+      minutes,
+      activeMinutes: minutes,
+      pausedMinutes: 0,
+      sessions: minutes > 0 ? 1 : 0,
+      completedSessions: minutes > 0 ? 1 : 0,
+      interruptedSessions: 0,
+      pages: 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      flashcards: 0,
+      focusSum: 0,
+      focusCount: 0,
+      focusAvg: null,
+      attempts: 0,
     }
   })
   const rows = computeComparisons(buckets, NOW, TZ)
@@ -385,10 +521,23 @@ test("computePlanning: aderência da semana", () => {
     if (date === "2026-08-10") minutes = 45
     else if (date === "2026-08-11") minutes = 30
     return {
-      date, minutes, activeMinutes: minutes, pausedMinutes: 0,
-      sessions: minutes > 0 ? 1 : 0, completedSessions: minutes > 0 ? 1 : 0, interruptedSessions: 0,
-      pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null,
-      flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0,
+      date,
+      minutes,
+      activeMinutes: minutes,
+      pausedMinutes: 0,
+      sessions: minutes > 0 ? 1 : 0,
+      completedSessions: minutes > 0 ? 1 : 0,
+      interruptedSessions: 0,
+      pages: 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      flashcards: 0,
+      focusSum: 0,
+      focusCount: 0,
+      focusAvg: null,
+      attempts: 0,
     }
   })
   const p = computePlanning(plan, buckets, NOW, TZ)
@@ -415,7 +564,9 @@ test("computeRevisionStatistics classifica por vencimento", () => {
     { id: "r2", disciplineId: "d1", status: "PENDING", nextReviewAt: "2026-08-11T23:00:00Z" },
     { id: "r3", disciplineId: "d2", status: "PENDING", nextReviewAt: "2026-08-20T10:00:00Z" },
   ]
-  const registry = new Map<string, DisciplineMeta>([["d1", { id: "d1", name: "Constitucional", area: "Direito" }]])
+  const registry = new Map<string, DisciplineMeta>([
+    ["d1", { id: "d1", name: "Constitucional", area: "Direito" }],
+  ])
   const s = computeRevisionStatistics(items, 12, NOW, registry)
   assert.equal(s.totalPending, 3)
   assert.equal(s.overdue, 1)
@@ -454,7 +605,7 @@ test("computeEditalCoverage conta status", () => {
     new Map(),
     150,
     NOW,
-    TZ
+    TZ,
   )
   void stats
   void d1
@@ -503,7 +654,12 @@ test("computeProductivity: pesos 40/30/20/10 com ≥3 sessões", () => {
   const q = { total: 10, correct: 9, wrong: 1, accuracy: 90, fromSessions: 10, fromAttempts: 0 }
   const p = computeProductivity(sessions, q, 80, 7)
   assert.equal(p.score, 85)
-  assert.deepEqual(p.breakdown, { activeRatioScore: 80, accuracyScore: 90, focusScore: 80, consistencyScore: 100 })
+  assert.deepEqual(p.breakdown, {
+    activeRatioScore: 80,
+    accuracyScore: 90,
+    focusScore: 80,
+    consistencyScore: 100,
+  })
 })
 
 // ─── Insights ───────────────────────────────────────────────────────────────
@@ -515,27 +671,73 @@ function insightInput(overrides: Partial<InsightInput> = {}): InsightInput {
     hoursOfDay: [],
     timeOfDayAnalysis: null,
     focusPct: 80,
-    questionStats: { total: 20, correct: 14, wrong: 6, accuracy: 70, fromSessions: 20, fromAttempts: 0 },
+    questionStats: {
+      total: 20,
+      correct: 14,
+      wrong: 6,
+      accuracy: 70,
+      fromSessions: 20,
+      fromAttempts: 0,
+    },
     streaks: { current: 4, currentEndsToday: true, longest: 6 },
     comparisons: [],
     planning: {
-      hasPlan: true, weeklyTargetMinutes: 420, weeklyTargetQuestions: 0, weeklyTargetDays: 0,
-      actualWeekMinutes: 420, actualWeekQuestions: 0, actualWeekDays: 5, adherencePct: 100, series: [],
+      hasPlan: true,
+      weeklyTargetMinutes: 420,
+      weeklyTargetQuestions: 0,
+      weeklyTargetDays: 0,
+      actualWeekMinutes: 420,
+      actualWeekQuestions: 0,
+      actualWeekDays: 5,
+      adherencePct: 100,
+      series: [],
     },
     revision: {
-      totalPending: 3, overdue: 2, dueToday: 0, upcoming: 1, completedLast30: 10, completionRate: 50,
+      totalPending: 3,
+      overdue: 2,
+      dueToday: 0,
+      upcoming: 1,
+      completedLast30: 10,
+      completionRate: 50,
       byDiscipline: [],
     },
     disciplineStats: [],
     topicStats: [
-      { topicName: "Princípios", disciplineId: "d1", disciplineName: "Constitucional", minutes: 100, sessions: 5, questions: 6, correct: 2, wrong: 4, accuracy: 33, focusAvg: null, pages: 0, lastStudiedDate: null, daysSinceLastStudy: 1, classification: "ATENCAO" },
+      {
+        topicName: "Princípios",
+        disciplineId: "d1",
+        disciplineName: "Constitucional",
+        minutes: 100,
+        sessions: 5,
+        questions: 6,
+        correct: 2,
+        wrong: 4,
+        accuracy: 33,
+        focusAvg: null,
+        pages: 0,
+        lastStudiedDate: null,
+        daysSinceLastStudy: 1,
+        classification: "ATENCAO",
+      },
     ],
     timeCards: {
-      todayMinutes: 0, weekMinutes: 0, monthMinutes: 0, last7Minutes: 0, last30Minutes: 0,
-      last90Minutes: 0, totalMinutes: 600, studiedDayCount: 12, avgPerStudiedDay: 50, avgPerPeriodDay: 33,
-      bestDay: null, worstDay: null,
+      todayMinutes: 0,
+      weekMinutes: 0,
+      monthMinutes: 0,
+      last7Minutes: 0,
+      last30Minutes: 0,
+      last90Minutes: 0,
+      totalMinutes: 600,
+      studiedDayCount: 12,
+      avgPerStudiedDay: 50,
+      avgPerPeriodDay: 33,
+      bestDay: null,
+      worstDay: null,
     },
-    productivity: { score: 80, breakdown: { activeRatioScore: 80, accuracyScore: 70, focusScore: 80, consistencyScore: 100 } },
+    productivity: {
+      score: 80,
+      breakdown: { activeRatioScore: 80, accuracyScore: 70, focusScore: 80, consistencyScore: 100 },
+    },
     daysSinceLastStudy: 0,
     questionsPerDay: 5,
     ...overrides,
@@ -561,7 +763,9 @@ test("generateInsights: semana em alta", () => {
   const input = insightInput()
   input.comparisons = [
     {
-      id: "week_vs_prev", label: "Semana", detail: "x",
+      id: "week_vs_prev",
+      label: "Semana",
+      detail: "x",
       metrics: {
         minutes: { current: 120, previous: 60, delta: 60, deltaPct: 100 },
         questions: { current: 10, previous: 10, delta: 0, deltaPct: 0 },
@@ -583,12 +787,23 @@ test("computeWeeklyReport compara 7 dias com os anteriores", () => {
   const buckets: DailyBucket[] = lastNDays(20, NOW, TZ).map((date) => {
     const minutes = date >= "2026-08-05" && date <= "2026-08-11" ? 100 : 0
     return {
-      date, minutes, activeMinutes: minutes, pausedMinutes: minutes / 10,
-      sessions: minutes > 0 ? 1 : 0, completedSessions: minutes > 0 ? 1 : 0, interruptedSessions: 0,
-      pages: minutes > 0 ? 3 : 0, questions: minutes > 0 ? 2 : 0,
-      correct: minutes > 0 ? 1 : 0, wrong: minutes > 0 ? 1 : 0, accuracy: 50,
-      flashcards: minutes > 0 ? 2 : 0, focusSum: minutes > 0 ? 70 : 0, focusCount: minutes > 0 ? 1 : 0,
-      focusAvg: 70, attempts: 0,
+      date,
+      minutes,
+      activeMinutes: minutes,
+      pausedMinutes: minutes / 10,
+      sessions: minutes > 0 ? 1 : 0,
+      completedSessions: minutes > 0 ? 1 : 0,
+      interruptedSessions: 0,
+      pages: minutes > 0 ? 3 : 0,
+      questions: minutes > 0 ? 2 : 0,
+      correct: minutes > 0 ? 1 : 0,
+      wrong: minutes > 0 ? 1 : 0,
+      accuracy: 50,
+      flashcards: minutes > 0 ? 2 : 0,
+      focusSum: minutes > 0 ? 70 : 0,
+      focusCount: minutes > 0 ? 1 : 0,
+      focusAvg: 70,
+      attempts: 0,
     }
   })
   const rows = computeWeeklyReport(buckets, NOW, TZ)
@@ -603,10 +818,23 @@ test("computeMonthlyReport compara mês corrido com anterior", () => {
   const buckets: DailyBucket[] = lastNDays(45, NOW, TZ).map((date) => {
     const minutes = date.startsWith("2026-08") ? 60 : 10
     return {
-      date, minutes, activeMinutes: minutes, pausedMinutes: 0,
-      sessions: minutes > 0 ? 1 : 0, completedSessions: minutes > 0 ? 1 : 0, interruptedSessions: 0,
-      pages: minutes > 0 ? 1 : 0, questions: 0, correct: 0, wrong: 0, accuracy: null,
-      flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0,
+      date,
+      minutes,
+      activeMinutes: minutes,
+      pausedMinutes: 0,
+      sessions: minutes > 0 ? 1 : 0,
+      completedSessions: minutes > 0 ? 1 : 0,
+      interruptedSessions: 0,
+      pages: minutes > 0 ? 1 : 0,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      flashcards: 0,
+      focusSum: 0,
+      focusCount: 0,
+      focusAvg: null,
+      attempts: 0,
     }
   })
   const rows = computeMonthlyReport(buckets, NOW, TZ)
@@ -619,10 +847,23 @@ test("computeMonthlyReport compara mês corrido com anterior", () => {
 
 test("buildHeatmap: nada de estudo = nível 0", () => {
   const buckets: DailyBucket[] = lastNDays(10, NOW, TZ).map((date) => ({
-    date, minutes: 0, activeMinutes: 0, pausedMinutes: 0,
-    sessions: 0, completedSessions: 0, interruptedSessions: 0,
-    pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null,
-    flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0,
+    date,
+    minutes: 0,
+    activeMinutes: 0,
+    pausedMinutes: 0,
+    sessions: 0,
+    completedSessions: 0,
+    interruptedSessions: 0,
+    pages: 0,
+    questions: 0,
+    correct: 0,
+    wrong: 0,
+    accuracy: null,
+    flashcards: 0,
+    focusSum: 0,
+    focusCount: 0,
+    focusAvg: null,
+    attempts: 0,
   }))
   const cells = buildHeatmap(buckets, 10)
   assert.equal(cells.length, 10)
@@ -631,10 +872,23 @@ test("buildHeatmap: nada de estudo = nível 0", () => {
 
 test("buildHeatmap: percentis geram níveis 1..4", () => {
   const buckets: DailyBucket[] = lastNDays(10, NOW, TZ).map((date, i) => ({
-    date, minutes: i * 10, activeMinutes: i * 10, pausedMinutes: 0,
-    sessions: i > 0 ? 1 : 0, completedSessions: i > 0 ? 1 : 0, interruptedSessions: 0,
-    pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null,
-    flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0,
+    date,
+    minutes: i * 10,
+    activeMinutes: i * 10,
+    pausedMinutes: 0,
+    sessions: i > 0 ? 1 : 0,
+    completedSessions: i > 0 ? 1 : 0,
+    interruptedSessions: 0,
+    pages: 0,
+    questions: 0,
+    correct: 0,
+    wrong: 0,
+    accuracy: null,
+    flashcards: 0,
+    focusSum: 0,
+    focusCount: 0,
+    focusAvg: null,
+    attempts: 0,
   }))
   const cells = buildHeatmap(buckets, 10)
   assert.equal(cells[0]!.level, 0)
@@ -672,31 +926,68 @@ test("computeSessionStatistics", () => {
 test("computePriorities ordena por score e traduz ações", () => {
   const stats = [
     {
-      disciplineId: "d1", name: "A", area: null, minutes: 10, activeMinutes: 10, sessions: 1,
-      questions: 0, correct: 0, wrong: 0, accuracy: null, accuracyTrend: null,
-      trendDirection: "STABLE" as const, focusAvg: null, pages: 0, flashcards: 0,
-      lastStudiedDate: null, daysSinceLastStudy: 80, firstHalfMinutes: 0, secondHalfMinutes: 10,
-      attentionScore: 90, attentionReasons: ["80 dias sem estudar"], classification: "CRITICO" as const,
+      disciplineId: "d1",
+      name: "A",
+      area: null,
+      minutes: 10,
+      activeMinutes: 10,
+      sessions: 1,
+      questions: 0,
+      correct: 0,
+      wrong: 0,
+      accuracy: null,
+      accuracyTrend: null,
+      trendDirection: "STABLE" as const,
+      focusAvg: null,
+      pages: 0,
+      flashcards: 0,
+      lastStudiedDate: null,
+      daysSinceLastStudy: 80,
+      firstHalfMinutes: 0,
+      secondHalfMinutes: 10,
+      attentionScore: 90,
+      attentionReasons: ["80 dias sem estudar"],
+      classification: "CRITICO" as const,
       shareOfTotalMinutes: 100,
     },
     {
-      disciplineId: "d2", name: "B", area: null, minutes: 90, activeMinutes: 90, sessions: 5,
-      questions: 10, correct: 9, wrong: 1, accuracy: 90, accuracyTrend: null,
-      trendDirection: "UP" as const, focusAvg: null, pages: 0, flashcards: 0,
-      lastStudiedDate: "2026-08-11", daysSinceLastStudy: 0, firstHalfMinutes: 40, secondHalfMinutes: 50,
-      attentionScore: 5, attentionReasons: [], classification: "DOMINADO" as const,
+      disciplineId: "d2",
+      name: "B",
+      area: null,
+      minutes: 90,
+      activeMinutes: 90,
+      sessions: 5,
+      questions: 10,
+      correct: 9,
+      wrong: 1,
+      accuracy: 90,
+      accuracyTrend: null,
+      trendDirection: "UP" as const,
+      focusAvg: null,
+      pages: 0,
+      flashcards: 0,
+      lastStudiedDate: "2026-08-11",
+      daysSinceLastStudy: 0,
+      firstHalfMinutes: 40,
+      secondHalfMinutes: 50,
+      attentionScore: 5,
+      attentionReasons: [],
+      classification: "DOMINADO" as const,
       shareOfTotalMinutes: 90,
     },
   ]
-  const priorities = computePriorities(stats as DisciplineStat[], {
-    totalPending: 0,
-    overdue: 0,
-    dueToday: 0,
-    upcoming: 0,
-    completedLast30: 0,
-    completionRate: null,
-    byDiscipline: [],
-  } as RevisionStatistics)
+  const priorities = computePriorities(
+    stats as DisciplineStat[],
+    {
+      totalPending: 0,
+      overdue: 0,
+      dueToday: 0,
+      upcoming: 0,
+      completedLast30: 0,
+      completionRate: null,
+      byDiscipline: [],
+    } as RevisionStatistics,
+  )
   assert.equal(priorities.length, 2)
   assert.equal(priorities[0]!.name, "A")
   assert.equal(priorities[0]!.action.includes("Retome"), true)
@@ -710,10 +1001,23 @@ test("computeFrequency conta dias e lacunas", () => {
     const studied = date >= "2026-08-09" && date <= "2026-08-11"
     const minutes = studied ? 30 : 0
     return {
-      date, minutes, activeMinutes: minutes, pausedMinutes: 0,
-      sessions: studied ? 1 : 0, completedSessions: studied ? 1 : 0, interruptedSessions: 0,
-      pages: 0, questions: studied ? 1 : 0, correct: studied ? 1 : 0, wrong: 0,
-      accuracy: studied ? 100 : null, flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0,
+      date,
+      minutes,
+      activeMinutes: minutes,
+      pausedMinutes: 0,
+      sessions: studied ? 1 : 0,
+      completedSessions: studied ? 1 : 0,
+      interruptedSessions: 0,
+      pages: 0,
+      questions: studied ? 1 : 0,
+      correct: studied ? 1 : 0,
+      wrong: 0,
+      accuracy: studied ? 100 : null,
+      flashcards: 0,
+      focusSum: 0,
+      focusCount: 0,
+      focusAvg: null,
+      attempts: 0,
     }
   })
   const f = computeFrequency(buckets, NOW, TZ)
@@ -738,13 +1042,55 @@ test("utilidades de data restantes", () => {
 test("computeTimeOfDayAnalysis: manhã com maior foco → overallBest = Manhã", () => {
   const sessions: SessionRecord[] = [
     // 3 sessões na manhã (08:00 UTC) com foco alto (91%)
-    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 50 }),
-    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 50 }),
-    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 90, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
+    session({
+      id: "m1",
+      startedAt: "2026-08-10T08:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 8,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m2",
+      startedAt: "2026-08-09T08:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 9,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m3",
+      startedAt: "2026-08-08T08:00:00Z",
+      focusPercentage: 90,
+      questionsAnswered: 10,
+      questionsCorrect: 7,
+      durationMinutes: 50,
+    }),
     // 3 sessões à tarde (14:00 UTC) com foco menor (72%)
-    session({ id: "t1", startedAt: "2026-08-10T14:00:00Z", focusPercentage: 72, questionsAnswered: 10, questionsCorrect: 5, durationMinutes: 50 }),
-    session({ id: "t2", startedAt: "2026-08-09T14:00:00Z", focusPercentage: 72, questionsAnswered: 10, questionsCorrect: 6, durationMinutes: 50 }),
-    session({ id: "t3", startedAt: "2026-08-08T14:00:00Z", focusPercentage: 73, questionsAnswered: 10, questionsCorrect: 4, durationMinutes: 50 }),
+    session({
+      id: "t1",
+      startedAt: "2026-08-10T14:00:00Z",
+      focusPercentage: 72,
+      questionsAnswered: 10,
+      questionsCorrect: 5,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "t2",
+      startedAt: "2026-08-09T14:00:00Z",
+      focusPercentage: 72,
+      questionsAnswered: 10,
+      questionsCorrect: 6,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "t3",
+      startedAt: "2026-08-08T14:00:00Z",
+      focusPercentage: 73,
+      questionsAnswered: 10,
+      questionsCorrect: 4,
+      durationMinutes: 50,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.hasEnoughData, true)
@@ -756,12 +1102,54 @@ test("computeTimeOfDayAnalysis: manhã com maior foco → overallBest = Manhã",
 // Caso 2: Noite com maior foco → Noite
 test("computeTimeOfDayAnalysis: noite com maior foco → overallBest = Noite", () => {
   const sessions: SessionRecord[] = [
-    session({ id: "n1", startedAt: "2026-08-10T20:00:00Z", focusPercentage: 92, questionsAnswered: 8, questionsCorrect: 6, durationMinutes: 40 }),
-    session({ id: "n2", startedAt: "2026-08-09T20:00:00Z", focusPercentage: 92, questionsAnswered: 8, questionsCorrect: 7, durationMinutes: 40 }),
-    session({ id: "n3", startedAt: "2026-08-08T20:00:00Z", focusPercentage: 91, questionsAnswered: 8, questionsCorrect: 5, durationMinutes: 40 }),
-    session({ id: "mm1", startedAt: "2026-08-10T03:00:00Z", focusPercentage: 70, questionsAnswered: 5, questionsCorrect: 3, durationMinutes: 30 }),
-    session({ id: "mm2", startedAt: "2026-08-09T03:00:00Z", focusPercentage: 71, questionsAnswered: 5, questionsCorrect: 2, durationMinutes: 30 }),
-    session({ id: "mm3", startedAt: "2026-08-08T03:00:00Z", focusPercentage: 72, questionsAnswered: 5, questionsCorrect: 4, durationMinutes: 30 }),
+    session({
+      id: "n1",
+      startedAt: "2026-08-10T20:00:00Z",
+      focusPercentage: 92,
+      questionsAnswered: 8,
+      questionsCorrect: 6,
+      durationMinutes: 40,
+    }),
+    session({
+      id: "n2",
+      startedAt: "2026-08-09T20:00:00Z",
+      focusPercentage: 92,
+      questionsAnswered: 8,
+      questionsCorrect: 7,
+      durationMinutes: 40,
+    }),
+    session({
+      id: "n3",
+      startedAt: "2026-08-08T20:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 8,
+      questionsCorrect: 5,
+      durationMinutes: 40,
+    }),
+    session({
+      id: "mm1",
+      startedAt: "2026-08-10T03:00:00Z",
+      focusPercentage: 70,
+      questionsAnswered: 5,
+      questionsCorrect: 3,
+      durationMinutes: 30,
+    }),
+    session({
+      id: "mm2",
+      startedAt: "2026-08-09T03:00:00Z",
+      focusPercentage: 71,
+      questionsAnswered: 5,
+      questionsCorrect: 2,
+      durationMinutes: 30,
+    }),
+    session({
+      id: "mm3",
+      startedAt: "2026-08-08T03:00:00Z",
+      focusPercentage: 72,
+      questionsAnswered: 5,
+      questionsCorrect: 4,
+      durationMinutes: 30,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.hasEnoughData, true)
@@ -773,13 +1161,55 @@ test("computeTimeOfDayAnalysis: noite com maior foco → overallBest = Noite", (
 test("computeTimeOfDayAnalysis: melhor foco ≠ melhor acerto, overallBest segue critério foco primeiro", () => {
   const sessions: SessionRecord[] = [
     // Manhã: foco 91%, acerto 82%
-    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 50 }),
-    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 50 }),
-    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
+    session({
+      id: "m1",
+      startedAt: "2026-08-10T08:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 8,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m2",
+      startedAt: "2026-08-09T08:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 9,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m3",
+      startedAt: "2026-08-08T08:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 7,
+      durationMinutes: 50,
+    }),
     // Noite: foco 91%, acerto 89% → mesmno foco, maior acerto → Noite vence
-    session({ id: "n1", startedAt: "2026-08-10T20:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 40 }),
-    session({ id: "n2", startedAt: "2026-08-09T20:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 40 }),
-    session({ id: "n3", startedAt: "2026-08-08T20:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 10, durationMinutes: 40 }),
+    session({
+      id: "n1",
+      startedAt: "2026-08-10T20:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 9,
+      durationMinutes: 40,
+    }),
+    session({
+      id: "n2",
+      startedAt: "2026-08-09T20:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 8,
+      durationMinutes: 40,
+    }),
+    session({
+      id: "n3",
+      startedAt: "2026-08-08T20:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 10,
+      durationMinutes: 40,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.hasEnoughData, true)
@@ -792,7 +1222,14 @@ test("computeTimeOfDayAnalysis: melhor foco ≠ melhor acerto, overallBest segue
 // Caso 4: Somente uma sessão → dados insuficientes
 test("computeTimeOfDayAnalysis: uma única sessão → dados insuficientes", () => {
   const sessions: SessionRecord[] = [
-    session({ id: "s1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 100, questionsAnswered: 10, questionsCorrect: 10, durationMinutes: 30 }),
+    session({
+      id: "s1",
+      startedAt: "2026-08-10T08:00:00Z",
+      focusPercentage: 100,
+      questionsAnswered: 10,
+      questionsCorrect: 10,
+      durationMinutes: 30,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.hasEnoughData, false)
@@ -803,9 +1240,24 @@ test("computeTimeOfDayAnalysis: uma única sessão → dados insuficientes", () 
 // Caso 5: Sessões sem horário → ignoradas para análise de horário
 test("computeTimeOfDayAnalysis: sessões sem horário são ignoradas", () => {
   const sessions: SessionRecord[] = [
-    session({ id: "ok1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 80, durationMinutes: 50 }),
-    session({ id: "ok2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 80, durationMinutes: 50 }),
-    session({ id: "ok3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 80, durationMinutes: 50 }),
+    session({
+      id: "ok1",
+      startedAt: "2026-08-10T08:00:00Z",
+      focusPercentage: 80,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "ok2",
+      startedAt: "2026-08-09T08:00:00Z",
+      focusPercentage: 80,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "ok3",
+      startedAt: "2026-08-08T08:00:00Z",
+      focusPercentage: 80,
+      durationMinutes: 50,
+    }),
   ]
   // Sessão com startedAt vazio/nulo não pode ser criada pois sanitizeSession rejeita.
   // Mas computeTimeOfDayAnalysis recebe SessionRecord[], então localParts retorna null para ISO inválido
@@ -821,9 +1273,33 @@ test("computeTimeOfDayAnalysis: sessões sem horário são ignoradas", () => {
 test("computeTimeOfDayAnalysis: sessões importadas são consideradas", () => {
   const sessions: SessionRecord[] = [
     // Sessão "importada" (simulada — studySource diferente, mas os mesmos dados)
-    session({ id: "imp1", startedAt: "2026-08-10T20:00:00Z", studySource: "APROVADO", focusPercentage: 95, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 60 }),
-    session({ id: "imp2", startedAt: "2026-08-09T20:00:00Z", studySource: "APROVADO", focusPercentage: 94, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 60 }),
-    session({ id: "imp3", startedAt: "2026-08-08T20:00:00Z", studySource: "APROVADO", focusPercentage: 96, questionsAnswered: 10, questionsCorrect: 10, durationMinutes: 60 }),
+    session({
+      id: "imp1",
+      startedAt: "2026-08-10T20:00:00Z",
+      studySource: "APROVADO",
+      focusPercentage: 95,
+      questionsAnswered: 10,
+      questionsCorrect: 9,
+      durationMinutes: 60,
+    }),
+    session({
+      id: "imp2",
+      startedAt: "2026-08-09T20:00:00Z",
+      studySource: "APROVADO",
+      focusPercentage: 94,
+      questionsAnswered: 10,
+      questionsCorrect: 8,
+      durationMinutes: 60,
+    }),
+    session({
+      id: "imp3",
+      startedAt: "2026-08-08T20:00:00Z",
+      studySource: "APROVADO",
+      focusPercentage: 96,
+      questionsAnswered: 10,
+      questionsCorrect: 10,
+      durationMinutes: 60,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.hasEnoughData, true)
@@ -835,9 +1311,24 @@ test("computeTimeOfDayAnalysis: sessões importadas são consideradas", () => {
 // Caso 7: Verificar que buckets estão na ordem correta (00-06, 06-12, 12-18, 18-24)
 test("computeTimeOfDayAnalysis: buckets sempre na ordem Madrugada, Manhã, Tarde, Noite", () => {
   const sessions: SessionRecord[] = [
-    session({ id: "n1", startedAt: "2026-08-10T20:00:00Z", focusPercentage: 80, durationMinutes: 30 }),
-    session({ id: "n2", startedAt: "2026-08-09T20:00:00Z", focusPercentage: 80, durationMinutes: 30 }),
-    session({ id: "n3", startedAt: "2026-08-08T20:00:00Z", focusPercentage: 80, durationMinutes: 30 }),
+    session({
+      id: "n1",
+      startedAt: "2026-08-10T20:00:00Z",
+      focusPercentage: 80,
+      durationMinutes: 30,
+    }),
+    session({
+      id: "n2",
+      startedAt: "2026-08-09T20:00:00Z",
+      focusPercentage: 80,
+      durationMinutes: 30,
+    }),
+    session({
+      id: "n3",
+      startedAt: "2026-08-08T20:00:00Z",
+      focusPercentage: 80,
+      durationMinutes: 30,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.buckets[0]!.period, "MADRUGADA")
@@ -854,12 +1345,47 @@ test("computeTimeOfDayAnalysis: buckets sempre na ordem Madrugada, Manhã, Tarde
 test("computeTimeOfDayAnalysis: faixa com poucos dados não vence mesmo com foco/accuracy alto", () => {
   const sessions: SessionRecord[] = [
     // Madrugada: 2 sessões, 40 min total, foco 100% — mas não atinge mínimo
-    session({ id: "md1", startedAt: "2026-08-10T02:00:00Z", focusPercentage: 100, questionsAnswered: 5, questionsCorrect: 5, durationMinutes: 20 }),
-    session({ id: "md2", startedAt: "2026-08-09T02:00:00Z", focusPercentage: 100, questionsAnswered: 5, questionsCorrect: 5, durationMinutes: 20 }),
+    session({
+      id: "md1",
+      startedAt: "2026-08-10T02:00:00Z",
+      focusPercentage: 100,
+      questionsAnswered: 5,
+      questionsCorrect: 5,
+      durationMinutes: 20,
+    }),
+    session({
+      id: "md2",
+      startedAt: "2026-08-09T02:00:00Z",
+      focusPercentage: 100,
+      questionsAnswered: 5,
+      questionsCorrect: 5,
+      durationMinutes: 20,
+    }),
     // Manhã: 3 sessões, 150 min, foco 80%
-    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 80, questionsAnswered: 10, questionsCorrect: 6, durationMinutes: 50 }),
-    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 80, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
-    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 81, questionsAnswered: 10, questionsCorrect: 6, durationMinutes: 50 }),
+    session({
+      id: "m1",
+      startedAt: "2026-08-10T08:00:00Z",
+      focusPercentage: 80,
+      questionsAnswered: 10,
+      questionsCorrect: 6,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m2",
+      startedAt: "2026-08-09T08:00:00Z",
+      focusPercentage: 80,
+      questionsAnswered: 10,
+      questionsCorrect: 7,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m3",
+      startedAt: "2026-08-08T08:00:00Z",
+      focusPercentage: 81,
+      questionsAnswered: 10,
+      questionsCorrect: 6,
+      durationMinutes: 50,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.hasEnoughData, true)
@@ -871,9 +1397,30 @@ test("computeTimeOfDayAnalysis: faixa com poucos dados não vence mesmo com foco
 // Caso 9: Recomendação contém a faixa de horário correta
 test("computeTimeOfDayAnalysis: recomendação menciona o horário correto", () => {
   const sessions: SessionRecord[] = [
-    session({ id: "m1", startedAt: "2026-08-10T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 8, durationMinutes: 50 }),
-    session({ id: "m2", startedAt: "2026-08-09T08:00:00Z", focusPercentage: 91, questionsAnswered: 10, questionsCorrect: 9, durationMinutes: 50 }),
-    session({ id: "m3", startedAt: "2026-08-08T08:00:00Z", focusPercentage: 90, questionsAnswered: 10, questionsCorrect: 7, durationMinutes: 50 }),
+    session({
+      id: "m1",
+      startedAt: "2026-08-10T08:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 8,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m2",
+      startedAt: "2026-08-09T08:00:00Z",
+      focusPercentage: 91,
+      questionsAnswered: 10,
+      questionsCorrect: 9,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m3",
+      startedAt: "2026-08-08T08:00:00Z",
+      focusPercentage: 90,
+      questionsAnswered: 10,
+      questionsCorrect: 7,
+      durationMinutes: 50,
+    }),
   ]
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.ok(result.recommendation.includes("06h–12h"))
@@ -887,4 +1434,60 @@ test("computeTimeOfDayAnalysis: sem sessões → mensagem de dados insuficientes
   assert.equal(result.overallBest, null)
   assert.ok(result.notEnoughDataMessage !== null)
   assert.ok(result.recommendation.includes("suficiente"))
+})
+
+// Caso 11: Média de foco ignora sessões com NULL (90, NULL, NULL -> 90)
+test("computeFocusStatistics: média ignora sessões com foco null", () => {
+  const sessions = [
+    session({ focusPercentage: 90, focusScore: null }),
+    session({ focusPercentage: null, focusScore: null }),
+    session({ focusPercentage: null, focusScore: null }),
+  ]
+  const stats = computeFocusStatistics(sessions)
+  assert.equal(stats.average, 90)
+  assert.equal(stats.averagePct, 90)
+  assert.equal(stats.best, 90)
+  assert.equal(stats.worst, 90)
+})
+
+// Caso 12: Somente sessões com NULL geram média null
+test("computeFocusStatistics: somente sessões com foco null geram média null", () => {
+  const sessions = [
+    session({ focusPercentage: null, focusScore: null }),
+    session({ focusPercentage: null, focusScore: null }),
+  ]
+  const stats = computeFocusStatistics(sessions)
+  assert.equal(stats.average, null)
+  assert.equal(stats.best, null)
+  assert.equal(stats.worst, null)
+})
+
+// Caso 13: TimeOfDayAnalysis com todas as sessões NULL não elege bestByFocus
+test("computeTimeOfDayAnalysis: todas as sessões com foco null geram bestByFocus null", () => {
+  const sessions: SessionRecord[] = [
+    session({
+      id: "m1",
+      startedAt: "2026-08-10T08:00:00Z",
+      focusPercentage: null,
+      focusScore: null,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m2",
+      startedAt: "2026-08-09T08:00:00Z",
+      focusPercentage: null,
+      focusScore: null,
+      durationMinutes: 50,
+    }),
+    session({
+      id: "m3",
+      startedAt: "2026-08-08T08:00:00Z",
+      focusPercentage: null,
+      focusScore: null,
+      durationMinutes: 50,
+    }),
+  ]
+  const result = computeTimeOfDayAnalysis(sessions, [], TZ)
+  assert.equal(result.bestByFocus, null)
+  assert.equal(result.buckets.find((b) => b.period === "MANHA")?.focusAvg, null)
 })

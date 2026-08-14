@@ -1,12 +1,18 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+
+import * as Sentry from "@sentry/nextjs"
+
 import { createClient } from "@/infrastructure/supabase/server"
 
 export async function saveStudySessionAction(data: Record<string, unknown>) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
       return { success: false, error: "Usuário não autenticado. Faça login novamente." }
@@ -51,11 +57,20 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       audio_platform: data["audio_platform"] || null,
       audio_speed: data["audio_speed"] || null,
       audio_url: data["audio_url"] || null,
-      focus_percentage: data["focusPercentage"] || 0,
+      // Foco: só grava quando existe medição REAL. Ausência (null/undefined/string
+      // vazia) vira NULL — nunca 0. "Foco 0%" exige medição real de 0%.
+      focus_percentage:
+        data["focusPercentage"] !== undefined &&
+        data["focusPercentage"] !== null &&
+        data["focusPercentage"] !== ""
+          ? Number(data["focusPercentage"])
+          : null,
       completed_cycles: data["completedCycles"] || 0,
       topic_name: data["topic_name"] || null,
       focus_sound: data["focus_sound"] || null,
       focus_sound_volume: data["focus_sound_volume"] ?? null,
+      reviews_completed: data["reviews_completed"] || 0,
+      is_manual_mode: data["is_manual_mode"] === true || data["is_manual_mode"] === "true",
     }
 
     // 3. Calcular duração real
@@ -93,41 +108,61 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     // 4. Mapear studyType → study_source (campo NOT NULL com CHECK constraint)
     // Valores permitidos: 'PLAN', 'FREE', 'REVIEW', 'SIMULADO', 'QUESTOES', 'VIDEO', 'PDF'
     const studySourceMap: Record<string, string> = {
-      TEORIA: 'FREE',
-      QUESTOES: 'QUESTOES',
-      REVISAO: 'REVIEW',
-      AUDIO: 'FREE',
-      VIDEOAULA: 'VIDEO',
-      SIMULADO: 'SIMULADO',
-      OUTRO: 'FREE',
-      RESUMO: 'FREE',
-      MAPA_MENTAL: 'FREE',
-      FLASHCARDS: 'FREE',
-      LEITURA: 'FREE',
-      LEI_SECA: 'FREE',
-      JURISPRUDENCIA: 'FREE',
-      INFORMATIVOS: 'FREE',
-      DOUTRINA: 'FREE',
-      MONITORIA: 'FREE',
-      ESTUDO_IA: 'FREE',
-      DISCUSSAO: 'FREE',
+      TEORIA: "FREE",
+      QUESTOES: "QUESTOES",
+      REVISAO: "REVIEW",
+      AUDIO: "FREE",
+      VIDEOAULA: "VIDEO",
+      SIMULADO: "SIMULADO",
+      OUTRO: "FREE",
+      RESUMO: "FREE",
+      MAPA_MENTAL: "FREE",
+      FLASHCARDS: "FREE",
+      LEITURA: "FREE",
+      LEI_SECA: "FREE",
+      JURISPRUDENCIA: "FREE",
+      INFORMATIVOS: "FREE",
+      DOUTRINA: "FREE",
+      MONITORIA: "FREE",
+      ESTUDO_IA: "FREE",
+      DISCUSSAO: "FREE",
     }
-    const studySource = studySourceMap[String(data["studyType"])] || 'FREE'
+    // Origem explícita (ex.: "PLAN" vinda do Cronograma) tem prioridade sobre o tipo de estudo.
+    const explicitSource = data["study_source"] ? String(data["study_source"]) : null
+    const studySource =
+      explicitSource &&
+      ["PLAN", "FREE", "REVIEW", "SIMULADO", "QUESTOES", "VIDEO", "PDF"].includes(explicitSource)
+        ? explicitSource
+        : studySourceMap[String(data["studyType"])] || "FREE"
+
+    // Sessão interrompida (Cronograma): tempo estudado abaixo de 90% do planejado
+    const interrupted = Boolean(data["interrupted"])
 
     // 5. Monta o payload base do study_history
     const insertPayload: Record<string, unknown> = {
       user_id: user.id,
       discipline_id: disciplineId,
-      study_source: studySource,  // OBRIGATÓRIO com CHECK constraint
+      study_source: studySource, // OBRIGATÓRIO com CHECK constraint
       study_type: data["studyType"] || null,
       technique: data["technique"] || null,
       active_minutes: activeMinutesFinal,
       paused_minutes: pausedMinutesFinal,
       duration_minutes: activeMinutesFinal,
-      completed: true,
-      interrupted: false,
+      completed: !interrupted,
+      interrupted,
       notes: data["notes"] || null,
       metadata: metadata,
+      // Vínculo com o planejamento (quando a sessão veio do Cronograma)
+      study_plan_item_id: data["study_plan_item_id"] ? String(data["study_plan_item_id"]) : null,
+      planned_minutes:
+        data["planned_minutes"] !== undefined && data["planned_minutes"] !== null
+          ? Math.max(0, Math.round(Number(data["planned_minutes"])))
+          : null,
+      // Energia é entrada manual do usuário (não existe medição automática)
+      energy_level:
+        data["energy_level"] !== undefined && data["energy_level"] !== null
+          ? Math.max(1, Math.min(5, Math.round(Number(data["energy_level"]))))
+          : null,
     }
 
     // Se for cronômetro, usar timestamps reais
@@ -145,15 +180,19 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       insertPayload["finished_at"] = now
     }
 
-    // 6. Salva no study_history
+    // 6. Salva no study_history e retorna a sessão REAL criada (com disciplina),
+    // para o frontend atualizar o estado local sem precisar de F5.
     const { data: historyData, error: historyError } = await supabase
       .from("study_history")
       .insert(insertPayload)
-      .select("id")
+      .select("*, disciplines ( id, name, area )")
       .single()
 
     if (historyError) {
       console.error("[STUDY_SAVE] Erro ao inserir study_history:", historyError)
+      Sentry.captureMessage("Falha ao salvar sessão de estudo", {
+        extra: { feature: "study-session", code: historyError.code ?? null },
+      })
       return {
         success: false,
         error: "Erro ao salvar sessão: " + (historyError.message || JSON.stringify(historyError)),
@@ -165,13 +204,16 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     revalidatePath("/dashboard")
     revalidatePath("/dashboard/history")
     revalidatePath("/estatisticas")
+    revalidatePath("/disciplines")
     revalidatePath("/home")
 
-    return { success: true, historyId: historyData.id }
-
+    return { success: true, historyId: historyData.id, session: historyData }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro inesperado ao salvar."
     console.error("[saveStudySession] Erro inesperado:", err)
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+      extra: { feature: "study-session" },
+    })
     return { success: false, error: message }
   }
 }

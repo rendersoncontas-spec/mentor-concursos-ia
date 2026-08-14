@@ -1,10 +1,6 @@
 // Enum de status de disciplinas do usuário
 export type DisciplineStatus =
-  | 'NOT_STARTED'
-  | 'STUDYING'
-  | 'REVISING'
-  | 'COMPLETED'
-  | 'READY_FOR_SCHEDULE'
+  "NOT_STARTED" | "STUDYING" | "REVISING" | "COMPLETED" | "READY_FOR_SCHEDULE"
 
 export interface Exam {
   id: string
@@ -20,6 +16,7 @@ export interface Discipline {
   id: string
   name: string
   area: string | null
+  color_hex: string | null
   created_at: string
 }
 

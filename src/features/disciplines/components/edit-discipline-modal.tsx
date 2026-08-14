@@ -5,9 +5,17 @@ import { useEffect, useState } from "react"
 import { ArrowUpDown, Check, ChevronDown, ChevronUp, Edit2, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { updateDisciplineAppearanceAction } from "@/application/disciplines/discipline-actions"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  DEFAULT_DISCIPLINE_COLOR,
+  DISCIPLINE_COLOR_PALETTE,
+  disciplineColorHex,
+} from "@/domain/disciplines/discipline-colors"
+
+const COLOR_OPTIONS = DISCIPLINE_COLOR_PALETTE.map((hex) => ({ value: hex, name: hex }))
 
 export interface DisciplineTopicItem {
   id: string
@@ -20,37 +28,30 @@ export interface EditDisciplineModalProps {
   onOpenChange: (open: boolean) => void
   disciplineName: string
   disciplineColor?: string
+  /** Id da disciplina GLOBAL (para persistir a cor no banco). */
+  disciplineId?: string | null
+  /** Cor persistida no banco (null = Automática). */
+  storedColorHex?: string | null
   badgeText?: string
   initialTopics?: DisciplineTopicItem[]
   onSave?: (data: { name: string; color: string; topics: DisciplineTopicItem[] }) => void
   onRemove?: () => void
 }
 
-const COLOR_OPTIONS = [
-  { name: "Amarelo", value: "#fef08a" },
-  { name: "Azul Claro", value: "#e0f2fe" },
-  { name: "Roxo Claro", value: "#f3e8ff" },
-  { name: "Laranja Claro", value: "#ffedd5" },
-  { name: "Azul", value: "#dbeafe" },
-  { name: "Verde Claro", value: "#dcfce7" },
-  { name: "Rosa", value: "#fce7f3" },
-  { name: "Verde Água", value: "#dbeafe" },
-]
-
-// Removido DEFAULT_TOPICS_LIST (não deve exibir mock data em produção)
-
 export function EditDisciplineModal({
   open,
   onOpenChange,
   disciplineName,
-  disciplineColor = "#fef08a",
+  disciplineColor: _disciplineColor,
+  disciplineId,
+  storedColorHex = null,
   badgeText,
   initialTopics,
   onSave,
   onRemove,
 }: EditDisciplineModalProps) {
   const [name, setName] = useState(disciplineName)
-  const [color, setColor] = useState(disciplineColor)
+  const [colorHex, setColorHex] = useState<string | null>(storedColorHex)
   const [topics, setTopics] = useState<DisciplineTopicItem[]>(initialTopics || [])
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
   const [editingTopicText, setEditingTopicText] = useState("")
@@ -61,19 +62,40 @@ export function EditDisciplineModal({
     if (!open) return
     const timer = setTimeout(() => {
       setName(disciplineName)
-      setColor(disciplineColor)
+      setColorHex(storedColorHex)
       setTopics(initialTopics && initialTopics.length > 0 ? initialTopics : [])
     }, 0)
     return () => clearTimeout(timer)
-  }, [disciplineName, disciplineColor, initialTopics, open])
+  }, [disciplineName, storedColorHex, initialTopics, open])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       toast.error("Informe o nome da disciplina.")
       return
     }
+    if (disciplineId) {
+      const res = await updateDisciplineAppearanceAction(disciplineId, {
+        name: name.trim(),
+        colorHex,
+      })
+      if (!res.success) {
+        toast.error(res.error || "Erro ao salvar disciplina.")
+        return
+      }
+      if (onSave) {
+        onSave({
+          name: name.trim(),
+          color: disciplineColorHex(disciplineId, colorHex),
+          topics,
+        })
+      } else {
+        toast.success(`Disciplina "${name.trim()}" salva com sucesso!`)
+      }
+      onOpenChange(false)
+      return
+    }
     if (onSave) {
-      onSave({ name: name.trim(), color, topics })
+      onSave({ name: name.trim(), color: disciplineColorHex("", colorHex), topics })
     } else {
       toast.success(`Disciplina "${name}" salva com sucesso!`)
     }
@@ -163,13 +185,14 @@ export function EditDisciplineModal({
               <div className="flex items-center gap-2">
                 <div
                   className="w-4 h-4 rounded-xs border shrink-0"
-                  style={{ backgroundColor: color }}
+                  style={{ backgroundColor: colorHex ?? DEFAULT_DISCIPLINE_COLOR }}
                 />
                 <select
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
+                  value={colorHex ?? ""}
+                  onChange={(e) => setColorHex(e.target.value)}
                   className="w-full h-8 bg-transparent border-b border-[#2563EB] text-xs font-semibold text-foreground focus:outline-none cursor-pointer"
                 >
+                  <option value="">Automática</option>
                   {COLOR_OPTIONS.map((c) => (
                     <option key={c.value} value={c.value}>
                       {c.name}

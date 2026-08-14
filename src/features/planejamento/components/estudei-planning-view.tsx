@@ -19,14 +19,12 @@ import { toast } from "sonner"
 
 import { deactivateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
-import { AiPlanningWizard } from "./ai-planning-wizard"
 import { DailyPlanningView } from "./daily-planning-view"
-import { EditPlanningWizardModal } from "./edit-planning-wizard-modal"
 import { PlanningGoalsProgressCard } from "./planning-goals-progress-card"
+import { PlanningWizardModal } from "./planning-wizard-modal"
 import { StudyCalendarView } from "./study-calendar-view"
 import { WeeklyPlanningView } from "./weekly-planning-view"
 
@@ -38,6 +36,7 @@ export interface StudyCycleBlock {
   studiedMinutes: number
   color: string
   completed: boolean
+  priorityScore?: number
 }
 
 interface PlanningViewProps {
@@ -67,6 +66,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
         ),
         color: b.color || "#2563EB",
         completed: false, // Always start as pending, completed is calculated per-day by the view
+        priorityScore: b.priorityScore ?? 3,
       }))
     }
     return []
@@ -91,6 +91,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
           ),
           color: b.color || "#2563EB",
           completed: false,
+          priorityScore: b.priorityScore ?? 3,
         }))
         setHasPlanning(true)
         setBlocks(nextBlocks)
@@ -106,10 +107,18 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
   // Modais
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
-  const [isChoiceModalOpen, setIsChoiceModalOpen] = useState(false)
-  const [isManualChoiceModalOpen, setIsManualChoiceModalOpen] = useState(false)
   const [isWizardModalOpen, setIsWizardModalOpen] = useState(false)
-  const [wizardTitle, setWizardTitle] = useState("Criar Planejamento")
+  const [wizardTitle, setWizardTitle] = useState("Criar planejamento")
+
+  const openCreateWizard = () => {
+    setWizardTitle("Criar planejamento")
+    setIsWizardModalOpen(true)
+  }
+
+  const openEditWizard = () => {
+    setWizardTitle("Editar planejamento")
+    setIsWizardModalOpen(true)
+  }
 
   // Modo de Edição da Tabela de Sequência
   const [isEditMode, setIsEditMode] = useState(false)
@@ -229,10 +238,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
             {/* AI Option */}
             <div
-              onClick={() => {
-                setWizardTitle("Criar Planejamento com IA")
-                setIsWizardModalOpen(true)
-              }}
+              onClick={openCreateWizard}
               className="bg-card border-2 border-[#2563EB]/20 hover:border-[#2563EB] rounded-3xl p-8 flex flex-col items-center text-center space-y-6 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/10 group"
             >
               <div className="w-16 h-16 bg-[#2563EB]/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -257,10 +263,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
             {/* Manual Option */}
             <div
-              onClick={() => {
-                setWizardTitle("Criar Planejamento Manual")
-                setIsWizardModalOpen(true)
-              }}
+              onClick={openCreateWizard}
               className="bg-card border-2 border-muted hover:border-foreground/30 rounded-3xl p-8 flex flex-col items-center text-center space-y-6 cursor-pointer transition-all hover:shadow-md group"
             >
               <div className="w-16 h-16 bg-muted/50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -286,84 +289,11 @@ export function PlanningView({ initialData }: PlanningViewProps) {
           </div>
         </div>
 
-        {/* Wizard Modal */}
-        <AiPlanningWizard
-          open={isChoiceModalOpen}
-          onOpenChange={setIsChoiceModalOpen}
-          onSuccess={() => {
-            // Apenas aciona um router refresh pra view buscar dados novos
-            // e o useEffect cuidará da tela de carregamento/sucesso
-            router.refresh()
-          }}
-        />
-
-        {/* Modal 2: Escolha Manual (Ciclo de Estudos vs Planejamento Semanal - Sua Foto 2) */}
-        <Dialog open={isManualChoiceModalOpen} onOpenChange={setIsManualChoiceModalOpen}>
-          <DialogContent className="sm:max-w-xl p-6 rounded-2xl">
-            <div className="space-y-6">
-              <div className="space-y-1 text-center">
-                <h2 className="text-2xl font-black text-foreground tracking-tight">
-                  Criar Planejamento
-                </h2>
-                <p className="text-xs font-semibold text-muted-foreground">
-                  Para iniciar o seu planejamento, escolha a melhor forma de visualização para você:
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {/* Opção 1: Ciclo de Estudos */}
-                <div
-                  onClick={() => {
-                    setIsManualChoiceModalOpen(false)
-                    setPlanningType("ciclo")
-                    setIsManualCreation(true)
-                    setHasPlanning(true)
-                    setBlocks([])
-                  }}
-                  className="rounded-2xl border-2 border-muted bg-card hover:border-[#2563EB] p-6 cursor-pointer transition-all flex flex-col items-center justify-between text-center space-y-4 shadow-xs"
-                >
-                  <div className="w-16 h-16 rounded-2xl text-[#2563EB] flex items-center justify-center">
-                    <RotateCcw className="h-12 w-12 stroke-[2]" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-extrabold text-sm text-foreground">Ciclo de Estudos</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Estude as disciplinas em uma ordem rotativa, sem depender de dias fixos. Ideal
-                      para quem precisa de flexibilidade na rotina.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Opção 2: Planejamento Semanal */}
-                <div
-                  onClick={() => {
-                    setIsManualChoiceModalOpen(false)
-                    setPlanningType("semanal")
-                    setIsManualCreation(false)
-                    setHasPlanning(true)
-                  }}
-                  className="rounded-2xl border-2 border-muted bg-card hover:border-[#2563EB] p-6 cursor-pointer transition-all flex flex-col items-center justify-between text-center space-y-4 shadow-xs"
-                >
-                  <div className="w-16 h-16 rounded-2xl text-emerald-500 flex items-center justify-center">
-                    <CalendarDays className="h-12 w-12 stroke-[2]" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-extrabold text-sm text-foreground">Planejamento Semanal</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Define quais matérias estudar em cada dia da semana. Ótimo para quem prefere
-                      uma rotina fixa e estruturada.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
         {/* Modal Assistente 4 Passos Criar Planejamento */}
-        <EditPlanningWizardModal
+        <PlanningWizardModal
           open={isWizardModalOpen}
           onOpenChange={setIsWizardModalOpen}
+          mode="create"
           modalTitle={wizardTitle}
           onComplete={() => {
             setHasPlanning(true)
@@ -405,10 +335,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
               </Button>
 
               <Button
-                onClick={() => {
-                  setWizardTitle("Editar Planejamento")
-                  setIsWizardModalOpen(true)
-                }}
+                onClick={openEditWizard}
                 className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 h-9 shadow-xs"
               >
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
@@ -496,10 +423,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
           blocks={blocks}
           history={initialData?.history || []}
           onSwitchToCiclo={() => setPlanningType("ciclo")}
-          onReplan={() => {
-            setWizardTitle("Editar Planejamento")
-            setIsWizardModalOpen(true)
-          }}
+          onReplan={openEditWizard}
         />
       )}
 
@@ -507,23 +431,12 @@ export function PlanningView({ initialData }: PlanningViewProps) {
         <WeeklyPlanningView
           blocks={blocks}
           history={initialData?.history || []}
-          onReplan={() => {
-            setWizardTitle("Editar Planejamento")
-            setIsWizardModalOpen(true)
-          }}
+          onReplan={openEditWizard}
           onRemove={handleRemovePlan}
         />
       )}
 
-      {planningType === "mensal" && (
-        <StudyCalendarView
-          blocks={blocks}
-          onReplan={() => {
-            setWizardTitle("Editar Planejamento")
-            setIsWizardModalOpen(true)
-          }}
-        />
-      )}
+      {planningType === "mensal" && <StudyCalendarView blocks={blocks} onReplan={openEditWizard} />}
 
       {planningType === "metas" && (
         <PlanningGoalsProgressCard
@@ -701,10 +614,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
               {!isEditMode && !isManualCreation && blocks.length > 0 && (
                 <div className="flex justify-end pt-2">
                   <Button
-                    onClick={() => {
-                      setWizardTitle("Editar Planejamento")
-                      setIsWizardModalOpen(true)
-                    }}
+                    onClick={openEditWizard}
                     className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs"
                   >
                     Editar Ciclo
@@ -778,9 +688,10 @@ export function PlanningView({ initialData }: PlanningViewProps) {
       <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
 
       {/* Modal Assistente 4 Passos Editar Planejamento */}
-      <EditPlanningWizardModal
+      <PlanningWizardModal
         open={isWizardModalOpen}
         onOpenChange={setIsWizardModalOpen}
+        mode="edit"
         modalTitle={wizardTitle}
         initialBlocks={blocks}
         onComplete={() => {

@@ -1,5 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types";
+
+import type { StudyHistory, StudyHistoryInsert } from "@/domain/study-history/study-history.types"
+
+type MonthlyHistoryRow = StudyHistory & {
+  disciplines?: {
+    id?: string
+    name?: string
+    area?: string | null
+    color_hex?: string | null
+  } | null
+}
 
 /**
  * Cria ou inicia uma sessão de estudo.
@@ -7,7 +17,7 @@ import type { StudyHistoryInsert } from "@/domain/study-history/study-history.ty
 export async function createStudySession(
   supabase: SupabaseClient,
   userId: string,
-  data: StudyHistoryInsert
+  data: StudyHistoryInsert,
 ) {
   const { data: session, error } = await supabase
     .from("study_history")
@@ -17,7 +27,7 @@ export async function createStudySession(
       study_plan_item_id: data.study_plan_item_id,
       study_source: data.study_source,
       planned_minutes: data.planned_minutes,
-      started_at: new Date().toISOString()
+      started_at: new Date().toISOString(),
     })
     .select()
     .single()
@@ -40,7 +50,7 @@ export async function finishStudySession(
     mood?: string
     notes?: string
     interrupted?: boolean
-  }
+  },
 ) {
   // 1. Buscar a sessão para calcular o tempo real
   const { data: session, error: fetchError } = await supabase
@@ -57,7 +67,9 @@ export async function finishStudySession(
   const durationMinutes = Math.floor((finishedAt.getTime() - startedAt.getTime()) / 60000)
 
   // Opcional: Se for interrompida e tiver menos de 1 minuto, pode ser descartada ou salva como 0
-  const isCompleted = feedback.interrupted ? false : (durationMinutes >= (session.planned_minutes || 0) * 0.9)
+  const isCompleted = feedback.interrupted
+    ? false
+    : durationMinutes >= (session.planned_minutes || 0) * 0.9
 
   const { data: updated, error: updateError } = await supabase
     .from("study_history")
@@ -70,7 +82,7 @@ export async function finishStudySession(
       difficulty: feedback.difficulty,
       focus_score: feedback.focus_score,
       mood: feedback.mood,
-      notes: feedback.notes
+      notes: feedback.notes,
     })
     .eq("id", sessionId)
     .eq("user_id", userId)
@@ -88,30 +100,30 @@ export async function updateStudySession(
   supabase: SupabaseClient,
   userId: string,
   sessionId: string,
-  data: Partial<StudyHistoryInsert>
+  data: Partial<StudyHistoryInsert>,
 ) {
   // Build update object from allowed fields
   const updateData: Record<string, unknown> = {}
   const allowedFields = [
-    'discipline_id',
-    'study_plan_item_id',
-    'study_source',
-    'study_type',
-    'technique',
-    'started_at',
-    'finished_at',
-    'duration_minutes',
-    'active_minutes',
-    'paused_minutes',
-    'planned_minutes',
-    'completed',
-    'interrupted',
-    'energy_level',
-    'difficulty',
-    'focus_score',
-    'mood',
-    'notes',
-    'metadata'
+    "discipline_id",
+    "study_plan_item_id",
+    "study_source",
+    "study_type",
+    "technique",
+    "started_at",
+    "finished_at",
+    "duration_minutes",
+    "active_minutes",
+    "paused_minutes",
+    "planned_minutes",
+    "completed",
+    "interrupted",
+    "energy_level",
+    "difficulty",
+    "focus_score",
+    "mood",
+    "notes",
+    "metadata",
   ] as const
 
   for (const key of allowedFields) {
@@ -129,7 +141,7 @@ export async function updateStudySession(
     .update(updateData)
     .eq("id", sessionId)
     .eq("user_id", userId)
-    .select()
+    .select("*, disciplines ( id, name, area )")
     .single()
 
   if (error) throw new Error("Erro ao atualizar sessão: " + error.message)
@@ -142,7 +154,7 @@ export async function updateStudySession(
 export async function deleteStudySession(
   supabase: SupabaseClient,
   userId: string,
-  sessionId: string
+  sessionId: string,
 ) {
   const { error } = await supabase
     .from("study_history")
@@ -198,7 +210,10 @@ async function fetchAllRows<T>(
   const all: T[] = []
   let offset = 0
   while (true) {
-    let query = supabase.from(table).select(select).range(offset, offset + pageSize - 1)
+    let query = supabase
+      .from(table)
+      .select(select)
+      .range(offset, offset + pageSize - 1)
     for (const f of filters) {
       if (f.op === "eq") query = query.eq(f.column, f.value)
       else if (f.op === "not.is") query = query.not(f.column, "is", f.value)
@@ -207,6 +222,40 @@ async function fetchAllRows<T>(
     if (error) break
     if (!data || data.length === 0) break
     all.push(...(data as T[]))
+    if (data.length < pageSize) break
+    offset += pageSize
+  }
+  return all
+}
+
+/**
+ * Busca TODAS as sessões do usuário (com disciplina e cor), paginando
+ * automaticamente para ultrapassar o limite do PostgREST (~1000 linhas).
+ * Necessário para o agrupamento por data no Histórico: a agregação de cada
+ * dia deve considerar TODO o histórico do período, nunca só a página atual.
+ */
+export async function getAllUserHistory(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Array<Record<string, unknown>>> {
+  const all: Array<Record<string, unknown>> = []
+  let offset = 0
+  const pageSize = 1000
+  while (true) {
+    const { data, error } = await supabase
+      .from("study_history")
+      .select(
+        `
+        *,
+        disciplines ( id, name, area )
+      `,
+      )
+      .eq("user_id", userId)
+      .order("started_at", { ascending: false })
+      .range(offset, offset + pageSize - 1)
+    if (error) throw new Error("Erro ao buscar histórico completo: " + error.message)
+    if (!data || data.length === 0) break
+    all.push(...(data as Array<Record<string, unknown>>))
     if (data.length < pageSize) break
     offset += pageSize
   }
@@ -238,21 +287,19 @@ export async function getTotalStudyMinutes(
  * Busca as últimas atividades finalizadas formatadas para o Dashboard.
  * Possui limite de itens parametrizável.
  */
-export async function getRecentActivities(
-  supabase: SupabaseClient,
-  userId: string,
-  limit = 5
-) {
+export async function getRecentActivities(supabase: SupabaseClient, userId: string, limit = 5) {
   const { data, error } = await supabase
     .from("study_history")
-    .select(`
+    .select(
+      `
       id,
       duration_minutes,
       study_source,
       started_at,
       completed,
       disciplines ( name )
-    `)
+    `,
+    )
     .eq("user_id", userId)
     .not("duration_minutes", "is", null)
     .order("started_at", { ascending: false })
@@ -263,13 +310,14 @@ export async function getRecentActivities(
   return data.map((item) => {
     const disc = Array.isArray(item.disciplines) ? item.disciplines[0] : item.disciplines
     return {
-    id: item.id,
-    discipline_name: disc?.name || "Estudo Livre",
-    duration_minutes: item.duration_minutes || 0,
-    study_source: item.study_source || "FREE",
-    started_at: item.started_at,
-    completed: item.completed ?? false
-  }})
+      id: item.id,
+      discipline_name: disc?.name || "Estudo Livre",
+      duration_minutes: item.duration_minutes || 0,
+      study_source: item.study_source || "FREE",
+      started_at: item.started_at,
+      completed: item.completed ?? false,
+    }
+  })
 }
 
 /**
@@ -282,28 +330,30 @@ export async function getMonthlyHistory(
   supabase: SupabaseClient,
   userId: string,
   year: number,
-  month: number // 1 a 12
+  month: number, // 1 a 12
 ) {
   // Construir as datas de início e fim do mês usando offset -03:00 (Brasília padrão)
-  const paddedMonth = String(month).padStart(2, '0')
+  const paddedMonth = String(month).padStart(2, "0")
   const startStr = `${year}-${paddedMonth}-01T00:00:00.000-03:00`
-  
+
   const nextMonth = month === 12 ? 1 : month + 1
   const nextYear = month === 12 ? year + 1 : year
-  const paddedNextMonth = String(nextMonth).padStart(2, '0')
+  const paddedNextMonth = String(nextMonth).padStart(2, "0")
   const nextMonthStartStr = `${nextYear}-${paddedNextMonth}-01T00:00:00.000-03:00`
 
-  const allSessions: any[] = []
+  const allSessions: MonthlyHistoryRow[] = []
   let offset = 0
   const pageSize = 1000
 
   while (true) {
     const { data, error } = await supabase
       .from("study_history")
-      .select(`
+      .select(
+        `
         *,
         disciplines ( id, name, area )
-      `)
+      `,
+      )
       .eq("user_id", userId)
       .gte("started_at", startStr)
       .lt("started_at", nextMonthStartStr)
@@ -312,9 +362,9 @@ export async function getMonthlyHistory(
 
     if (error) throw new Error("Erro ao buscar histórico mensal: " + error.message)
     if (!data || data.length === 0) break
-    
+
     allSessions.push(...data)
-    
+
     if (data.length < pageSize) break
     offset += pageSize
   }

@@ -71,6 +71,7 @@ export interface StudyPlanItemWithDetails extends StudyPlanItem {
     id: string
     name: string
     area: string | null
+    color_hex?: string | null
   }
 }
 
@@ -145,9 +146,9 @@ export interface StudyPlanDisciplineSummary {
 // Input do algoritmo puro
 export interface AlgorithmInput {
   weeklyMinutes: number
-  availableDays: DayOfWeek[]    // Futuro: dias disponíveis do aluno
+  availableDays: DayOfWeek[] // Futuro: dias disponíveis do aluno
   disciplines: AlgorithmDisciplineInput[]
-  adaptiveDecisions?: AdaptiveDecision[]     // Decisões do Adaptive Learning Engine (ALE)
+  adaptiveDecisions?: AdaptiveDecision[] // Decisões do Adaptive Learning Engine (ALE)
 }
 
 export interface AlgorithmDisciplineInput {
@@ -156,7 +157,7 @@ export interface AlgorithmDisciplineInput {
   area: string | null
   weight: number
   difficulty?: number
-  status: string   // Disciplinas COMPLETED podem ter peso reduzido
+  status: string // Disciplinas COMPLETED podem ter peso reduzido
 }
 
 // Output do algoritmo puro (antes de persistir)

@@ -36,6 +36,7 @@ export interface DisciplineCardData {
   topicsTotal: number
   questionsSolved: number
   color: string
+  colorHex?: string | null
   accuracy?: number | null
   area?: string | null
   totalMinutes?: number
@@ -725,6 +726,8 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
         onOpenChange={setIsEditModalOpen}
         disciplineName={editingDisc?.name || ""}
         disciplineColor={editingDisc?.color || "#fef08a"}
+        disciplineId={editingDisc?.disciplineId ?? null}
+        storedColorHex={editingDisc?.colorHex ?? null}
         onSave={(data) => {
           if (editingDisc) {
             setDisciplines(

@@ -1,13 +1,18 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
-import { type Exam, type ExamDisciplineWithDetails, type UserDisciplineWithDetails, type DisciplineStatus, type EditalTree, type EditalDisciplineNode } from "@/domain/disciplines/disciplines.types"
+
+import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
+import {
+  type DisciplineStatus,
+  type EditalDisciplineNode,
+  type EditalTree,
+  type Exam,
+  type ExamDisciplineWithDetails,
+  type UserDisciplineWithDetails,
+} from "@/domain/disciplines/disciplines.types"
 
 // Busca todos os concursos ativos para o Combobox do Onboarding
 export async function getGlobalExams(supabase: SupabaseClient): Promise<Exam[]> {
-  const { data, error } = await supabase
-    .from("exams")
-    .select("*")
-    .eq("active", true)
-    .order("name")
+  const { data, error } = await supabase.from("exams").select("*").eq("active", true).order("name")
 
   if (error) {
     console.error("Error fetching exams:", error)
@@ -20,11 +25,12 @@ export async function getGlobalExams(supabase: SupabaseClient): Promise<Exam[]> 
 // Busca as disciplinas vinculadas a um concurso específico (via exam_disciplines)
 export async function getExamDisciplines(
   supabase: SupabaseClient,
-  examId: string
+  examId: string,
 ): Promise<ExamDisciplineWithDetails[]> {
   const { data, error } = await supabase
     .from("exam_disciplines")
-    .select(`
+    .select(
+      `
       id,
       exam_id,
       discipline_id,
@@ -33,7 +39,8 @@ export async function getExamDisciplines(
       active,
       created_at,
       disciplines ( id, name, area, created_at )
-    `)
+    `,
+    )
     .eq("exam_id", examId)
     .eq("active", true)
     .order("display_order")
@@ -51,7 +58,13 @@ export async function getExamDisciplines(
     display_order: number
     active: boolean
     created_at: string
-    disciplines: { id: string; name: string; area: string | null; created_at: string }
+    disciplines: {
+      id: string
+      name: string
+      area: string | null
+      color_hex: string | null
+      created_at: string
+    }
   }
 
   return (data as unknown as RawRow[]).map((row) => ({
@@ -62,7 +75,13 @@ export async function getExamDisciplines(
     display_order: row.display_order,
     active: row.active,
     created_at: row.created_at,
-    discipline: row.disciplines,
+    discipline: {
+      id: row.disciplines.id,
+      name: row.disciplines.name,
+      area: row.disciplines.area,
+      color_hex: row.disciplines.color_hex ?? null,
+      created_at: row.disciplines.created_at,
+    },
   }))
 }
 
@@ -70,11 +89,12 @@ export async function getExamDisciplines(
 export async function getUserDisciplines(
   supabase: SupabaseClient,
   userId: string,
-  targetId?: string
+  targetId?: string,
 ): Promise<UserDisciplineWithDetails[]> {
   let query = supabase
     .from("user_disciplines")
-    .select(`
+    .select(
+      `
       id,
       user_id,
       discipline_id,
@@ -83,7 +103,8 @@ export async function getUserDisciplines(
       mastery_level,
       created_at,
       disciplines ( id, name, area, created_at )
-    `)
+    `,
+    )
     .eq("user_id", userId)
 
   if (targetId) {
@@ -105,7 +126,13 @@ export async function getUserDisciplines(
     status: DisciplineStatus
     mastery_level: number
     created_at: string
-    disciplines: { id: string; name: string; area: string | null; created_at: string }
+    disciplines: {
+      id: string
+      name: string
+      area: string | null
+      color_hex: string | null
+      created_at: string
+    }
   }
 
   return (data as unknown as RawRow[]).map((row) => ({
@@ -125,7 +152,7 @@ export async function updateUserDisciplineStatus(
   supabase: SupabaseClient,
   userId: string,
   userDisciplineId: string,
-  status: DisciplineStatus
+  status: DisciplineStatus,
 ): Promise<boolean> {
   const { error } = await supabase
     .from("user_disciplines")
@@ -146,7 +173,7 @@ export async function seedUserDisciplinesFromExam(
   supabase: SupabaseClient,
   userId: string,
   examId: string,
-  targetId?: string
+  targetId?: string,
 ): Promise<boolean> {
   // 1. Busca as disciplinas do edital
   const examDisciplines = await getExamDisciplines(supabase, examId)
@@ -165,12 +192,10 @@ export async function seedUserDisciplinesFromExam(
   }))
 
   // 3. Insere ignorando duplicatas (UNIQUE user_id + target_id + discipline_id)
-  const { error } = await supabase
-    .from("user_disciplines")
-    .upsert(userDisciplinesToInsert, {
-      onConflict: "user_id,target_id,discipline_id",
-      ignoreDuplicates: true,
-    })
+  const { error } = await supabase.from("user_disciplines").upsert(userDisciplinesToInsert, {
+    onConflict: "user_id,target_id,discipline_id",
+    ignoreDuplicates: true,
+  })
 
   if (error) {
     console.error("Error seeding user disciplines:", error)
@@ -181,7 +206,10 @@ export async function seedUserDisciplinesFromExam(
 }
 
 // Busca o edital completo de um concurso com assuntos aninhados por disciplina
-export async function getExamEdital(supabase: SupabaseClient, examId: string): Promise<EditalTree | null> {
+export async function getExamEdital(
+  supabase: SupabaseClient,
+  examId: string,
+): Promise<EditalTree | null> {
   const { data: exam, error: examError } = await supabase
     .from("exams")
     .select("*")
@@ -195,11 +223,13 @@ export async function getExamEdital(supabase: SupabaseClient, examId: string): P
 
   const { data: mappings, error: mappingError } = await supabase
     .from("exam_subjects")
-    .select(`
+    .select(
+      `
       weight,
       subjects ( id, name, slug ),
       disciplines ( id, name, area )
-    `)
+    `,
+    )
     .eq("exam_id", examId)
 
   if (mappingError || !mappings) {
@@ -243,7 +273,9 @@ export async function getExamEdital(supabase: SupabaseClient, examId: string): P
     })
   })
 
-  const sortedDisciplines = Array.from(disciplinesMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+  const sortedDisciplines = Array.from(disciplinesMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  )
   sortedDisciplines.forEach((d) => {
     d.subjects.sort((a, b) => a.name.localeCompare(b.name))
   })
@@ -287,7 +319,7 @@ export interface DisciplinesPageData {
 
 export async function getDisciplinesPageData(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
 ): Promise<DisciplinesPageData> {
   const { data: rawTarget } = await supabase
     .from("user_targets")
@@ -321,7 +353,7 @@ export async function getDisciplinesPageData(
   if (rawTarget?.exam_id) {
     const edital = await getExamEdital(supabase, rawTarget.exam_id)
     if (edital?.disciplines) {
-      edital.disciplines.forEach(d => {
+      edital.disciplines.forEach((d) => {
         topicsByDiscipline.set(d.id, d.subjects?.length || 0)
       })
     }
@@ -335,24 +367,23 @@ export async function getDisciplinesPageData(
     supabase
       .from("study_history")
       .select("id, discipline_id, duration_minutes, completed, metadata")
-      .eq("user_id", userId)
+      .eq("user_id", userId),
   ])
 
-  const attempts = (questionAttemptsResult?.data || []).map((a: {
-    id: string
-    correct: boolean
-    questions?: { discipline_id?: string } | Array<{ discipline_id?: string }>
-  }) => ({
-    id: a.id,
-    correct: a.correct,
-    discipline_id: (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ?? null,
-  }))
+  const attempts = (questionAttemptsResult?.data || []).map(
+    (a: {
+      id: string
+      correct: boolean
+      questions?: { discipline_id?: string } | Array<{ discipline_id?: string }>
+    }) => ({
+      id: a.id,
+      correct: a.correct,
+      discipline_id:
+        (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ??
+        null,
+    }),
+  )
   const history = studyHistoryResult?.data || []
-
-  const COLOR_PALETTE = [
-    "#fef08a", "#e0f2fe", "#f3e8ff", "#ffedd5", "#dbeafe",
-    "#dcfce7", "#ede9fe", "#fce7f3", "#e0e7ff", "#d1fae5",
-  ]
 
   let grandTotalMinutes = 0
   let grandTotalQuestions = 0
@@ -360,7 +391,7 @@ export async function getDisciplinesPageData(
   let grandTotalTopics = 0
   let grandTotalTopicsStudied = 0
 
-  const disciplineCards = userDisciplines.map((ud, idx) => {
+  const disciplineCards = userDisciplines.map((ud) => {
     const discId = ud.discipline_id
     const discName = ud.discipline?.name || "Disciplina"
 
@@ -383,7 +414,7 @@ export async function getDisciplinesPageData(
 
     // Tópicos reais do edital
     const topicsTotal = topicsByDiscipline.get(discId) || 0
-    
+
     // Tópicos estudados baseado no mastery_level (0-100) aplicado ao total
     const mastery = ud.mastery_level ?? 0
     const topicsStudied = topicsTotal > 0 ? Math.round((topicsTotal * mastery) / 100) : 0
@@ -400,7 +431,8 @@ export async function getDisciplinesPageData(
       questionsSolved: totalCount,
       accuracy: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : null,
       totalMinutes,
-      color: COLOR_PALETTE[idx % COLOR_PALETTE.length] || "#2563EB",
+      color: disciplineColorHex(discId, ud.discipline?.color_hex ?? null),
+      colorHex: ud.discipline?.color_hex ?? null,
       status: ud.status,
       area: ud.discipline?.area || null,
     }
@@ -408,8 +440,10 @@ export async function getDisciplinesPageData(
 
   const totalH = Math.floor(grandTotalMinutes / 60)
   const totalM = grandTotalMinutes % 60
-  const studyTimeFormatted = grandTotalMinutes > 0 ? `${totalH}h${totalM.toString().padStart(2, "0")}min` : "0h00min"
-  const accuracyPercentage = grandTotalQuestions > 0 ? Math.round((grandTotalCorrect / grandTotalQuestions) * 100) : 0
+  const studyTimeFormatted =
+    grandTotalMinutes > 0 ? `${totalH}h${totalM.toString().padStart(2, "0")}min` : "0h00min"
+  const accuracyPercentage =
+    grandTotalQuestions > 0 ? Math.round((grandTotalCorrect / grandTotalQuestions) * 100) : 0
 
   return {
     target: {
@@ -430,4 +464,3 @@ export async function getDisciplinesPageData(
     disciplines: disciplineCards,
   }
 }
-

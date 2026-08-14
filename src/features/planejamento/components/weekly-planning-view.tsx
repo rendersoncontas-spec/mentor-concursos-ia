@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { getStudyDaysCount, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
 
 import { type StudyCycleBlock } from "./estudei-planning-view"
 
@@ -33,15 +34,14 @@ const SCHEDULE_MODES: readonly ScheduleMode[] = [
 ]
 const WEEKDAY_KEYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const
 
-function isScheduleMode(value: string | null): value is ScheduleMode {
-  return value !== null && SCHEDULE_MODES.includes(value as ScheduleMode)
-}
+const CUSTOM_SCALE_RE = /^custom_(\d+)x(\d+)$/
 
-function getStudyDaysCount(scheduleMode: ScheduleMode, studyDays: string[]): number {
-  if (scheduleMode === "normal") return studyDays.length || 6
-  if (scheduleMode === "24x72") return 5
-  if (scheduleMode === "12x36") return 3.5
-  return 6
+/** Aceita as escalas fixas e também o formato custom_XxY salvo pelo wizard. */
+function isScheduleMode(value: string | null): value is ScheduleMode {
+  return (
+    value !== null &&
+    (SCHEDULE_MODES.includes(value as ScheduleMode) || CUSTOM_SCALE_RE.test(value))
+  )
 }
 
 function getEventCardClass(isDone: boolean, isPastOrToday: boolean): string {
@@ -139,20 +139,12 @@ export function WeeklyPlanningView({
   }, [])
 
   const isShiftDay = (dayNum: number) => {
-    const dayDiff = dayNum - firstShiftDay
-
-    if (scheduleMode === "12x36") return dayDiff >= 0 && dayDiff % 2 === 0
-    if (scheduleMode === "24x72") return dayDiff >= 0 && dayDiff % 4 === 0
-    if (scheduleMode === "24x48") return dayDiff >= 0 && dayDiff % 3 === 0
-    if (scheduleMode === "5x1") return dayDiff >= 0 && dayDiff % 6 === 0
-    if (scheduleMode === "6x1") return dayDiff >= 0 && dayDiff % 7 === 0
-    if (scheduleMode === "4x2")
-      return dayDiff >= 0 && (dayDiff % 6 === 0 || (dayDiff - 1) % 6 === 0)
-
-    return false
+    return isShiftDayForScale(dayNum, firstShiftDay, scheduleMode)
   }
 
   const getScaleLabel = (mode: string) => {
+    const custom = CUSTOM_SCALE_RE.exec(mode)
+    if (custom) return `Escala personalizada (Trabalha ${custom[1]}d / Folga ${custom[2]}d)`
     switch (mode) {
       case "12x36":
         return "Escala 12x36 (Plantão 12h / Folga 36h)"

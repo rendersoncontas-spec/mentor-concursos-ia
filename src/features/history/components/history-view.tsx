@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
+import * as Sentry from "@sentry/nextjs"
 import {
+  AlertTriangle,
   Clock,
   Database,
   Edit2,
@@ -17,22 +19,41 @@ import { toast } from "sonner"
 
 import {
   deleteStudySessionAction,
+  getAllHistoryAction,
   getMonthlyHistoryAction,
-  getUserHistoryAction,
 } from "@/application/study-history/study-history.actions"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
 import { ImportHistoryModal } from "@/features/importacao/components/import-history-modal"
 import { ManageImportsModal } from "@/features/importacao/components/manage-imports-modal"
 import { originDisplayName } from "@/features/importacao/lib/origin"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+import {
+  STUDY_SESSION_SAVED_EVENT,
+  readStudySessionSaved,
+} from "@/features/study-session/lib/study-session-events"
+import { formatDayLabel, getDayInSaoPaulo, getTimeInSaoPaulo } from "@/lib/sao-paulo"
 
 import { StudyCalendar } from "./study-calendar"
 
-type HistorySession = StudyHistory & { disciplines?: { name?: string } | null }
+type HistorySession = StudyHistory & {
+  disciplines?: {
+    id?: string
+    name?: string
+    area?: string | null
+    color_hex?: string | null
+  } | null
+}
 
-const HISTORY_PAGE_SIZE = 50
+type DayGroup = {
+  day: string
+  label: string
+  totalSeconds: number
+  activityCount: number
+  sessions: HistorySession[]
+}
 
 interface Filters {
   dateStart: string
@@ -75,53 +96,50 @@ const TECHNIQUES = [
   { value: "PERSONALIZADO", label: "Personalizado" },
 ]
 
+/** Data YYYY-MM-DD do estudo no fuso oficial (America/Sao_Paulo). */
 function getStudyDate(session: HistorySession): string {
-  return session.started_at ? (String(session.started_at).split("T")[0] ?? "") : ""
+  return getDayInSaoPaulo(session.started_at)
 }
 
-// Formata a DATA DO ESTUDO de forma robusta, sem depender de concatenar strings
-function formatStudyDate(value: unknown): string {
-  if (value === null || value === undefined || value === "") return ""
-  const str = String(value)
-  // Se já é uma data pura YYYY-MM-DD, usar direto para evitar timezone shift
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const [y, m, d] = str.split("-")
-    return `${d}/${m}/${y}`
-  }
-  // Se é ISO string (YYYY-MM-DDTHH:mm:ss), extrair a parte da data (dia local do estudo)
-  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(str)) {
-    const [y, m, d] = str.slice(0, 10).split("-")
-    return `${d}/${m}/${y}`
-  }
-  // Se é timestamp numérico ou Date
-  const date = new Date(value as string | number | Date)
-  if (!isNaN(date.getTime())) {
-    const d = date.getDate()
-    const m = date.getMonth() + 1
-    const y = date.getFullYear()
-    return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`
-  }
-  return ""
-}
-
-// Formata o HORÁRIO DE SALVAMENTO de forma robusta (hora local)
+// Formata o HORÁRIO no fuso de São Paulo
 function formatSavedAt(value: unknown): string {
-  if (value === null || value === undefined || value === "") return ""
-  const date = new Date(value as string | number | Date)
-  if (isNaN(date.getTime())) return ""
-  return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+  return getTimeInSaoPaulo(value as string | Date | null | undefined)
+}
+
+/** Duração real de uma sessão em SEGUNDOS (unidade real do banco). */
+function sessionRealSeconds(s: HistorySession): number {
+  const imported = Number(s.metadata?.["imported_seconds"] || 0)
+  if (imported > 0) return imported
+  return (Number(s.duration_minutes) || 0) * 60
+}
+
+/** Formata duração de UMA sessão: "10m29s", "1h00m", "45s". */
+function formatSessionDuration(totalSeconds: number): string {
+  const total = Math.max(0, Math.round(totalSeconds))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (h === 0 && m === 0) return `${s}s`
+  if (h === 0) return `${m}m${s.toString().padStart(2, "0")}s`
+  if (s === 0) return `${h}h${m.toString().padStart(2, "0")}m`
+  return `${h}h${m.toString().padStart(2, "0")}m${s.toString().padStart(2, "0")}s`
+}
+
+/** Formata o TOTAL do dia: "2h13m44s", "1h10m24s", "34m12s". */
+function formatDayTotalSeconds(totalSeconds: number): string {
+  const total = Math.max(0, Math.round(totalSeconds))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (h === 0 && m === 0) return `${s}s`
+  if (h === 0) return `${m}m${s.toString().padStart(2, "0")}s`
+  return `${h}h${m.toString().padStart(2, "0")}m${s.toString().padStart(2, "0")}s`
 }
 
 function formatHoursMinutes(min: number) {
   const h = Math.floor(min / 60)
   const m = min % 60
   return `${h}h${m < 10 ? "0" : ""}${m}min`
-}
-
-function formatTime(min: number) {
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return `${h < 10 ? "0" + h : h}:${m < 10 ? "0" + m : m}:00`
 }
 
 function countActiveFilters(f: Filters): number {
@@ -139,11 +157,8 @@ function countActiveFilters(f: Filters): number {
 
 export function HistoryView() {
   const [sessions, setSessions] = useState<HistorySession[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [dbTotalMinutes, setDbTotalMinutes] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [loadingPage, setLoadingPage] = useState(false)
+  const [queryError, setQueryError] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list")
   const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear())
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth() + 1)
@@ -162,30 +177,21 @@ export function HistoryView() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / HISTORY_PAGE_SIZE))
-
-  const loadHistory = useCallback(async (page: number = 1) => {
-    if (page === 1) {
-      setLoading(true)
-    } else {
-      setLoadingPage(true)
-    }
-    const {
-      data,
-      error,
-      total,
-      totalMinutes: dbMinutes,
-    } = await getUserHistoryAction(page, HISTORY_PAGE_SIZE)
+  const loadHistory = useCallback(async () => {
+    setLoading(true)
+    const { data, error } = await getAllHistoryAction()
     if (error) {
+      setQueryError(true)
+      Sentry.captureMessage("Falha ao carregar histórico", {
+        level: "error",
+        extra: { feature: "historico", error },
+      })
       toast.error("Erro ao carregar histórico: " + error)
     } else if (data) {
-      setSessions(data)
-      setTotalCount(total)
-      setDbTotalMinutes(dbMinutes || 0)
-      setCurrentPage(page)
+      setQueryError(false)
+      setSessions(data as HistorySession[])
     }
     setLoading(false)
-    setLoadingPage(false)
   }, [])
 
   const loadMonthlyHistory = useCallback(async (year: number, month: number) => {
@@ -199,17 +205,67 @@ export function HistoryView() {
     setLoadingMonthly(false)
   }, [])
 
+  // Insere/substitui a sessão REAL retornada pelo banco no estado local,
+  // deduplicando por id. O agrupamento por dia (dayGroups) recalcula sozinho.
+  const upsertSession = useCallback(
+    (saved: HistorySession) => {
+      setSessions((prev) => {
+        const index = prev.findIndex((s) => s.id === saved.id)
+        if (index !== -1) {
+          const next = [...prev]
+          next[index] = saved
+          return next
+        }
+        return [...prev, saved]
+      })
+
+      setMonthlySessions((prev) => {
+        const day = getDayInSaoPaulo(saved.started_at)
+        if (!day) return prev
+        const [year, month] = day.split("-").map(Number)
+        if (year !== calendarYear || month !== calendarMonth) return prev
+        const index = prev.findIndex((s) => s.id === saved.id)
+        if (index !== -1) {
+          const next = [...prev]
+          next[index] = saved
+          return next
+        }
+        return [...prev, saved]
+      })
+    },
+    [calendarYear, calendarMonth],
+  )
+
+  // Qualquer instância do modal (incluindo a do botão flutuante global, que
+  // NÃO passa por handleModalClose) notifica o Histórico após salvar/editar.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const saved = readStudySessionSaved(event)
+      if (!saved) {
+        Sentry.captureMessage("Evento de sessão salva sem sessão válida", {
+          extra: { feature: "historico" },
+        })
+        return
+      }
+      upsertSession(saved as HistorySession)
+    }
+    window.addEventListener(STUDY_SESSION_SAVED_EVENT, handler)
+    return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handler)
+  }, [upsertSession])
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadHistory(1)
+      void loadHistory()
     }, 0)
     return () => clearTimeout(timer)
   }, [loadHistory])
 
   useEffect(() => {
-    if (viewMode === "calendar") {
+    if (viewMode !== "calendar") return
+    const timer = setTimeout(() => {
       void loadMonthlyHistory(calendarYear, calendarMonth)
-    }
+    }, 0)
+    return () => clearTimeout(timer)
   }, [viewMode, calendarYear, calendarMonth, loadMonthlyHistory])
 
   const clearImportFilter = () => {
@@ -313,7 +369,9 @@ export function HistoryView() {
     }
     if (filters.focusRange) {
       result = result.filter((s) => {
-        const focus = Number(s.metadata?.["focus_percentage"] || 0)
+        const rawFocus = s.metadata?.["focus_percentage"]
+        if (rawFocus === null || rawFocus === undefined) return false
+        const focus = Number(rawFocus)
         switch (filters.focusRange) {
           case "0-49":
             return focus >= 0 && focus < 50
@@ -374,7 +432,9 @@ export function HistoryView() {
     }
     if (filters.focusRange) {
       result = result.filter((s) => {
-        const focus = Number(s.metadata?.["focus_percentage"] || 0)
+        const rawFocus = s.metadata?.["focus_percentage"]
+        if (rawFocus === null || rawFocus === undefined) return false
+        const focus = Number(rawFocus)
         switch (filters.focusRange) {
           case "0-49":
             return focus >= 0 && focus < 50
@@ -393,16 +453,10 @@ export function HistoryView() {
     return result
   }, [monthlySessions, filters, importFilterId])
 
-  // KPIs from filtered
+  // KPIs from filtered (todas as sessões estão em memória → soma sempre precisa)
   const activeFilterCount = countActiveFilters(filters)
-  // When no filters are active, use the total minutes from the database (all records).
-  // When filters are active, we can only sum the current page's filtered sessions
-  // (the DB query does not support these client-side filters).
   const currentSessions = viewMode === "calendar" ? filteredMonthlySessions : filteredSessions
-  const totalMinutes =
-    viewMode === "list" && activeFilterCount === 0 && !importFilterId
-      ? dbTotalMinutes
-      : currentSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)
+  const totalMinutes = currentSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)
   const totalCorrect = currentSessions.reduce(
     (acc, s) => acc + Number(s.metadata?.["questions_correct"] || 0),
     0,
@@ -418,6 +472,34 @@ export function HistoryView() {
     0,
   )
 
+  // Agrupamento por dia (fuso America/Sao_Paulo): data → total real → atividades → sessões (mais recente primeiro)
+  const dayGroups = useMemo(() => {
+    const map = new Map<string, HistorySession[]>()
+    for (const s of filteredSessions) {
+      const day = getStudyDate(s)
+      if (!day) continue
+      const list = map.get(day)
+      if (list) list.push(s)
+      else map.set(day, [s])
+    }
+    const groups: DayGroup[] = []
+    for (const [day, daySessions] of map.entries()) {
+      const sorted = [...daySessions].sort((a, b) => {
+        const t = (s: HistorySession) => new Date(s.started_at || s.created_at || 0).getTime()
+        return t(b) - t(a)
+      })
+      groups.push({
+        day,
+        label: formatDayLabel(day),
+        totalSeconds: sorted.reduce((acc, s) => acc + sessionRealSeconds(s), 0),
+        activityCount: sorted.length,
+        sessions: sorted,
+      })
+    }
+    groups.sort((a, b) => (a.day < b.day ? 1 : -1))
+    return groups
+  }, [filteredSessions])
+
   const handleEditSession = (session: HistorySession) => {
     setEditingSession(session)
     setIsRegisterOpen(true)
@@ -427,7 +509,7 @@ export function HistoryView() {
     setIsRegisterOpen(open)
     if (!open) {
       setEditingSession(null)
-      void loadHistory(currentPage)
+      void loadHistory()
       if (viewMode === "calendar") {
         void loadMonthlyHistory(calendarYear, calendarMonth)
       }
@@ -439,7 +521,6 @@ export function HistoryView() {
       "Excluir esta sessão de estudo?\nEsta ação não pode ser desfeita.",
     )
     if (!confirmed) return
-    const session = sessions.find((s) => s.id === sessionId)
     try {
       const { error } = await deleteStudySessionAction(sessionId)
       if (error) {
@@ -448,10 +529,11 @@ export function HistoryView() {
         toast.success("Sessão excluída com sucesso")
         setSessions((prev) => prev.filter((s) => s.id !== sessionId))
         setMonthlySessions((prev) => prev.filter((s) => s.id !== sessionId))
-        setTotalCount((prev) => Math.max(0, prev - 1))
-        setDbTotalMinutes((prev) => Math.max(0, prev - (Number(session?.duration_minutes) || 0)))
       }
     } catch {
+      Sentry.captureMessage("Erro inesperado ao excluir sessão de estudo", {
+        extra: { feature: "historico" },
+      })
       toast.error("Erro inesperado ao excluir")
     }
   }
@@ -743,12 +825,11 @@ export function HistoryView() {
               {viewMode === "list" ? (
                 <>
                   <span className="text-primary block">
-                    {totalCount.toLocaleString("pt-BR")} registro{totalCount !== 1 ? "s" : ""}
+                    {filteredSessions.length.toLocaleString("pt-BR")} registro
+                    {filteredSessions.length !== 1 ? "s" : ""}
                   </span>
                   {activeFilterCount > 0 && (
-                    <span className="text-muted-foreground block">
-                      {filteredSessions.length} na página
-                    </span>
+                    <span className="text-muted-foreground block">Com filtros aplicados</span>
                   )}
                 </>
               ) : (
@@ -822,6 +903,25 @@ export function HistoryView() {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             )
+          if (queryError)
+            return (
+              <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 border rounded-xl bg-card/50">
+                <AlertTriangle className="h-10 w-10 text-rose-500/70" />
+                <h3 className="text-base font-extrabold text-foreground">
+                  Não foi possível carregar seu histórico
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Ocorreu um erro ao consultar seus registros. Tente novamente em instantes.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => void loadHistory()}
+                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5"
+                >
+                  Tentar novamente
+                </Button>
+              </div>
+            )
           if (filteredSessions.length === 0)
             return (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 border rounded-xl bg-card/50">
@@ -836,6 +936,23 @@ export function HistoryView() {
                     ? "Tente ajustar ou limpar os filtros para ver seus registros."
                     : "Inicie uma sessão de estudos ou cadastre manualmente para visualizar aqui."}
                 </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => setIsRegisterOpen(true)}
+                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5"
+                  >
+                    Adicionar estudo
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsImportOpen(true)}
+                    className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs"
+                  >
+                    Importar histórico
+                  </Button>
+                </div>
                 {activeFilterCount > 0 && (
                   <Button
                     variant="outline"
@@ -849,133 +966,125 @@ export function HistoryView() {
               </div>
             )
           return (
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div className="flex items-center gap-3">
                 <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-                  REGISTROS RECENTES
+                  LINHA DO TEMPO
                   {activeFilterCount > 0 &&
                     ` (${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""})`}
                 </span>
                 <div className="flex-1 h-0.5 bg-[#2563EB]/30" />
-                {!importFilterId && activeFilterCount === 0 && totalPages > 1 && (
-                  <span className="text-[11px] font-bold text-muted-foreground">
-                    Página {currentPage} de {totalPages}
-                  </span>
-                )}
               </div>
 
-              <div className="space-y-3">
-                {filteredSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="rounded-xl border bg-card p-4 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 hover:border-[#2563EB]/60 transition-all"
-                  >
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="w-1.5 h-10 rounded-full bg-[#38bdf8] shrink-0 mt-0.5" />
-                      <div className="space-y-0.5 min-w-0">
-                        <h3 className="font-extrabold text-xs text-foreground tracking-tight">
-                          {session.disciplines?.name || "Estudo Livre"}
-                        </h3>
-                        {session.origin_source && (
-                          <span className="inline-flex items-center rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#2563EB]">
-                            Importado ·{" "}
-                            {originDisplayName(session.origin_source, session.origin_source_name)}
-                          </span>
-                        )}
-                        <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
-                          Data: {formatStudyDate(session.started_at) || "Não informada"}
-                        </p>
-                        {session.study_type && (
-                          <p className="text-[11px] font-bold text-primary">
-                            Tipo:{" "}
-                            {STUDY_TYPES.find((t) => t.value === session.study_type)?.label ||
-                              session.study_type}
-                          </p>
-                        )}
-                        {Number(session.metadata?.["flashcards_reviewed"] || 0) > 0 && (
-                          <p className="text-[11px] text-emerald-600 font-semibold">
-                            Flashcards: {Number(session.metadata?.["flashcards_reviewed"] || 0)}{" "}
-                            revisados ({Number(session.metadata?.["flashcards_correct"] || 0)}{" "}
-                            acertos)
-                          </p>
-                        )}
-                        {Number(session.metadata?.["questions_answered"] || 0) > 0 && (
-                          <p className="text-[11px] text-blue-600 font-semibold">
-                            Questões: {Number(session.metadata?.["questions_correct"] || 0)}/
-                            {Number(session.metadata?.["questions_answered"] || 0)} acertos
-                          </p>
-                        )}
-                        <p className="text-[11px] text-muted-foreground truncate leading-relaxed">
-                          Salvo às:{" "}
-                          {formatSavedAt(session.created_at) ||
-                            formatSavedAt(session.started_at) ||
-                            "--:--"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 self-end lg:self-center shrink-0">
-                      <span className="text-xs font-mono text-muted-foreground font-bold flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        {formatTime(session.duration_minutes || 0)}
+              {dayGroups.map((day) => (
+                <div key={day.day} className="space-y-3">
+                  <div className="flex items-end justify-between gap-3 flex-wrap">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-lg font-black text-foreground">{day.label}</h2>
+                      <span className="text-[11px] font-bold text-muted-foreground">
+                        {day.activityCount} atividade{day.activityCount !== 1 ? "s" : ""}
                       </span>
-
-                      <span className="px-4 py-1 rounded-md bg-[#2563EB] text-white font-extrabold text-[10px] tracking-wider uppercase shadow-xs">
-                        FOCO{" "}
-                        {session.metadata?.["focus_percentage"] != null
-                          ? `${String(session.metadata["focus_percentage"])}%`
-                          : "—"}
-                      </span>
-
-                      <div className="flex items-center gap-2 text-muted-foreground/50">
-                        <button
-                          type="button"
-                          onClick={() => handleEditSession(session)}
-                          className="hover:text-foreground p-1 transition-colors"
-                          title="Editar"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSession(session.id)}
-                          className="hover:text-rose-500 p-1 transition-colors"
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
                     </div>
+                    <span className="text-sm font-mono font-black text-[#2563EB]">
+                      Total: {formatDayTotalSeconds(day.totalSeconds)}
+                    </span>
                   </div>
-                ))}
-              </div>
 
-              {!importFilterId && activeFilterCount === 0 && totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage <= 1 || loadingPage}
-                    onClick={() => void loadHistory(currentPage - 1)}
-                    className="text-xs font-bold"
-                  >
-                    Anterior
-                  </Button>
-                  <span className="text-xs font-bold text-muted-foreground px-2">
-                    {currentPage} / {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage >= totalPages || loadingPage}
-                    onClick={() => void loadHistory(currentPage + 1)}
-                    className="text-xs font-bold"
-                  >
-                    {loadingPage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Próxima"}
-                  </Button>
+                  <div className="space-y-3">
+                    {day.sessions.map((session) => {
+                      const disc = session.disciplines
+                      const color = disciplineColorHex(
+                        session.discipline_id || "",
+                        disc?.color_hex ?? null,
+                      )
+                      return (
+                        <div
+                          key={session.id}
+                          className="rounded-xl border bg-card p-4 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 hover:border-[#2563EB]/60 transition-all"
+                        >
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <div
+                              className="w-1.5 h-10 rounded-full shrink-0 mt-0.5"
+                              style={{ backgroundColor: color }}
+                            />
+                            <div className="space-y-0.5 min-w-0">
+                              <h3 className="font-extrabold text-xs text-foreground tracking-tight">
+                                {disc?.name || "Estudo Livre"}
+                              </h3>
+                              {session.origin_source && (
+                                <span className="inline-flex items-center rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#2563EB]">
+                                  Importado ·{" "}
+                                  {originDisplayName(
+                                    session.origin_source,
+                                    session.origin_source_name,
+                                  )}
+                                </span>
+                              )}
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Horário: {formatSavedAt(session.started_at) || "Não informado"}
+                              </p>
+                              {session.study_type && (
+                                <p className="text-[11px] font-bold text-primary">
+                                  {STUDY_TYPES.find((t) => t.value === session.study_type)?.label ||
+                                    session.study_type}
+                                </p>
+                              )}
+                              {Number(session.metadata?.["flashcards_reviewed"] || 0) > 0 && (
+                                <p className="text-[11px] text-emerald-600 font-semibold">
+                                  Flashcards:{" "}
+                                  {Number(session.metadata?.["flashcards_reviewed"] || 0)} revisados
+                                  ({Number(session.metadata?.["flashcards_correct"] || 0)} acertos)
+                                </p>
+                              )}
+                              {Number(session.metadata?.["questions_answered"] || 0) > 0 && (
+                                <p className="text-[11px] text-blue-600 font-semibold">
+                                  Questões: {Number(session.metadata?.["questions_correct"] || 0)}/
+                                  {Number(session.metadata?.["questions_answered"] || 0)} acertos
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 self-end lg:self-center shrink-0">
+                            <span className="text-xs font-mono text-muted-foreground font-bold flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                              {formatSessionDuration(sessionRealSeconds(session))}
+                            </span>
+
+                            <span className="px-4 py-1 rounded-md bg-[#2563EB] text-white font-extrabold text-[10px] tracking-wider uppercase shadow-xs">
+                              FOCO{" "}
+                              {session.metadata?.["focus_percentage"] !== null &&
+                              session.metadata?.["focus_percentage"] !== undefined
+                                ? `${String(session.metadata["focus_percentage"])}%`
+                                : "—"}
+                            </span>
+
+                            <div className="flex items-center gap-2 text-muted-foreground/50">
+                              <button
+                                type="button"
+                                onClick={() => handleEditSession(session)}
+                                className="hover:text-foreground p-1 transition-colors"
+                                title="Editar"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSession(session.id)}
+                                className="hover:text-rose-500 p-1 transition-colors"
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           )
         })()}
@@ -992,7 +1101,7 @@ export function HistoryView() {
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
         onImported={() => {
-          void loadHistory(1)
+          void loadHistory()
         }}
       />
 
@@ -1000,7 +1109,7 @@ export function HistoryView() {
         open={isManageOpen}
         onOpenChange={setIsManageOpen}
         onChanged={() => {
-          void loadHistory(currentPage)
+          void loadHistory()
         }}
         onImportClick={() => setIsImportOpen(true)}
       />

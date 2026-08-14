@@ -1,15 +1,32 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/infrastructure/supabase/server"
-import { createStudySession, finishStudySession, getUserHistory, updateStudySession, deleteStudySession, getTotalStudyMinutes, getMonthlyHistory } from "./study-history.service"
+
+import * as Sentry from "@sentry/nextjs"
+
 import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
+import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
+
+import {
+  createStudySession,
+  deleteStudySession,
+  finishStudySession,
+  getAllUserHistory,
+  getMonthlyHistory,
+  getTotalStudyMinutes,
+  getUserHistory,
+  updateStudySession,
+} from "./study-history.service"
+
+const HISTORY_PATHS = ["/dashboard", "/dashboard/history", "/estatisticas", "/disciplines"]
 
 export async function getUserHistoryAction(page: number = 1, pageSize: number = 50) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { data: null, error: "Usuário não autenticado", total: 0, totalMinutes: 0 }
 
     const result = await getUserHistory(supabase, user.id, { page, pageSize })
@@ -23,7 +40,9 @@ export async function getUserHistoryAction(page: number = 1, pageSize: number = 
 export async function getMonthlyHistoryAction(year: number, month: number) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { data: null, error: "Usuário não autenticado" }
 
     const data = await getMonthlyHistory(supabase, user.id, year, month)
@@ -33,22 +52,41 @@ export async function getMonthlyHistoryAction(year: number, month: number) {
   }
 }
 
+export async function getAllHistoryAction() {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: "Usuário não autenticado" }
+
+    const data = await getAllUserHistory(supabase, user.id)
+    return { data, error: null }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message }
+  }
+}
 
 export async function startStudySessionAction(data: Omit<StudyHistoryInsert, "user_id">) {
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       throw new Error("Usuário não autenticado")
     }
 
     const session = await createStudySession(supabase, user.id, data as StudyHistoryInsert)
-    
-    revalidatePath("/dashboard")
+
+    for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: session, error: null }
   } catch (error) {
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      extra: { feature: "study-session" },
+    })
     return { data: null, error: (error as { message?: string }).message }
   }
 }
@@ -62,44 +100,54 @@ export async function finishStudySessionAction(
     mood?: string
     notes?: string
     interrupted?: boolean
-  }
+  },
 ) {
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       throw new Error("Usuário não autenticado")
     }
 
     const session = await finishStudySession(supabase, user.id, sessionId, feedback)
-    
-    revalidatePath("/dashboard")
+
+    for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: session, error: null }
   } catch (error) {
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      extra: { feature: "study-session" },
+    })
     return { data: null, error: (error as { message?: string }).message }
   }
 }
 
 export async function updateStudySessionAction(
   sessionId: string,
-  data: Partial<StudyHistoryInsert>
+  data: Partial<StudyHistoryInsert>,
 ) {
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       throw new Error("Usuário não autenticado")
     }
 
     const session = await updateStudySession(supabase, user.id, sessionId, data)
-    
-    revalidatePath("/dashboard/history")
+
+    for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: session, error: null }
   } catch (error) {
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      extra: { feature: "study-session" },
+    })
     return { data: null, error: (error as { message?: string }).message }
   }
 }
@@ -108,7 +156,9 @@ export async function deleteStudySessionAction(sessionId: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       throw new Error("Usuário não autenticado")
@@ -116,9 +166,12 @@ export async function deleteStudySessionAction(sessionId: string) {
 
     await deleteStudySession(supabase, user.id, sessionId)
 
-    revalidatePath("/dashboard/history")
+    for (const path of HISTORY_PATHS) revalidatePath(path)
     return { error: null }
   } catch (error) {
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      extra: { feature: "historico" },
+    })
     return { error: (error as { message?: string }).message }
   }
 }
@@ -127,7 +180,9 @@ export async function cancelStudySessionAction(sessionId: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       throw new Error("Usuário não autenticado")
@@ -142,9 +197,12 @@ export async function cancelStudySessionAction(sessionId: string) {
 
     if (error) throw error
 
-    revalidatePath("/dashboard")
+    for (const path of HISTORY_PATHS) revalidatePath(path)
     return { error: null }
   } catch (error) {
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      extra: { feature: "study-session" },
+    })
     return { error: (error as { message?: string }).message }
   }
 }

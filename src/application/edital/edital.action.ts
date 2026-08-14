@@ -1,23 +1,39 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+
+import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
 import { createClient } from "@/infrastructure/supabase/server"
 
-export async function addCustomDisciplineAction(name: string, targetId: string): Promise<{ success: boolean; data?: { id: string; name: string }; error?: string }> {
+export async function addCustomDisciplineAction(
+  name: string,
+  targetId: string,
+): Promise<{ success: boolean; data?: { id: string; name: string }; error?: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     const discName = name.trim()
     if (!discName) return { success: false, error: "Nome da matéria é obrigatório." }
 
     // 1. Procurar disciplina global
-    let { data: d } = await supabase.from("disciplines").select("id, name").ilike("name", discName).maybeSingle()
-    
-    // 2. Se não existe, cria global
+    let { data: d } = await supabase
+      .from("disciplines")
+      .select("id, name")
+      .ilike("name", discName)
+      .maybeSingle()
+
+    // 2. Se não existe, cria global (com cor automática da paleta central)
     if (!d) {
-      const res = await supabase.from("disciplines").insert({ name: discName, area: "Geral" }).select("id, name").single()
+      const color = await pickNextDisciplineColor(supabase)
+      const res = await supabase
+        .from("disciplines")
+        .insert({ name: discName, area: "Geral", ...(color ? { color_hex: color } : {}) })
+        .select("id, name")
+        .single()
       if (res.error) return { success: false, error: "Erro ao criar matéria global." }
       d = res.data
     }
@@ -25,30 +41,39 @@ export async function addCustomDisciplineAction(name: string, targetId: string):
     if (!d) return { success: false, error: "Não foi possível resolver a matéria." }
 
     // 3. Adicionar ao user_disciplines
-    const { error: udError } = await supabase.from("user_disciplines").upsert({
-      user_id: user.id,
-      target_id: targetId,
-      discipline_id: d.id,
-      status: "NOT_STARTED",
-      mastery_level: 0
-    }, { onConflict: "user_id,target_id,discipline_id", ignoreDuplicates: true })
+    const { error: udError } = await supabase.from("user_disciplines").upsert(
+      {
+        user_id: user.id,
+        target_id: targetId,
+        discipline_id: d.id,
+        status: "NOT_STARTED",
+        mastery_level: 0,
+      },
+      { onConflict: "user_id,target_id,discipline_id", ignoreDuplicates: true },
+    )
 
     if (udError) return { success: false, error: "Erro ao vincular matéria ao seu perfil." }
 
     revalidatePath("/edital")
     revalidatePath("/dashboard")
     revalidatePath("/planejamento")
-    
+
     return { success: true, data: d }
   } catch {
     return { success: false, error: "Erro interno." }
   }
 }
 
-export async function saveCustomTopicsAction(targetId: string, disciplineId: string, topics: { id: string }[]): Promise<{ success: boolean; error?: string }> {
+export async function saveCustomTopicsAction(
+  targetId: string,
+  disciplineId: string,
+  topics: { id: string }[],
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     // 1. Buscar o target atual
@@ -66,7 +91,10 @@ export async function saveCustomTopicsAction(targetId: string, disciplineId: str
     if (targetData.main_study_source) {
       if (typeof targetData.main_study_source === "object") {
         meta = { ...targetData.main_study_source }
-      } else if (typeof targetData.main_study_source === "string" && targetData.main_study_source.startsWith("{")) {
+      } else if (
+        typeof targetData.main_study_source === "string" &&
+        targetData.main_study_source.startsWith("{")
+      ) {
         try {
           meta = JSON.parse(targetData.main_study_source)
         } catch {
@@ -98,21 +126,26 @@ export async function searchDisciplinesAction(query: string) {
   try {
     const supabase = await createClient()
     const { data } = await supabase
-      .from('disciplines')
-      .select('name')
-      .ilike('name', `%${query}%`)
+      .from("disciplines")
+      .select("name")
+      .ilike("name", `%${query}%`)
       .limit(10)
-    
-    return { success: true, data: data?.map(d => d.name) || [] }
+
+    return { success: true, data: data?.map((d) => d.name) || [] }
   } catch {
     return { success: false, data: [] }
   }
 }
 
-export async function removeDisciplineAction(disciplineId: string, targetId: string): Promise<{ success: boolean; error?: string }> {
+export async function removeDisciplineAction(
+  disciplineId: string,
+  targetId: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     const { error } = await supabase
@@ -127,17 +160,23 @@ export async function removeDisciplineAction(disciplineId: string, targetId: str
     revalidatePath("/edital")
     revalidatePath("/dashboard")
     revalidatePath("/planejamento")
-    
+
     return { success: true }
   } catch {
     return { success: false, error: "Erro interno." }
   }
 }
 
-export async function removeCustomTopicAction(targetId: string, disciplineId: string, topicId: string): Promise<{ success: boolean; error?: string }> {
+export async function removeCustomTopicAction(
+  targetId: string,
+  disciplineId: string,
+  topicId: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     const { data: targetData } = await supabase
@@ -153,7 +192,10 @@ export async function removeCustomTopicAction(targetId: string, disciplineId: st
     if (targetData.main_study_source) {
       if (typeof targetData.main_study_source === "object") {
         meta = { ...targetData.main_study_source }
-      } else if (typeof targetData.main_study_source === "string" && targetData.main_study_source.startsWith("{")) {
+      } else if (
+        typeof targetData.main_study_source === "string" &&
+        targetData.main_study_source.startsWith("{")
+      ) {
         try {
           meta = JSON.parse(targetData.main_study_source)
         } catch {
@@ -167,7 +209,9 @@ export async function removeCustomTopicAction(targetId: string, disciplineId: st
     }
 
     // Filtra o tópico fora da lista
-    meta.customEdital[disciplineId] = meta.customEdital[disciplineId].filter((t) => t.id !== topicId)
+    meta.customEdital[disciplineId] = meta.customEdital[disciplineId].filter(
+      (t) => t.id !== topicId,
+    )
 
     const { error } = await supabase
       .from("user_targets")

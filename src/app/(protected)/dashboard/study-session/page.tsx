@@ -34,7 +34,7 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
         `
         id, study_plan_id, discipline_id, day_of_week,
         duration_minutes, priority, priority_score, recommended_sessions, created_at,
-        disciplines ( id, name, area )
+        disciplines ( id, name, area, color_hex )
       `,
       )
       .eq("id", planId)
@@ -52,7 +52,7 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
   } else if (disciplineId) {
     const { data: disc } = await supabase
       .from("disciplines")
-      .select("id, name, area")
+      .select("id, name, area, color_hex")
       .eq("id", disciplineId)
       .single()
 

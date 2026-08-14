@@ -1,23 +1,26 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/infrastructure/supabase/server"
-import { isMaintenanceMode } from "@/lib/maintenance"
-import { detectStudyType, studyTypeToSource } from "@/features/importacao/lib/study-map"
+
+import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
 import type { StudySource, StudyType } from "@/domain/study-history/study-history.types"
-import type { ImportChunkResult, ImportedStudyRecord, ImportPreviewResult } from "@/features/importacao/lib/types"
+import type { OriginSource } from "@/domain/study-history/study-history.types"
 import {
-  compactToRecords,
   type CompactRecord,
   type SubjectImportConfig,
   type SubjectImportMap,
+  compactToRecords,
 } from "@/features/importacao/lib/import-contract"
-import {
-  normalizeOrigin,
-  type ImportOrigin,
-} from "@/features/importacao/lib/origin"
+import { type ImportOrigin, normalizeOrigin } from "@/features/importacao/lib/origin"
+import { detectStudyType, studyTypeToSource } from "@/features/importacao/lib/study-map"
 import { normalizeText } from "@/features/importacao/lib/subject-matcher"
-import type { OriginSource } from "@/domain/study-history/study-history.types"
+import type {
+  ImportChunkResult,
+  ImportPreviewResult,
+  ImportedStudyRecord,
+} from "@/features/importacao/lib/types"
+import { createClient } from "@/infrastructure/supabase/server"
+import { isMaintenanceMode } from "@/lib/maintenance"
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -35,7 +38,11 @@ function fingerprint(
   return `v2|${epochSeconds}|${disciplineId}|${durationMinutes}|${questions}|${correct}|${origin}`
 }
 
-function recordFingerprint(record: ImportedStudyRecord, disciplineId: string | null, origin: string): string | null {
+function recordFingerprint(
+  record: ImportedStudyRecord,
+  disciplineId: string | null,
+  origin: string,
+): string | null {
   if (!record.startAt) return null
   const epoch = Math.floor(new Date(record.startAt).getTime() / 1000)
   const minutes = record.durationSeconds !== null ? Math.round(record.durationSeconds / 60) : null
@@ -72,9 +79,16 @@ async function loadExistingFingerprints(supabase: Supabase, userId: string): Pro
         fingerprint(
           String(epoch),
           row.discipline_id ?? "",
-          row.duration_minutes !== null && row.duration_minutes !== undefined ? String(row.duration_minutes) : "",
-          metadata?.["questions_answered"] !== undefined && metadata?.["questions_answered"] !== null ? String(metadata["questions_answered"]) : "",
-          metadata?.["questions_correct"] !== undefined && metadata?.["questions_correct"] !== null ? String(metadata["questions_correct"]) : "",
+          row.duration_minutes !== null && row.duration_minutes !== undefined
+            ? String(row.duration_minutes)
+            : "",
+          metadata?.["questions_answered"] !== undefined &&
+            metadata?.["questions_answered"] !== null
+            ? String(metadata["questions_answered"])
+            : "",
+          metadata?.["questions_correct"] !== undefined && metadata?.["questions_correct"] !== null
+            ? String(metadata["questions_correct"])
+            : "",
           row.origin_source ?? "",
         ),
       )
@@ -86,7 +100,10 @@ async function loadExistingFingerprints(supabase: Supabase, userId: string): Pro
   return set
 }
 
-async function findDisciplineByNormalizedName(supabase: Supabase, name: string): Promise<{ id: string } | null> {
+async function findDisciplineByNormalizedName(
+  supabase: Supabase,
+  name: string,
+): Promise<{ id: string } | null> {
   const normalized = normalizeText(name)
   if (!normalized) return null
   const { data } = await supabase.from("disciplines").select("id, name").limit(500)
@@ -111,7 +128,11 @@ async function resolveSubjectDisciplineId(
       .eq("id", config.disciplineId)
       .maybeSingle()
     if (error || !data) {
-      return { disciplineId: null, created: false, error: `Disciplina não encontrada: ${subjectName}` }
+      return {
+        disciplineId: null,
+        created: false,
+        error: `Disciplina não encontrada: ${subjectName}`,
+      }
     }
     return { disciplineId: data.id, created: false, error: null }
   }
@@ -128,9 +149,10 @@ async function resolveSubjectDisciplineId(
     const normalizedMatch = await findDisciplineByNormalizedName(supabase, trimmed)
     if (normalizedMatch) return { disciplineId: normalizedMatch.id, created: false, error: null }
 
+    const color = await pickNextDisciplineColor(supabase)
     const { data: inserted, error } = await supabase
       .from("disciplines")
-      .insert({ name: trimmed, area: "Geral" })
+      .insert({ name: trimmed, area: "Geral", ...(color ? { color_hex: color } : {}) })
       .select("id")
       .single()
     if (!error && inserted) return { disciplineId: inserted.id, created: true, error: null }
@@ -141,7 +163,11 @@ async function resolveSubjectDisciplineId(
       .ilike("name", trimmed)
       .maybeSingle()
     if (retry) return { disciplineId: retry.id, created: false, error: null }
-    return { disciplineId: null, created: false, error: `Não foi possível criar a disciplina "${subjectName}": ${error?.message ?? "erro desconhecido"}` }
+    return {
+      disciplineId: null,
+      created: false,
+      error: `Não foi possível criar a disciplina "${subjectName}": ${error?.message ?? "erro desconhecido"}`,
+    }
   }
 
   if (config.mode === "create" && !createIfMissing) {
@@ -163,7 +189,9 @@ async function resolveSubjectDisciplineId(
 export async function listDisciplinesForImportAction() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { data: null, error: "Usuário não autenticado" }
 
     const { data, error } = await supabase
@@ -178,7 +206,14 @@ export async function listDisciplinesForImportAction() {
   }
 }
 
-const ALLOWED_ORIGIN_SOURCES: OriginSource[] = ["aprovado", "estudei", "outra", "gran", "tec", "qconcursos"]
+const ALLOWED_ORIGIN_SOURCES: OriginSource[] = [
+  "aprovado",
+  "estudei",
+  "outra",
+  "gran",
+  "tec",
+  "qconcursos",
+]
 
 function validateOriginPayload(origin: ImportOrigin | null): ImportOrigin | null {
   if (!origin || typeof origin !== "object") return null
@@ -202,7 +237,9 @@ export async function beginImportAction(
     if (!normalized) return { success: false, error: "Selecione a plataforma de origem." }
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     const { data: batch, error } = await supabase
@@ -217,7 +254,11 @@ export async function beginImportAction(
       .select("id")
       .single()
 
-    if (error || !batch) return { success: false, error: `Erro ao registrar origem: ${error?.message ?? "desconhecido"}` }
+    if (error || !batch)
+      return {
+        success: false,
+        error: `Erro ao registrar origem: ${error?.message ?? "desconhecido"}`,
+      }
     return { success: true, importId: batch.id }
   } catch (err) {
     return { success: false, error: (err as { message?: string }).message ?? "Erro desconhecido." }
@@ -239,7 +280,9 @@ export async function previewImportAction(
     if (!normalized) return { success: false, error: "Selecione a plataforma de origem." }
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     const parsed = compactToRecords(records)
@@ -273,7 +316,12 @@ export async function previewImportAction(
 
       let disciplineId = resolutionCache.get(record.subjectName)
       if (disciplineId === undefined) {
-        const resolved = await resolveSubjectDisciplineId(supabase, record.subjectName, config, false)
+        const resolved = await resolveSubjectDisciplineId(
+          supabase,
+          record.subjectName,
+          config,
+          false,
+        )
         if (resolved.error) {
           errors.push(resolved.error)
           disciplineId = null
@@ -321,7 +369,9 @@ export async function importHistoryChunkAction(
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     if (typeof importId !== "string" || !importId) {
@@ -358,7 +408,12 @@ export async function importHistoryChunkAction(
       let resolution = resolutionCache.get(record.subjectName)
       if (!resolution) {
         const config = subjectMap[record.subjectName] ?? { mode: "ignore" }
-        const resolved = await resolveSubjectDisciplineId(supabase, record.subjectName, config, true)
+        const resolved = await resolveSubjectDisciplineId(
+          supabase,
+          record.subjectName,
+          config,
+          true,
+        )
         resolution = { disciplineId: resolved.disciplineId, created: resolved.created }
         if (resolved.error) {
           errorDetails.push(resolved.error)
@@ -477,10 +532,16 @@ export interface ImportBatchItem {
  * Lista as importações do usuário autenticado com a contagem real de sessões
  * de cada lote (somente sessões importadas do próprio usuário).
  */
-export async function listImportsAction(): Promise<{ success: boolean; data?: ImportBatchItem[]; error?: string }> {
+export async function listImportsAction(): Promise<{
+  success: boolean
+  data?: ImportBatchItem[]
+  error?: string
+}> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     const { data: batches, error } = await supabase
@@ -532,7 +593,9 @@ export async function deleteImportBatchAction(
 ): Promise<{ success: boolean; deleted?: number; error?: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
     if (typeof importId !== "string" || !importId) {
       return { success: false, error: "Importação não identificada." }
@@ -564,7 +627,8 @@ export async function deleteImportBatchAction(
     if ((existing ?? 0) > 0 && (count ?? 0) === 0) {
       return {
         success: false,
-        error: "A exclusão foi bloqueada pelo banco (permissão ausente). Execute a migration docs/ensure-import-delete.sql.",
+        error:
+          "A exclusão foi bloqueada pelo banco (permissão ausente). Execute a migration docs/ensure-import-delete.sql.",
       }
     }
 
@@ -586,10 +650,16 @@ export async function deleteImportBatchAction(
  * Exclui TODAS as sessões importadas do usuário autenticado (e os lotes),
  * preservando estudos manuais, do cronômetro, planejamento e outros usuários.
  */
-export async function deleteAllImportedAction(): Promise<{ success: boolean; deleted?: number; error?: string }> {
+export async function deleteAllImportedAction(): Promise<{
+  success: boolean
+  deleted?: number
+  error?: string
+}> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
     const { count: existing } = await supabase
@@ -608,7 +678,8 @@ export async function deleteAllImportedAction(): Promise<{ success: boolean; del
     if ((existing ?? 0) > 0 && (count ?? 0) === 0) {
       return {
         success: false,
-        error: "A exclusão foi bloqueada pelo banco (permissão ausente). Execute a migration docs/ensure-import-delete.sql.",
+        error:
+          "A exclusão foi bloqueada pelo banco (permissão ausente). Execute a migration docs/ensure-import-delete.sql.",
       }
     }
 

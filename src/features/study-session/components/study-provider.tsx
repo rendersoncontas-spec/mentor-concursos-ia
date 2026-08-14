@@ -2,7 +2,10 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 
-import { Maximize2, Pause, Play, RotateCcw, Square, Volume2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+
+import * as Sentry from "@sentry/nextjs"
+import { Maximize2, Pause, Play, RefreshCcw, RotateCcw, Square, Volume2 } from "lucide-react"
 
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { Button } from "@/components/ui/button"
@@ -10,6 +13,7 @@ import type { StudyTechnique } from "@/domain/study-history/study-history.types"
 import { cn } from "@/lib/utils"
 
 import { type FocusSoundId, useFocusSound } from "../hooks/use-focus-sound"
+import { ResetTimerDialog } from "./reset-timer-dialog"
 
 type TimerPhase = "IDLE" | "STUDYING" | "PAUSED" | "SHORT_BREAK" | "LONG_BREAK"
 
@@ -25,6 +29,16 @@ const TECHNIQUE_DURATIONS: Record<StudyTechnique, number> = {
 const STORAGE_KEY = "mentor_active_study_session"
 const POSITION_KEY = "mentor-study-floating-timer-position-v2"
 const FLOATING_TIMER_PREF_KEY = "mentor-floating-timer-enabled"
+const DEFAULT_TITLE = "Nomeia — Sua preparação rumo à nomeação"
+
+/** Formato do título da guia: "MM:SS" e "H:MM:SS" acima de 1 hora. */
+function formatTitleTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+}
 
 interface StudySessionState {
   isActive: boolean
@@ -42,19 +56,29 @@ interface StudySessionState {
   plannedSeconds: number
   activeSeconds: number
   pausedSeconds: number
+  /** Vínculo com o bloco do planejamento (study_plan_items.id), quando a sessão veio do Cronograma. */
+  planItemId: string | null
+  /** Origem da sessão: "PLAN" (Cronograma) ou "FREE" (Central/Livre). */
+  source: "PLAN" | "FREE" | null
 }
 
 interface StudyContextType {
   session: StudySessionState | null
   startSession: (data: {
     disciplineName: string
-    disciplineId?: string
-    topicName?: string
+    disciplineId?: string | null
+    topicName?: string | null
     studyType?: string
     technique?: StudyTechnique
+    plannedSeconds?: number
+    planItemId?: string | null
+    source?: "PLAN" | "FREE" | null
   }) => void
   minimizeSession: () => void
   restoreSession: () => void
+  unminimizeSession: () => void
+  /** Zera APENAS a sessão atual ainda não salva. Não toca no Histórico. */
+  resetSession: () => void
   pauseSession: () => void
   resumeSession: () => void
   endSession: () => void
@@ -64,7 +88,12 @@ interface StudyContextType {
   toggleFloatingTimer: () => void
   finalizeAndSaveSession: (
     formData?: Record<string, unknown>,
-  ) => Promise<{ success: boolean; error?: string; historyId?: string }>
+  ) => Promise<{
+    success: boolean
+    error?: string
+    historyId?: string
+    session?: Record<string, unknown>
+  }>
   isCentralOpen: boolean
   setIsCentralOpen: (open: boolean) => void
   focusSound: FocusSoundId
@@ -77,18 +106,36 @@ interface StudyContextType {
 
 const StudyContext = createContext<StudyContextType | null>(null)
 
+function totalPausedMsAt(state: StudySessionState, now: number): number {
+  let pausedMs = state.totalPausedMs
+  if (state.lastPauseStartTime !== null) {
+    pausedMs += now - state.lastPauseStartTime
+  }
+  return pausedMs
+}
+
+/**
+ * FONTE ÚNICA DE VERDADE do tempo ativo da sessão (em segundos).
+ * Usado pelo cronômetro visual, widget flutuante, título da guia e salvamento.
+ * Calculado sempre a partir de timestamps reais (Date.now()):
+ *   elapsed = now - startTime - totalPaused - pausaAtual
+ * Nunca incrementa por +1.
+ */
+export function getActiveElapsedSeconds(state: StudySessionState): number {
+  if (!state.startTime) return 0
+  const now = Date.now()
+  const pausedMs = totalPausedMsAt(state, now)
+  return Math.max(0, Math.floor((now - state.startTime - pausedMs) / 1000))
+}
+
 function calculateTimes(state: StudySessionState): {
   activeSeconds: number
   pausedSeconds: number
 } {
   if (!state.startTime) return { activeSeconds: 0, pausedSeconds: 0 }
   const now = Date.now()
-  const totalElapsedMs = now - state.startTime
-  let pausedMs = state.totalPausedMs
-  if (state.lastPauseStartTime !== null) {
-    pausedMs += now - state.lastPauseStartTime
-  }
-  const activeMs = Math.max(0, totalElapsedMs - pausedMs)
+  const pausedMs = totalPausedMsAt(state, now)
+  const activeMs = Math.max(0, now - state.startTime - pausedMs)
   return {
     activeSeconds: Math.floor(activeMs / 1000),
     pausedSeconds: Math.floor(pausedMs / 1000),
@@ -103,7 +150,7 @@ interface Position {
 
 function getDefaultPosition(): Position {
   if (typeof window === "undefined") return { x: 0, y: 10 }
-  const floatingWidth = 220
+  const floatingWidth = 250
   const x = Math.max(0, (window.innerWidth - floatingWidth) / 2)
   const y = 10
   return { x, y }
@@ -117,7 +164,7 @@ function loadSavedPosition(): Position | null {
     if (typeof window !== "undefined") {
       const vw = window.innerWidth
       const vh = window.innerHeight
-      const floatingWidth = 220
+      const floatingWidth = 250
       const floatingHeight = 60
       // Garantir que a posição salva seja válida dentro da viewport
       pos.x = Math.max(0, Math.min(pos.x, vw - floatingWidth))
@@ -133,6 +180,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<StudySessionState | null>(null)
   const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(false)
   const [isCentralOpen, setIsCentralOpen] = useState(false)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const focusSound = useFocusSound()
@@ -234,24 +282,91 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("visibilitychange", handleVisibility)
   }, [])
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // TÍTULO DA GUIA — representação do cronômetro REAL (timestamp), nunca um
+  // contador independente. Recalculado a cada tick e imediatamente quando o
+  // navegador retoma a execução (visibilitychange → visible, focus, pageshow)
+  // ou quando o Next/metadata altera o title durante a navegação.
+  // ═══════════════════════════════════════════════════════════════════════
+  const sessionRef = useRef<StudySessionState | null>(null)
   useEffect(() => {
-    if (session && session.isActive) {
-      const timeStr = formatTime(session.activeSeconds)
-      const isStudying = session.phase === "STUDYING"
-      document.title = `${isStudying ? "⏱️" : "⏸️"} ${timeStr} - ${isStudying ? "Estudando" : "Pausado"}`
-    } else {
-      document.title = "Nomeia — Sua preparação rumo à nomeação"
+    sessionRef.current = session
+  }, [session])
+
+  useEffect(() => {
+    let wasTimerTitle = false
+
+    const applyTitle = () => {
+      try {
+        const state = sessionRef.current
+        if (state && state.isActive) {
+          const seconds = getActiveElapsedSeconds(state)
+          const icon = state.phase === "STUDYING" ? "⏱" : "⏸"
+          const title = `${icon} ${formatTitleTime(seconds)} — ${state.disciplineName || "Estudo"}`
+          wasTimerTitle = true
+          if (document.title !== title) document.title = title
+        } else if (wasTimerTitle && document.title !== DEFAULT_TITLE) {
+          wasTimerTitle = false
+          document.title = DEFAULT_TITLE
+        }
+      } catch (error) {
+        Sentry.captureException(error, {
+          extra: { feature: "cronometro", step: "update_document_title" },
+        })
+      }
     }
+
+    applyTitle()
+    const intervalId = setInterval(applyTitle, 1000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") applyTitle()
+    }
+    const handleFocus = () => applyTitle()
+    const handlePageShow = () => applyTitle()
+
+    document.addEventListener("visibilitychange", handleVisibility)
+    window.addEventListener("focus", handleFocus)
+    window.addEventListener("pageshow", handlePageShow)
+
+    // Navegação entre rotas faz o Next sobrescrever o título via metadata —
+    // enquanto houver sessão ativa, o cronômetro mantém a prioridade.
+    const observer = new MutationObserver(applyTitle)
+    const titleElement = document.querySelector("title")
+    if (titleElement)
+      observer.observe(titleElement, { childList: true, characterData: true, subtree: true })
+
+    return () => {
+      clearInterval(intervalId)
+      document.removeEventListener("visibilitychange", handleVisibility)
+      window.removeEventListener("focus", handleFocus)
+      window.removeEventListener("pageshow", handlePageShow)
+      observer.disconnect()
+    }
+  }, [])
+
+  // Aviso ao fechar/recarregar o navegador com uma sessão em andamento
+  useEffect(() => {
+    if (!session || !session.isActive) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = "Você tem um estudo em andamento."
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.activeSeconds, session?.phase, session?.isActive])
+  }, [session?.isActive])
 
   const startSession = useCallback(
     (data: {
       disciplineName: string
-      disciplineId?: string
-      topicName?: string
+      disciplineId?: string | null
+      topicName?: string | null
       studyType?: string
       technique?: StudyTechnique
+      plannedSeconds?: number
+      planItemId?: string | null
+      source?: "PLAN" | "FREE" | null
     }) => {
       const technique = data.technique || "LIVRE"
       const now = Date.now()
@@ -260,7 +375,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         isMinimized: false,
         phase: "STUDYING",
         disciplineName: data.disciplineName,
-        disciplineId: data.disciplineId,
+        disciplineId: data.disciplineId ?? undefined,
         topicName: data.topicName || "",
         studyType: data.studyType || "TEORIA",
         technique,
@@ -268,9 +383,11 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         startTime: now,
         totalPausedMs: 0,
         lastPauseStartTime: null,
-        plannedSeconds: TECHNIQUE_DURATIONS[technique] || 0,
+        plannedSeconds: data.plannedSeconds ?? (TECHNIQUE_DURATIONS[technique] || 0),
         activeSeconds: 0,
         pausedSeconds: 0,
+        planItemId: data.planItemId || null,
+        source: data.source || null,
       })
       if (focusSound.selectedSound !== "off") {
         void focusSound.startSound(focusSound.selectedSound)
@@ -281,6 +398,10 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
 
   const minimizeSession = useCallback(() => {
     setSession((prev) => (prev ? { ...prev, isMinimized: true } : null))
+  }, [])
+
+  const unminimizeSession = useCallback(() => {
+    setSession((prev) => (prev ? { ...prev, isMinimized: false } : null))
   }, [])
 
   const restoreSession = useCallback(() => {
@@ -317,6 +438,22 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   }, [focusSound])
 
   const endSession = useCallback(() => {
+    setSession(null)
+    localStorage.removeItem(STORAGE_KEY)
+    focusSound.stopSound()
+  }, [focusSound])
+
+  // Reset: abre a confirmação apenas se houver tempo acumulado na sessão atual.
+  // Nunca apaga Histórico/estatísticas — apenas zera a sessão ainda não salva.
+  const resetSession = useCallback(() => {
+    if (!session || !session.isActive) return
+    const hasTime = session.activeSeconds + session.pausedSeconds > 0
+    if (!hasTime) return
+    setResetDialogOpen(true)
+  }, [session])
+
+  const confirmReset = useCallback(() => {
+    setResetDialogOpen(false)
     setSession(null)
     localStorage.removeItem(STORAGE_KEY)
     focusSound.stopSound()
@@ -359,6 +496,15 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         // Focus sound
         focus_sound: focusSound.selectedSound !== "off" ? focusSound.selectedSound : null,
         focus_sound_volume: focusSound.selectedSound !== "off" ? focusSound.volume : null,
+        // Vínculo com o planejamento (quando a sessão veio do Cronograma)
+        study_plan_item_id: session.planItemId || null,
+        planned_minutes:
+          session.plannedSeconds > 0 ? Math.round(session.plannedSeconds / 60) : null,
+        study_source: session.source || null,
+        // Avaliação (Cronograma)
+        energy_level: (formData?.["energy_level"] as number) ?? null,
+        interrupted: Boolean(formData?.["interrupted"]),
+        reviews_completed: (formData?.["reviews_completed"] as number) || 0,
         // Tempo calculado
         activeSeconds: session.activeSeconds,
         pausedSeconds: session.pausedSeconds,
@@ -369,7 +515,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
             ? Math.round(
                 (session.activeSeconds / (session.activeSeconds + session.pausedSeconds)) * 100,
               )
-            : 0,
+            : null,
         completedCycles: 0,
       }
 
@@ -392,7 +538,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       setSession(null)
       localStorage.removeItem(STORAGE_KEY)
 
-      return { success: true, historyId: res.historyId }
+      return { success: true, historyId: res.historyId, session: res.session }
     },
     [session, focusSound],
   )
@@ -419,6 +565,8 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         startSession,
         minimizeSession,
         restoreSession,
+        unminimizeSession,
+        resetSession,
         pauseSession,
         resumeSession,
         endSession,
@@ -439,6 +587,11 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     >
       {children}
       <FloatingStudyWidget />
+      <ResetTimerDialog
+        open={resetDialogOpen}
+        onOpenChange={setResetDialogOpen}
+        onConfirm={confirmReset}
+      />
     </StudyContext.Provider>
   )
 }
@@ -453,15 +606,16 @@ export function useGlobalStudy() {
    FLOATING STUDY WIDGET — Mini cronômetro arrastável e persistido
    ═══════════════════════════════════════════════════════════════ */
 function FloatingStudyWidget() {
+  const router = useRouter()
   const {
     session,
-    restoreSession,
     pauseSession,
     resumeSession,
     formatTime,
     floatingTimerEnabled,
     isCentralOpen,
     focusSoundActiveLabel,
+    resetSession,
   } = useGlobalStudy()
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
@@ -519,7 +673,7 @@ function FloatingStudyWidget() {
 
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const floatingWidth = 220
+    const floatingWidth = 250
     const floatingHeight = 60
     const newX = Math.max(0, Math.min(dragRef.current.startPosX + dx, vw - floatingWidth))
     const newY = Math.max(0, Math.min(dragRef.current.startPosY + dy, vh - floatingHeight))
@@ -539,6 +693,16 @@ function FloatingStudyWidget() {
     localStorage.removeItem(POSITION_KEY)
     setPos(null) // Isso forçará o uso da posição padrão (centralizada)
   }, [])
+
+  // Sessão vinda do Cronograma: restaurar leva de volta à tela do cronômetro do planejamento.
+  // Caso contrário, reabre a Central Inteligente.
+  const handleRestoreFull = useCallback(() => {
+    if (session?.source === "PLAN" && session?.planItemId) {
+      router.push(`/dashboard/study-session?planId=${session.planItemId}`)
+    } else if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("restore-study-session"))
+    }
+  }, [router, session])
 
   if (!session || !session.isMinimized || !floatingTimerEnabled || isCentralOpen) return null
 
@@ -600,6 +764,7 @@ function FloatingStudyWidget() {
             size="icon"
             variant="ghost"
             onClick={pauseSession}
+            aria-label="Pausar cronômetro"
             className="w-7 h-7 sm:w-8 sm:h-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
           >
             <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -609,6 +774,7 @@ function FloatingStudyWidget() {
             size="icon"
             variant="ghost"
             onClick={resumeSession}
+            aria-label="Retomar cronômetro"
             className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
           >
             <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -618,9 +784,10 @@ function FloatingStudyWidget() {
         <Button
           size="icon"
           variant="ghost"
-          onClick={restoreSession}
+          onClick={handleRestoreFull}
+          aria-label="Restaurar cronômetro"
           className="w-7 h-7 sm:w-8 sm:h-8 text-[#2563EB] hover:text-[#1D4ED8] hover:bg-[#2563EB]/10"
-          title="Restaurar Central"
+          title="Restaurar tela do cronômetro"
         >
           <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </Button>
@@ -628,7 +795,19 @@ function FloatingStudyWidget() {
         <Button
           size="icon"
           variant="ghost"
+          onClick={resetSession}
+          aria-label="Resetar cronômetro"
+          className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+          title="Resetar cronômetro"
+        >
+          <RefreshCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+        </Button>
+
+        <Button
+          size="icon"
+          variant="ghost"
           onClick={handleResetPosition}
+          aria-label="Restaurar posição do cronômetro flutuante"
           className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground hover:text-foreground hover:bg-muted"
           title="Voltar à posição original"
         >
@@ -643,6 +822,7 @@ function FloatingStudyWidget() {
               window.dispatchEvent(new CustomEvent("open-study-session-modal"))
             }
           }}
+          aria-label="Abrir Central Inteligente"
           className="w-7 h-7 sm:w-8 sm:h-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
           title="Abrir Central Inteligente"
         >

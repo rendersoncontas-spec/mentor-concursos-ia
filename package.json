@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test src/application/simulados/simulado-engine.test.ts src/application/review-engine/fsrs-engine.test.ts src/application/review-engine/queue-engine.test.ts src/application/study-analytics/engine/stats-engine.test.ts src/features/importacao/lib/import-parser.test.ts src/features/importacao/lib/origin.test.ts src/utils/study-streak.test.ts",
+    "test": "tsx --test src/application/simulados/simulado-engine.test.ts src/application/review-engine/fsrs-engine.test.ts src/application/review-engine/queue-engine.test.ts src/application/study-analytics/engine/stats-engine.test.ts src/features/importacao/lib/import-parser.test.ts src/features/importacao/lib/origin.test.ts src/utils/study-streak.test.ts src/application/study-plan/replan/replan-engine.test.ts src/features/planejamento/lib/planning-form.test.ts",
     "lint": "eslint",
     "format": "prettier --write .",
     "prepare": "husky"
