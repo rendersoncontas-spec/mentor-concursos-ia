@@ -12,8 +12,6 @@ import {
   BookOpen,
   CalendarDays,
   CalendarRange,
-  ChevronLeft,
-  ChevronRight,
   FileText,
   GraduationCap,
   Heart,
@@ -173,46 +171,75 @@ export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
           </button>
         )}
 
-        {/* ── Cabeçalho: Logo (atalho para a Home /dashboard) ────────────── */}
-        <Link
-          href="/dashboard"
-          onClick={(event) => {
-            // Já estando na Home, apenas fecha o menu mobile sem re-navegar
-            if (pathname === "/dashboard") event.preventDefault()
-            onClose?.()
-          }}
-          aria-label="Ir para a página inicial"
-          title="Ir para a página inicial"
-          className={cn(
-            "group relative flex items-center h-[72px] shrink-0 border-b border-[hsl(var(--sidebar-border))/70] px-4 transition-colors duration-150",
-            effectiveCollapsed ? "justify-center px-0" : "gap-3",
-            "cursor-pointer hover:bg-[hsl(var(--sidebar-accent))/60] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-          )}
-        >
-          <div className="flex items-center justify-center shrink-0">
-            <Image
-              src="/branding/nomeia-icon.png"
-              alt="NomeIA"
-              width={38}
-              height={38}
-              className="w-[38px] h-[38px] object-contain rounded-xl shadow-xs"
-              priority
-            />
-          </div>
-          {!effectiveCollapsed && (
-            <div className="min-w-0 leading-tight">
-              <p className="text-[16px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] truncate flex items-center">
-                <span>Nome</span>
-                <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
-                  IA
-                </span>
-              </p>
-              <p className="text-[10px] font-medium text-[hsl(var(--sidebar-foreground))/0.6] truncate">
-                Sua preparação rumo à nomeação.
-              </p>
-            </div>
-          )}
-        </Link>
+        {/* ── Cabeçalho: Logo oficial do NomeIA como Botão de Abrir/Fechar Sidebar ── */}
+        {effectiveCollapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                aria-label="Abrir menu"
+                className={cn(
+                  "group relative flex items-center justify-center h-[72px] w-full shrink-0 border-b border-[hsl(var(--sidebar-border))/70] px-0 transition-colors duration-150",
+                  "cursor-pointer hover:bg-[hsl(var(--sidebar-accent))/60] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                )}
+              >
+                <div className="flex items-center justify-center shrink-0 transition-transform duration-150 group-hover:scale-105">
+                  <Image
+                    src="/branding/nomeia-icon.png"
+                    alt="NomeIA"
+                    width={38}
+                    height={38}
+                    className="w-[38px] h-[38px] object-contain rounded-xl shadow-xs"
+                    priority
+                  />
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={12}>
+              Abrir menu
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={isDesktop ? toggleCollapsed : onClose}
+                aria-label="Fechar menu"
+                className={cn(
+                  "group relative flex items-center h-[72px] w-full shrink-0 border-b border-[hsl(var(--sidebar-border))/70] px-4 gap-3 transition-colors duration-150 text-left",
+                  "cursor-pointer hover:bg-[hsl(var(--sidebar-accent))/60] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                )}
+              >
+                <div className="flex items-center justify-center shrink-0 transition-transform duration-150 group-hover:scale-105">
+                  <Image
+                    src="/branding/nomeia-icon.png"
+                    alt="NomeIA"
+                    width={38}
+                    height={38}
+                    className="w-[38px] h-[38px] object-contain rounded-xl shadow-xs"
+                    priority
+                  />
+                </div>
+                <div className="min-w-0 leading-tight">
+                  <p className="text-[16px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] truncate flex items-center">
+                    <span>Nome</span>
+                    <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
+                      IA
+                    </span>
+                  </p>
+                  <p className="text-[10px] font-medium text-[hsl(var(--sidebar-foreground))/0.6] truncate">
+                    Sua preparação rumo à nomeação.
+                  </p>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6} className="hidden md:block">
+              Fechar menu
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* ── Navegação agrupada ─────────────────────────────────────────── */}
         <nav
@@ -287,16 +314,6 @@ export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
             </div>
           ))}
         </nav>
-
-        {/* ── Botão recolher/expandir ────────────────────────────────────── */}
-        <button
-          onClick={toggleCollapsed}
-          className="absolute -right-3 top-[5.25rem] z-10 hidden md:flex h-6 w-6 items-center justify-center rounded-full border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] text-[hsl(var(--sidebar-foreground))/0.6] shadow-sm hover:text-[hsl(var(--sidebar-foreground))] transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={collapsed ? "Expandir menu" : "Colapsar menu"}
-          title={collapsed ? "Expandir menu" : "Colapsar menu"}
-        >
-          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-        </button>
       </aside>
     </TooltipProvider>
   )
