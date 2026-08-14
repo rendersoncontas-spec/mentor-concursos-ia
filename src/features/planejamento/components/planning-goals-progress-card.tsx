@@ -1,14 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import {
-  ChevronLeft,
-  ChevronRight,
-  Play,
-  Target,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
+
+import { ChevronLeft, ChevronRight, Play, Target } from "lucide-react"
 import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
+
 import { type StudyCycleBlock } from "./estudei-planning-view"
 
 interface PlanningGoalsProgressCardProps {
@@ -32,7 +30,10 @@ function getProgressBarClass(isCompleted: boolean, percentage: number): string {
   return "bg-amber-500"
 }
 
-export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGoalsProgressCardProps) {
+export function PlanningGoalsProgressCard({
+  blocks,
+  onStartSession,
+}: PlanningGoalsProgressCardProps) {
   const [period, setPeriod] = useState<PeriodFilter>("semana")
   const [currentOffset, setCurrentOffset] = useState(0) // offset for period navigation
 
@@ -69,29 +70,37 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
   // Multiplier factor based on period (semana = 1, mes = 4.3, ano = 52, total = 12)
   const getMultiplier = () => {
     switch (period) {
-      case "semana": return 1
-      case "mes": return 4.3
-      case "ano": return 52
-      case "total": return 12
-      default: return 1
+      case "semana":
+        return 1
+      case "mes":
+        return 4.3
+      case "ano":
+        return 52
+      case "total":
+        return 12
+      default:
+        return 1
     }
   }
 
   const multiplier = getMultiplier()
 
   // Aggregate total duration and studied minutes per discipline
-  const disciplineMap = new Map<string, {
-    id: string;
-    name: string;
-    color: string;
-    totalDuration: number;
-    totalStudied: number;
-  }>();
-  blocks.forEach(b => {
-    const existing = disciplineMap.get(b.disciplineId);
+  const disciplineMap = new Map<
+    string,
+    {
+      id: string
+      name: string
+      color: string
+      totalDuration: number
+      totalStudied: number
+    }
+  >()
+  blocks.forEach((b) => {
+    const existing = disciplineMap.get(b.disciplineId)
     if (existing) {
-      existing.totalDuration += b.durationMinutes;
-      existing.totalStudied += b.studiedMinutes || 0;
+      existing.totalDuration += b.durationMinutes
+      existing.totalStudied += b.studiedMinutes || 0
     } else {
       disciplineMap.set(b.disciplineId, {
         id: b.id,
@@ -99,14 +108,15 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
         color: b.color || "#2563EB",
         totalDuration: b.durationMinutes,
         totalStudied: b.studiedMinutes || 0,
-      });
+      })
     }
-  });
-  const disciplineGoals = Array.from(disciplineMap.values()).map(d => {
-    const targetMinutes = Math.round(d.totalDuration * multiplier);
-    const studiedMinutes = Math.min(targetMinutes, Math.round(d.totalStudied * multiplier));
-    const missingMinutes = Math.max(0, targetMinutes - studiedMinutes);
-    const percentage = targetMinutes > 0 ? Math.min(100, Math.round((studiedMinutes / targetMinutes) * 100)) : 0;
+  })
+  const disciplineGoals = Array.from(disciplineMap.values()).map((d) => {
+    const targetMinutes = Math.round(d.totalDuration * multiplier)
+    const studiedMinutes = Math.min(targetMinutes, Math.round(d.totalStudied * multiplier))
+    const missingMinutes = Math.max(0, targetMinutes - studiedMinutes)
+    const percentage =
+      targetMinutes > 0 ? Math.min(100, Math.round((studiedMinutes / targetMinutes) * 100)) : 0
     return {
       id: d.id,
       name: d.name,
@@ -115,16 +125,17 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
       studiedMinutes,
       missingMinutes,
       percentage,
-    };
-  });
+    }
+  })
 
   // Group total calculation based on all blocks (full weekly goal)
   const totalTargetMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
   const totalStudiedMinutes = blocks.reduce((acc, b) => acc + b.studiedMinutes, 0)
   const totalMissingMinutes = Math.max(0, totalTargetMinutes - totalStudiedMinutes)
-  const totalPercentage = totalTargetMinutes > 0
-    ? parseFloat(((totalStudiedMinutes / totalTargetMinutes) * 100).toFixed(1))
-    : 0
+  const totalPercentage =
+    totalTargetMinutes > 0
+      ? parseFloat(((totalStudiedMinutes / totalTargetMinutes) * 100).toFixed(1))
+      : 0
 
   const formatHoursMinutesShort = (mins: number) => {
     const h = Math.floor(mins / 60)
@@ -143,7 +154,9 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
             <Target className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-black text-foreground">Metas & Progresso do Planejamento</h3>
+            <h3 className="text-lg font-black text-foreground">
+              Metas & Progresso do Planejamento
+            </h3>
             <p className="text-xs text-muted-foreground font-medium">
               Acompanhamento de horas definidas vs estudadas por disciplina
             </p>
@@ -162,8 +175,8 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
                   setCurrentOffset(0)
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  period === f 
-                    ? "bg-[#2563EB] text-white shadow-sm" 
+                  period === f
+                    ? "bg-[#2563EB] text-white shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -175,19 +188,19 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
           {/* Date Navigator Controls */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
-              onClick={() => setCurrentOffset(prev => prev - 1)}
+              onClick={() => setCurrentOffset((prev) => prev - 1)}
               className="p-2 border rounded-xl hover:bg-muted text-muted-foreground transition-colors bg-background shadow-xs"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <span className="text-xs font-extrabold text-foreground px-3 py-2 bg-muted rounded-xl border flex-1 text-center min-w-[200px]">
+            <span className="text-xs font-extrabold text-foreground px-3 py-2 bg-muted rounded-xl border flex-1 text-center min-w-0">
               {getDateRangeLabel()}
             </span>
 
             <button
-              onClick={() => setCurrentOffset(prev => prev + 1)}
-              className="p-2 border rounded-xl hover:bg-muted text-muted-foreground transition-colors bg-background shadow-xs"
+              onClick={() => setCurrentOffset((prev) => prev + 1)}
+              className="p-2 border rounded-xl hover:bg-muted text-muted-foreground transition-colors bg-background shadow-xs shrink-0"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -199,22 +212,33 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
       <div className="space-y-4">
         {disciplineGoals.map((d) => {
           const isCompleted = d.percentage >= 100
-          
+
           return (
-            <div 
-              key={d.id} 
+            <div
+              key={d.id}
               className="p-4 rounded-xl border bg-muted/20 hover:border-primary/40 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
             >
               {/* Discipline Info & Missing/Target Labels */}
-              <div className="space-y-1 min-w-[240px]">
+              <div className="space-y-1 w-full md:w-auto md:min-w-[240px] min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                  <span
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: d.color }}
+                  />
                   <h4 className="text-sm font-black text-foreground">{d.name}</h4>
                 </div>
 
                 <div className="flex items-center gap-3 text-xs font-semibold">
-                  <span className={isCompleted ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-amber-600 dark:text-amber-400"}>
-                    {isCompleted ? "🟢 Meta Batida!" : `Falta: ${formatHoursMinutesShort(d.missingMinutes)}`}
+                  <span
+                    className={
+                      isCompleted
+                        ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                        : "text-amber-600 dark:text-amber-400"
+                    }
+                  >
+                    {isCompleted
+                      ? "🟢 Meta Batida!"
+                      : `Falta: ${formatHoursMinutesShort(d.missingMinutes)}`}
                   </span>
                   <span className="text-muted-foreground">
                     Meta definida: <strong>{formatHoursMinutesShort(d.targetMinutes)}</strong>
@@ -231,9 +255,11 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
                   />
                 </div>
 
-                <span className={`text-xs font-black min-w-[48px] text-right ${
-                  isCompleted ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
-                }`}>
+                <span
+                  className={`text-xs font-black min-w-[48px] text-right ${
+                    isCompleted ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+                  }`}
+                >
                   {d.percentage}%
                 </span>
               </div>
@@ -282,8 +308,6 @@ export function PlanningGoalsProgressCard({ blocks, onStartSession }: PlanningGo
             style={{ width: `${totalPercentage}%` }}
           />
         </div>
-
-
       </div>
     </div>
   )

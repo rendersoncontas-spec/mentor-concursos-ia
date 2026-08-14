@@ -1,12 +1,6 @@
 "use client"
 
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts"
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 
 const CATEGORY_DATA = [
   { name: "Teoria", value: 38, color: "#3b9edd", icon: "📖" },
@@ -45,7 +39,9 @@ function CustomLegend() {
       {CATEGORY_DATA.map((d) => (
         <div key={d.name} className="flex items-center gap-2 text-xs">
           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-          <span className="text-muted-foreground">{d.icon} {d.name}</span>
+          <span className="text-muted-foreground">
+            {d.icon} {d.name}
+          </span>
           <span className="ml-auto font-bold">{d.value}%</span>
         </div>
       ))}
@@ -61,9 +57,9 @@ export function HoursDistributionChart() {
         <p className="text-xs text-muted-foreground">Como você divide seu tempo de estudo</p>
       </div>
 
-      <div className="flex gap-6 items-center flex-wrap">
+      <div className="flex flex-col sm:flex-row gap-6 items-center justify-center">
         {/* Pie */}
-        <div className="h-52 flex-1 min-w-[200px]">
+        <div className="h-52 w-full sm:flex-1 min-w-0 max-w-[280px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -85,7 +81,7 @@ export function HoursDistributionChart() {
         </div>
 
         {/* Legend */}
-        <div className="min-w-[150px]">
+        <div className="w-full sm:w-auto min-w-0">
           <CustomLegend />
         </div>
       </div>
