@@ -983,6 +983,10 @@ export async function getReplanInfo(
     const sanityInvalid =
       totalPending > plausibleMaxPending || totalPending < 0 || plausibleMaxPending < 0
 
+    // Evento antigo com pendência impossível (gerado pelo bug) é considerado
+    // OBSOLETO: nunca exibir "Identificamos 457h54min..." como se fosse real.
+    const staleEvent = !!event && (event.pending_minutes ?? 0) > plausibleMaxPending
+
     if (sanityInvalid) {
       const duplicatedSources = new Map<string, number>()
       for (const b of windowBlocks) {
@@ -1026,7 +1030,7 @@ export async function getReplanInfo(
         : [...byDiscipline.values()].sort((a, b) => b.pendingMinutes - a.pendingMinutes),
       totalPendingMinutes: sanityInvalid ? 0 : totalPending,
       unscheduledMinutes: 0,
-      lastEvent: event
+      lastEvent: !sanityInvalid && !staleEvent && event
         ? {
             id: event.id,
             createdAt: event.created_at,

@@ -436,7 +436,8 @@ export function DailyPlanningView({
 
   const hasAdjustments = scheduledTasks.some((t) => t.origin !== "BASE")
   const lastEvent = replanInfo?.lastEvent
-  const showBanner = lastEvent && !lastEvent.revertedAt
+  const showBanner =
+    lastEvent && !lastEvent.revertedAt && !replanInfo?.replanPaused && !replanInfo?.sanityInvalid
   const showPendencyPanel =
     (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
     (showPendencies || !replanInfo?.enabled) &&
