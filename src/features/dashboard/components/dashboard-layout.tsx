@@ -1,18 +1,24 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
-import { DashboardDndContext } from "./dashboard-dnd-context"
-import { SortableWidget } from "./sortable-widget"
-import { WIDGET_REGISTRY } from "./dashboard-widget-catalog"
-import { DashboardCustomizationModal } from "./dashboard-customization-modal"
-import { saveDashboardLayoutAction, resetDashboardLayoutAction } from "@/application/dashboard/dashboard-layout.action"
-import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
+import React, { useEffect, useState } from "react"
+
+import { toast } from "sonner"
+
+import {
+  resetDashboardLayoutAction,
+  saveDashboardLayoutAction,
+} from "@/application/dashboard/dashboard-layout.action"
 import { Button } from "@/components/ui/button"
-import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
+import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { UserExamModal } from "@/features/dashboard/components/user-exam-modal"
 import { WeeklyGoalsModal } from "@/features/dashboard/components/weekly-goals-modal"
-import { toast } from "sonner"
+import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+
+import { DashboardCustomizationModal } from "./dashboard-customization-modal"
+import { DashboardDndContext } from "./dashboard-dnd-context"
+import { WIDGET_REGISTRY } from "./dashboard-widget-catalog"
+import { SortableWidget } from "./sortable-widget"
 
 export interface DashboardLayoutProps {
   snapshot: DashboardSnapshot
@@ -33,7 +39,8 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
     }
   }, [])
 
-  const examName = snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Minha Prova"
+  const examName =
+    snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Minha Prova"
   const formattedTodayDate = new Intl.DateTimeFormat("pt-BR", {
     weekday: "long",
     day: "numeric",
@@ -75,27 +82,30 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
   return (
     <div className="flex flex-col min-h-full bg-background/50">
       <div className="flex-1 p-4 md:p-6 space-y-6 w-full pb-24">
-
         {/* Header Dinâmico e Unificado */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-black text-foreground">Home</h1>
             <p className="text-sm font-bold text-muted-foreground mt-0.5">
-              Olá, <span className="text-[#2563EB]">{snapshot?.user?.name || "Estudante"}</span>! Hoje é {capitalizedDate}. 👋 Bem-vindo de volta.
+              Olá, <span className="text-[#2563EB]">{snapshot?.user?.name || "Estudante"}</span>!
+              Hoje é {capitalizedDate}. 👋 Bem-vindo de volta.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto shrink-0 min-w-0">
             <Button
               onClick={() => {
                 setIsRegisterModalOpen(true)
                 window.dispatchEvent(new CustomEvent("study-center-opened"))
               }}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs cursor-pointer"
+              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs cursor-pointer w-full sm:w-auto h-9 shrink-0"
             >
               Adicionar Estudo
             </Button>
-            <TargetSelectorDropdown initialActiveTargetName={examName} />
+            <TargetSelectorDropdown
+              initialActiveTargetName={examName}
+              className="w-full sm:w-auto"
+            />
           </div>
         </div>
 
@@ -106,15 +116,16 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
             const WidgetComponent = widgetInfo.component
 
-            const cycleBlocks = snapshot?.cycleBlocks?.map((b) => ({
-              id: b.id,
-              disciplineName: b.disciplineName,
-              disciplineId: b.disciplineId,
-              durationMinutes: b.durationMinutes,
-              studiedMinutes: b.studiedMinutes ?? 0,
-              color: b.color || "#2563EB",
-              completed: b.status === "CONCLUIDO",
-            })) || []
+            const cycleBlocks =
+              snapshot?.cycleBlocks?.map((b) => ({
+                id: b.id,
+                disciplineName: b.disciplineName,
+                disciplineId: b.disciplineId,
+                durationMinutes: b.durationMinutes,
+                studiedMinutes: b.studiedMinutes ?? 0,
+                color: b.color || "#2563EB",
+                completed: b.status === "CONCLUIDO",
+              })) || []
 
             return (
               <SortableWidget key={item.widget_id} id={item.widget_id} colSpan={item.col_span}>
@@ -139,10 +150,7 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
         onRestoreDefault={handleRestoreDefault}
       />
 
-      <StudyRegisterModal
-        open={isRegisterModalOpen}
-        onOpenChange={setIsRegisterModalOpen}
-      />
+      <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
       <UserExamModal
         open={isExamModalOpen}
         onOpenChange={setIsExamModalOpen}

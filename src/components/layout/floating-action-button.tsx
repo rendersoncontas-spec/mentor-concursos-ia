@@ -38,7 +38,7 @@ export function FloatingActionButton() {
       <StudyRegisterModal open={isRegisterOpen} onOpenChange={setIsRegisterOpen} />
 
       {/* Botões Flutuantes de Ação Rápida */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-3">
+      <div className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-center gap-2.5 sm:gap-3 pb-[env(safe-area-inset-bottom,0px)]">
         {/* Botão 1 (Superior): Bloco de Notas */}
         <button
           id="fab-sticky-note"

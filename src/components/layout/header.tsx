@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { useTheme } from "next-themes"
 import Image from "next/image"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import {
@@ -13,6 +14,7 @@ import {
   HelpCircle,
   Library,
   LogOut,
+  Menu,
   Moon,
   Settings,
   Sun,
@@ -39,6 +41,7 @@ interface AppHeaderProps {
   userId?: string
   avatarUrl?: string | null
   logoutAction: () => Promise<void>
+  onOpenMenu?: () => void
 }
 
 export function AppHeader({
@@ -47,6 +50,7 @@ export function AppHeader({
   userId = "",
   avatarUrl = null,
   logoutAction,
+  onOpenMenu,
 }: AppHeaderProps) {
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
@@ -114,32 +118,45 @@ export function AppHeader({
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/90 backdrop-blur-sm px-6">
-      {/* Esquerda: Logo / Título em Mobile */}
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/90 backdrop-blur-sm px-3 sm:px-6 w-full">
+      {/* Esquerda: Menu Hamburger + Logo em Mobile */}
       <div className="flex items-center gap-2 md:hidden">
-        <Image
-          src="/branding/nomeia-icon.png"
-          alt="NomeIA"
-          width={32}
-          height={32}
-          className="w-8 h-8 rounded-xl object-contain shadow-xs"
-        />
-        <span className="font-extrabold text-sm text-foreground flex items-center">
-          <span>Nome</span>
-          <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
-            IA
+        {onOpenMenu && (
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="p-2 -ml-1 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+            aria-label="Abrir menu de navegação"
+            title="Abrir menu"
+          >
+            <Menu className="w-5 h-5 text-foreground" />
+          </button>
+        )}
+        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+          <Image
+            src="/branding/nomeia-icon.png"
+            alt="NomeIA"
+            width={30}
+            height={30}
+            className="w-[30px] h-[30px] rounded-xl object-contain shadow-xs shrink-0"
+          />
+          <span className="font-extrabold text-sm text-foreground flex items-center shrink-0">
+            <span>Nome</span>
+            <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
+              IA
+            </span>
           </span>
-        </span>
+        </Link>
       </div>
 
       <div className="hidden md:block" />
 
       {/* Direita: Ações Superiores + Avatar do Usuário */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Botão ? (Ajuda / Suporte) */}
         <button
           onClick={() => toast.info("Central de Ajuda e Suporte do NomeIA")}
-          className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center hover:bg-[#1D4ED8] transition-colors shadow-xs"
+          className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center hover:bg-[#1D4ED8] transition-colors shadow-xs shrink-0"
           title="Ajuda e Suporte"
         >
           <HelpCircle className="h-4 w-4" />
@@ -148,7 +165,7 @@ export function AppHeader({
         {/* Botão Notificações */}
         <button
           onClick={() => toast.info("Nenhuma nova notificação no momento.")}
-          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
+          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative shrink-0"
           title="Notificações"
         >
           <Bell className="h-4 w-4" />
@@ -160,7 +177,7 @@ export function AppHeader({
           onClick={() => {
             window.dispatchEvent(new CustomEvent("open-dashboard-customization"))
           }}
-          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
           title="Personalizar Home"
         >
           <Settings className="h-4 w-4" />
@@ -169,7 +186,7 @@ export function AppHeader({
         {/* Botão Modo Noturno / Tema */}
         <button
           onClick={toggleDarkMode}
-          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
           title="Alternar Tema"
         >
           {resolvedTheme === "dark" ? (
@@ -180,7 +197,7 @@ export function AppHeader({
         </button>
 
         {/* Dropdown Menu do Usuário */}
-        <div className="relative" ref={menuRef}>
+        <div className="relative shrink-0" ref={menuRef}>
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="w-9 h-9 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xs focus:outline-none overflow-hidden"

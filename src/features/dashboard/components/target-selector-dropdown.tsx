@@ -1,20 +1,30 @@
 "use client"
 
-import { useState, useRef, useEffect, useTransition, useCallback } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+
 import { useRouter } from "next/navigation"
-import { GraduationCap, ChevronDown, Check, Plus, Calendar, BookOpen, Loader2 } from "lucide-react"
+
+import { BookOpen, Calendar, Check, ChevronDown, GraduationCap, Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
+
+import {
+  type UserTargetSummary,
+  getUserTargetsAction,
+  switchActiveTargetAction,
+} from "@/application/dashboard/target.action"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { getUserTargetsAction, switchActiveTargetAction, type UserTargetSummary } from "@/application/dashboard/target.action"
 import { RenderConcursoIcon } from "@/features/concursos/components/concursos-manager-view"
+import { cn } from "@/lib/utils"
 
 export interface TargetSelectorDropdownProps {
   initialActiveTargetName?: string | null
   className?: string
 }
 
-export function TargetSelectorDropdown({ initialActiveTargetName, className }: TargetSelectorDropdownProps) {
+export function TargetSelectorDropdown({
+  initialActiveTargetName,
+  className,
+}: TargetSelectorDropdownProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [targets, setTargets] = useState<UserTargetSummary[]>([])
@@ -133,10 +143,12 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
         if (res.success) {
           toast.success(`Concurso ativo alterado para ${targetName}!`)
           setIsOpen(false)
-          setTargets(prev => prev.map(t => ({
-            ...t,
-            is_active: t.id === targetId
-          })))
+          setTargets((prev) =>
+            prev.map((t) => ({
+              ...t,
+              is_active: t.id === targetId,
+            })),
+          )
           router.refresh()
         } else {
           toast.error(res.error || "Erro ao trocar de concurso.")
@@ -154,7 +166,10 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
   }
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div
+      className={cn("relative text-left w-full sm:w-auto min-w-0 max-w-full", className)}
+      ref={dropdownRef}
+    >
       {/* Botão Trigger Principal */}
       <Button
         ref={buttonRef}
@@ -162,19 +177,23 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
         onClick={toggleDropdown}
         disabled={isPending}
         className={cn(
-          "border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2 cursor-pointer transition-all shadow-2xs",
+          "w-full sm:w-auto justify-between sm:justify-start border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2 cursor-pointer transition-all shadow-2xs min-w-0 max-w-full h-9",
           isOpen && "bg-[#2563EB]/15 ring-2 ring-[#2563EB]/30",
-          className
         )}
       >
-        {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin text-[#2563EB]" />
-        ) : (
-          <GraduationCap className="h-4 w-4 shrink-0" />
-        )}
-        <span className="truncate max-w-[200px] sm:max-w-[260px]">{buttonLabel}</span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin text-[#2563EB] shrink-0" />
+          ) : (
+            <GraduationCap className="h-4 w-4 shrink-0" />
+          )}
+          <span className="truncate flex-1 min-w-0 text-left">{buttonLabel}</span>
+        </div>
         <ChevronDown
-          className={cn("h-3.5 w-3.5 shrink-0 transition-transform duration-200", isOpen && "rotate-180")}
+          className={cn(
+            "h-3.5 w-3.5 shrink-0 transition-transform duration-200 ml-1",
+            isOpen && "rotate-180",
+          )}
         />
       </Button>
 
@@ -229,15 +248,19 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
                       "group flex items-start gap-3 p-2.5 rounded-lg transition-all cursor-pointer border text-left",
                       isActive
                         ? "border-[#2563EB]/40 bg-[#2563EB]/10 shadow-2xs"
-                        : "border-transparent hover:bg-muted/80 hover:border-border"
+                        : "border-transparent hover:bg-muted/80 hover:border-border",
                     )}
                   >
                     {/* Ícone de Selecionado e Logo do Concurso */}
                     <div className="mt-0.5 shrink-0 flex items-center gap-2">
-                      <div className={cn(
-                        "w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden border shadow-2xs",
-                        isActive ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#2563EB]" : "bg-muted border-border text-muted-foreground"
-                      )}>
+                      <div
+                        className={cn(
+                          "w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden border shadow-2xs",
+                          isActive
+                            ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#2563EB]"
+                            : "bg-muted border-border text-muted-foreground",
+                        )}
+                      >
                         <RenderConcursoIcon iconKey={target.icon} className="h-4 w-4" />
                       </div>
                       {isActive ? (
@@ -252,7 +275,12 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
                     {/* Informações Rápidas do Concurso */}
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className={cn("font-bold text-xs truncate", isActive ? "text-foreground font-black" : "text-foreground/90")}>
+                        <p
+                          className={cn(
+                            "font-bold text-xs truncate",
+                            isActive ? "text-foreground font-black" : "text-foreground/90",
+                          )}
+                        >
                           {displayName}
                           {target.target_role ? ` - ${target.target_role}` : ""}
                         </p>
@@ -262,7 +290,7 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
                             "px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider shrink-0",
                             isActive
                               ? "bg-[#2563EB] text-white shadow-2xs"
-                              : "bg-muted text-muted-foreground"
+                              : "bg-muted text-muted-foreground",
                           )}
                         >
                           {isActive ? "Ativo" : "Inativo"}
@@ -323,4 +351,3 @@ export function TargetSelectorDropdown({ initialActiveTargetName, className }: T
     </div>
   )
 }
-

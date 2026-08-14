@@ -286,6 +286,51 @@ export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
               })}
             </div>
           ))}
+
+          {/* ── Seção: Acesso Rápido (em Drawer Mobile ou Sidebar Expandida) ── */}
+          {!effectiveCollapsed && (
+            <div className="pt-4 border-t border-[hsl(var(--sidebar-border))/60] space-y-1.5 pb-6">
+              <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[hsl(var(--sidebar-foreground))/0.4]">
+                Acesso Rápido
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose?.()
+                  window.dispatchEvent(new CustomEvent("open-study-session-modal"))
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#2563EB]/10 rounded-lg transition-colors text-left cursor-pointer"
+              >
+                <span className="w-5 h-5 rounded-md bg-[#2563EB]/15 flex items-center justify-center text-[#2563EB] font-bold text-xs">
+                  +
+                </span>
+                <span>Adicionar Estudo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose?.()
+                  window.dispatchEvent(new CustomEvent("study-center-opened"))
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors text-left cursor-pointer"
+              >
+                <span className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                  ▶
+                </span>
+                <span>Iniciar Cronômetro</span>
+              </button>
+              <Link
+                href="/dashboard/history"
+                onClick={onClose as MouseEventHandler<HTMLAnchorElement>}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--sidebar-accent))] rounded-lg transition-colors text-left cursor-pointer"
+              >
+                <span className="w-5 h-5 rounded-md bg-muted flex items-center justify-center text-muted-foreground font-bold text-xs">
+                  ↑
+                </span>
+                <span>Importar Histórico</span>
+              </Link>
+            </div>
+          )}
         </nav>
 
         {/* ── Botão recolher/expandir ────────────────────────────────────── */}
