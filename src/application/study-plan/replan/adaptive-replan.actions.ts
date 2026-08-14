@@ -11,6 +11,7 @@ import {
   type ReplanAvailability,
   type ReplanInfoPayload,
   type ReplanSummary,
+  closeBlockManually,
   getAutoReplanPreference,
   getReplanInfo,
   runAdaptiveReplanning,
@@ -121,6 +122,39 @@ export async function undoReplanningAction(
       extra: { feature: "adaptive-planning", step: "undo_replanning_action" },
     })
     return { ok: false, error: "Erro ao desfazer o reajuste." }
+  }
+}
+
+/** "Marcar como concluído hoje" — decisão explícita do aluno: encerra o bloco
+ *  mesmo parcial e perdoa a pendência restante (não será reprogramada). */
+export async function closeBlockManuallyAction(
+  blockId: string,
+  plannedMinutes: number,
+  realizedMinutes: number,
+): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { ok: false, error: "Usuário não autenticado" }
+
+    const result = await closeBlockManually(
+      supabase,
+      user.id,
+      blockId,
+      plannedMinutes,
+      realizedMinutes,
+    )
+    if (result.ok) {
+      for (const path of REPLAN_PATHS) revalidatePath(path)
+    }
+    return { ok: result.ok, error: result.error ?? null }
+  } catch (error) {
+    Sentry.captureException(error, {
+      extra: { feature: "adaptive-planning", step: "close_block_manually_action" },
+    })
+    return { ok: false, error: "Erro ao concluir o bloco." }
   }
 }
 

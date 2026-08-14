@@ -23,7 +23,7 @@ export const CRITICAL_MISSED_DAYS = 3
 export const MAX_DAILY_MINUTES_CAP = 240
 
 export type ReplanBlockOrigin = "BASE" | "REAJUSTE" | "CRITICO"
-export type ReplanBlockStatus = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO"
+export type ReplanBlockStatus = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO" | "CONCLUIDO_MANUAL"
 
 export interface ReplanBlock {
   blockId: string
@@ -35,6 +35,9 @@ export interface ReplanBlock {
   executionOrder: number
   origin: ReplanBlockOrigin
   status: ReplanBlockStatus
+  /** Bloco encerrado voluntariamente pelo aluno ("Marcar como concluído hoje").
+   *  Sua pendência restante é perdoada e nunca é reprogramada para o futuro. */
+  manuallyClosed?: boolean
 }
 
 export interface ReplanSession {
@@ -243,6 +246,8 @@ export function computePendingBlocks(
   )
 
   for (const block of sorted) {
+    // Bloco encerrado manualmente: pendência perdoada (não gera reajuste futuro).
+    if (block.manuallyClosed) continue
     const realizedMinutes = realized.get(block.blockId) ?? 0
     const pending = pendingOf(block.durationMinutes, realizedMinutes, toleranceMinutes)
     if (pending > 0) {
@@ -280,7 +285,10 @@ export function computeDayStatuses(
   const result: ReplanDayStatus[] = []
   for (const [date, blocks] of [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const planned = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-    const realizedMinutes = blocks.reduce((acc, b) => acc + (realized.get(b.blockId) ?? 0), 0)
+    const realizedMinutes = blocks.reduce(
+      (acc, b) => acc + (b.manuallyClosed ? b.durationMinutes : (realized.get(b.blockId) ?? 0)),
+      0,
+    )
     result.push({
       date,
       plannedMinutes: planned,

@@ -112,3 +112,22 @@ CREATE POLICY "Usuário exclui seus eventos de reajuste"
 --    (perfil → preferences jsonb, chave: adaptive_replan). O padrão fica ON.
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS preferences jsonb DEFAULT '{}'::jsonb;
+
+-- ============================================================================
+-- MIGRAÇÃO — "Marcar como concluído hoje" (fechamento manual de bloco)
+-- ----------------------------------------------------------------------------
+-- Habilita o status 'CONCLUIDO_MANUAL' e guarda os minutos perdoados para
+-- exibição ("Concluído com 2 min pendentes") e o instante do fechamento.
+-- Rodar no SQL Editor do Supabase (banco já existente).
+-- ============================================================================
+
+ALTER TABLE public.study_plan_daily_blocks
+  ADD COLUMN IF NOT EXISTS manual_pending_minutes integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS manual_close_at timestamptz;
+
+ALTER TABLE public.study_plan_daily_blocks
+  DROP CONSTRAINT IF EXISTS study_plan_daily_blocks_status_check;
+
+ALTER TABLE public.study_plan_daily_blocks
+  ADD CONSTRAINT study_plan_daily_blocks_status_check
+  CHECK (status IN ('PENDENTE', 'EM_ANDAMENTO', 'CONCLUIDO', 'CONCLUIDO_MANUAL'));

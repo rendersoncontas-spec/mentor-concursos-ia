@@ -9,6 +9,7 @@ import {
   type ReplanSession,
   buildAdjustedDay,
   classifyDay,
+  computeDayStatuses,
   computeDisciplinePendencies,
   computePendingBlocks,
   computeReplan,
@@ -530,4 +531,68 @@ test("prova próxima aumenta agressividade (horizonte curto) — sem criar bola 
   )
   assert.equal(result.horizonDays, 2)
   assert.ok(result.ran)
+})
+
+// ============================================================================
+// CONCLUSÃO MANUAL ("Marcar como concluído hoje")
+// ============================================================================
+
+test("bloco encerrado manualmente não gera pendência (2 min restantes perdoados)", () => {
+  const pastBlocks = [
+    block({ blockId: "b-1", itemId: "item-1", durationMinutes: 60, manuallyClosed: true }),
+  ]
+  const sessions: ReplanSession[] = [
+    session({ id: "s-1", studyPlanItemId: "item-1", durationMinutes: 58 }),
+  ]
+
+  const pendings = computePendingBlocks(pastBlocks, sessions)
+  assert.equal(pendings.length, 0)
+
+  const result = computeReplan(input({ pastBlocks, sessions }))
+  assert.equal(result.ran, false)
+  assert.equal(result.reason, "no_pendency")
+  assert.equal(result.totalPendingMinutes, 0)
+})
+
+test("bloco encerrado manualmente marca o dia como concluído (sem pendência no dia)", () => {
+  const pastBlocks = [
+    block({ blockId: "b-1", itemId: "item-1", durationMinutes: 60, manuallyClosed: true }),
+  ]
+  const sessions: ReplanSession[] = [
+    session({ id: "s-1", studyPlanItemId: "item-1", durationMinutes: 58 }),
+  ]
+
+  const statuses = computeDayStatuses(pastBlocks, sessions)
+  assert.equal(statuses.length, 1)
+  assert.equal(statuses[0]?.classification, "CONCLUIDO")
+  assert.equal(statuses[0]?.pendingMinutes, 0)
+  assert.equal(statuses[0]?.realizedMinutes, 60)
+})
+
+test("bloco manualmente fechado não contribui com pendência quando misturado a blocos abertos", () => {
+  const pastBlocks = [
+    block({
+      blockId: "b-ok",
+      itemId: "item-ok",
+      disciplineId: "d-ok",
+      durationMinutes: 60,
+      manuallyClosed: true,
+    }),
+    block({
+      blockId: "b-open",
+      itemId: "item-open",
+      disciplineId: "d-open",
+      durationMinutes: 60,
+    }),
+  ]
+  const sessions: ReplanSession[] = [
+    session({ id: "s-open", studyPlanItemId: "item-open", durationMinutes: 30 }),
+  ]
+
+  const result = computeReplan(input({ pastBlocks, sessions }))
+  assert.equal(result.ran, true)
+  assert.equal(result.pendingBlocks.length, 1)
+  assert.equal(result.pendingBlocks[0]?.blockId, "b-open")
+  assert.equal(result.pendingBlocks[0]?.pendingMinutes, 29)
+  assert.equal(result.totalPendingMinutes, 29)
 })

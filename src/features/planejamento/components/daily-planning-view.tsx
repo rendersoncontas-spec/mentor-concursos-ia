@@ -21,13 +21,23 @@ import {
 import { toast } from "sonner"
 
 import {
+  closeBlockManuallyAction,
   getReplanInfoAction,
   runReplanningAction,
   setAutoReplanPreferenceAction,
   undoReplanningAction,
 } from "@/application/study-plan/replan/adaptive-replan.actions"
 import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive-replan.service"
+import { pendingOf } from "@/application/study-plan/replan/replan-engine"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
@@ -51,9 +61,16 @@ interface DayTask {
   timeSlot: string
   completed: boolean
   studiedMinutes: number
+  manuallyClosed: boolean
+  manualPendingMinutes: number
 }
 
-type PlannedBlockForView = StudyCycleBlock & { itemId?: string | null; origin?: string }
+type PlannedBlockForView = StudyCycleBlock & {
+  itemId?: string | null
+  origin?: string
+  manuallyClosed?: boolean
+  manualPendingMinutes?: number
+}
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60)
@@ -123,6 +140,10 @@ export function DailyPlanningView({
   const [replanInfo, setReplanInfo] = useState<ReplanInfoPayload | null>(null)
   const [showPendencies, setShowPendencies] = useState(false)
   const [busy, setBusy] = useState(false)
+
+  // Conclusão manual do dia ("Marcar como concluído hoje")
+  const [blockToClose, setBlockToClose] = useState<DayTask | null>(null)
+  const [closingBlock, setClosingBlock] = useState(false)
 
   const loadReplanInfo = useCallback(async () => {
     const availability = {
@@ -198,6 +219,29 @@ export function DailyPlanningView({
       await handleManualReplan()
     } else {
       await loadReplanInfo()
+    }
+  }
+
+  const handleConfirmCloseBlock = async () => {
+    if (!blockToClose) return
+    setClosingBlock(true)
+    try {
+      const res = await closeBlockManuallyAction(
+        blockToClose.id,
+        blockToClose.durationMinutes,
+        blockToClose.studiedMinutes,
+      )
+      if (res.ok) {
+        toast.success("Bloco concluído. Os minutos restantes não serão reprogramados.")
+        setBlockToClose(null)
+        await loadReplanInfo()
+      } else {
+        toast.error(res.error || "Não foi possível concluir o bloco.")
+      }
+    } catch {
+      toast.error("Erro de conexão ao concluir o bloco.")
+    } finally {
+      setClosingBlock(false)
     }
   }
 
@@ -297,6 +341,8 @@ export function DailyPlanningView({
         color: colorByDiscipline.get(b.disciplineId) || "#2563EB",
         completed: false,
         origin: b.origin,
+        manuallyClosed: b.manuallyClosed,
+        manualPendingMinutes: b.manualPendingMinutes,
       }))
     }
 
@@ -332,7 +378,18 @@ export function DailyPlanningView({
     return "PENDENTE"
   }
 
-  const getTaskProgressText = (completed: boolean, studied: number, duration: number) => {
+  const getTaskProgressText = (
+    completed: boolean,
+    studied: number,
+    duration: number,
+    manuallyClosed: boolean,
+    manualPendingMinutes: number,
+  ) => {
+    if (manuallyClosed) {
+      return manualPendingMinutes > 0
+        ? `Concluído com ${manualPendingMinutes} min pendentes`
+        : "Concluído manualmente"
+    }
     if (completed) return `Concluído — ${studied || 0} min estudados`
     if (studied) return `Em andamento — ${studied} de ${duration} min`
     return "Aguardando início"
@@ -345,6 +402,8 @@ export function DailyPlanningView({
 
     const studiedMins = studiedMinutesByDiscipline.get(block.disciplineId) || 0
     const isCompletedByHistory = studiedMins >= block.durationMinutes && studiedMins > 0
+    const manuallyClosed = block.manuallyClosed ?? false
+    const isCompleted = manuallyClosed || isCompletedByHistory
 
     return {
       id: block.id,
@@ -355,9 +414,11 @@ export function DailyPlanningView({
       color: block.color || "#2563EB",
       origin: block.origin ?? "BASE",
       timeSlot: `${startStr} - ${endStr}`,
-      completed: isCompletedByHistory,
+      completed: isCompleted,
       studiedMinutes: studiedMins,
-      status: getTaskStatus(isCompletedByHistory, idx),
+      manuallyClosed,
+      manualPendingMinutes: block.manualPendingMinutes ?? 0,
+      status: getTaskStatus(isCompleted, idx),
     }
   })
 
@@ -636,6 +697,8 @@ export function DailyPlanningView({
                         task.completed,
                         task.studiedMinutes,
                         task.durationMinutes,
+                        task.manuallyClosed,
+                        task.manualPendingMinutes,
                       )}
                     </p>
                   </div>
@@ -645,19 +708,32 @@ export function DailyPlanningView({
                   {task.completed ? (
                     <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg">
                       <CheckCircle2 className="w-4 h-4" />
-                      Concluído
+                      {task.manuallyClosed ? "Concluído hoje" : "Concluído"}
                     </span>
                   ) : (
-                    <Button
-                      onClick={() => {
-                        toast.success(`Iniciando estudo de ${task.disciplineName}`)
-                        router.push(`/dashboard/study-session?planId=${task.itemId ?? task.id}`)
-                      }}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs h-9 px-4 rounded-xl shadow-xs cursor-pointer"
-                    >
-                      <PlayCircle className="w-4 h-4 mr-1.5" />
-                      Iniciar Estudo
-                    </Button>
+                    <>
+                      {!task.manuallyClosed && task.studiedMinutes > 0 && isToday && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBlockToClose(task)}
+                          className="h-9 px-3 text-xs font-bold rounded-xl cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                          Marcar como concluído hoje
+                        </Button>
+                      )}
+                      <Button
+                        onClick={() => {
+                          toast.success(`Iniciando estudo de ${task.disciplineName}`)
+                          router.push(`/dashboard/study-session?planId=${task.itemId ?? task.id}`)
+                        }}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs h-9 px-4 rounded-xl shadow-xs cursor-pointer"
+                      >
+                        <PlayCircle className="w-4 h-4 mr-1.5" />
+                        Iniciar Estudo
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -665,6 +741,47 @@ export function DailyPlanningView({
           </div>
         )}
       </div>
+
+      {/* Diálogo de confirmação — "Marcar como concluído hoje" */}
+      <Dialog
+        open={blockToClose !== null}
+        onOpenChange={(open) => {
+          if (!open) setBlockToClose(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Marcar como concluído hoje?</DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const pending =
+                  blockToClose && blockToClose.studiedMinutes > 0
+                    ? pendingOf(blockToClose.durationMinutes, blockToClose.studiedMinutes)
+                    : 0
+                return pending > 0
+                  ? `Você estudou ${blockToClose?.studiedMinutes} de ${blockToClose?.durationMinutes} minutos. Os ${pending} minutos restantes não serão reprogramados para o futuro.`
+                  : `Você estudou ${blockToClose?.studiedMinutes} de ${blockToClose?.durationMinutes} minutos. Este bloco será marcado como concluído.`
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBlockToClose(null)}
+              className="rounded-xl cursor-pointer"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleConfirmCloseBlock()}
+              disabled={closingBlock}
+              className="bg-primary hover:bg-primary/90 rounded-xl cursor-pointer"
+            >
+              {closingBlock ? "Concluindo..." : "Concluir hoje"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

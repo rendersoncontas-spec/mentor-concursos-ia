@@ -27,6 +27,7 @@ import {
   addDaysToKey,
   computePendingBlocks,
   computeReplan,
+  pendingOf,
 } from "./replan-engine"
 
 export const REPLAN_LOOKBACK_DAYS = 7
@@ -75,6 +76,8 @@ interface DailyBlockRow {
   status: string
   origin: string
   source_block_id: string | null
+  manual_pending_minutes: number
+  manual_close_at: string | null
 }
 
 interface SessionRow {
@@ -187,7 +190,7 @@ async function loadWindowBlocks(
   const { data } = await supabase
     .from("study_plan_daily_blocks")
     .select(
-      "id, item_id, discipline_id, scheduled_date, duration_minutes, execution_order, status, origin, source_block_id",
+      "id, item_id, discipline_id, scheduled_date, duration_minutes, execution_order, status, origin, source_block_id, manual_pending_minutes, manual_close_at",
     )
     .eq("study_plan_id", planId)
     .gte("scheduled_date", fromKey)
@@ -413,6 +416,7 @@ export async function runAdaptiveReplanning(
         executionOrder: row.execution_order,
         origin: row.origin as ReplanBlock["origin"],
         status: row.status as ReplanBlockStatus,
+        manuallyClosed: row.status === "CONCLUIDO_MANUAL",
       }
       if (row.scheduled_date < todayKey) {
         pastBlocks.push(block)
@@ -645,6 +649,61 @@ function buildReplanMessage(pendingMinutes: number, distributedDays: number): st
 }
 
 // ---------------------------------------------------------------------------
+// Conclusão manual do dia ("Marcar como concluído hoje")
+// ---------------------------------------------------------------------------
+// Decisão explícita do aluno: encerra o bloco mesmo parcial, perdoando a
+// pendência restante. NÃO cria sessão, NÃO altera o histórico e NÃO soma o
+// planejado ao tempo real estudado. O motor de replan ignora estes blocos
+// (manuallyClosed) ao calcular pendências futuras.
+export async function closeBlockManually(
+  supabase: SupabaseClient,
+  userId: string,
+  blockId: string,
+  plannedMinutes: number,
+  realizedMinutes: number,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { data: block } = await supabase
+      .from("study_plan_daily_blocks")
+      .select("id, user_id, status, scheduled_date")
+      .eq("id", blockId)
+      .maybeSingle()
+
+    const row = block as {
+      id: string
+      user_id: string
+      status: string
+      scheduled_date: string
+    } | null
+    if (!row || row.user_id !== userId) {
+      return { ok: false, error: "Bloco não encontrado." }
+    }
+    if (row.status === "CONCLUIDO" || row.status === "CONCLUIDO_MANUAL") {
+      return { ok: false, error: "Este bloco já foi concluído." }
+    }
+    if (row.scheduled_date > todayKeyInSaoPaulo()) {
+      return { ok: false, error: "Só é possível concluir blocos de hoje ou anteriores." }
+    }
+
+    const pending = pendingOf(Math.max(0, plannedMinutes), Math.max(0, realizedMinutes))
+    const { error } = await supabase
+      .from("study_plan_daily_blocks")
+      .update({
+        status: "CONCLUIDO_MANUAL",
+        manual_pending_minutes: pending,
+        manual_close_at: new Date().toISOString(),
+      })
+      .eq("id", blockId)
+
+    if (error) return { ok: false, error: error.message }
+    return { ok: true }
+  } catch (error) {
+    Sentry.captureException(error, { extra: { feature: FEATURE, step: "close_block_manually" } })
+    return { ok: false, error: "Erro ao concluir o bloco." }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Desfazer (apenas reajustes não-críticos — janela segura)
 // ---------------------------------------------------------------------------
 
@@ -718,6 +777,8 @@ export interface ReplanUiBlock {
   durationMinutes: number
   executionOrder: number
   origin: string
+  manuallyClosed: boolean
+  manualPendingMinutes: number
 }
 
 export async function getReplanInfo(
@@ -766,6 +827,8 @@ export async function getReplanInfo(
         durationMinutes: row.duration_minutes,
         executionOrder: row.execution_order,
         origin: row.origin,
+        manuallyClosed: row.status === "CONCLUIDO_MANUAL",
+        manualPendingMinutes: row.manual_pending_minutes || 0,
       })
       dailyBlocks[row.scheduled_date] = list
     }
@@ -782,6 +845,7 @@ export async function getReplanInfo(
         executionOrder: row.execution_order,
         origin: row.origin as ReplanBlock["origin"],
         status: row.status as ReplanBlockStatus,
+        manuallyClosed: row.status === "CONCLUIDO_MANUAL",
       }))
 
     const sessions = await loadSessions(supabase, userId, plan.generated_at || plan.created_at)
