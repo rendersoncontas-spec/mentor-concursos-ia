@@ -86,9 +86,7 @@ interface StudyContextType {
   formatTime: (seconds: number) => string
   floatingTimerEnabled: boolean
   toggleFloatingTimer: () => void
-  finalizeAndSaveSession: (
-    formData?: Record<string, unknown>,
-  ) => Promise<{
+  finalizeAndSaveSession: (formData?: Record<string, unknown>) => Promise<{
     success: boolean
     error?: string
     historyId?: string
@@ -704,9 +702,28 @@ function FloatingStudyWidget() {
     }
   }, [router, session])
 
-  if (!session || !session.isMinimized || !floatingTimerEnabled || isCentralOpen) return null
+  const isStudying = session?.phase === "STUDYING"
 
-  const isStudying = session.phase === "STUDYING"
+  // Abrir a Central Inteligente pelo botão vermelho quadrado:
+  // Pausa imediatamente a sessão atual se estiver em execução, congelando o tempo, e abre a Central.
+  const handleEndOrOpenCentral = useCallback(() => {
+    try {
+      if (isStudying) {
+        pauseSession()
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("open-study-session-modal"))
+      }
+    } catch (error) {
+      console.error("[FloatingStudyWidget] Erro ao pausar/abrir central:", error)
+      Sentry.captureException(error, {
+        tags: { feature: "cronometro" },
+        extra: { step: "open_central_from_widget" },
+      })
+    }
+  }, [pauseSession, isStudying])
+
+  if (!session || !session.isMinimized || !floatingTimerEnabled || isCentralOpen) return null
 
   return (
     <div
@@ -817,14 +834,10 @@ function FloatingStudyWidget() {
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => {
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("open-study-session-modal"))
-            }
-          }}
+          onClick={handleEndOrOpenCentral}
           aria-label="Abrir Central Inteligente"
           className="w-7 h-7 sm:w-8 sm:h-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
-          title="Abrir Central Inteligente"
+          title="Abrir Central Inteligente (pausa o cronômetro)"
         >
           <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />
         </Button>
