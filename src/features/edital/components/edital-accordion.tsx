@@ -268,7 +268,7 @@ export function EditalAccordion({
   return (
     <div className="space-y-6">
       {/* Top Header Buttons */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-foreground">Edital Verticalizado</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -276,20 +276,23 @@ export function EditalAccordion({
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 h-9 shadow-xs"
           >
             Adicionar Estudo
           </Button>
 
-          <TargetSelectorDropdown initialActiveTargetName={activeTargetName ?? null} />
+          <TargetSelectorDropdown
+            initialActiveTargetName={activeTargetName ?? null}
+            className="w-full sm:w-auto"
+          />
         </div>
       </div>
 
       {/* Card PROGRESSO NO EDITAL */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm space-y-3">
+      <div className="rounded-xl border bg-card p-4 sm:p-5 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">

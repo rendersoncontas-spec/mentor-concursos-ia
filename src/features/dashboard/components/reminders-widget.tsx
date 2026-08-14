@@ -206,7 +206,7 @@ export function RemindersWidget({ className }: { className?: string }) {
               </Button>
               <Button
                 type="submit"
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold"
               >
                 Salvar Lembrete
               </Button>

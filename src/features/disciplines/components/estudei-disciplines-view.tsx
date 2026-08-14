@@ -318,21 +318,21 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
   return (
     <div className="space-y-6 pb-12">
       {/* HEADER PROFISSIONAL */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-slate-900/5 dark:bg-slate-100/5 p-6 rounded-3xl border">
-        <div className="space-y-1">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/5 dark:bg-slate-100/5 p-4 sm:p-5 rounded-2xl border">
+        <div className="space-y-0.5">
           <h1 className="text-2xl font-black text-foreground tracking-tight">Disciplinas</h1>
           <p className="text-xs text-muted-foreground font-medium max-w-lg">
             Visão geral do seu progresso por matéria.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
           <div className="relative hidden md:block">
             <Input
               placeholder="Buscar disciplina..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 w-64 text-xs rounded-xl bg-card"
+              className="pl-9 h-9 w-64 text-xs rounded-xl bg-card"
             />
             <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
@@ -342,7 +342,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
               setDisciplineNameInput("")
               setIsModalOpen(true)
             }}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-5 h-10 rounded-xl shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-4 h-9 rounded-xl shadow-md shadow-emerald-500/20 flex items-center gap-2 w-full md:w-auto justify-center"
           >
             <Plus className="h-4 w-4" />
             Nova Disciplina
@@ -351,17 +351,19 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
       </div>
 
       {/* CONTEXTO ATUAL (CONCURSO/EDITAL) */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
-          <div className="w-14 h-14 rounded-2xl bg-slate-900 border flex items-center justify-center text-white shrink-0 shadow-sm">
-            <ShieldCheck className="h-8 w-8 text-emerald-400" />
+      <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-slate-900 border flex items-center justify-center text-white shrink-0 shadow-xs">
+            <ShieldCheck className="h-6 w-6 text-emerald-400" />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-0.5 min-w-0">
             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Concurso / Edital Atual
             </span>
-            <h2 className="text-xl font-black text-foreground tracking-tight">{targetInfo.name}</h2>
-            <p className="text-xs text-muted-foreground font-medium">
+            <h2 className="text-lg font-black text-foreground tracking-tight truncate">
+              {targetInfo.name}
+            </h2>
+            <p className="text-xs text-muted-foreground font-medium truncate">
               Edital Próprio · Cargo: {targetInfo.role}
             </p>
           </div>

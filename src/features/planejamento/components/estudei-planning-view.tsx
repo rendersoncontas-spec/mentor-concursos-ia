@@ -219,44 +219,44 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   // VISTA 1: SEM PLANEJAMENTO
   if (!hasPlanning && !isManualCreation) {
     return (
-      <div className="space-y-6">
-        <div className="border-b pb-4">
+      <div className="space-y-4">
+        <div className="border-b pb-3">
           <h1 className="text-2xl font-black text-foreground">Planejamento</h1>
         </div>
 
-        <div className="min-h-[500px] flex flex-col items-center justify-center text-center p-8 bg-card rounded-2xl border shadow-xs space-y-12 my-4">
-          <div className="space-y-4 max-w-lg">
-            <div className="flex items-center justify-center gap-3 text-[#2563EB] mb-2">
-              <BrainCircuit className="w-8 h-8" />
-              <h2 className="text-2xl font-black">Criar Planejamento Inteligente</h2>
+        <div className="flex flex-col items-center justify-center text-center p-5 sm:p-8 bg-card rounded-2xl border shadow-xs space-y-6 my-2">
+          <div className="space-y-2 max-w-lg">
+            <div className="flex items-center justify-center gap-2.5 text-[#2563EB]">
+              <BrainCircuit className="w-7 h-7" />
+              <h2 className="text-xl font-black">Criar Planejamento Inteligente</h2>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Vamos montar um planejamento completo para você. Escolha uma opção abaixo.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 w-full max-w-2xl">
             {/* AI Option */}
             <div
               onClick={openCreateWizard}
-              className="bg-card border-2 border-[#2563EB]/20 hover:border-[#2563EB] rounded-3xl p-8 flex flex-col items-center text-center space-y-6 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/10 group"
+              className="bg-card border-2 border-[#2563EB]/20 hover:border-[#2563EB] rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/10 group"
             >
-              <div className="w-16 h-16 bg-[#2563EB]/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Bot className="w-8 h-8 text-[#2563EB]" />
+              <div className="w-12 h-12 bg-[#2563EB]/10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Bot className="w-6 h-6 text-[#2563EB]" />
               </div>
-              <div className="space-y-3 flex-1">
-                <h3 className="text-lg font-bold text-foreground flex items-center justify-center gap-2">
+              <div className="space-y-2 flex-1">
+                <h3 className="text-base font-bold text-foreground flex items-center justify-center gap-1.5">
                   Nomeia Inteligente <Sparkles className="w-4 h-4 text-[#2563EB]" />
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   O Nomeia monta todo o seu planejamento automaticamente com base no seu perfil,
                   escala de trabalho e carga horária.
                 </p>
-                <div className="inline-flex items-center text-[10px] font-bold text-[#2563EB] bg-[#2563EB]/10 px-2 py-1 rounded-full uppercase tracking-wider">
+                <div className="inline-flex items-center text-[10px] font-bold text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Tempo: ~2 minutos
                 </div>
               </div>
-              <Button className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold h-12 rounded-xl">
+              <Button className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold h-10 rounded-xl">
                 Começar com IA
               </Button>
             </div>
@@ -264,24 +264,24 @@ export function PlanningView({ initialData }: PlanningViewProps) {
             {/* Manual Option */}
             <div
               onClick={openCreateWizard}
-              className="bg-card border-2 border-muted hover:border-foreground/30 rounded-3xl p-8 flex flex-col items-center text-center space-y-6 cursor-pointer transition-all hover:shadow-md group"
+              className="bg-card border-2 border-muted hover:border-foreground/30 rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-md group"
             >
-              <div className="w-16 h-16 bg-muted/50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Settings2 className="w-8 h-8 text-foreground/70" />
+              <div className="w-12 h-12 bg-muted/50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Settings2 className="w-6 h-6 text-foreground/70" />
               </div>
-              <div className="space-y-3 flex-1">
-                <h3 className="text-lg font-bold text-foreground">Criar Manualmente</h3>
+              <div className="space-y-2 flex-1">
+                <h3 className="text-base font-bold text-foreground">Criar Manualmente</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Monte disciplina por disciplina, configurando sua escala e relevâncias em 4
                   passos.
                 </p>
-                <div className="inline-flex items-center text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded-full uppercase tracking-wider">
+                <div className="inline-flex items-center text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Para Usuários Avançados
                 </div>
               </div>
               <Button
                 variant="outline"
-                className="w-full border-2 h-12 font-bold rounded-xl text-foreground hover:bg-muted"
+                className="w-full border-2 h-10 font-bold rounded-xl text-foreground hover:bg-muted"
               >
                 Criar Manualmente
               </Button>

@@ -85,7 +85,7 @@ export function SubscriptionView() {
       {/* Card do Plano Ativo */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col md:flex-row">
         {/* Bloco da Esquerda */}
-        <div className="w-full md:w-64 bg-[#2563EB] text-slate-900 font-black text-3xl flex items-center justify-center p-8 shrink-0 tracking-tight">
+        <div className="w-full md:w-64 bg-[#2563EB] text-white font-black text-3xl flex items-center justify-center p-8 shrink-0 tracking-tight">
           {data.plan}
         </div>
 
