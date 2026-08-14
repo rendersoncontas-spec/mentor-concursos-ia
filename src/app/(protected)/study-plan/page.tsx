@@ -18,7 +18,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Cronograma de Estudos",
-  description: "Seu cronograma de estudos personalizado no Nomeia.",
+  description: "Seu cronograma de estudos personalizado no NomeIA.",
 }
 
 function formatMinutes(minutes: number): string {

@@ -4,7 +4,7 @@ import { PlanosView } from "@/features/planos/components/estudei-planos-view"
 
 export const metadata = {
   title: "Planos de Estudo",
-  description: "Gerencie seu plano de concurso e matérias no Nomeia.",
+  description: "Gerencie seu plano de concurso e matérias no NomeIA.",
 }
 
 export default function PlanosPage() {

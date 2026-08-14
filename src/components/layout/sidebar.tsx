@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import type { MouseEventHandler } from "react"
 
 import Image from "next/image"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 
 import {
   BarChart3,
@@ -101,7 +101,6 @@ interface AppSidebarProps {
 
 export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   // Estado inicial fixo para evitar mismatch de hydration (não ler window/localStorage aqui).
   // A preferência salva ou o auto-colapso em telas médias é aplicado no efeito abaixo.
   const [collapsed, setCollapsed] = useState(false)
@@ -192,20 +191,23 @@ export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
         >
           <div className="flex items-center justify-center shrink-0">
             <Image
-              src="/logo.png"
-              alt="Nomeia Logo"
+              src="/branding/nomeia-icon.png"
+              alt="NomeIA"
               width={38}
               height={38}
-              className="w-[38px] h-[38px] object-contain rounded-xl"
+              className="w-[38px] h-[38px] object-contain rounded-xl shadow-xs"
               priority
             />
           </div>
           {!effectiveCollapsed && (
             <div className="min-w-0 leading-tight">
-              <p className="text-[15px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] truncate">
-                Nomeia
+              <p className="text-[16px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] truncate flex items-center">
+                <span>Nome</span>
+                <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
+                  IA
+                </span>
               </p>
-              <p className="text-[10px] font-medium text-[hsl(var(--sidebar-foreground))/0.5] truncate">
+              <p className="text-[10px] font-medium text-[hsl(var(--sidebar-foreground))/0.6] truncate">
                 Sua preparação rumo à nomeação.
               </p>
             </div>

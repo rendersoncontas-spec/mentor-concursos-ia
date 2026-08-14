@@ -13,7 +13,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Revisões",
-  description: "Gerencie suas revisões espaçadas no Nomeia.",
+  description: "Gerencie suas revisões espaçadas no NomeIA.",
 }
 
 const DISC_PALETTE = [

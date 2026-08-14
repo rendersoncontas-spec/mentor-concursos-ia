@@ -4,7 +4,7 @@ import { BibliotecaView } from "@/features/biblioteca/components/estudei-bibliot
 
 export const metadata = {
   title: "Biblioteca",
-  description: "Organize seus materiais de estudo, PDFs, resumos e links no Nomeia.",
+  description: "Organize seus materiais de estudo, PDFs, resumos e links no NomeIA.",
 }
 
 export default function BibliotecaPage() {

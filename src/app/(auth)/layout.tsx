@@ -20,14 +20,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             className="flex items-center gap-3 font-bold text-xl tracking-tight text-white hover:opacity-90 transition-opacity"
           >
             <Image
-              src="/logo.png"
-              alt="Nomeia Logo"
+              src="/branding/nomeia-icon.png"
+              alt="NomeIA"
               width={44}
               height={44}
-              className="w-11 h-11 rounded-xl object-cover shadow-md ring-2 ring-white/10"
+              className="w-11 h-11 rounded-xl object-contain shadow-md ring-2 ring-white/10"
               priority
             />
-            <span className="text-white">Nomeia</span>
+            <span className="text-white flex items-center">
+              <span>Nome</span>
+              <span className="text-sky-400">IA</span>
+            </span>
           </Link>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-medium backdrop-blur-sm">
             <Sparkles className="w-3.5 h-3.5 text-sky-400" />
@@ -76,7 +79,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               ))}
             </div>
             <p className="text-slate-300 text-sm italic leading-relaxed">
-              &quot;O Nomeia organizou minha rotina de forma cirúrgica. Consegui cobrir todo o
+              &quot;O NomeIA organizou minha rotina de forma cirúrgica. Consegui cobrir todo o
               edital e ser aprovado no meu concurso dos sonhos!&quot;
             </p>
             <div className="flex items-center gap-3 pt-1">
@@ -93,7 +96,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Rodapé do Lado Esquerdo */}
         <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/80 pt-6">
-          <p>© {new Date().getFullYear()} Nomeia. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} NomeIA. Todos os direitos reservados.</p>
           <div className="flex items-center gap-2 text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span>Ambiente 100% Seguro</span>
@@ -107,14 +110,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="flex items-center justify-between lg:hidden mb-8">
           <Link href="/login" className="flex items-center gap-3 font-bold text-lg text-foreground">
             <Image
-              src="/logo.png"
-              alt="Nomeia Logo"
+              src="/branding/nomeia-icon.png"
+              alt="NomeIA"
               width={36}
               height={36}
-              className="w-9 h-9 rounded-xl object-cover shadow-sm"
+              className="w-9 h-9 rounded-xl object-contain shadow-xs"
               priority
             />
-            <span className="text-foreground">Nomeia</span>
+            <span className="text-foreground flex items-center">
+              <span>Nome</span>
+              <span className="text-primary">IA</span>
+            </span>
           </Link>
         </div>
 
@@ -122,7 +128,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Footer Mobile */}
         <div className="mt-8 text-center text-xs text-muted-foreground lg:hidden">
-          © {new Date().getFullYear()} Nomeia. Todos os direitos reservados.
+          © {new Date().getFullYear()} NomeIA. Todos os direitos reservados.
         </div>
       </div>
     </div>

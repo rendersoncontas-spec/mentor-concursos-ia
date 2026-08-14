@@ -4,7 +4,7 @@ import { PedirEditalView } from "@/features/editais/components/estudei-pedir-edi
 
 export const metadata = {
   title: "Pedidos de Editais",
-  description: "Solicite a análise e cadastro de novos editais verticalizados no Nomeia.",
+  description: "Solicite a análise e cadastro de novos editais verticalizados no NomeIA.",
 }
 
 export default function PedidosEditaisPage() {

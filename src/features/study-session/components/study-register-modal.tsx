@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { type Resolver, useForm, useWatch } from "react-hook-form"
 
 import { useRouter } from "next/navigation"
@@ -8,16 +8,19 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as Sentry from "@sentry/nextjs"
 import {
+  Calendar,
   Check,
   CheckCircle2,
   ChevronsUpDown,
+  Clock,
+  FileText,
   Minimize2,
   Pause,
   Play,
   RotateCcw,
-  Square,
-  Timer,
+  Sparkles,
   ToggleLeft,
+  ToggleRight,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -59,6 +62,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
 import type { StudyHistory, StudyTechnique } from "@/domain/study-history/study-history.types"
 import {
@@ -90,7 +94,7 @@ const sessionSchema = z
     audio_url: z.string().url("URL inválida").optional().or(z.literal("")),
     notes: z.string().optional(),
     is_manual_mode: z.boolean().default(false),
-    manual_hours: z.coerce.number().min(0).optional(),
+    manual_hours: z.coerce.number().min(0).max(23).optional(),
     manual_minutes_field: z.coerce.number().min(0).max(59).optional(),
     manual_seconds: z.coerce.number().min(0).max(59).optional(),
     study_date: z.string().optional(),
@@ -135,11 +139,33 @@ interface StudyRegisterModalProps {
   mode?: "create" | "edit"
 }
 
-function formatTime(seconds: number) {
+function formatClock(seconds: number) {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+}
+
+function formatDateBR(dateStr?: string) {
+  if (!dateStr) return ""
+  try {
+    const [y, m, d] = dateStr.split("-")
+    if (y && m && d) return `${d}/${m}/${y}`
+    return dateStr
+  } catch {
+    return dateStr
+  }
+}
+
+const STUDY_TYPE_LABELS: Record<string, string> = {
+  TEORIA: "Teoria",
+  QUESTOES: "Questões",
+  REVISAO: "Revisão",
+  FLASHCARDS: "Flashcards",
+  AUDIO: "Áudio / Podcast",
+  VIDEOAULA: "Videoaula",
+  SIMULADO: "Simulado",
+  OUTRO: "Outro",
 }
 
 export function StudyRegisterModal({
@@ -185,6 +211,10 @@ export function StudyRegisterModal({
   const watchTechnique = useWatch({ control: form.control, name: "technique" }) as StudyTechnique
   const isManualMode = useWatch({ control: form.control, name: "is_manual_mode" })
   const watchDisciplineId = useWatch({ control: form.control, name: "discipline_id" })
+  const watchDisciplineName = useWatch({ control: form.control, name: "discipline_name" })
+  const watchManualHours = useWatch({ control: form.control, name: "manual_hours" }) || 0
+  const watchManualMinutes = useWatch({ control: form.control, name: "manual_minutes_field" }) || 0
+  const watchStudyDate = useWatch({ control: form.control, name: "study_date" })
 
   // Pre-fill form when entering edit mode
   useEffect(() => {
@@ -243,17 +273,13 @@ export function StudyRegisterModal({
     }
   }, [form, open, isEditMode, sessionToEdit])
 
-  const toggleManualMode = () => {
-    const newVal = !isManualMode
-    form.setValue("is_manual_mode", newVal, { shouldDirty: true, shouldValidate: true })
-  }
-
   const {
     session,
     startSession,
     pauseSession,
     resumeSession,
     endSession,
+    resetSession,
     minimizeSession,
     toggleFloatingTimer,
     floatingTimerEnabled,
@@ -303,7 +329,7 @@ export function StudyRegisterModal({
 
   const handleClose = () => {
     if (phase !== "IDLE") {
-      // Timer ativo/pausado: minimizar em vez de sumir, para a barra flutuante continuar visível
+      // Timer ativo/pausado: minimizar para a barra flutuante continuar visível
       handleMinimize()
       return
     }
@@ -311,6 +337,11 @@ export function StudyRegisterModal({
     form.reset()
     onOpenChange(false)
     window.dispatchEvent(new CustomEvent("close-study-session-modal"))
+  }
+
+  const setMode = (manual: boolean) => {
+    if (manual === isManualMode) return
+    form.setValue("is_manual_mode", manual, { shouldDirty: true, shouldValidate: true })
   }
 
   const onSubmit = async (data: SessionFormValues) => {
@@ -341,12 +372,10 @@ export function StudyRegisterModal({
           metadata,
         }
 
-        // Handle date change
         if (data.study_date) {
           updatePayload["started_at"] = new Date(data.study_date + "T12:00:00").toISOString()
         }
 
-        // Handle duration change from manual time inputs
         const totalMinutes =
           (Number(data.manual_hours) || 0) * 60 +
           (Number(data.manual_minutes_field) || 0) +
@@ -363,7 +392,6 @@ export function StudyRegisterModal({
           ).toISOString()
         }
 
-        // Preserve focus_score if it was in original metadata
         if (sessionToEdit.metadata?.["focus_percentage"] !== undefined) {
           updatePayload["metadata"] = {
             ...metadata,
@@ -394,8 +422,6 @@ export function StudyRegisterModal({
           return
         }
 
-        // Se há sessão ativa (cronômetro rodando ou pausado), usar finalizeAndSaveSession
-        // Se não há sessão (fase IDLE), usar saveStudySessionAction diretamente (modo manual)
         if (session && session.isActive) {
           const res = await finalizeAndSaveSession({
             pages_read: data.pages_read,
@@ -481,7 +507,7 @@ export function StudyRegisterModal({
     } catch (error: unknown) {
       console.error("[STUDY_SAVE_CLIENT] Exceção:", error)
       Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
-        extra: { feature: "study-session" },
+        tags: { feature: "study-session" },
       })
       toast.error(error instanceof Error ? error.message : "Erro ao salvar a sessão.", {
         duration: 8000,
@@ -491,8 +517,25 @@ export function StudyRegisterModal({
     }
   }
 
-  const planIds = new Set(planDisciplines.map((d) => d.id))
-  const otherDisciplines = allDisciplines.filter((d) => !planIds.has(d.id))
+  const planIds = useMemo(() => new Set(planDisciplines.map((d) => d.id)), [planDisciplines])
+  const otherDisciplines = useMemo(
+    () => allDisciplines.filter((d) => !planIds.has(d.id)),
+    [allDisciplines, planIds],
+  )
+
+  const selectedDiscipline = useMemo(() => {
+    if (!watchDisciplineId) return null
+    return (
+      allDisciplines.find((d) => d.id === watchDisciplineId) ||
+      planDisciplines.find((d) => d.id === watchDisciplineId) ||
+      null
+    )
+  }, [allDisciplines, planDisciplines, watchDisciplineId])
+
+  const selectedColor = useMemo(() => {
+    if (!watchDisciplineId) return "#2563EB"
+    return disciplineColorHex(watchDisciplineId, selectedDiscipline?.color_hex)
+  }, [selectedDiscipline, watchDisciplineId])
 
   const handleSelectDiscipline = (disc: DisciplineOption) => {
     form.setValue("discipline_name", disc.name, { shouldValidate: true })
@@ -500,7 +543,6 @@ export function StudyRegisterModal({
     setDisciplinePopoverOpen(false)
   }
 
-  // Registra o tópico no catálogo personalizado (dedupe-safe) após salvar a sessão
   const registerTopicInCatalog = (
     topicName: string | undefined,
     disciplineId: string | undefined,
@@ -508,6 +550,11 @@ export function StudyRegisterModal({
     if (!topicName?.trim() || !disciplineId) return
     void createCustomTopicAction(disciplineId, topicName)
   }
+
+  // Resumo dos minutos manuais
+  const manualTotalMinutes = useMemo(() => {
+    return Number(watchManualHours) * 60 + Number(watchManualMinutes)
+  }, [watchManualHours, watchManualMinutes])
 
   const renderDynamicFields = () => {
     if (
@@ -517,15 +564,23 @@ export function StudyRegisterModal({
       watchType === "RESUMO"
     ) {
       return (
-        <>
+        <div className="grid grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="questions_answered"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Questões Respondidas</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">
+                  Questões Respondidas
+                </FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} />
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    className="h-8 text-xs font-mono"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -536,28 +591,42 @@ export function StudyRegisterModal({
             name="questions_correct"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Acertos</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">Acertos</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} />
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    className="h-8 text-xs font-mono"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </>
+        </div>
       )
     }
     if (watchType === "FLASHCARDS") {
       return (
-        <>
+        <div className="grid grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="flashcards_reviewed"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Flashcards Revisados</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">
+                  Flashcards Revisados
+                </FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} />
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    className="h-8 text-xs font-mono"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -568,28 +637,40 @@ export function StudyRegisterModal({
             name="flashcards_correct"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Flashcards Acertados</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">Acertos</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} />
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    className="h-8 text-xs font-mono"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </>
+        </div>
       )
     }
     if (watchType === "AUDIO") {
       return (
-        <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <FormField
             control={form.control}
             name="audio_name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nome do Áudio/Podcast</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">
+                  Nome do Áudio/Podcast
+                </FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input
+                    placeholder="Ex: Aula 03 - Direito Penal"
+                    className="h-8 text-xs"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -600,9 +681,11 @@ export function StudyRegisterModal({
             name="audio_author"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Autor / Professor</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">
+                  Autor / Professor
+                </FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input placeholder="Ex: Prof. Silva" className="h-8 text-xs" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -613,9 +696,15 @@ export function StudyRegisterModal({
             name="audio_platform"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Plataforma (ex: Spotify)</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">
+                  Plataforma (ex: Spotify)
+                </FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input
+                    placeholder="Spotify, Gran, YouTube..."
+                    className="h-8 text-xs"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -626,15 +715,17 @@ export function StudyRegisterModal({
             name="audio_url"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Link (Opcional)</FormLabel>
+                <FormLabel className="text-xs text-muted-foreground font-medium">
+                  Link (Opcional)
+                </FormLabel>
                 <FormControl>
-                  <Input type="url" {...field} />
+                  <Input type="url" placeholder="https://..." className="h-8 text-xs" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </>
+        </div>
       )
     }
     if (watchType === "TEORIA" || watchType === "LEITURA" || watchType === "RESUMO") {
@@ -643,138 +734,23 @@ export function StudyRegisterModal({
           control={form.control}
           name="pages_read"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Páginas Estudadas</FormLabel>
+            <FormItem className="max-w-[200px]">
+              <FormLabel className="text-xs text-muted-foreground font-medium">
+                Páginas Estudadas
+              </FormLabel>
               <FormControl>
-                <Input type="number" {...field} />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  className="h-8 text-xs font-mono"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-      )
-    }
-    if (watchType === "OUTRO") {
-      return (
-        <>
-          <FormField
-            control={form.control}
-            name="pages_read"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Páginas Estudadas</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="questions_answered"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Questões Respondidas</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="questions_correct"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Acertos</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="flashcards_reviewed"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Flashcards Revisados</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="flashcards_correct"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Flashcards Acertados</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="audio_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nome do Áudio/Podcast</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="audio_author"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Autor / Professor</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="audio_platform"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Plataforma (ex: Spotify)</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="audio_url"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Link (Opcional)</FormLabel>
-                <FormControl>
-                  <Input type="url" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </>
       )
     }
     return null
@@ -783,241 +759,218 @@ export function StudyRegisterModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="max-w-[1000px] w-[95vw] max-h-[90vh] h-[85vh] p-0 flex flex-col overflow-y-auto bg-background border-border z-[150]"
+        className="max-w-[1020px] w-[96vw] max-h-[92vh] md:h-[86vh] p-0 flex flex-col overflow-hidden bg-background border-border/80 shadow-2xl rounded-2xl z-[150]"
         overlayOnClick={handleMinimize}
       >
-        {/* Header Simplificado */}
-        <div className="flex items-center justify-between p-3 border-b shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-base font-bold">
-            <CheckCircle2 className="h-5 w-5 text-primary" />
-            Centro Inteligente de Estudos
-          </DialogTitle>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleMinimize}
-              className="w-8 h-8 text-muted-foreground hover:text-foreground"
-              title="Minimizar"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </Button>
-            <Button
-              size="icon"
-              onClick={() => {
-                toggleFloatingTimer()
-              }}
-              className={cn(
-                "w-8 h-8 rounded-lg transition-all",
-                floatingTimerEnabled
-                  ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                  : "bg-rose-500 text-white hover:bg-rose-600",
-              )}
-              title={floatingTimerEnabled ? "Desativar balão flutuante" : "Ativar balão flutuante"}
-            >
-              <ToggleLeft className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="w-8 h-8 text-muted-foreground hover:text-foreground"
-              title="Fechar"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+        <TooltipProvider delayDuration={200}>
+          {/* ═══════════════════════════════════════════════════════════════
+              HEADER REFINADO
+              ═══════════════════════════════════════════════════════════════ */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-muted/20 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <DialogTitle className="text-sm sm:text-base font-bold tracking-tight text-foreground truncate">
+                  Centro Inteligente de Estudos
+                </DialogTitle>
+                <p className="text-[11px] text-muted-foreground truncate hidden sm:block">
+                  Registre, acompanhe e analise cada sessão de estudo.
+                </p>
+              </div>
+            </div>
+
+            {/* Ações do Header */}
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleMinimize}
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground"
+                    aria-label="Minimizar Central"
+                  >
+                    <Minimize2 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Minimizar</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleFloatingTimer}
+                    className={cn(
+                      "w-8 h-8 rounded-lg transition-colors",
+                      floatingTimerEnabled
+                        ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    aria-label={
+                      floatingTimerEnabled ? "Desativar balão flutuante" : "Ativar balão flutuante"
+                    }
+                  >
+                    {floatingTimerEnabled ? (
+                      <ToggleRight className="w-4 h-4" />
+                    ) : (
+                      <ToggleLeft className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {floatingTimerEnabled ? "Balão flutuante ativado" : "Ativar balão flutuante"}
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleClose}
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-rose-500/10 hover:text-rose-600"
+                    aria-label="Fechar"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Fechar</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
-        </div>
 
-        {/* Body */}
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit, (errors) => {
-              const messages = Object.entries(errors)
-                .map(([key, err]) => `${key}: ${(err as { message?: string })?.message}`)
-                .join(", ")
-              toast.error(`Campos obrigatórios: ${messages}`)
-            })}
-            className="flex flex-col h-full gap-3 p-4 overflow-y-auto"
-          >
-            <div className="flex flex-col lg:flex-row gap-4 flex-1">
-              {/* Timer Left */}
-              <div className="lg:w-[280px] flex flex-col shrink-0">
-                <div className="rounded-xl border bg-muted/20 p-4 flex flex-col justify-between h-full shadow-sm">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-md">
-                        <Timer className="h-3.5 w-3.5" />
-                        {isManualMode ? "Modo Manual" : "Cronômetro"}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        type="button"
-                        onClick={toggleManualMode}
-                        className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground"
-                      >
-                        {isManualMode ? "← Voltar ao Cronômetro" : "Alternar para Manual"}
-                      </Button>
-                    </div>
-
-                    {!isManualMode && (
-                      <div className="flex justify-center">
-                        <FormField
-                          control={form.control}
-                          name="technique"
-                          render={({ field }) => (
-                            <Select
-                              onValueChange={(val) => {
-                                field.onChange(val)
-                              }}
-                              value={field.value}
-                            >
-                              <SelectTrigger className="h-8 text-xs w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="z-[200]">
-                                <SelectItem value="LIVRE">Livre</SelectItem>
-                                <SelectItem value="POMODORO_25_5">Pomodoro 25/5</SelectItem>
-                                <SelectItem value="POMODORO_50_10">Pomodoro 50/10</SelectItem>
-                                <SelectItem value="FLOWTIME">Flowtime</SelectItem>
-                                <SelectItem value="DEEP_WORK">Deep Work 90m</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                      </div>
-                    )}
-
-                    {!isManualMode && (
-                      <FocusSoundControl
-                        selectedSound={focusSoundId}
-                        volume={focusSoundVolume}
-                        isPlaying={focusSoundIsPlaying}
-                        onSelectSound={selectFocusSound}
-                        onVolumeChange={changeFocusSoundVolume}
-                      />
-                    )}
+          {/* ═══════════════════════════════════════════════════════════════
+              BODY (FORMULÁRIO PRINCIPAL)
+              ═══════════════════════════════════════════════════════════════ */}
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                const messages = Object.entries(errors)
+                  .map(([key, err]) => `${key}: ${(err as { message?: string })?.message}`)
+                  .join(", ")
+                toast.error(`Verifique os campos obrigatórios: ${messages}`)
+              })}
+              className="flex flex-col flex-1 overflow-hidden"
+            >
+              <div className="flex flex-col md:flex-row flex-1 overflow-y-auto p-4 sm:p-5 gap-4 lg:gap-5">
+                {/* ═══════════════════════════════════════════════════════════════
+                    COLUNA ESQUERDA — CENTRAL DE CONTROLE (320px - 340px)
+                    ═══════════════════════════════════════════════════════════════ */}
+                <div className="w-full md:w-[320px] lg:w-[340px] shrink-0 flex flex-col gap-3">
+                  {/* Segmented Mode Switcher */}
+                  <div className="p-1 rounded-xl bg-muted/60 border border-border/50 grid grid-cols-2 gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setMode(false)}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all select-none",
+                        !isManualMode
+                          ? "bg-background text-foreground shadow-sm border border-border/40 font-bold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/40",
+                      )}
+                    >
+                      <Clock className="w-3.5 h-3.5 text-primary" />
+                      <span>Cronômetro</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode(true)}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all select-none",
+                        isManualMode
+                          ? "bg-background text-foreground shadow-sm border border-border/40 font-bold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/40",
+                      )}
+                    >
+                      <FileText className="w-3.5 h-3.5 text-primary" />
+                      <span>Manual</span>
+                    </button>
                   </div>
 
-                  {isManualMode ? (
-                    <div className="flex flex-col gap-3 justify-center my-auto bg-card p-3 rounded-xl border">
-                      <div className="text-xs font-bold text-foreground mb-1 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-primary inline-block" /> Lançamento
-                        Manual
-                      </div>
-                      <div>
-                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Tempo Estudado
-                        </Label>
-                        <div className="grid grid-cols-3 gap-1 mt-1">
-                          <FormField
-                            control={form.control}
-                            name="manual_hours"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={23}
-                                    placeholder="0h"
-                                    className="text-center text-xs h-8 font-mono"
-                                    {...field}
-                                    value={field.value || ""}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="manual_minutes_field"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={59}
-                                    placeholder="0m"
-                                    className="text-center text-xs h-8 font-mono"
-                                    {...field}
-                                    value={field.value || ""}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="manual_seconds"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={59}
-                                    placeholder="0s"
-                                    className="text-center text-xs h-8 font-mono"
-                                    {...field}
-                                    value={field.value || ""}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Data
-                        </Label>
-                        <FormField
-                          control={form.control}
-                          name="study_date"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input type="date" className="h-8 text-xs font-mono" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-col items-center gap-3 flex-1 justify-center">
-                        {phase !== "IDLE" && (
-                          <span
-                            className={cn(
-                              "text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5",
-                              phase === "STUDYING"
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "w-1.5 h-1.5 rounded-full",
-                                phase === "STUDYING"
-                                  ? "bg-emerald-500 animate-pulse"
-                                  : "bg-amber-500",
-                              )}
-                            />
-                            {phase === "STUDYING" ? "Estudando" : "Pausado"}
+                  {/* Card da Central de Controle */}
+                  <div className="rounded-2xl border border-border/70 bg-card p-4 flex flex-col justify-between flex-1 shadow-sm gap-4">
+                    {/* Topo do Card: Status Pill & Disciplina */}
+                    <div className="flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between">
+                        {!isManualMode ? (
+                          (() => {
+                            let badgeColor = "bg-muted text-muted-foreground border-border/40"
+                            let dotColor = "bg-muted-foreground/60"
+                            let label = "Pronto para estudar"
+
+                            if (phase === "STUDYING") {
+                              badgeColor =
+                                "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                              dotColor = "bg-emerald-500 animate-pulse"
+                              label = "Estudando"
+                            } else if (phase === "PAUSED") {
+                              badgeColor =
+                                "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                              dotColor = "bg-amber-500"
+                              label = "Pausado"
+                            }
+
+                            return (
+                              <span
+                                className={cn(
+                                  "text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border",
+                                  badgeColor,
+                                )}
+                              >
+                                <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
+                                {label}
+                              </span>
+                            )
+                          })()
+                        ) : (
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                            Lançamento Manual
                           </span>
                         )}
-                        <div className="text-4xl font-mono font-bold tracking-tight tabular-nums text-primary w-[120px] text-center">
-                          {formatTime(activeSeconds)}
+
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                          Central
+                        </span>
+                      </div>
+
+                      {/* Disciplina Selecionada Badge */}
+                      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/30 border border-border/40 min-h-[32px]">
+                        {watchDisciplineName ? (
+                          <>
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                              style={{ backgroundColor: selectedColor }}
+                            />
+                            <span className="text-xs font-semibold text-foreground truncate">
+                              {watchDisciplineName}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/70 italic">
+                            Selecione uma disciplina
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Meio do Card: Display do Tempo / Inputs Manuais */}
+                    {!isManualMode ? (
+                      /* ─── CRONÔMETRO DISPLAY ─── */
+                      <div className="flex flex-col items-center justify-center my-auto py-2 gap-3">
+                        <div className="text-4xl sm:text-5xl font-mono font-black tracking-tight tabular-nums text-foreground select-none">
+                          {formatClock(activeSeconds)}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground">
+                          {phase === "PAUSED" ? "Tempo congelado" : "Tempo ativo"}
+                        </span>
+
+                        {/* Controles do Cronômetro */}
+                        <div className="flex items-center gap-2 w-full pt-1">
                           {phase === "IDLE" || phase === "PAUSED" ? (
                             <Button
                               size="sm"
@@ -1043,304 +996,551 @@ export function StudyRegisterModal({
                                   resumeSession()
                                 }
                               }}
-                              className="gap-1.5 w-24 bg-blue-600 hover:bg-blue-700 h-9"
+                              className="flex-1 gap-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold h-10 rounded-xl shadow-sm"
                             >
-                              <Play className="h-4 w-4" />{" "}
-                              {phase === "PAUSED" ? "Retomar" : "Iniciar"}
+                              <Play className="h-4 w-4 fill-current" />
+                              <span>{phase === "PAUSED" ? "Retomar" : "Iniciar"}</span>
                             </Button>
                           ) : (
                             <Button
                               size="sm"
                               type="button"
-                              variant="secondary"
                               onClick={pauseSession}
-                              className="gap-1.5 w-24 h-9"
+                              className="flex-1 gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold h-10 rounded-xl shadow-sm"
                             >
-                              <Pause className="h-4 w-4" /> Pausar
+                              <Pause className="h-4 w-4 fill-current" />
+                              <span>Pausar</span>
                             </Button>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            onClick={() => {
-                              endSession()
-                              form.reset()
-                            }}
-                            className="gap-1.5 w-24 h-9"
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" /> Resetar
-                          </Button>
-                        </div>
-                      </div>
 
-                      <div className="flex gap-4 text-xs text-center w-full justify-center pt-3 border-t mt-2">
-                        <div>
-                          <p className="text-muted-foreground text-[9px] font-bold uppercase">
-                            Ativo
-                          </p>
-                          <p className="font-semibold text-green-600 font-mono">
-                            {formatTime(activeSeconds)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-[9px] font-bold uppercase">
-                            Pausa
-                          </p>
-                          <p className="font-semibold text-amber-600 font-mono">
-                            {formatTime(pausedSeconds)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-[9px] font-bold uppercase">
-                            Foco
-                          </p>
-                          <p className="font-semibold text-blue-600 font-mono">
-                            {focusPercentage !== null ? `${focusPercentage}%` : "—"}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Right: Form */}
-              <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
-                  <FormField
-                    control={form.control}
-                    name="discipline_name"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel className="text-xs">Disciplina</FormLabel>
-                        <Popover
-                          open={disciplinePopoverOpen}
-                          onOpenChange={setDisciplinePopoverOpen}
-                        >
-                          <PopoverTrigger asChild>
-                            <FormControl>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
                               <Button
                                 variant="outline"
-                                role="combobox"
-                                className={cn(
-                                  "w-full justify-between font-normal h-9 text-sm relative z-[160]",
-                                  !field.value && "text-muted-foreground",
-                                )}
+                                size="icon"
+                                type="button"
+                                onClick={resetSession}
+                                className="h-10 w-10 rounded-xl border-border/70 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 hover:border-rose-500/30 shrink-0"
+                                aria-label="Resetar cronômetro"
                               >
-                                {field.value || "Selecionar..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                <RotateCcw className="h-4 w-4" />
                               </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-[min(400px,calc(100vw-2rem))] p-0 z-[200] pointer-events-auto"
-                            align="start"
-                            sideOffset={4}
-                            onWheel={(e) => e.stopPropagation()}
-                          >
-                            <Command
-                              className="w-full flex flex-col max-h-[300px] overflow-hidden rounded-md border shadow-md"
-                              shouldFilter={true}
-                            >
-                              <CommandInput
-                                placeholder="Digite para buscar ou adicionar..."
-                                value={field.value}
-                                onValueChange={(search) => {
-                                  field.onChange(search)
-                                  const found = allDisciplines.find(
-                                    (d) => d.name.toLowerCase() === search.toLowerCase(),
-                                  )
-                                  form.setValue("discipline_id", found ? found.id : "")
-                                }}
-                              />
-                              <CommandList className="max-h-[300px] overflow-y-auto">
-                                <CommandEmpty>
-                                  Nenhuma disciplina encontrada. Selecione uma existente na lista.
-                                </CommandEmpty>
-                                <CommandGroup heading="Sugestões do Plano">
-                                  {planDisciplines.length > 0 ? (
-                                    planDisciplines.map((disc) => (
-                                      <CommandItem
-                                        key={`plan-${disc.id}`}
-                                        value={disc.name}
-                                        onSelect={() => {
-                                          handleSelectDiscipline(disc)
-                                        }}
-                                        className="cursor-pointer flex items-center justify-between"
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <Check
-                                            className={cn(
-                                              "h-4 w-4 shrink-0",
-                                              field.value === disc.name
-                                                ? "opacity-100"
-                                                : "opacity-0",
-                                            )}
-                                          />
-                                          <span
-                                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                                            style={{
-                                              backgroundColor: disciplineColorHex(
-                                                disc.id,
-                                                disc.color_hex,
-                                              ),
-                                            }}
-                                          />
-                                          <span className="truncate">{disc.name}</span>
-                                        </div>
-                                        {disc.area && (
-                                          <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
-                                            {disc.area}
-                                          </span>
-                                        )}
-                                      </CommandItem>
-                                    ))
-                                  ) : (
-                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">
-                                      {hasActivePlan === false
-                                        ? "Nenhum planejamento ativo. Crie um planejamento para receber sugestões personalizadas."
-                                        : "Seu planejamento ainda não possui disciplinas."}
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Zerar cronômetro</TooltipContent>
+                          </Tooltip>
+                        </div>
+
+                        {/* Técnica & Som de Foco Compactos */}
+                        <div className="w-full flex flex-col gap-2 pt-2 border-t border-border/40">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                              Técnica
+                            </span>
+                            <FormField
+                              control={form.control}
+                              name="technique"
+                              render={({ field }) => (
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger className="h-7 text-[11px] w-[130px] rounded-lg">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="z-[200]">
+                                    <SelectItem value="LIVRE">Livre</SelectItem>
+                                    <SelectItem value="POMODORO_25_5">Pomodoro 25/5</SelectItem>
+                                    <SelectItem value="POMODORO_50_10">Pomodoro 50/10</SelectItem>
+                                    <SelectItem value="FLOWTIME">Flowtime</SelectItem>
+                                    <SelectItem value="DEEP_WORK">Deep Work 90m</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </div>
+
+                          <FocusSoundControl
+                            selectedSound={focusSoundId}
+                            volume={focusSoundVolume}
+                            isPlaying={focusSoundIsPlaying}
+                            onSelectSound={selectFocusSound}
+                            onVolumeChange={changeFocusSoundVolume}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      /* ─── MANUAL INPUTS DISPLAY ─── */
+                      <div className="flex flex-col gap-3 my-auto py-1">
+                        <div>
+                          <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
+                            Duração Estudada
+                          </Label>
+                          {/* Segmented Digital Input */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <FormField
+                              control={form.control}
+                              name="manual_hours"
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <div className="flex flex-col items-center bg-muted/30 border border-border/60 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        max={23}
+                                        placeholder="0"
+                                        className="text-center font-mono font-bold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
+                                        {...field}
+                                        value={field.value ?? 0}
+                                      />
+                                      <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">
+                                        Horas
+                                      </span>
                                     </div>
-                                  )}
-                                </CommandGroup>
-                                {otherDisciplines.length > 0 && (
-                                  <CommandGroup heading="Todas as Disciplinas">
-                                    {otherDisciplines.map((disc) => (
-                                      <CommandItem
-                                        key={`all-${disc.id}`}
-                                        value={disc.name}
-                                        onSelect={() => {
-                                          handleSelectDiscipline(disc)
-                                        }}
-                                        className="cursor-pointer flex items-center justify-between"
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <Check
-                                            className={cn(
-                                              "h-4 w-4 shrink-0",
-                                              field.value === disc.name
-                                                ? "opacity-100"
-                                                : "opacity-0",
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="manual_minutes_field"
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <div className="flex flex-col items-center bg-muted/30 border border-border/60 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        max={59}
+                                        placeholder="30"
+                                        className="text-center font-mono font-bold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
+                                        {...field}
+                                        value={field.value ?? 0}
+                                      />
+                                      <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">
+                                        Minutos
+                                      </span>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="manual_seconds"
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <div className="flex flex-col items-center bg-muted/30 border border-border/60 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        max={59}
+                                        placeholder="0"
+                                        className="text-center font-mono font-bold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
+                                        {...field}
+                                        value={field.value ?? 0}
+                                      />
+                                      <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">
+                                        Segundos
+                                      </span>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
+                            Data do Estudo
+                          </Label>
+                          <FormField
+                            control={form.control}
+                            name="study_date"
+                            render={({ field }) => (
+                              <FormItem className="space-y-0">
+                                <FormControl>
+                                  <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-xl px-3 py-1.5">
+                                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <Input
+                                      type="date"
+                                      className="h-6 p-0 border-0 text-xs font-mono bg-transparent shadow-none focus-visible:ring-0"
+                                      {...field}
+                                    />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rodapé do Card: 3 Métricas Balanceadas */}
+                    <div className="grid grid-cols-3 divide-x divide-border/50 bg-muted/20 border border-border/40 rounded-xl p-2 text-center shrink-0">
+                      {!isManualMode ? (
+                        <>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                              Ativo
+                            </p>
+                            <p className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 truncate">
+                              {formatClock(activeSeconds)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                              Pausa
+                            </p>
+                            <p className="font-mono font-bold text-xs text-amber-600 dark:text-amber-400 truncate">
+                              {formatClock(pausedSeconds)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                              Foco
+                            </p>
+                            <p className="font-mono font-bold text-xs text-primary truncate">
+                              {focusPercentage !== null ? `${focusPercentage}%` : "—"}
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                              Duração
+                            </p>
+                            <p className="font-mono font-bold text-xs text-foreground truncate">
+                              {manualTotalMinutes > 0 ? `${manualTotalMinutes} min` : "0 min"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                              Data
+                            </p>
+                            <p className="font-mono font-bold text-xs text-foreground truncate">
+                              {formatDateBR(watchStudyDate)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                              Foco
+                            </p>
+                            <p className="font-mono font-bold text-xs text-muted-foreground truncate">
+                              —
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════════════
+                    COLUNA DIREITA — DETALHES DA SESSÃO
+                    ═══════════════════════════════════════════════════════════════ */}
+                <div className="flex-1 flex flex-col justify-between gap-3.5 min-w-0">
+                  <div className="flex flex-col gap-3.5">
+                    {/* Linha 1: Disciplina & Tópico */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Disciplina Combobox */}
+                      <FormField
+                        control={form.control}
+                        name="discipline_name"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col space-y-1.5">
+                            <FormLabel className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                              <span>Disciplina</span>
+                              <span className="text-rose-500">*</span>
+                            </FormLabel>
+                            <Popover
+                              open={disciplinePopoverOpen}
+                              onOpenChange={setDisciplinePopoverOpen}
+                            >
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn(
+                                      "w-full justify-between font-normal h-9 text-xs sm:text-sm rounded-xl border-border/70 hover:border-primary/40 relative z-[160]",
+                                      !field.value && "text-muted-foreground",
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      {field.value && (
+                                        <span
+                                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                                          style={{ backgroundColor: selectedColor }}
+                                        />
+                                      )}
+                                      <span className="truncate">
+                                        {field.value || "Selecione uma disciplina..."}
+                                      </span>
+                                    </div>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-[min(380px,calc(100vw-2rem))] p-0 z-[200] rounded-xl shadow-xl border-border/80"
+                                align="start"
+                                sideOffset={4}
+                                onWheel={(e) => e.stopPropagation()}
+                              >
+                                <Command className="w-full max-h-[300px]" shouldFilter={true}>
+                                  <CommandInput
+                                    placeholder="Buscar disciplina..."
+                                    value={field.value}
+                                    onValueChange={(search) => {
+                                      field.onChange(search)
+                                      const found = allDisciplines.find(
+                                        (d) => d.name.toLowerCase() === search.toLowerCase(),
+                                      )
+                                      form.setValue("discipline_id", found ? found.id : "")
+                                    }}
+                                  />
+                                  <CommandList className="max-h-[250px] overflow-y-auto">
+                                    <CommandEmpty>Nenhuma disciplina encontrada.</CommandEmpty>
+                                    <CommandGroup heading="Sugestões do Plano">
+                                      {planDisciplines.length > 0 ? (
+                                        planDisciplines.map((disc) => (
+                                          <CommandItem
+                                            key={`plan-${disc.id}`}
+                                            value={disc.name}
+                                            onSelect={() => handleSelectDiscipline(disc)}
+                                            className="cursor-pointer flex items-center justify-between"
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <Check
+                                                className={cn(
+                                                  "h-4 w-4 shrink-0 text-primary",
+                                                  field.value === disc.name
+                                                    ? "opacity-100"
+                                                    : "opacity-0",
+                                                )}
+                                              />
+                                              <span
+                                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                style={{
+                                                  backgroundColor: disciplineColorHex(
+                                                    disc.id,
+                                                    disc.color_hex,
+                                                  ),
+                                                }}
+                                              />
+                                              <span className="truncate">{disc.name}</span>
+                                            </div>
+                                            {disc.area && (
+                                              <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
+                                                {disc.area}
+                                              </span>
                                             )}
-                                          />
-                                          <span
-                                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                                            style={{
-                                              backgroundColor: disciplineColorHex(
-                                                disc.id,
-                                                disc.color_hex,
-                                              ),
-                                            }}
-                                          />
-                                          <span className="truncate">{disc.name}</span>
+                                          </CommandItem>
+                                        ))
+                                      ) : (
+                                        <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                                          {hasActivePlan === false
+                                            ? "Nenhum planejamento ativo. Crie um planejamento para receber sugestões personalizadas."
+                                            : "Seu planejamento ainda não possui disciplinas."}
                                         </div>
-                                        {disc.area && (
-                                          <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
-                                            {disc.area}
-                                          </span>
-                                        )}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                )}
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="topic_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs">Tópico</FormLabel>
-                        <TopicAutocomplete
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                          disciplineId={watchDisciplineId}
-                          placeholder="Ex: Direitos Fundamentais"
-                          className="relative z-[160]"
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                                      )}
+                                    </CommandGroup>
 
-                <div className="p-3 border rounded-lg bg-card shrink-0">
-                  <FormField
-                    control={form.control}
-                    name="studyType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <Select
-                          onValueChange={(value) => field.onChange(value)}
-                          value={field.value}
-                        >
+                                    {otherDisciplines.length > 0 && (
+                                      <CommandGroup heading="Todas as Disciplinas">
+                                        {otherDisciplines.map((disc) => (
+                                          <CommandItem
+                                            key={`all-${disc.id}`}
+                                            value={disc.name}
+                                            onSelect={() => handleSelectDiscipline(disc)}
+                                            className="cursor-pointer flex items-center justify-between"
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <Check
+                                                className={cn(
+                                                  "h-4 w-4 shrink-0 text-primary",
+                                                  field.value === disc.name
+                                                    ? "opacity-100"
+                                                    : "opacity-0",
+                                                )}
+                                              />
+                                              <span
+                                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                style={{
+                                                  backgroundColor: disciplineColorHex(
+                                                    disc.id,
+                                                    disc.color_hex,
+                                                  ),
+                                                }}
+                                              />
+                                              <span className="truncate">{disc.name}</span>
+                                            </div>
+                                            {disc.area && (
+                                              <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
+                                                {disc.area}
+                                              </span>
+                                            )}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    )}
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Tópico Autocomplete */}
+                      <FormField
+                        control={form.control}
+                        name="topic_name"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col space-y-1.5">
+                            <FormLabel className="text-xs font-semibold text-foreground">
+                              Tópico
+                            </FormLabel>
+                            <TopicAutocomplete
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              disciplineId={watchDisciplineId}
+                              placeholder={
+                                watchDisciplineName
+                                  ? "Ex: Direitos Fundamentais"
+                                  : "Selecione uma disciplina primeiro"
+                              }
+                              className="relative z-[160]"
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Linha 2: Tipo de Estudo & Dados Complementares */}
+                    <div className="p-3.5 border border-border/60 rounded-2xl bg-muted/20 flex flex-col gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                        <FormField
+                          control={form.control}
+                          name="studyType"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1.5">
+                              <FormLabel className="text-xs font-semibold text-foreground">
+                                Formato do Estudo
+                              </FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="font-medium h-9 text-xs sm:text-sm rounded-xl border-border/70 bg-background relative z-[160]">
+                                    <SelectValue placeholder="Selecione o tipo..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="z-[200]">
+                                  <SelectItem value="TEORIA">📖 Teoria</SelectItem>
+                                  <SelectItem value="QUESTOES">✍️ Questões</SelectItem>
+                                  <SelectItem value="REVISAO">🔁 Revisão</SelectItem>
+                                  <SelectItem value="FLASHCARDS">🎴 Flashcards</SelectItem>
+                                  <SelectItem value="AUDIO">🎧 Áudio</SelectItem>
+                                  <SelectItem value="VIDEOAULA">🎥 Videoaula</SelectItem>
+                                  <SelectItem value="SIMULADO">🧪 Simulado</SelectItem>
+                                  <SelectItem value="OUTRO">⭐ Outro</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Dynamic contextual fields (pages, questions, audio) */}
+                        {renderDynamicFields() && (
+                          <div className="flex flex-col justify-end">{renderDynamicFields()}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Linha 3: Anotações da Sessão */}
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <span>Anotações</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">
+                              (opcional)
+                            </span>
+                          </FormLabel>
                           <FormControl>
-                            <SelectTrigger className="font-medium h-9 text-sm relative z-[160]">
-                              <SelectValue placeholder="Tipo..." />
-                            </SelectTrigger>
+                            <Textarea
+                              placeholder="Anote conceitos-chave, resumos, dúvidas ou links importantes..."
+                              className="min-h-[80px] max-h-[140px] resize-none text-xs sm:text-sm font-sans bg-muted/10 rounded-xl border-border/60 focus-visible:ring-primary/20"
+                              {...field}
+                            />
                           </FormControl>
-                          <SelectContent className="z-[200] max-h-[200px]">
-                            <SelectItem value="TEORIA">📖 Teoria</SelectItem>
-                            <SelectItem value="QUESTOES">✍️ Questões</SelectItem>
-                            <SelectItem value="REVISAO">🔁 Revisão</SelectItem>
-                            <SelectItem value="FLASHCARDS">🎴 Flashcards</SelectItem>
-                            <SelectItem value="AUDIO">🎧 Áudio</SelectItem>
-                            <SelectItem value="VIDEOAULA">🎥 Videoaula</SelectItem>
-                            <SelectItem value="SIMULADO">🧪 Simulado</SelectItem>
-                            <SelectItem value="OUTRO">⭐ Outro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {renderDynamicFields() && (
-                    <div className="grid grid-cols-2 gap-2 pt-2">{renderDynamicFields()}</div>
-                  )}
-                </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem className="flex-1 flex flex-col min-h-[80px]">
-                      <FormLabel className="text-xs shrink-0">Anotações</FormLabel>
-                      <FormControl className="flex-1">
-                        <Textarea
-                          placeholder="Resumos, conceitos ou links..."
-                          className="flex-1 resize-none font-mono text-sm bg-muted/10"
-                          {...field}
+                  {/* ═══════════════════════════════════════════════════════════════
+                      RODAPÉ DIREITO: RESUMO DA SESSÃO & BOTÕES
+                      ═══════════════════════════════════════════════════════════════ */}
+                  <div className="flex flex-col gap-2.5 pt-2 border-t border-border/50 shrink-0">
+                    {/* Resumo da Sessão */}
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/30 border border-border/40 text-xs text-muted-foreground flex-wrap">
+                      <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: selectedColor }}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <span className="truncate max-w-[150px]">
+                          {watchDisciplineName || "Sem disciplina"}
+                        </span>
+                      </div>
+                      <span>•</span>
+                      <span className="font-medium text-foreground">
+                        {!isManualMode ? formatClock(activeSeconds) : `${manualTotalMinutes} min`}
+                      </span>
+                      <span>•</span>
+                      <span>{STUDY_TYPE_LABELS[watchType] || watchType}</span>
+                      <span>•</span>
+                      <span>{formatDateBR(watchStudyDate)}</span>
+                    </div>
 
-                <div className="flex gap-2 justify-end pt-2 shrink-0">
-                  <Button type="button" variant="ghost" onClick={handleClose} className="h-9">
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="gap-1.5 bg-primary h-9 px-6"
-                  >
-                    <Square className="h-3.5 w-3.5 fill-current" />
-                    {isSubmitting ? "Salvando..." : "Finalizar & Salvar"}
-                  </Button>
+                    {/* Botões de Ação */}
+                    <div className="flex items-center justify-end gap-2.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleClose}
+                        className="h-9 px-4 rounded-xl text-muted-foreground hover:text-foreground text-xs sm:text-sm"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="h-9 px-6 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm shadow-sm flex items-center gap-2"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>{isSubmitting ? "Salvando..." : "Salvar estudo"}</span>
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </form>
-        </Form>
+            </form>
+          </Form>
+        </TooltipProvider>
       </DialogContent>
     </Dialog>
   )

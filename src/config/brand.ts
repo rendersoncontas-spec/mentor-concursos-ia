@@ -1,14 +1,20 @@
 /**
- * Configurações Centrais de Marca — Nomeia
+ * Configurações Centrais de Marca — NomeIA
  * "Sua preparação rumo à nomeação."
  */
 
 export const BRAND = {
-  name: "Nomeia",
+  name: "NomeIA",
   tagline: "Sua preparação rumo à nomeação.",
-  description: "Plataforma inteligente de preparação para concursos.",
-  titleTemplate: "%s — Nomeia",
-  defaultTitle: "Nomeia — Sua preparação rumo à nomeação",
-  defaultEmailFrom: "Nomeia <onboarding@resend.dev>",
-  copyright: `© ${new Date().getFullYear()} Nomeia. Todos os direitos reservados.`,
+  description:
+    "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",
+  titleTemplate: "%s — NomeIA",
+  defaultTitle: "NomeIA — Sua preparação rumo à nomeação",
+  defaultEmailFrom: "NomeIA <onboarding@resend.dev>",
+  copyright: `© ${new Date().getFullYear()} NomeIA. Todos os direitos reservados.`,
+  assets: {
+    logo: "/branding/nomeia-logo.png",
+    icon: "/branding/nomeia-icon.png",
+    favicon: "/favicon.ico",
+  },
 } as const

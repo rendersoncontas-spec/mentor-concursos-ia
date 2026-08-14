@@ -1,8 +1,8 @@
-import { ConquistasView } from "@/features/conquistas/components/estudei-conquistas-view"
+import { ConquistasView } from "@/features/conquistas/components/conquistas-view"
 
 export const metadata = {
   title: "Minhas Conquistas",
-  description: "Acompanhe suas conquistas, medalhas e marcos de estudo no Nomeia.",
+  description: "Acompanhe suas conquistas, medalhas e marcos de estudo no NomeIA.",
 }
 
 export default function ConquistasPage() {

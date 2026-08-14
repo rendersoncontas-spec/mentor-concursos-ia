@@ -9,7 +9,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Análise de Desempenho",
-  description: "Gráficos e estatísticas de evolução no Nomeia.",
+  description: "Gráficos e estatísticas de evolução no NomeIA.",
 }
 
 export default async function AnalyticsDashboardPage() {

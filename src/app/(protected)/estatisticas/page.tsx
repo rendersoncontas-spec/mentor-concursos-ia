@@ -1,10 +1,10 @@
-import { Metadata } from "next"
+import type { Metadata } from "next"
 
 import { StatisticsCenterView } from "@/features/statistics/components/statistics-center-view"
 
 export const metadata: Metadata = {
   title: "Estatísticas",
-  description: "Análise completa de desempenho e métricas no Nomeia.",
+  description: "Análise completa de desempenho e métricas no NomeIA.",
 }
 
 export default function EstatisticasPage() {

@@ -50,7 +50,7 @@ export function MaintenancePage() {
       </main>
 
       <footer className="py-6 flex flex-col items-center justify-center border-t text-sm text-muted-foreground">
-        <p className="font-medium">Nomeia</p>
+        <p className="font-medium text-foreground">NomeIA</p>
         <p>Sua preparação rumo à nomeação.</p>
       </footer>
     </div>

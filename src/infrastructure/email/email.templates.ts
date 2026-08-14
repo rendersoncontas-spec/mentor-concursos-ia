@@ -163,7 +163,7 @@ export function getBaseEmailLayout({
           <div class="main">
             <!-- Header -->
             <div class="header">
-              <div class="header-logo">⚡ Nomeia</div>
+              <div class="header-logo">⚡ NomeIA</div>
               <div class="header-tagline">Sua preparação rumo à nomeação.</div>
             </div>
 
@@ -196,15 +196,15 @@ export function getBaseEmailLayout({
           <!-- Footer -->
           <div class="footer">
             <p style="margin: 0 0 8px 0;">
-              Você recebeu este e-mail porque possui uma conta ativa no <strong>Nomeia</strong>.
+              Você recebeu este e-mail porque possui uma conta ativa no <strong>NomeIA</strong>.
             </p>
             <p style="margin: 0 0 12px 0;">
               <a href="${appUrl}/profile">Preferências de Notificação</a> &nbsp;•&nbsp; 
               <a href="${appUrl}/dashboard">Acessar Painel</a> &nbsp;•&nbsp; 
-              <a href="${appUrl}">Nomeia</a>
+              <a href="${appUrl}">NomeIA</a>
             </p>
             <p style="margin: 0; color: #94a3b8; font-size: 11px;">
-              © ${currentYear} Nomeia. Todos os direitos reservados.
+              © ${currentYear} NomeIA. Todos os direitos reservados.
             </p>
           </div>
         </td>
@@ -228,14 +228,14 @@ export function getTestEmailTemplate({
   email: string
   appUrl: string
 }): { subject: string; html: string; text: string } {
-  const subject = "⚡ Teste de e-mail — Nomeia"
+  const subject = "⚡ Teste de e-mail — NomeIA"
 
   const contentHtml = `
     <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 800; color: #0f172a;">
       Olá, ${name}!
     </h2>
     <p style="margin: 0 0 16px 0;">
-      Este é um e-mail de teste para confirmar que a integração do <strong>Resend</strong> com o <strong>Nomeia</strong> está funcionando com sucesso.
+      Este é um e-mail de teste para confirmar que a integração do <strong>Resend</strong> com o <strong>NomeIA</strong> está funcionando com sucesso.
     </p>
     <div class="stats-card">
       <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">
@@ -263,15 +263,15 @@ export function getTestEmailTemplate({
 
   const html = getBaseEmailLayout({
     title: subject,
-    preheader: "Seu sistema de e-mails do Nomeia está funcionando corretamente.",
+    preheader: "Seu sistema de e-mails do NomeIA está funcionando corretamente.",
     contentHtml,
-    ctaText: "Abrir o Nomeia",
+    ctaText: "Abrir o NomeIA",
     ctaUrl: `${appUrl}/dashboard`,
     appUrl,
-    securityNotice: "Este teste foi disparado a partir da sua conta de usuário no Nomeia.",
+    securityNotice: "Este teste foi disparado a partir da sua conta de usuário no NomeIA.",
   })
 
-  const text = `Olá, ${name}!\n\nEste é um e-mail de teste confirmando que a infraestrutura do Resend no Nomeia está funcionando.\nDestinatário: ${email}\nData: ${new Date().toISOString()}\n\nAcesse: ${appUrl}/dashboard`
+  const text = `Olá, ${name}!\n\nEste é um e-mail de teste confirmando que a infraestrutura do Resend no NomeIA está funcionando.\nDestinatário: ${email}\nData: ${new Date().toISOString()}\n\nAcesse: ${appUrl}/dashboard`
 
   return { subject, html, text }
 }
@@ -286,11 +286,11 @@ export function getWelcomeEmailTemplate({
   name?: string
   appUrl: string
 }): { subject: string; html: string; text: string } {
-  const subject = "Bem-vindo ao Nomeia! 🚀 Sua preparação começa agora"
+  const subject = "Bem-vindo ao NomeIA! 🚀 Sua preparação começa agora"
 
   const contentHtml = `
     <h2 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 800; color: #0f172a;">
-      Bem-vindo ao Nomeia, ${name}!
+      Bem-vindo ao NomeIA, ${name}!
     </h2>
     <p style="margin: 0 0 16px 0;">
       Sua conta foi criada com sucesso. A partir de agora, você conta com um ecossistema completo para acelerar sua preparação rumo à nomeação.
@@ -315,14 +315,14 @@ export function getWelcomeEmailTemplate({
 
   const html = getBaseEmailLayout({
     title: subject,
-    preheader: "Sua conta no Nomeia está pronta. Acesse e comece a estudar com estratégia.",
+    preheader: "Sua conta no NomeIA está pronta. Acesse e comece a estudar com estratégia.",
     contentHtml,
-    ctaText: "Acessar o Nomeia",
+    ctaText: "Acessar o NomeIA",
     ctaUrl: `${appUrl}/dashboard`,
     appUrl,
   })
 
-  const text = `Bem-vindo ao Nomeia, ${name}!\n\nSua conta foi criada com sucesso. Acesse ${appUrl}/dashboard para planejar seus estudos e acompanhar seu desempenho.`
+  const text = `Bem-vindo ao NomeIA, ${name}!\n\nSua conta foi criada com sucesso. Acesse ${appUrl}/dashboard para planejar seus estudos e acompanhar seu desempenho.`
 
   return { subject, html, text }
 }
@@ -398,14 +398,14 @@ export function getWeeklySummaryEmailTemplate({
 
   const html = getBaseEmailLayout({
     title: subject,
-    preheader: `Você estudou ${timeFormatted} e fez ${stats.totalQuestions} questões esta semana no Nomeia.`,
+    preheader: `Você estudou ${timeFormatted} e fez ${stats.totalQuestions} questões esta semana no NomeIA.`,
     contentHtml,
     ctaText: "Ver Relatório Completo",
     ctaUrl: `${appUrl}/estatisticas`,
     appUrl,
   })
 
-  const text = `Relatório Semanal de Estudos — Nomeia\n\nOlá, ${name}!\nTempo estudado: ${timeFormatted}\nQuestões: ${stats.totalQuestions} (${stats.correctQuestions} acertos, ${accuracy}%)\nDisciplinas: ${stats.disciplinesCount}\nSequência: ${stats.consecutiveDays} dias\n\nVer estatísticas: ${appUrl}/estatisticas`
+  const text = `Relatório Semanal de Estudos — NomeIA\n\nOlá, ${name}!\nTempo estudado: ${timeFormatted}\nQuestões: ${stats.totalQuestions} (${stats.correctQuestions} acertos, ${accuracy}%)\nDisciplinas: ${stats.disciplinesCount}\nSequência: ${stats.consecutiveDays} dias\n\nVer estatísticas: ${appUrl}/estatisticas`
 
   return { subject, html, text }
 }
@@ -429,7 +429,7 @@ export function getImportCompletedEmailTemplate({
       Olá, ${name}!
     </h2>
     <p style="margin: 0 0 16px 0;">
-      A importação do seu histórico de estudos da plataforma <strong>${stats.platformName}</strong> foi concluída e processada no Nomeia.
+      A importação do seu histórico de estudos da plataforma <strong>${stats.platformName}</strong> foi concluída e processada no NomeIA.
     </p>
 
     <div class="stats-card">
@@ -477,12 +477,12 @@ export function getImportCompletedEmailTemplate({
     title: subject,
     preheader: `Importação de ${stats.importedCount} sessões do ${stats.platformName} concluída com sucesso.`,
     contentHtml,
-    ctaText: "Ver Histórico no Nomeia",
+    ctaText: "Ver Histórico no NomeIA",
     ctaUrl: `${appUrl}/dashboard/history`,
     appUrl,
   })
 
-  const text = `Importação Concluída — Nomeia\n\nOlá, ${name}!\nSua importação do ${stats.platformName} terminou com sucesso.\nSessões importadas: ${stats.importedCount}\n\nAcesse: ${appUrl}/dashboard/history`
+  const text = `Importação Concluída — NomeIA\n\nOlá, ${name}!\nSua importação do ${stats.platformName} terminou com sucesso.\nSessões importadas: ${stats.importedCount}\n\nAcesse: ${appUrl}/dashboard/history`
 
   return { subject, html, text }
 }
@@ -499,18 +499,18 @@ export function getStudyReminderEmailTemplate({
   details: StudyReminderDetails
   appUrl: string
 }): { subject: string; html: string; text: string } {
-  let subject = "⏰ Lembrete de Estudo — Nomeia"
+  let subject = "⏰ Lembrete de Estudo — NomeIA"
   let message = "Sua meta de estudos de hoje está pronta no seu plano semanal."
   let ctaText = "Iniciar Sessão de Estudo"
   let ctaUrl = `${appUrl}/dashboard/study-session`
 
   if (details.reason === "pending_review") {
-    subject = `📚 Você tem ${details.pendingCount || "revisões"} pendentes no Nomeia`
+    subject = `📚 Você tem ${details.pendingCount || "revisões"} pendentes no NomeIA`
     message = `Você possui <strong>${details.pendingCount ?? "alguns"} flashcards/tópicos</strong> aguardando revisão hoje para fixação na memória de longo prazo.`
     ctaText = "Fazer Revisões Agora"
     ctaUrl = `${appUrl}/dashboard/reviews`
   } else if (details.reason === "streak_protection") {
-    subject = "🔥 Não perca sua sequência de estudos no Nomeia!"
+    subject = "🔥 Não perca sua sequência de estudos no NomeIA!"
     message =
       "Você ainda não registrou estudos hoje. Dedique alguns minutos para manter sua constância e ritmo de preparação."
   } else if (details.reason === "inactive_discipline" && details.disciplineName) {
@@ -541,7 +541,7 @@ export function getStudyReminderEmailTemplate({
     appUrl,
   })
 
-  const text = `Lembrete — Nomeia\n\nOlá, ${name}!\n${message.replace(/<[^>]*>?/gm, "")}\n\nAcesse: ${ctaUrl}`
+  const text = `Lembrete — NomeIA\n\nOlá, ${name}!\n${message.replace(/<[^>]*>?/gm, "")}\n\nAcesse: ${ctaUrl}`
 
   return { subject, html, text }
 }

@@ -33,7 +33,7 @@ export function getDefaultFromEmail(): string {
   return (
     process.env["EMAIL_FROM"]?.trim() ||
     process.env["NEXT_PUBLIC_EMAIL_FROM"]?.trim() ||
-    "Nomeia <onboarding@resend.dev>"
+    "NomeIA <onboarding@resend.dev>"
   )
 }
 

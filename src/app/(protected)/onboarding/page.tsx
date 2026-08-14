@@ -3,7 +3,7 @@ import { OnboardingWizard } from "@/features/onboarding/components/onboarding-wi
 
 export const metadata = {
   title: "Onboarding",
-  description: "Configure seu plano de estudos no Nomeia.",
+  description: "Configure seu plano de estudos no NomeIA.",
 }
 
 export default async function OnboardingPage() {

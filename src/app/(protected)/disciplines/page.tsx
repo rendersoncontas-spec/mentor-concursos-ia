@@ -10,7 +10,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Disciplinas",
-  description: "Gerencie suas disciplinas, tópicos e desempenho por matéria no Nomeia.",
+  description: "Gerencie suas disciplinas, tópicos e desempenho por matéria no NomeIA.",
 }
 
 export default async function DisciplinesPage() {

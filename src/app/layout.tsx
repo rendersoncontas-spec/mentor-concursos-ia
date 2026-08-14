@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next"
 
 import { Providers } from "@/components/providers"
 import { MaintenancePage } from "@/components/system/maintenance-page"
-import { BRAND } from "@/config/brand"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import { cn } from "@/lib/utils"
 
@@ -17,19 +16,21 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    template: "%s — Nomeia",
-    default: "Nomeia — Sua preparação rumo à nomeação",
+    template: "%s — NomeIA",
+    default: "NomeIA — Sua preparação rumo à nomeação",
   },
-  description: "Plataforma inteligente de preparação para concursos.",
+  description:
+    "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",
   keywords: [
     "concursos públicos",
     "nomeia",
+    "NomeIA",
     "cronograma de estudo",
     "questões",
     "edital verticalizado",
     "mentoria",
   ],
-  authors: [{ name: "Equipe Nomeia" }],
+  authors: [{ name: "Equipe NomeIA" }],
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },
@@ -47,22 +48,24 @@ export const metadata: Metadata = {
     type: "website",
     locale: "pt_BR",
     url: "https://nomeia.concursos",
-    title: "Nomeia — Sua preparação rumo à nomeação",
-    description: "Plataforma inteligente de preparação para concursos públicos.",
-    siteName: "Nomeia",
+    title: "NomeIA — Sua preparação rumo à nomeação",
+    description:
+      "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos públicos.",
+    siteName: "NomeIA",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Nomeia Logo",
+        alt: "NomeIA Logo",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Nomeia — Sua preparação rumo à nomeação",
-    description: "Plataforma inteligente de preparação para concursos públicos.",
+    title: "NomeIA — Sua preparação rumo à nomeação",
+    description:
+      "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos públicos.",
     images: ["/og-image.png"],
   },
 }

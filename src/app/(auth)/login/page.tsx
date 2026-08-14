@@ -4,8 +4,8 @@ import Link from "next/link"
 import { LoginForm } from "@/features/auth/components/login-form"
 
 export const metadata: Metadata = {
-  title: "Login — Nomeia",
-  description: "Acesse sua conta no Nomeia. Sua preparação rumo à nomeação.",
+  title: "Login — NomeIA",
+  description: "Acesse sua conta no NomeIA. Sua preparação rumo à nomeação.",
 }
 
 export default function LoginPage() {
@@ -16,7 +16,7 @@ export default function LoginPage() {
           Acesse sua conta
         </h1>
         <p className="text-sm text-muted-foreground">
-          Insira suas credenciais abaixo para acessar o Nomeia.
+          Insira suas credenciais abaixo para acessar o NomeIA.
         </p>
       </div>
 

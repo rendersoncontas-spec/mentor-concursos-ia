@@ -10,7 +10,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Aprendizado Adaptativo",
-  description: "Sistema de aprendizado adaptativo no Nomeia.",
+  description: "Sistema de aprendizado adaptativo no NomeIA.",
 }
 
 export default async function AdaptiveDashboardPage() {

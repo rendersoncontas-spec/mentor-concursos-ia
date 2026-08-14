@@ -118,13 +118,18 @@ export function AppHeader({
       {/* Esquerda: Logo / Título em Mobile */}
       <div className="flex items-center gap-2 md:hidden">
         <Image
-          src="/logo.png"
-          alt="Nomeia"
+          src="/branding/nomeia-icon.png"
+          alt="NomeIA"
           width={32}
           height={32}
-          className="w-8 h-8 rounded-lg object-contain"
+          className="w-8 h-8 rounded-xl object-contain shadow-xs"
         />
-        <span className="font-extrabold text-sm text-foreground">Nomeia</span>
+        <span className="font-extrabold text-sm text-foreground flex items-center">
+          <span>Nome</span>
+          <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
+            IA
+          </span>
+        </span>
       </div>
 
       <div className="hidden md:block" />
@@ -133,7 +138,7 @@ export function AppHeader({
       <div className="flex items-center gap-3">
         {/* Botão ? (Ajuda / Suporte) */}
         <button
-          onClick={() => toast.info("Central de Ajuda e Suporte do Nomeia")}
+          onClick={() => toast.info("Central de Ajuda e Suporte do NomeIA")}
           className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center hover:bg-[#1D4ED8] transition-colors shadow-xs"
           title="Ajuda e Suporte"
         >

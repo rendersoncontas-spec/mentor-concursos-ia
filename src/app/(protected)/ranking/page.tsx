@@ -1,10 +1,10 @@
-import { Metadata } from "next"
+import type { Metadata } from "next"
 
 import { RankingView } from "@/features/ranking/components/estudei-ranking-view"
 
 export const metadata: Metadata = {
   title: "Ranking",
-  description: "Compare seu desempenho e evolução com os estudantes no Nomeia.",
+  description: "Compare seu desempenho e evolução com os estudantes no NomeIA.",
 }
 
 export default function RankingPage() {

@@ -7,7 +7,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Planejamento de Estudos",
-  description: "Gerencie seu ciclo de estudos rotativo e contínuo no Nomeia.",
+  description: "Gerencie seu ciclo de estudos rotativo e contínuo no NomeIA.",
 }
 
 export default async function PlanejamentoPage() {

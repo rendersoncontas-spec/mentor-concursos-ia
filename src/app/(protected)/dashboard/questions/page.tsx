@@ -6,7 +6,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Questões",
-  description: "Acompanhe seu rendimento em questões no Nomeia.",
+  description: "Acompanhe seu rendimento em questões no NomeIA.",
 }
 
 export default async function QuestionsDashboardPage() {

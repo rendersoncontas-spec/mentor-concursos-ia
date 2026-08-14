@@ -9,7 +9,7 @@ import { MentorFeed } from "@/features/mentor-ai/components/mentor-feed"
 
 export const metadata = {
   title: "Análise Inteligente",
-  description: "Análise inteligente e copiloto de estudos no Nomeia.",
+  description: "Análise inteligente e copiloto de estudos no NomeIA.",
 }
 
 export default async function MentorPage() {

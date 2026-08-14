@@ -4,7 +4,7 @@ import { SimuladosView } from "@/features/simulados/components/simulados-view"
 
 export const metadata = {
   title: "Simulados",
-  description: "Acompanhe e registre seu desempenho em simulados no Nomeia.",
+  description: "Acompanhe e registre seu desempenho em simulados no NomeIA.",
 }
 
 export default function SimuladosPage() {

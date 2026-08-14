@@ -7,7 +7,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Homologação",
-  description: "Painel de homologação e testes do Nomeia.",
+  description: "Painel de homologação e testes do NomeIA.",
 }
 
 export default async function HomologationPage() {

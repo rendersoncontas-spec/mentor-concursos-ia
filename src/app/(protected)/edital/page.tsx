@@ -12,12 +12,12 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Edital Verticalizado",
-  description: "Visualize e acompanhe seu progresso em cada tópico do edital no Nomeia.",
+  description: "Visualize e acompanhe seu progresso em cada tópico do edital no NomeIA.",
 }
 
 const COLOR_PALETTE = ["#2563EB", "#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444", "#f59e0b"]
 
-// Base de dados local para tópicos pré-cadastrados do Nomeia
+// Base de dados local para tópicos pré-cadastrados do NomeIA
 function getPreRegisteredTopics(disciplineName: string): TopicItem[] | null {
   const normalized = disciplineName.trim().toLowerCase()
 

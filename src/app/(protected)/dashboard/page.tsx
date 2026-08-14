@@ -8,7 +8,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata: Metadata = {
   title: "Dashboard",
-  description: "Acompanhe seu progresso e planejamento de estudos no Nomeia.",
+  description: "Acompanhe seu progresso e planejamento de estudos no NomeIA.",
 }
 
 export default async function DashboardPage() {

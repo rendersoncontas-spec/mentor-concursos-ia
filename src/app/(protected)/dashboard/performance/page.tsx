@@ -8,7 +8,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Performance",
-  description: "Análise de performance e radar de competências no Nomeia.",
+  description: "Análise de performance e radar de competências no NomeIA.",
 }
 
 export default async function PerformancePage() {

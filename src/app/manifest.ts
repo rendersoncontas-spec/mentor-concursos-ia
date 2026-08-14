@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Nomeia",
-    short_name: "Nomeia",
+    name: "NomeIA",
+    short_name: "NomeIA",
     description:
       "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",
     start_url: "/dashboard",

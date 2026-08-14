@@ -1,4 +1,4 @@
-import { Metadata } from "next"
+import type { Metadata } from "next"
 
 import { History } from "lucide-react"
 
@@ -6,7 +6,7 @@ import { HistoryView } from "@/features/history/components/history-view"
 
 export const metadata: Metadata = {
   title: "Histórico de Estudos",
-  description: "Visualize todo o seu histórico de sessões de estudo no Nomeia.",
+  description: "Visualize todo o seu histórico de sessões de estudo no NomeIA.",
 }
 
 export default function HistoryPage() {

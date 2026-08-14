@@ -4,8 +4,8 @@ import Link from "next/link"
 import { RegisterForm } from "@/features/auth/components/register-form"
 
 export const metadata: Metadata = {
-  title: "Cadastro — Nomeia",
-  description: "Crie sua conta no Nomeia e organize sua preparação rumo à nomeação.",
+  title: "Cadastro — NomeIA",
+  description: "Crie sua conta no NomeIA e organize sua preparação rumo à nomeação.",
 }
 
 export default function RegisterPage() {
@@ -14,7 +14,7 @@ export default function RegisterPage() {
       <div className="flex flex-col space-y-2 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Crie sua conta</h1>
         <p className="text-sm text-muted-foreground">
-          Preencha os dados abaixo para iniciar sua jornada no Nomeia.
+          Preencha os dados abaixo para iniciar sua jornada no NomeIA.
         </p>
       </div>
 

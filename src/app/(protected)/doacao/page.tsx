@@ -39,7 +39,7 @@ export default function DoacaoPage() {
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-foreground">
-              Apoie o Projeto Nomeia
+              Apoie o Projeto NomeIA
             </h1>
             <p className="text-xs text-muted-foreground font-semibold">
               Ajude a manter a plataforma no ar e evoluindo para a comunidade de concurseiros
@@ -56,10 +56,10 @@ export default function DoacaoPage() {
               <Sparkles className="h-3 w-3 mr-1 inline" /> Doação Voluntária
             </Badge>
             <h2 className="text-xl font-extrabold text-foreground">
-              O Nomeia é um projeto feito de concurseiro para concurseiro! 🚀
+              O NomeIA é um projeto feito de concurseiro para concurseiro! 🚀
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-              O <strong>Nomeia</strong> nasceu com o objetivo de oferecer uma ferramenta completa,
+              O <strong>NomeIA</strong> nasceu com o objetivo de oferecer uma ferramenta completa,
               moderna e 100% focada na aprovação: com edital verticalizado, gestão por ciclos de
               estudo, estatísticas de desempenho, cronômetro inteligente e controle de constância.
             </p>

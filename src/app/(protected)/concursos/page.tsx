@@ -6,7 +6,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Concursos",
-  description: "Gerencie todos os seus concursos e editais em um só lugar no Nomeia.",
+  description: "Gerencie todos os seus concursos e editais em um só lugar no NomeIA.",
 }
 
 interface RawMeta {

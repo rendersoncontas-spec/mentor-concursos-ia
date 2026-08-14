@@ -6,7 +6,7 @@ import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Sessão de Estudo",
-  description: "Registre e execute sua sessão de estudo no Nomeia.",
+  description: "Registre e execute sua sessão de estudo no NomeIA.",
 }
 
 interface PageProps {

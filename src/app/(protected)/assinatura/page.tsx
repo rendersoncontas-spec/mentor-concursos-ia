@@ -4,7 +4,7 @@ import { SubscriptionView } from "@/features/subscription/components/estudei-sub
 
 export const metadata = {
   title: "Assinatura & Planos",
-  description: "Gerencie sua assinatura e plano no Nomeia.",
+  description: "Gerencie sua assinatura e plano no NomeIA.",
 }
 
 export default function AssinaturaPage() {
