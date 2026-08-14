@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
 import type { StudyHistory, StudyTechnique } from "@/domain/study-history/study-history.types"
 import {
   type SavedStudySession,
@@ -151,9 +152,9 @@ export function StudyRegisterModal({
   const isEditMode = mode === "edit" && !!sessionToEdit
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [disciplinePopoverOpen, setDisciplinePopoverOpen] = useState(false)
+  const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null)
   const [planDisciplines, setPlanDisciplines] = useState<DisciplineOption[]>([])
   const [allDisciplines, setAllDisciplines] = useState<DisciplineOption[]>([])
-  const [disciplinesLoaded, setDisciplinesLoaded] = useState(false)
 
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema) as Resolver<SessionFormValues>,
@@ -273,16 +274,18 @@ export function StudyRegisterModal({
       : null
 
   const loadDisciplines = useCallback(async () => {
-    if (disciplinesLoaded) return
     try {
       const result = await getDisciplinesForAutocomplete()
       setPlanDisciplines(result.planDisciplines)
       setAllDisciplines(result.allDisciplines)
-      setDisciplinesLoaded(true)
+      setHasActivePlan(result.hasActivePlan)
     } catch (err) {
       console.error("Erro ao carregar disciplinas:", err)
+      Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+        tags: { feature: "discipline-selector" },
+      })
     }
-  }, [disciplinesLoaded])
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -990,7 +993,27 @@ export function StudyRegisterModal({
                     </div>
                   ) : (
                     <>
-                      <div className="flex flex-col items-center gap-4 flex-1 justify-center">
+                      <div className="flex flex-col items-center gap-3 flex-1 justify-center">
+                        {phase !== "IDLE" && (
+                          <span
+                            className={cn(
+                              "text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5",
+                              phase === "STUDYING"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                phase === "STUDYING"
+                                  ? "bg-emerald-500 animate-pulse"
+                                  : "bg-amber-500",
+                              )}
+                            />
+                            {phase === "STUDYING" ? "Estudando" : "Pausado"}
+                          </span>
+                        )}
                         <div className="text-4xl font-mono font-bold tracking-tight tabular-nums text-primary w-[120px] text-center">
                           {formatTime(activeSeconds)}
                         </div>
@@ -1023,7 +1046,7 @@ export function StudyRegisterModal({
                               className="gap-1.5 w-24 bg-blue-600 hover:bg-blue-700 h-9"
                             >
                               <Play className="h-4 w-4" />{" "}
-                              {phase === "PAUSED" ? "Continuar" : "Iniciar"}
+                              {phase === "PAUSED" ? "Retomar" : "Iniciar"}
                             </Button>
                           ) : (
                             <Button
@@ -1135,28 +1158,52 @@ export function StudyRegisterModal({
                                 <CommandEmpty>
                                   Nenhuma disciplina encontrada. Selecione uma existente na lista.
                                 </CommandEmpty>
-                                {planDisciplines.length > 0 && (
-                                  <CommandGroup heading="Sugestões do Plano">
-                                    {planDisciplines.map((disc) => (
+                                <CommandGroup heading="Sugestões do Plano">
+                                  {planDisciplines.length > 0 ? (
+                                    planDisciplines.map((disc) => (
                                       <CommandItem
                                         key={`plan-${disc.id}`}
                                         value={disc.name}
                                         onSelect={() => {
                                           handleSelectDiscipline(disc)
                                         }}
-                                        className="cursor-pointer"
+                                        className="cursor-pointer flex items-center justify-between"
                                       >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            field.value === disc.name ? "opacity-100" : "opacity-0",
-                                          )}
-                                        />
-                                        {disc.name}
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <Check
+                                            className={cn(
+                                              "h-4 w-4 shrink-0",
+                                              field.value === disc.name
+                                                ? "opacity-100"
+                                                : "opacity-0",
+                                            )}
+                                          />
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                                            style={{
+                                              backgroundColor: disciplineColorHex(
+                                                disc.id,
+                                                disc.color_hex,
+                                              ),
+                                            }}
+                                          />
+                                          <span className="truncate">{disc.name}</span>
+                                        </div>
+                                        {disc.area && (
+                                          <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
+                                            {disc.area}
+                                          </span>
+                                        )}
                                       </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                )}
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                                      {hasActivePlan === false
+                                        ? "Nenhum planejamento ativo. Crie um planejamento para receber sugestões personalizadas."
+                                        : "Seu planejamento ainda não possui disciplinas."}
+                                    </div>
+                                  )}
+                                </CommandGroup>
                                 {otherDisciplines.length > 0 && (
                                   <CommandGroup heading="Todas as Disciplinas">
                                     {otherDisciplines.map((disc) => (
@@ -1166,15 +1213,33 @@ export function StudyRegisterModal({
                                         onSelect={() => {
                                           handleSelectDiscipline(disc)
                                         }}
-                                        className="cursor-pointer"
+                                        className="cursor-pointer flex items-center justify-between"
                                       >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            field.value === disc.name ? "opacity-100" : "opacity-0",
-                                          )}
-                                        />
-                                        {disc.name}
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <Check
+                                            className={cn(
+                                              "h-4 w-4 shrink-0",
+                                              field.value === disc.name
+                                                ? "opacity-100"
+                                                : "opacity-0",
+                                            )}
+                                          />
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                                            style={{
+                                              backgroundColor: disciplineColorHex(
+                                                disc.id,
+                                                disc.color_hex,
+                                              ),
+                                            }}
+                                          />
+                                          <span className="truncate">{disc.name}</span>
+                                        </div>
+                                        {disc.area && (
+                                          <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
+                                            {disc.area}
+                                          </span>
+                                        )}
                                       </CommandItem>
                                     ))}
                                   </CommandGroup>
