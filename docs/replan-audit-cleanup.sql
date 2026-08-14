@@ -72,32 +72,36 @@ WHERE origin <> 'BASE' AND source_block_id IS NULL;
 -- 6. DEDUPLICAR REAJUSTE por (source_block_id, scheduled_date)
 --    Mantém o bloco mais antigo do grupo, soma os minutos nele e apaga os
 --    demais. Sempre em transação — revogue (ROLLBACK) se algo parecer errado.
+--    Obs.: CTEs do PostgreSQL não sobrevivem entre statements, por isso a
+--    classificação é gravada em tabela temporária.
 BEGIN;
 
-WITH ranked AS (
-  SELECT id, source_block_id, scheduled_date, duration_minutes,
-         row_number() OVER (
-           PARTITION BY source_block_id, scheduled_date
-           ORDER BY created_at, id
-         ) AS rn
-  FROM study_plan_daily_blocks
-  WHERE source_block_id IS NOT NULL
-),
-keepers AS (
-  SELECT source_block_id, scheduled_date, sum(duration_minutes) AS total
-  FROM ranked
-  WHERE rn = 1
-  GROUP BY source_block_id, scheduled_date
-)
-UPDATE study_plan_daily_blocks b
-SET duration_minutes = k.total
-FROM keepers k
-WHERE b.id IN (SELECT id FROM ranked WHERE rn = 1)
-  AND b.source_block_id = k.source_block_id
-  AND b.scheduled_date = k.scheduled_date;
+CREATE TEMP TABLE _dup_ranked AS
+SELECT id, source_block_id, scheduled_date, duration_minutes,
+       row_number() OVER (
+         PARTITION BY source_block_id, scheduled_date
+         ORDER BY created_at, id
+       ) AS rn
+FROM study_plan_daily_blocks
+WHERE source_block_id IS NOT NULL;
 
+-- Soma os minutos de cada grupo no bloco "keeper" (rn = 1, o mais antigo)
+UPDATE study_plan_daily_blocks b
+SET duration_minutes = t.total
+FROM (
+  SELECT source_block_id, scheduled_date, sum(duration_minutes) AS total
+  FROM _dup_ranked
+  GROUP BY source_block_id, scheduled_date
+) t
+WHERE b.id IN (SELECT id FROM _dup_ranked WHERE rn = 1)
+  AND b.source_block_id = t.source_block_id
+  AND b.scheduled_date = t.scheduled_date;
+
+-- Remove os duplicados (rn > 1)
 DELETE FROM study_plan_daily_blocks
-WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+WHERE id IN (SELECT id FROM _dup_ranked WHERE rn > 1);
+
+DROP TABLE _dup_ranked;
 
 COMMIT;
 
