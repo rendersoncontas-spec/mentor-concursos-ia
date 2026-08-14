@@ -124,6 +124,7 @@ removed AS (
   DELETE FROM study_plan_daily_blocks b
   USING ranked r
   WHERE b.id = r.id AND r.rn > 1
+  RETURNING b.id
 )
 SELECT count(*) AS removed_blocks FROM removed;
 
