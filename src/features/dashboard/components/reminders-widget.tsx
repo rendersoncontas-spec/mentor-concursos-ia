@@ -103,41 +103,27 @@ export function RemindersWidget({ className }: { className?: string }) {
 
       {/* Lista ou Estado Vazio */}
       {reminders.length === 0 ? (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-6 px-4">
-          {/* Ilustração Visual de Lembretes */}
-          <div className="flex flex-col gap-2 p-4 rounded-xl border bg-muted/20 w-44 shrink-0 shadow-inner">
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              <div className="h-2 w-20 bg-emerald-500/30 rounded" />
-            </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted border text-muted-foreground">
-              <Circle className="h-4 w-4 shrink-0" />
-              <div className="h-2 w-24 bg-muted-foreground/20 rounded" />
-            </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted border text-muted-foreground">
-              <Circle className="h-4 w-4 shrink-0" />
-              <div className="h-2 w-16 bg-muted-foreground/20 rounded" />
-            </div>
+        <div className="flex flex-col items-center justify-center text-center py-6 px-2 flex-1 gap-3 w-full">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs shrink-0">
+            <BellRing className="h-6 w-6 text-[#2563EB]" />
           </div>
 
-          {/* Texto de Estado Vazio */}
-          <div className="space-y-3 text-center sm:text-left flex-1">
-            <h4 className="font-bold text-base text-foreground leading-snug">
-              Você ainda não criou nenhum lembrete.
+          <div className="space-y-1 max-w-[280px]">
+            <h4 className="font-bold text-sm text-foreground leading-snug">
+              Você ainda não criou nenhum lembrete
             </h4>
-            <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
-              Use este espaço para anotar coisas importantes: datas de inscrição, provas, boletos a
-              pagar, aulas ao vivo...
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Use este espaço para anotar datas de inscrições, provas, simulados ou metas.
             </p>
-            <div className="pt-1">
-              <Button
-                onClick={() => setIsModalOpen(true)}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs px-5 shadow-sm"
-              >
-                Criar Lembrete
-              </Button>
-            </div>
           </div>
+
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 h-8 shadow-xs cursor-pointer gap-1.5 mt-1"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Criar Lembrete
+          </Button>
         </div>
       ) : (
         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
