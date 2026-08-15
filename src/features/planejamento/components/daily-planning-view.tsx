@@ -553,11 +553,11 @@ export function DailyPlanningView({
 
       {/* REGRA 0 — Aviso de manutenção (replanejamento pausado) */}
       {replanInfo?.replanPaused && (
-        <div className="flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-xl px-3.5 py-2.5">
-          <p className="text-xs font-bold text-sky-600 flex items-center gap-1.5">
-            <Wrench className="w-3.5 h-3.5 shrink-0" />
-            Replanejamento automático pausado para manutenção. Nenhum novo reajuste será gerado até
-            a validação concluir.
+        <div className="flex items-start sm:items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-lg px-2.5 py-2">
+          <Wrench className="w-3.5 h-3.5 shrink-0 mt-0.5 sm:mt-0 text-sky-600" />
+          <p className="text-[12px] leading-snug">
+            <span className="font-bold text-sky-600">Replanejamento pausado temporariamente.</span>{" "}
+            <span className="text-sky-600/80">Nenhum novo reajuste será gerado.</span>
           </p>
         </div>
       )}
