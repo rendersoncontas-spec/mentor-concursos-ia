@@ -490,12 +490,12 @@ export function DailyPlanningView({
   }
 
   return (
-    <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-xs space-y-5">
+    <div className="bg-card border rounded-xl p-3.5 sm:p-4.5 shadow-2xs space-y-3.5">
       {/* Linha 1: Controles de Data e Navegação */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
-            <CalendarIcon className="w-5 h-5" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 border-b pb-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+            <CalendarIcon className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -689,13 +689,13 @@ export function DailyPlanningView({
         {scheduledTasks.length === 0 ? (
           renderEmptyState()
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {scheduledTasks.map((task) => (
               <div
                 key={task.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border rounded-xl hover:border-primary/40 transition-all bg-muted/20"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 border rounded-xl hover:border-primary/40 transition-all bg-muted/20"
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3">
                   <div
                     className="w-1.5 self-stretch rounded-full"
                     style={{ backgroundColor: task.color }}

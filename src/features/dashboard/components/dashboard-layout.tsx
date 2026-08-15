@@ -82,11 +82,13 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
   return (
     <div className="flex flex-col min-h-full bg-background/50">
-      <div className="flex-1 p-4 md:p-6 space-y-4 md:space-y-5 w-full pb-24">
+      <div className="flex-1 p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 w-full pb-20">
         {/* 1. Header: Título e Saudação */}
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-black text-foreground">Home</h1>
-          <p className="text-sm font-bold text-muted-foreground mt-0.5">
+          <h1 className="text-2xl sm:text-[28px] font-black text-foreground tracking-tight leading-none">
+            Home
+          </h1>
+          <p className="text-xs sm:text-[13px] font-semibold text-muted-foreground mt-1">
             Olá, <span className="text-[#2563EB]">{snapshot?.user?.name || "Estudante"}</span>! Hoje
             é {capitalizedDate}. 👋 Bem-vindo de volta.
           </p>
@@ -96,13 +98,13 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
         <DailyMessageBanner />
 
         {/* 3. Ações Principais: Adicionar Estudo e Seletor de Cargo */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 w-full min-w-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-2.5 w-full min-w-0">
           <Button
             onClick={() => {
               setIsRegisterModalOpen(true)
               window.dispatchEvent(new CustomEvent("study-center-opened"))
             }}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs cursor-pointer w-full sm:w-auto h-9 shrink-0"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 shadow-2xs cursor-pointer w-full sm:w-auto h-8.5 shrink-0"
           >
             Adicionar Estudo
           </Button>

@@ -65,22 +65,36 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
 
   if (colSpan === 1) {
     return (
-      <div className="p-4 flex flex-col justify-between h-full space-y-2">
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO
+            <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO DE ESTUDO
           </span>
           <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
             {pct === null ? "—" : `${pct}%`}
           </span>
         </div>
-        <div>
-          <div className="text-2xl font-black text-foreground font-mono leading-tight">
-            {formatMin(weeklyMins)}
+        <div className="grid grid-cols-2 gap-2 my-auto">
+          <div>
+            <span className="text-[9px] text-muted-foreground font-bold uppercase block">Hoje</span>
+            <span className="text-sm sm:text-base font-black text-foreground font-mono leading-tight">
+              {formatMin(dailyMins)}
+            </span>
           </div>
-          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
-            {targetMins === null ? "Meta não definida" : `Meta: ${formatMin(targetMins)}`}
+          <div className="text-right">
+            <span className="text-[9px] text-muted-foreground font-bold uppercase block">
+              Semana
+            </span>
+            <span className="text-sm sm:text-base font-black text-[#2563EB] font-mono leading-tight">
+              {formatMin(weeklyMins)}
+            </span>
           </div>
+        </div>
+        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+          <div
+            className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct ?? 0}%` }}
+          />
         </div>
       </div>
     )
@@ -201,7 +215,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
 
   if (colSpan === 1) {
     return (
-      <div className="p-4 flex flex-col justify-between h-full space-y-2">
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-emerald-600" /> DESEMPENHO
@@ -210,13 +224,22 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             {accuracy}%
           </span>
         </div>
-        <div>
-          <div className="text-2xl font-black text-foreground font-mono leading-tight">
+        <div className="flex items-center justify-between gap-2 my-auto">
+          <div className="text-xl sm:text-2xl font-black text-foreground font-mono leading-tight">
             {accuracy}%
           </div>
-          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
-            {total} questões respondidas
+          <div className="text-right text-[10px] sm:text-[11px] text-muted-foreground font-medium leading-tight">
+            <div>
+              <strong className="text-emerald-600 font-bold">{correct}</strong> acertos
+            </div>
+            <div>
+              <strong className="text-rose-500 font-bold">{wrong}</strong> erros
+            </div>
           </div>
+        </div>
+        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+          <span>Total</span>
+          <span className="font-mono text-foreground font-extrabold">{total} questões</span>
         </div>
       </div>
     )
@@ -334,24 +357,28 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
   if (colSpan === 1) {
     return (
       <div
-        className="p-4 flex flex-col justify-between h-full space-y-2 cursor-pointer hover:bg-muted/10 transition-colors"
+        className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2 cursor-pointer hover:bg-muted/10 transition-colors"
         onClick={() => router.push("/edital")}
       >
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-[#2563EB]" /> EDITAL
+            <FileText className="w-3.5 h-3.5 text-[#2563EB]" /> PROGRESSO NO EDITAL
           </span>
           <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
             {progress}%
           </span>
         </div>
-        <div>
-          <div className="text-2xl font-black text-foreground font-mono leading-tight">
-            {progress}%
-          </div>
-          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
-            {completed} de {total} disciplinas concluídas
-          </div>
+        <div className="my-auto flex items-baseline justify-between">
+          <span className="text-xl sm:text-2xl font-black text-foreground font-mono leading-tight">
+            {completed} <span className="text-xs text-muted-foreground font-bold">/ {total}</span>
+          </span>
+          <span className="text-[10px] text-muted-foreground font-bold">matérias</span>
+        </div>
+        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+          <div
+            className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       </div>
     )
@@ -400,7 +427,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
 
   if (colSpan === 1) {
     return (
-      <div className="p-4 flex flex-col justify-between h-full space-y-2">
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
             <Flame className="w-3.5 h-3.5 text-orange-500" /> CONSTÂNCIA
@@ -409,12 +436,39 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
             {streak}d
           </span>
         </div>
-        <div>
-          <div className="text-2xl font-black text-foreground font-mono leading-tight">
-            {streak} dias
+        <div className="flex items-center justify-between gap-2 my-auto">
+          <div>
+            <span className="text-xl sm:text-2xl font-black text-foreground font-mono leading-tight">
+              {streak}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-bold ml-1">dias seguidos</span>
           </div>
-          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
-            Recorde: {longest} dias
+          <div className="text-right text-[10px] text-muted-foreground font-bold leading-tight">
+            Recorde: <span className="text-orange-500 font-extrabold">{longest}d</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-1 pt-1 border-t border-border/50">
+          <span className="text-[9px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Registro diário
+          </span>
+          <div className="flex items-center gap-1">
+            {(heatmap.length > 0
+              ? heatmap.slice(-7)
+              : Array.from({ length: 7 }, () => ({ minutes: 0, date: "" }))
+            ).map((day, idx) => {
+              const studied = (day?.minutes ?? 0) > 0 || idx < streak
+              return (
+                <div
+                  key={idx}
+                  className={`w-2.5 h-2.5 rounded-xs transition-all ${
+                    studied ? "bg-emerald-500" : "bg-muted-foreground/20"
+                  }`}
+                  title={
+                    day?.date ? `${day.date}: ${studied ? `${day.minutes} min` : "Sem estudo"}` : ""
+                  }
+                />
+              )
+            })}
           </div>
         </div>
       </div>
