@@ -1,7 +1,7 @@
 export type EditalMetadata = {
   name?: string | undefined
   organizer?: string | undefined
-  role?: string | undefined
+  positionName?: string | undefined
   banca?: string | undefined
   examDate?: string | undefined
   publicationDate?: string | undefined

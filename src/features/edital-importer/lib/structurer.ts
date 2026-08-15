@@ -413,7 +413,7 @@ export function guessMetadata(lines: string[]): EditalMetadata {
   const roleMatch = lines.slice(0, 40).find((l) => /(?:CARGO|FUNÇÃO|FUNCAO)\s*:?\s*[A-ZÀ-Ú]/i.test(l))
   if (roleMatch) {
     const value = roleMatch.replace(/(?:CARGO|FUNÇÃO|FUNCAO)\s*:?\s*/i, "")
-    if (value.trim()) meta.role = value.trim().slice(0, 80)
+    if (value.trim()) meta.positionName = value.trim().slice(0, 80)
   }
 
   const allDates: string[] = []

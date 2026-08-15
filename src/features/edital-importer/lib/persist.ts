@@ -238,7 +238,7 @@ export async function persistEditalImport(
       user_id: userId,
       name: editalName.slice(0, 255),
       organizer: payload.metadata.organizer?.slice(0, 120) ?? null,
-      role: payload.metadata.role?.slice(0, 120) ?? null,
+      position_name: payload.metadata.positionName?.slice(0, 120) ?? null,
       banca: payload.metadata.banca?.slice(0, 120) ?? null,
       exam_date: dateBRToISO(payload.metadata.examDate),
       publication_date: dateBRToISO(payload.metadata.publicationDate),

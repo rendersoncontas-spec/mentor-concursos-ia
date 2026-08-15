@@ -12,7 +12,7 @@ BEGIN
     user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
     name text NOT NULL,
     organizer text,
-    role text,
+    position_name text,
     banca text,
     exam_date date,
     publication_date date,

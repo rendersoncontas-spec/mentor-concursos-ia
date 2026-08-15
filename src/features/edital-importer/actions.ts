@@ -124,7 +124,7 @@ export async function parseEditalFileAction(
 const metadataSchema = z.object({
   name: z.string().max(160).optional(),
   organizer: z.string().max(120).optional(),
-  role: z.string().max(120).optional(),
+  positionName: z.string().max(120).optional(),
   banca: z.string().max(120).optional(),
   examDate: z.string().max(10).optional(),
   publicationDate: z.string().max(10).optional(),

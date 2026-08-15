@@ -159,7 +159,7 @@ CONTEÚDO PROGRAMÁTICO
   assert.ok(meta.name?.includes("EDITAL Nº 01/2026"))
   assert.ok(meta.organizer?.includes("POLÍCIA MILITAR"))
   assert.ok(meta.banca?.includes("FUNDATEC"))
-  assert.ok(meta.role?.includes("SOLDADO"))
+  assert.ok(meta.positionName?.includes("SOLDADO"))
   assert.equal(meta.examDate, "15/03/2026")
   assert.equal(meta.registrationDate, "05/01/2026")
 })
