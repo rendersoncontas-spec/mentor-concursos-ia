@@ -8,6 +8,7 @@ import {
   EditalAccordion,
   type TopicItem,
 } from "@/features/edital/components/edital-accordion"
+import { EditalImporter } from "@/features/edital-importer/components/edital-importer"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
@@ -591,6 +592,8 @@ export default async function EditalPage() {
             <ArrowRight className="h-3 w-3" />
           </Link>
         )}
+
+        {active?.id && <EditalImporter targetId={active.id} />}
       </div>
 
       <div className="flex-1 p-4 md:p-6">
