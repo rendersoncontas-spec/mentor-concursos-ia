@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { RankingView } from "@/features/ranking/components/estudei-ranking-view"
+import { RankingView } from "@/features/ranking/components/ranking-view"
 
 export const metadata: Metadata = {
   title: "Ranking",

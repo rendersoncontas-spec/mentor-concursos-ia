@@ -1,6 +1,6 @@
 import { FilePlus } from "lucide-react"
 
-import { PedirEditalView } from "@/features/editais/components/estudei-pedir-edital-view"
+import { PedirEditalView } from "@/features/editais/components/pedir-edital-view"
 
 export const metadata = {
   title: "Pedidos de Editais",

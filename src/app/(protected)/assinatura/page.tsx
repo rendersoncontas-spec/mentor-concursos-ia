@@ -1,6 +1,6 @@
 import { CreditCard } from "lucide-react"
 
-import { SubscriptionView } from "@/features/subscription/components/estudei-subscription-view"
+import { SubscriptionView } from "@/features/subscription/components/subscription-view"
 
 export const metadata = {
   title: "Assinatura & Planos",

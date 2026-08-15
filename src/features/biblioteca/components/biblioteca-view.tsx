@@ -413,5 +413,3 @@ export function BibliotecaView() {
     </div>
   )
 }
-
-export { BibliotecaView as EstudeiBibliotecaView }

@@ -1,6 +1,6 @@
 import { Folder } from "lucide-react"
 
-import { PlanosView } from "@/features/planos/components/estudei-planos-view"
+import { PlanosView } from "@/features/planos/components/planos-view"
 
 export const metadata = {
   title: "Planos de Estudo",

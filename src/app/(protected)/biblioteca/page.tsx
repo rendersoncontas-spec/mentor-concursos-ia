@@ -1,6 +1,6 @@
 import { Library } from "lucide-react"
 
-import { BibliotecaView } from "@/features/biblioteca/components/estudei-biblioteca-view"
+import { BibliotecaView } from "@/features/biblioteca/components/biblioteca-view"
 
 export const metadata = {
   title: "Biblioteca",

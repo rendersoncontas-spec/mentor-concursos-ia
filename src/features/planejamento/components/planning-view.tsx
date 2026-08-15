@@ -703,5 +703,3 @@ export function PlanningView({ initialData }: PlanningViewProps) {
     </div>
   )
 }
-
-export { PlanningView as EstudeiPlanningView }

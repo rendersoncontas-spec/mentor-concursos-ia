@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button"
 import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 import { RemindersWidget } from "@/features/dashboard/components/reminders-widget"
 import { DailyPlanningView } from "@/features/planejamento/components/daily-planning-view"
-import { type StudyCycleBlock } from "@/features/planejamento/components/estudei-planning-view"
+import { type StudyCycleBlock } from "@/features/planejamento/components/planning-view"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { getDailyMessage } from "./daily-message-banner"

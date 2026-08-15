@@ -446,5 +446,3 @@ function formatMinutesLabel(minutes: number | null): string {
   const m = minutes % 60
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}min` : `${m}min`
 }
-
-export { DisciplineDetailView as EstudeiDisciplineDetailView }

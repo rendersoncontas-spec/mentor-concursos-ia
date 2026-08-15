@@ -55,7 +55,7 @@ import {
 } from "@/features/planejamento/lib/planning-form"
 import { cn } from "@/lib/utils"
 
-import { type StudyCycleBlock } from "./estudei-planning-view"
+import { type StudyCycleBlock } from "./planning-view"
 
 export interface PlanningWizardModalProps {
   open: boolean

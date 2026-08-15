@@ -25,8 +25,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
+import { DisciplineDetailView } from "@/features/disciplines/components/discipline-detail-view"
 import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
-import { DisciplineDetailView } from "@/features/disciplines/components/estudei-discipline-detail-view"
 
 export interface DisciplineCardData {
   id: string
@@ -749,5 +749,3 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
     </div>
   )
 }
-
-export { DisciplinesView as EstudeiDisciplinesView }

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { BookOpen } from "lucide-react"
 
 import { getDisciplinesPageData } from "@/application/disciplines/disciplines.service"
-import { DisciplinesView } from "@/features/disciplines/components/estudei-disciplines-view"
+import { DisciplinesView } from "@/features/disciplines/components/disciplines-view"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {

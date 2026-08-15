@@ -19,7 +19,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { getStudyDaysCount, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
 
-import { type StudyCycleBlock } from "./estudei-planning-view"
+import { type StudyCycleBlock } from "./planning-view"
 
 type ScheduleMode = "normal" | "12x36" | "24x72" | "24x48" | "5x1" | "6x1" | "4x2"
 

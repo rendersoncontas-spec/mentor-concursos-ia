@@ -194,5 +194,3 @@ export function SubscriptionView() {
     </div>
   )
 }
-
-export { SubscriptionView as EstudeiSubscriptionView }

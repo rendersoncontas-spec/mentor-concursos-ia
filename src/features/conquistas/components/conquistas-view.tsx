@@ -950,5 +950,3 @@ export function ConquistasView() {
     </div>
   )
 }
-
-export { ConquistasView as EstudeiConquistasView }

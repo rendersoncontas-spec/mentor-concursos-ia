@@ -390,5 +390,3 @@ export function PedirEditalView() {
     </div>
   )
 }
-
-export { PedirEditalView as EstudeiPedirEditalView }

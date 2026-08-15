@@ -42,7 +42,7 @@ import {
 import { isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
-import { type StudyCycleBlock } from "./estudei-planning-view"
+import { type StudyCycleBlock } from "./planning-view"
 
 interface DailyPlanningViewProps {
   blocks: StudyCycleBlock[]

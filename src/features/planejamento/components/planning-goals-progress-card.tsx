@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 
-import { type StudyCycleBlock } from "./estudei-planning-view"
+import { type StudyCycleBlock } from "./planning-view"
 
 interface PlanningGoalsProgressCardProps {
   blocks: StudyCycleBlock[]

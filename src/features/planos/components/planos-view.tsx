@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 
 import {
   Archive,
-  ArrowLeft,
   BarChart3,
   Calendar,
   ChevronRight,
@@ -41,11 +40,11 @@ import {
 } from "@/application/study-plan/list-plans.action"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import type { PlanStatus, PlanType } from "@/domain/study-plan/study-plan.types"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
-import { DisciplineDetailView } from "@/features/disciplines/components/estudei-discipline-detail-view"
+import { DisciplineDetailView } from "@/features/disciplines/components/discipline-detail-view"
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60)
@@ -292,7 +291,10 @@ export function PlanosView() {
             Aderência Real
           </span>
           <span className="text-sm font-black text-emerald-500 block">
-            {activePlan?.adherencePercentage != null ? `${activePlan.adherencePercentage}%` : "—"}
+            {activePlan?.adherencePercentage !== null &&
+            activePlan?.adherencePercentage !== undefined
+              ? `${activePlan.adherencePercentage}%`
+              : "—"}
           </span>
         </div>
       </div>
@@ -807,5 +809,3 @@ export function PlanosView() {
     </div>
   )
 }
-
-export { PlanosView as EstudeiPlanosView }

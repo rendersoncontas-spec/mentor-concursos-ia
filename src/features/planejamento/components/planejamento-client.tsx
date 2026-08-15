@@ -1,7 +1,7 @@
 "use client"
 
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
-import { PlanningView } from "@/features/planejamento/components/estudei-planning-view"
+import { PlanningView } from "@/features/planejamento/components/planning-view"
 
 interface PlanejamentoClientProps {
   initialData: CycleOverviewData | null
