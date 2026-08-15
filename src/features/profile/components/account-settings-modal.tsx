@@ -751,19 +751,63 @@ export function AccountSettingsModal({
                 {/* CONTEÚDO TAB 3: Ranking */}
                 {activeTab === "RANKING" && (
                   <div className="space-y-6">
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                        TORNAR MEU PERFIL PÚBLICO
+                        PRIVACIDADE DO PERFIL DE DESEMPENHO
                       </label>
-                      <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={perfilPublico}
-                          onChange={(e) => setPerfilPublico(e.target.checked)}
-                          className="rounded text-[#2563EB] focus:ring-[#2563EB]"
-                        />
-                        <span>PERMITE QUE OUTRAS PESSOAS VEJAM O SEU PERFIL NOS RANKINGS</span>
-                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        Permitir que outros usuários vejam seu perfil de desempenho ao clicar no seu
+                        nome no Ranking.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <label
+                          className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                            perfilPublico
+                              ? "bg-primary/10 border-primary shadow-xs"
+                              : "bg-muted/10 border-border hover:bg-muted/20"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="perfilPublicoRadio"
+                            checked={perfilPublico}
+                            onChange={() => setPerfilPublico(true)}
+                            className="mt-0.5 text-primary"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-foreground block">
+                              Público (Recomendado)
+                            </span>
+                            <span className="text-[11px] text-muted-foreground leading-tight block mt-0.5">
+                              Exibe tempo estudado, constância, acertos e disciplinas para a
+                              comunidade.
+                            </span>
+                          </div>
+                        </label>
+
+                        <label
+                          className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                            !perfilPublico
+                              ? "bg-primary/10 border-primary shadow-xs"
+                              : "bg-muted/10 border-border hover:bg-muted/20"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="perfilPublicoRadio"
+                            checked={!perfilPublico}
+                            onChange={() => setPerfilPublico(false)}
+                            className="mt-0.5 text-primary"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-foreground block">Privado</span>
+                            <span className="text-[11px] text-muted-foreground leading-tight block mt-0.5">
+                              Outros usuários verão apenas seu nome e posição, mantendo suas
+                              métricas ocultas.
+                            </span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
 
                     {/* Minha Foto */}

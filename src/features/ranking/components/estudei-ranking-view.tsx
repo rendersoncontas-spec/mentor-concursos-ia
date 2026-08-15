@@ -45,6 +45,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+import { PublicStudyProfileModal } from "./public-study-profile-modal"
+
 export interface RankingStudent {
   rank: number
   id: string
@@ -268,6 +270,14 @@ export function RankingView() {
   const [data, setData] = useState<GlobalRankingData | null>(null)
   const [prevWeekData, setPrevWeekData] = useState<GlobalRankingData | null>(null)
   const [personal, setPersonal] = useState<RankingPersonalContext | null>(null)
+  const [selectedProfileStudent, setSelectedProfileStudent] = useState<RankingStudent | null>(null)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+
+  const handleOpenProfile = (student: RankingStudent) => {
+    if (!student?.id) return
+    setSelectedProfileStudent(student)
+    setIsProfileModalOpen(true)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -359,7 +369,6 @@ export function RankingView() {
   )
 
   const top3 = rankedStudents.slice(0, 3)
-  const others = rankedStudents.slice(3)
 
   const myIndex = useMemo(
     () =>
@@ -624,6 +633,7 @@ export function RankingView() {
                 student={top3[1] ?? null}
                 metric={activeTab}
                 isYou={top3[1] ? isCurrentUserStudent(top3[1], isCurrentUserId) : false}
+                onSelect={handleOpenProfile}
               />
               {/* 1º Lugar (Centro, mais alto) */}
               <PodiumPedestal
@@ -631,6 +641,7 @@ export function RankingView() {
                 student={top3[0] ?? null}
                 metric={activeTab}
                 isYou={top3[0] ? isCurrentUserStudent(top3[0], isCurrentUserId) : false}
+                onSelect={handleOpenProfile}
               />
               {/* 3º Lugar */}
               <PodiumPedestal
@@ -638,6 +649,7 @@ export function RankingView() {
                 student={top3[2] ?? null}
                 metric={activeTab}
                 isYou={top3[2] ? isCurrentUserStudent(top3[2], isCurrentUserId) : false}
+                onSelect={handleOpenProfile}
               />
             </div>
           </div>
@@ -715,7 +727,12 @@ export function RankingView() {
                           )} para ultrapassar #${prevStudent.rank} ${cleanStudentName(prevStudent.name)}`}
                         />
                       )}
-                    <RankRankingRow student={student} metric={activeTab} isYou={isYou} />
+                    <RankRankingRow
+                      student={student}
+                      metric={activeTab}
+                      isYou={isYou}
+                      onSelect={handleOpenProfile}
+                    />
                     {isYou &&
                       nextStudent &&
                       metricNumber(student, activeTab) > metricNumber(nextStudent, activeTab) && (
@@ -741,7 +758,12 @@ export function RankingView() {
                 <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground px-1">
                   Sua posição atual (sem atividade no período)
                 </p>
-                <RankRankingRow student={currentUserStats} metric={activeTab} isYou />
+                <RankRankingRow
+                  student={currentUserStats}
+                  metric={activeTab}
+                  isYou
+                  onSelect={handleOpenProfile}
+                />
               </div>
             )}
           </div>
@@ -751,9 +773,23 @@ export function RankingView() {
         <aside className="lg:col-span-4 space-y-5 min-w-0">
           <WeeklyGoalCard personal={personal} />
           <ConsistencyCard personal={personal} />
-          {period === "this_week" && <WeeklyWinnersCard />}
+          {period === "this_week" && <WeeklyWinnersCard onSelectStudent={handleOpenProfile} />}
         </aside>
       </div>
+
+      {/* Modal de Perfil Público de Estudos */}
+      <PublicStudyProfileModal
+        open={isProfileModalOpen}
+        onOpenChange={setIsProfileModalOpen}
+        userId={selectedProfileStudent?.id ?? null}
+        initialName={
+          selectedProfileStudent ? cleanStudentName(selectedProfileStudent.name) : undefined
+        }
+        initialAvatar={selectedProfileStudent?.avatar}
+        initialInitials={selectedProfileStudent?.initials}
+        initialBgColor={selectedProfileStudent?.bgColor}
+        initialRank={selectedProfileStudent?.rank}
+      />
     </div>
   )
 }
@@ -950,29 +986,123 @@ function SuaPosicaoCard({
 /* ─────────────────────────────────────────────────────────────────────────────
    CARD: PRÓXIMO ALVO / DEFESA
 ──────────────────────────────────────────────────────────────────────────────*/
+function renderAboveTargetBanner(
+  above: RankingStudent | null,
+  metric: RankingMetric,
+  userValue: number,
+  isTop1: boolean,
+) {
+  if (above) {
+    return (
+      <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-primary/20 bg-primary/[0.03] p-3.5">
+        <Avatar student={above} sizeClass="h-12 w-12 text-sm shadow-sm" imgSize={96} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-black text-primary">#{above.rank}</span>
+            <p className="text-sm font-black text-foreground truncate">
+              {cleanStudentName(above.name)}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground font-medium">
+            {metricValueFor(above, metric)}
+          </p>
+        </div>
+        <div className="text-right">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+            Faltam
+          </span>
+          <span className="text-sm font-black text-primary tabular-nums">
+            {formatGap(metric, metricNumber(above, metric) - userValue)}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (isTop1) {
+    return (
+      <div className="mt-3 flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3.5">
+        <Crown className="h-6 w-6 text-amber-500 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-foreground">Você está no topo!</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Mantenha o ritmo para defender sua posição.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex items-center gap-3 rounded-2xl border bg-muted/20 p-3.5">
+      <Target className="h-6 w-6 text-muted-foreground/50 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-foreground">Disputa aberta</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Estude para registrar seu tempo e definir o próximo alvo.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function renderBelowDefenseBanner(
+  below: RankingStudent | null,
+  belowValue: number | null,
+  userValue: number,
+  metric: RankingMetric,
+  isOnlyParticipant: boolean,
+) {
+  if (below && belowValue !== null && userValue >= belowValue) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
+        <Eye className="h-4 w-4 shrink-0 text-amber-500" />
+        <p className="text-xs font-bold text-foreground leading-snug truncate">
+          Atenção:{" "}
+          <span className="text-amber-600 dark:text-amber-400">{cleanStudentName(below.name)}</span>{" "}
+          (#{below.rank}) está a apenas{" "}
+          <span className="text-amber-600 dark:text-amber-400 tabular-nums font-black">
+            {formatGap(metric, userValue - belowValue)}
+          </span>{" "}
+          de você.
+        </p>
+      </div>
+    )
+  }
+
+  if (isOnlyParticipant) {
+    return (
+      <p className="text-xs text-muted-foreground font-semibold px-1">
+        Chame outros concurseiros para medir o nível de preparação!
+      </p>
+    )
+  }
+
+  return (
+    <p className="text-xs text-muted-foreground font-semibold px-1">
+      Continue firme para garantir sua melhor colocação histórica.
+    </p>
+  )
+}
+
 function ProximoAlvoCard({
   student,
   metric,
   above,
   below,
-  totalParticipants,
+  _totalParticipants,
   isOnlyParticipant,
 }: {
   student: RankingStudent | null
   metric: RankingMetric
   above: RankingStudent | null
   below: RankingStudent | null
-  totalParticipants: number
+  _totalParticipants?: number
   isOnlyParticipant: boolean
 }) {
   const isTop1 = student?.rank === 1
   const userValue = student ? metricNumber(student, metric) : 0
-  const aboveValue = above ? metricNumber(above, metric) : null
   const belowValue = below ? metricNumber(below, metric) : null
-  const progress =
-    aboveValue !== null && aboveValue > 0 && userValue > 0
-      ? Math.min(100, Math.round((userValue / aboveValue) * 100))
-      : 0
 
   return (
     <div className="relative rounded-3xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
@@ -984,83 +1114,61 @@ function ProximoAlvoCard({
           {isTop1 ? "Defesa da Liderança" : "Próximo Adversário à Frente"}
         </span>
 
-        {above ? (
-          <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-primary/20 bg-primary/[0.03] p-3.5">
-            <Avatar student={above} sizeClass="h-12 w-12 text-sm shadow-sm" imgSize={96} />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-primary">#{above.rank}</span>
-                <p className="text-sm font-black text-foreground truncate">
-                  {cleanStudentName(above.name)}
-                </p>
-              </div>
-              <p className="text-xs font-bold text-muted-foreground tabular-nums mt-0.5">
-                {metricValueFor(above, metric)}
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                Distância
-              </span>
-              <span className="text-xs font-black text-primary tabular-nums">
-                {aboveValue !== null && aboveValue > userValue
-                  ? formatGap(metric, aboveValue - userValue)
-                  : "0"}
-              </span>
-            </div>
-          </div>
-        ) : isTop1 ? (
-          <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center shrink-0">
-              <Crown className="h-6 w-6 text-amber-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-black text-foreground">Você é o líder da competição!</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Nenhum concorrente está na sua frente. Mantenha o ritmo de estudo.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-dashed p-3.5 bg-muted/20">
-            <Target className="h-6 w-6 text-muted-foreground/50 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground">Disputa aberta</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Estude para registrar seu tempo e definir o próximo alvo.
-              </p>
-            </div>
-          </div>
-        )}
+        {renderAboveTargetBanner(above, metric, userValue, isTop1)}
       </div>
 
-      {/* Alerta de quem vem atrás ou status de defesa */}
-      {below && belowValue !== null && userValue >= belowValue ? (
-        <div className="flex items-center gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
-          <Eye className="h-4 w-4 shrink-0 text-amber-500" />
-          <p className="text-xs font-bold text-foreground leading-snug truncate">
-            Atenção:{" "}
-            <span className="text-amber-600 dark:text-amber-400">
-              {cleanStudentName(below.name)}
-            </span>{" "}
-            (#{below.rank}) está a apenas{" "}
-            <span className="text-amber-600 dark:text-amber-400 tabular-nums font-black">
-              {formatGap(metric, userValue - belowValue)}
-            </span>{" "}
-            de você.
-          </p>
-        </div>
-      ) : isOnlyParticipant ? (
-        <p className="text-xs text-muted-foreground font-semibold px-1">
-          Chame outros concurseiros para medir o nível de preparação!
-        </p>
-      ) : (
-        <p className="text-xs text-muted-foreground font-semibold px-1">
-          Continue firme para garantir sua melhor colocação histórica.
-        </p>
-      )}
+      {renderBelowDefenseBanner(below, belowValue, userValue, metric, isOnlyParticipant)}
     </div>
   )
+}
+
+function getPedestalBorderClass(rank: 1 | 2 | 3): string {
+  if (rank === 1) return "border-amber-400 shadow-amber-500/20"
+  if (rank === 2) return "border-slate-300 shadow-slate-400/20"
+  return "border-amber-600 shadow-amber-700/20"
+}
+
+function getPedestalOrderClass(rank: 1 | 2 | 3): string {
+  if (rank === 1) return "order-2"
+  if (rank === 2) return "order-1"
+  return "order-3"
+}
+
+function getRankMetalName(rank: 1 | 2 | 3): string {
+  if (rank === 1) return "Ouro"
+  if (rank === 2) return "Prata"
+  return "Bronze"
+}
+
+function getRowRankBadge(rank: number) {
+  if (rank === 1) {
+    return (
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15 text-amber-600 font-black text-xs">
+        1º
+      </span>
+    )
+  }
+  if (rank === 2) {
+    return (
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-400/20 text-slate-600 dark:text-slate-300 font-black text-xs">
+        2º
+      </span>
+    )
+  }
+  if (rank === 3) {
+    return (
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-700 dark:text-amber-400 font-black text-xs">
+        3º
+      </span>
+    )
+  }
+  return <span className="text-xs font-black text-muted-foreground tabular-nums">#{rank}</span>
+}
+
+function getMetricValueClass(isYou: boolean, inMedal: boolean): string {
+  if (isYou) return "bg-primary text-primary-foreground"
+  if (inMedal) return "bg-muted/80 text-foreground font-extrabold"
+  return "text-muted-foreground font-bold"
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1071,15 +1179,15 @@ function PodiumPedestal({
   student,
   metric,
   isYou,
+  onSelect,
 }: {
   rank: 1 | 2 | 3
   student: RankingStudent | null
   metric: RankingMetric
   isYou: boolean
+  onSelect?: (student: RankingStudent) => void
 }) {
   const isFirst = rank === 1
-  const isSecond = rank === 2
-  const isThird = rank === 3
 
   // Configurações visuais por posição
   const pedestalHeights = {
@@ -1117,7 +1225,19 @@ function PodiumPedestal({
 
   return (
     <div
-      className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 ${isFirst ? "order-2" : isSecond ? "order-1" : "order-3"}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver perfil de estudos de ${cleanStudentName(student.name)}`}
+      onClick={() => onSelect?.(student)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onSelect?.(student)
+        }
+      }}
+      className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-3xl ${getPedestalOrderClass(
+        rank,
+      )}`}
     >
       {/* Coroa / Medalha no topo */}
       <div className="relative mb-2 flex flex-col items-center">
@@ -1133,13 +1253,7 @@ function PodiumPedestal({
             student={student}
             sizeClass={`${
               isFirst ? "h-16 w-16 sm:h-20 sm:w-20" : "h-12 w-12 sm:h-16 sm:w-16"
-            } text-base font-black border-4 ${
-              isFirst
-                ? "border-amber-400 shadow-amber-500/20"
-                : isSecond
-                  ? "border-slate-300 shadow-slate-400/20"
-                  : "border-amber-600 shadow-amber-700/20"
-            } shadow-lg`}
+            } text-base font-black border-4 ${getPedestalBorderClass(rank)} shadow-lg`}
             imgSize={isFirst ? 160 : 128}
           />
           {isYou && (
@@ -1176,7 +1290,7 @@ function PodiumPedestal({
           {rank}º
         </span>
         <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest opacity-70 mt-0.5">
-          {rank === 1 ? "Ouro" : rank === 2 ? "Prata" : "Bronze"}
+          {getRankMetalName(rank)}
         </span>
       </div>
     </div>
@@ -1190,41 +1304,35 @@ function RankRankingRow({
   student,
   metric,
   isYou,
+  onSelect,
 }: {
   student: RankingStudent
   metric: RankingMetric
   isYou: boolean
+  onSelect?: (student: RankingStudent) => void
 }) {
   const inMedal = isMedalRank(student.rank)
 
   return (
     <div
-      className={`flex items-center gap-3 sm:gap-4 px-4 py-3 rounded-2xl border transition-all duration-150 ${
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver perfil de estudos de ${cleanStudentName(student.name)}`}
+      onClick={() => onSelect?.(student)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onSelect?.(student)
+        }
+      }}
+      className={`flex items-center gap-3 sm:gap-4 px-4 py-3 rounded-2xl border transition-all duration-150 cursor-pointer group select-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${
         isYou
-          ? "bg-primary/[0.08] border-primary/40 shadow-xs ring-1 ring-primary/20"
-          : "bg-card/70 border-border/70 hover:bg-muted/40 hover:border-border"
+          ? "bg-primary/[0.08] border-primary/40 shadow-xs ring-1 ring-primary/20 hover:bg-primary/[0.14]"
+          : "bg-card/70 border-border/70 hover:bg-muted/60 hover:border-border/90 hover:shadow-xs"
       }`}
     >
       {/* Posição */}
-      <div className="w-8 shrink-0 text-center">
-        {student.rank === 1 ? (
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15 text-amber-600 font-black text-xs">
-            1º
-          </span>
-        ) : student.rank === 2 ? (
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-400/20 text-slate-600 dark:text-slate-300 font-black text-xs">
-            2º
-          </span>
-        ) : student.rank === 3 ? (
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-700 dark:text-amber-400 font-black text-xs">
-            3º
-          </span>
-        ) : (
-          <span className="text-xs font-black text-muted-foreground tabular-nums">
-            #{student.rank}
-          </span>
-        )}
-      </div>
+      <div className="w-8 shrink-0 text-center">{getRowRankBadge(student.rank)}</div>
 
       {/* Avatar */}
       <Avatar student={student} sizeClass="h-9 w-9 text-xs font-bold shrink-0" imgSize={72} />
@@ -1253,13 +1361,10 @@ function RankRankingRow({
       {/* Valor da Métrica */}
       <div className="text-right shrink-0">
         <span
-          className={`text-xs sm:text-sm font-black tabular-nums px-2.5 py-1 rounded-xl ${
-            isYou
-              ? "bg-primary text-primary-foreground"
-              : inMedal
-                ? "bg-muted/80 text-foreground font-extrabold"
-                : "text-muted-foreground font-bold"
-          }`}
+          className={`text-xs sm:text-sm font-black tabular-nums px-2.5 py-1 rounded-xl ${getMetricValueClass(
+            isYou,
+            inMedal,
+          )}`}
         >
           {metricValueFor(student, metric)}
         </span>
@@ -1368,15 +1473,19 @@ function ConsistencyCard({ personal }: { personal: RankingPersonalContext | null
 /* ─────────────────────────────────────────────────────────────────────────────
    WIDGET: VENCEDORES DAS SEMANAS ANTERIORES
 ──────────────────────────────────────────────────────────────────────────────*/
-interface WeekWinners {
+interface WeekData {
   offset: number
   rangeLabel: string
   podium: RankingStudent[]
   list: RankingStudent[]
 }
 
-function WeeklyWinnersCard() {
-  const [weeks, setWeeks] = useState<Record<number, WeekWinners>>({})
+function WeeklyWinnersCard({
+  onSelectStudent,
+}: {
+  onSelectStudent?: (student: RankingStudent) => void
+} = {}) {
+  const [weeks, setWeeks] = useState<Record<number, WeekData>>({})
   const [navOffset, setNavOffset] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1488,42 +1597,72 @@ function WeeklyWinnersCard() {
         </div>
       )}
 
+      {!loading && error && !current && (
+        <p className="text-xs text-muted-foreground italic py-2 text-center">{error}</p>
+      )}
+
       {current && current.podium.length > 0 && (
         <div className="space-y-2">
           {/* Campeão da Semana passada */}
-          {current.podium[0] && (
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25">
-              <div className="relative">
-                <Avatar
-                  student={current.podium[0]}
-                  sizeClass="h-10 w-10 text-xs border border-amber-400"
-                  imgSize={80}
-                />
-                <Crown className="absolute -top-2 -right-1 h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 block">
-                  1º Lugar da Semana
+          {(() => {
+            const champion = current.podium[0]
+            if (!champion) return null
+            return (
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={`Ver perfil de estudos de ${cleanStudentName(champion.name)}`}
+                onClick={() => onSelectStudent?.(champion)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    onSelectStudent?.(champion)
+                  }
+                }}
+                className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 cursor-pointer group hover:bg-amber-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <div className="relative">
+                  <Avatar
+                    student={champion}
+                    sizeClass="h-10 w-10 text-xs border border-amber-400"
+                    imgSize={80}
+                  />
+                  <Crown className="absolute -top-2 -right-1 h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 block">
+                    1º Lugar da Semana
+                  </span>
+                  <p className="text-sm font-black text-foreground truncate group-hover:text-amber-600 transition-colors">
+                    {cleanStudentName(champion.name)}
+                  </p>
+                </div>
+                <span className="text-xs font-black text-amber-600 dark:text-amber-400 tabular-nums">
+                  {champion.hours}
                 </span>
-                <p className="text-sm font-black text-foreground truncate">
-                  {cleanStudentName(current.podium[0].name)}
-                </p>
               </div>
-              <span className="text-xs font-black text-amber-600 dark:text-amber-400 tabular-nums">
-                {current.podium[0].hours}
-              </span>
-            </div>
-          )}
+            )
+          })()}
 
           {/* 2º e 3º lugares */}
           {current.podium.slice(1, 3).map((student) => (
             <div
               key={student.id || student.rank}
-              className="flex items-center justify-between px-3 py-2 rounded-xl bg-muted/20 text-xs"
+              role="button"
+              tabIndex={0}
+              aria-label={`Ver perfil de estudos de ${cleanStudentName(student.name)}`}
+              onClick={() => onSelectStudent?.(student)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  onSelectStudent?.(student)
+                }
+              }}
+              className="flex items-center justify-between px-3 py-2 rounded-xl bg-muted/20 text-xs cursor-pointer group hover:bg-muted/40 transition-all focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="font-bold text-muted-foreground">{student.rank}º</span>
-                <span className="font-semibold text-foreground truncate">
+                <span className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {cleanStudentName(student.name)}
                 </span>
               </div>
