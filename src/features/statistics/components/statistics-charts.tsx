@@ -1,9 +1,16 @@
 "use client"
 
-import type { ReactNode} from "react";
+import type { ReactNode } from "react"
 import { useState } from "react"
-import { TrendingDown, TrendingUp, Minus } from "lucide-react"
-import { formatBRDate, formatSmartDate, weekdayOfKey, type DailyBucket } from "@/application/study-analytics/engine/stats-engine"
+
+import { Minus, TrendingDown, TrendingUp } from "lucide-react"
+
+import {
+  type DailyBucket,
+  formatBRDate,
+  formatSmartDate,
+  weekdayOfKey,
+} from "@/application/study-analytics/engine/stats-engine"
 
 // ─── Card de seção ──────────────────────────────────────────────────────────
 
@@ -48,14 +55,25 @@ export function EmptyState({ message }: { message: string }) {
 
 export function ClassificationChip({ classification }: { classification: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    DOMINADO: { label: "Dominado", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-    EM_DESENVOLVIMENTO: { label: "Em desenvolvimento", cls: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+    DOMINADO: {
+      label: "Dominado",
+      cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+    },
+    EM_DESENVOLVIMENTO: {
+      label: "Em desenvolvimento",
+      cls: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+    },
     ATENCAO: { label: "Atenção", cls: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
     CRITICO: { label: "Crítico", cls: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
   }
-  const c = map[classification] ?? { label: classification, cls: "bg-muted text-muted-foreground border" }
+  const c = map[classification] ?? {
+    label: classification,
+    cls: "bg-muted text-muted-foreground border",
+  }
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${c.cls}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${c.cls}`}
+    >
       {c.label}
     </span>
   )
@@ -63,7 +81,15 @@ export function ClassificationChip({ classification }: { classification: string 
 
 // ─── Delta (subiu / caiu / igual) ───────────────────────────────────────────
 
-export function DeltaBadge({ delta, invert = false, suffix = "" }: { delta: number | null; invert?: boolean; suffix?: string }) {
+export function DeltaBadge({
+  delta,
+  invert = false,
+  suffix = "",
+}: {
+  delta: number | null
+  invert?: boolean
+  suffix?: string
+}) {
   if (delta === null || delta === 0) {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
@@ -74,7 +100,9 @@ export function DeltaBadge({ delta, invert = false, suffix = "" }: { delta: numb
   const up = invert ? delta < 0 : delta > 0
   const sign = delta > 0 ? "+" : ""
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-bold ${up ? "text-emerald-600" : "text-rose-600"}`}>
+    <span
+      className={`inline-flex items-center gap-1 text-xs font-bold ${up ? "text-emerald-600" : "text-rose-600"}`}
+    >
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {sign}
       {Math.round(Math.abs(delta))}
@@ -96,7 +124,10 @@ export function ProgressBar({
 }) {
   return (
     <div className={`w-full ${height} bg-muted/40 rounded-full overflow-hidden`}>
-      <div className={`${height} ${barClass} rounded-full transition-all`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+      <div
+        className={`${height} ${barClass} rounded-full transition-all`}
+        style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+      />
     </div>
   )
 }
@@ -115,9 +146,13 @@ export function Metric({
   accent?: boolean
 }) {
   return (
-    <div className="rounded-lg border bg-card p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`mt-1 font-black text-xl ${accent ? "text-[#2563EB]" : "text-foreground"}`}>{value}</p>
+    <div className="rounded-lg border bg-card p-3 min-w-0">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p className={`mt-1 font-black text-xl ${accent ? "text-[#2563EB]" : "text-foreground"}`}>
+        {value}
+      </p>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   )
@@ -133,7 +168,21 @@ const HEAT_LEVELS: Record<number, string> = {
   4: "bg-[#2563EB]",
 }
 
-const MONTH_NAMES = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+const MONTH_NAMES = [
+  "",
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+]
 
 export function HeatmapCalendar({
   cells,

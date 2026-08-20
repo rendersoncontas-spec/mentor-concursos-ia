@@ -570,17 +570,17 @@ export function PlanningWizardModal({
           Desktop: altura ajustada ao conteúdo, sem scroll. */}
       <DialogContent
         className={cn(
-          "flex flex-col gap-0 p-0 border-0 max-w-none",
+          "flex flex-col gap-0 p-0 border-0 max-w-none max-w-[100vw]",
           "fixed inset-0 h-[100dvh] w-full overflow-y-auto sm:overflow-hidden",
           "rounded-none sm:rounded-2xl sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:right-auto",
-          "sm:translate-x-0 sm:translate-y-0 sm:translate-x-[-50%] sm:translate-y-[-50%]",
+          "translate-x-0 translate-y-0 sm:translate-x-[-50%] sm:translate-y-[-50%]",
           "sm:w-[min(900px,94vw)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:border",
         )}
       >
         {/* ─────────────── HEADER (compacto) ─────────────── */}
         <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b bg-card">
           <div className="flex items-start justify-between gap-4 pr-8">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground">
                 {modalTitle}
               </h2>
@@ -643,7 +643,7 @@ export function PlanningWizardModal({
         </div>
 
         {/* ─────────────── BODY (sem scroll interno) ─────────────── */}
-        <div className="flex-1 px-4 sm:px-6 py-4">
+        <div className="flex-1 px-4 sm:px-6 py-4 min-w-0">
           <div
             key={currentStep}
             className="space-y-3.5 animate-in fade-in slide-in-from-bottom-2 duration-200"
@@ -1504,17 +1504,17 @@ export function PlanningWizardModal({
         </div>
 
         {/* ─────────────── FOOTER (sempre visível) ─────────────── */}
-        <div className="shrink-0 px-4 sm:px-6 py-3 border-t bg-card flex items-center justify-between gap-3 sticky bottom-0">
+        <div className="shrink-0 px-4 sm:px-6 py-3 border-t bg-card flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 sticky bottom-0">
           {currentStep > 1 ? (
             <Button
               variant="outline"
               onClick={handlePrevStep}
-              className="border-[#2563EB] text-[#2563EB] font-bold text-xs px-6 h-9 rounded-xl cursor-pointer"
+              className="border-[#2563EB] text-[#2563EB] font-bold text-xs px-6 h-10 sm:h-9 rounded-xl cursor-pointer w-full sm:w-auto"
             >
               Voltar
             </Button>
           ) : (
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground text-center sm:text-left py-2 sm:py-0">
               Etapa 1 de 4
             </span>
           )}
@@ -1522,7 +1522,7 @@ export function PlanningWizardModal({
           <Button
             onClick={() => void handleNextStep()}
             disabled={!canProceed}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-8 h-9 rounded-xl shadow-xs cursor-pointer"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-8 h-10 sm:h-9 rounded-xl shadow-xs cursor-pointer w-full sm:w-auto whitespace-normal"
           >
             {currentStep === 4 ? "Salvar planejamento" : "Próximo"}
           </Button>

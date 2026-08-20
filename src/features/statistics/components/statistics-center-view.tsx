@@ -1,19 +1,20 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+
 import {
+  AlertTriangle,
   BarChart3,
+  Brain,
+  CheckCircle2,
   Download,
+  Info,
+  ListChecks,
+  Loader2,
   Printer,
   RefreshCw,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-  XCircle,
   Sparkles,
-  ListChecks,
-  Brain,
+  XCircle,
 } from "lucide-react"
 import {
   Area,
@@ -28,10 +29,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { getStatisticsCenterAction, type StatisticsCenterPayload } from "@/application/study-analytics/statistics-center.action"
+
 import {
+  type ComparisonRow,
+  type DailyBucket,
+  type DisciplineStat,
+  type HourBucket,
+  type Insight,
+  type MetricComparison,
+  type TimeOfDayAnalysis,
+  type TopicStat,
   buildDayBuckets,
   buildDayBucketsFromKeys,
   buildHeatmap,
@@ -61,15 +69,13 @@ import {
   keysBetween,
   mondayKeyOf,
   todayKey,
-  type ComparisonRow,
-  type DailyBucket,
-  type DisciplineStat,
-  type HourBucket,
-  type Insight,
-  type MetricComparison,
-  type TimeOfDayAnalysis,
-  type TopicStat,
 } from "@/application/study-analytics/engine/stats-engine"
+import {
+  type StatisticsCenterPayload,
+  getStatisticsCenterAction,
+} from "@/application/study-analytics/statistics-center.action"
+import { Button } from "@/components/ui/button"
+
 import {
   ClassificationChip,
   DeltaBadge,
@@ -113,8 +119,15 @@ function metricCmpValue(m: MetricComparison | undefined, key: CmpKey): string {
   return String(Math.round(v))
 }
 
-function formatPlanningSubtitle(planning: { weeklyTargetMinutes: number; weeklyTargetQuestions: number; weeklyTargetDays: number }): string {
-  const questionTarget = planning.weeklyTargetQuestions > 0 ? `${planning.weeklyTargetQuestions} questões` : "sem meta de questões"
+function formatPlanningSubtitle(planning: {
+  weeklyTargetMinutes: number
+  weeklyTargetQuestions: number
+  weeklyTargetDays: number
+}): string {
+  const questionTarget =
+    planning.weeklyTargetQuestions > 0
+      ? `${planning.weeklyTargetQuestions} questões`
+      : "sem meta de questões"
   const dayTarget = planning.weeklyTargetDays > 0 ? ` · ${planning.weeklyTargetDays} dias` : ""
   return `Meta semanal: ${formatDurationRaw(planning.weeklyTargetMinutes)} · ${questionTarget}${dayTarget}`
 }
@@ -214,29 +227,62 @@ export function StatisticsCenterView() {
     })
     ;(payload?.sessions ?? []).forEach((s) => {
       if (s.disciplineId && !m.has(s.disciplineId)) {
-        m.set(s.disciplineId, { id: s.disciplineId, name: s.disciplineName ?? s.disciplineId, area: s.disciplineArea })
+        m.set(s.disciplineId, {
+          id: s.disciplineId,
+          name: s.disciplineName ?? s.disciplineId,
+          area: s.disciplineArea,
+        })
       }
     })
     return m
   }, [payload?.disciplines, payload?.sessions])
 
-  const filteredSessions = useMemo(() => filterSessions(payload?.sessions ?? [], rangeKeys, disciplineId, studyType, TIMEZONE, isAllRange), [payload, rangeKeys, disciplineId, studyType, isAllRange])
-  const filteredAttempts = useMemo(() => filterAttempts(payload?.attempts ?? [], rangeKeys, disciplineId, TIMEZONE, isAllRange), [payload, rangeKeys, disciplineId, isAllRange])
+  const filteredSessions = useMemo(
+    () =>
+      filterSessions(
+        payload?.sessions ?? [],
+        rangeKeys,
+        disciplineId,
+        studyType,
+        TIMEZONE,
+        isAllRange,
+      ),
+    [payload, rangeKeys, disciplineId, studyType, isAllRange],
+  )
+  const filteredAttempts = useMemo(
+    () => filterAttempts(payload?.attempts ?? [], rangeKeys, disciplineId, TIMEZONE, isAllRange),
+    [payload, rangeKeys, disciplineId, isAllRange],
+  )
 
   // ── Cálculos ──────────────────────────────────────────────────────────────
   const buckets = useMemo(
-    () => isAllRange
-      ? buildDayBucketsFromKeys(filteredSessions, filteredAttempts, rangeKeys, TIMEZONE)
-      : buildDayBuckets(filteredSessions, filteredAttempts, Math.max(1, rangeKeys.length), now, TIMEZONE),
-    [filteredSessions, filteredAttempts, rangeKeys, now, isAllRange]
+    () =>
+      isAllRange
+        ? buildDayBucketsFromKeys(filteredSessions, filteredAttempts, rangeKeys, TIMEZONE)
+        : buildDayBuckets(
+            filteredSessions,
+            filteredAttempts,
+            Math.max(1, rangeKeys.length),
+            now,
+            TIMEZONE,
+          ),
+    [filteredSessions, filteredAttempts, rangeKeys, now, isAllRange],
   )
   const timeCards = useMemo(() => computeTimeCards(buckets, now, TIMEZONE), [buckets, now])
   const sessionStats = useMemo(() => computeSessionStatistics(filteredSessions), [filteredSessions])
-  const questionStats = useMemo(() => computeQuestionStatistics(filteredSessions, filteredAttempts), [filteredSessions, filteredAttempts])
+  const questionStats = useMemo(
+    () => computeQuestionStatistics(filteredSessions, filteredAttempts),
+    [filteredSessions, filteredAttempts],
+  )
   const focusStats = useMemo(() => computeFocusStatistics(filteredSessions), [filteredSessions])
   const streaks = useMemo(
-    () => computeStreaks(new Set(buckets.filter((b) => b.minutes > 0).map((b) => b.date)), now, TIMEZONE),
-    [buckets, now]
+    () =>
+      computeStreaks(
+        new Set(buckets.filter((b) => b.minutes > 0).map((b) => b.date)),
+        now,
+        TIMEZONE,
+      ),
+    [buckets, now],
   )
   const frequency = useMemo(() => computeFrequency(buckets, now, TIMEZONE), [buckets, now])
   const revisionStats = useMemo(
@@ -245,9 +291,9 @@ export function StatisticsCenterView() {
         payload?.reviewItems ?? [],
         payload?.reviewsCompletedLast30 ?? 0,
         now,
-        registry
+        registry,
       ),
-    [payload?.reviewItems, payload?.reviewsCompletedLast30, now, registry]
+    [payload?.reviewItems, payload?.reviewsCompletedLast30, now, registry],
   )
   const overdueByDiscipline = useMemo(() => {
     const m = new Map<string, number>()
@@ -265,25 +311,54 @@ export function StatisticsCenterView() {
         overdueByDiscipline,
         timeCards.totalMinutes,
         now,
-        TIMEZONE
+        TIMEZONE,
       ),
-    [filteredSessions, filteredAttempts, registry, payload?.userDisciplines, overdueByDiscipline, timeCards.totalMinutes, now]
+    [
+      filteredSessions,
+      filteredAttempts,
+      registry,
+      payload?.userDisciplines,
+      overdueByDiscipline,
+      timeCards.totalMinutes,
+      now,
+    ],
   )
-  const topicStats = useMemo(() => computeTopicStats(filteredSessions, now, TIMEZONE), [filteredSessions, now])
-  const hoursOfDay = useMemo(() => computeHoursOfDay(filteredSessions, filteredAttempts, TIMEZONE), [filteredSessions, filteredAttempts])
-  const timeOfDayAnalysis = useMemo(() => computeTimeOfDayAnalysis(filteredSessions, filteredAttempts, TIMEZONE), [filteredSessions, filteredAttempts])
+  const topicStats = useMemo(
+    () => computeTopicStats(filteredSessions, now, TIMEZONE),
+    [filteredSessions, now],
+  )
+  const hoursOfDay = useMemo(
+    () => computeHoursOfDay(filteredSessions, filteredAttempts, TIMEZONE),
+    [filteredSessions, filteredAttempts],
+  )
+  const timeOfDayAnalysis = useMemo(
+    () => computeTimeOfDayAnalysis(filteredSessions, filteredAttempts, TIMEZONE),
+    [filteredSessions, filteredAttempts],
+  )
   const comparisons = useMemo(() => computeComparisons(buckets, now, TIMEZONE), [buckets, now])
-  const planning = useMemo(() => computePlanning(payload?.activePlan ?? null, buckets, now, TIMEZONE), [payload?.activePlan, buckets, now])
+  const planning = useMemo(
+    () => computePlanning(payload?.activePlan ?? null, buckets, now, TIMEZONE),
+    [payload?.activePlan, buckets, now],
+  )
   const edital = useMemo(
     () => computeEditalCoverage(payload?.userDisciplines ?? [], disciplineStats, registry, now),
-    [payload?.userDisciplines, disciplineStats, registry, now]
+    [payload?.userDisciplines, disciplineStats, registry, now],
   )
   const productivity = useMemo(
-    () => computeProductivity(filteredSessions, questionStats, focusStats.averagePct, frequency.last7Days),
-    [filteredSessions, questionStats, focusStats.averagePct, frequency.last7Days]
+    () =>
+      computeProductivity(
+        filteredSessions,
+        questionStats,
+        focusStats.averagePct,
+        frequency.last7Days,
+      ),
+    [filteredSessions, questionStats, focusStats.averagePct, frequency.last7Days],
   )
   const questionTrend = useMemo(() => computeQuestionTrend(buckets), [buckets])
-  const heatmap = useMemo(() => buildHeatmap(buckets, Math.min(rangeKeys.length, 365)), [buckets, rangeKeys])
+  const heatmap = useMemo(
+    () => buildHeatmap(buckets, Math.min(rangeKeys.length, 365)),
+    [buckets, rangeKeys],
+  )
   const insights = useMemo(
     () =>
       generateInsights({
@@ -302,27 +377,57 @@ export function StatisticsCenterView() {
         timeCards,
         productivity,
         daysSinceLastStudy: frequency.daysSinceLastStudy,
-        questionsPerDay: (isAllRange ? rangeKeys.length : days) > 0 ? questionStats.total / (isAllRange ? rangeKeys.length : days) : 0,
+        questionsPerDay:
+          (isAllRange ? rangeKeys.length : days) > 0
+            ? questionStats.total / (isAllRange ? rangeKeys.length : days)
+            : 0,
       }),
-    [filteredSessions.length, hoursOfDay, timeOfDayAnalysis, focusStats.averagePct, questionStats, streaks, comparisons, planning, revisionStats, disciplineStats, topicStats, timeCards, productivity, frequency.daysSinceLastStudy, days, isAllRange, rangeKeys.length]
+    [
+      filteredSessions.length,
+      hoursOfDay,
+      timeOfDayAnalysis,
+      focusStats.averagePct,
+      questionStats,
+      streaks,
+      comparisons,
+      planning,
+      revisionStats,
+      disciplineStats,
+      topicStats,
+      timeCards,
+      productivity,
+      frequency.daysSinceLastStudy,
+      days,
+      isAllRange,
+      rangeKeys.length,
+    ],
   )
-  const priorities = useMemo(() => computePriorities(disciplineStats, revisionStats), [disciplineStats, revisionStats])
+  const priorities = useMemo(
+    () => computePriorities(disciplineStats, revisionStats),
+    [disciplineStats, revisionStats],
+  )
   const weeklyReport = useMemo(() => computeWeeklyReport(buckets, now, TIMEZONE), [buckets, now])
   const monthlyReport = useMemo(() => computeMonthlyReport(buckets, now, TIMEZONE), [buckets, now])
   const effectiveDays = isAllRange ? rangeKeys.length : days
-  const chartData = useMemo(() => buildChartData(buckets, effectiveDays, TIMEZONE), [buckets, effectiveDays])
+  const chartData = useMemo(
+    () => buildChartData(buckets, effectiveDays, TIMEZONE),
+    [buckets, effectiveDays],
+  )
 
   // Opções de filtro (a partir dos dados totais, não filtrados)
   const allSessions = useMemo(() => payload?.sessions ?? [], [payload?.sessions])
   const disciplineOptions = useMemo(() => {
     const byId = new Map<string, string>()
     allSessions.forEach((s) => {
-      if (s.disciplineId && !byId.has(s.disciplineId)) byId.set(s.disciplineId, s.disciplineName ?? s.disciplineId)
+      if (s.disciplineId && !byId.has(s.disciplineId))
+        byId.set(s.disciplineId, s.disciplineName ?? s.disciplineId)
     })
     payload?.disciplines.forEach((d) => {
       if (d.id) byId.set(d.id, d.name)
     })
-    return [...byId.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [allSessions, payload?.disciplines])
   const typeOptions = useMemo(() => {
     const names = new Set<string>()
@@ -352,11 +457,13 @@ export function StatisticsCenterView() {
           b.focusAvg === null ? "" : Math.round(b.focusAvg),
           b.pages,
           b.flashcards,
-        ].join(";")
+        ].join(";"),
       )
     })
     lines.push("")
-    lines.push("disciplina;minutos;sessoes;questoes;acertos;acuracia_pct;tendencia;classificacao;score_atencao")
+    lines.push(
+      "disciplina;minutos;sessoes;questoes;acertos;acuracia_pct;tendencia;classificacao;score_atencao",
+    )
     disciplineStats.forEach((d) => {
       lines.push(
         [
@@ -369,7 +476,7 @@ export function StatisticsCenterView() {
           d.trendDirection,
           d.classification,
           d.attentionScore,
-        ].join(";")
+        ].join(";"),
       )
     })
     const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" })
@@ -392,7 +499,9 @@ export function StatisticsCenterView() {
   if (error && !payload) {
     return (
       <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-        <p className="font-semibold text-foreground mb-1">Não foi possível carregar suas estatísticas</p>
+        <p className="font-semibold text-foreground mb-1">
+          Não foi possível carregar suas estatísticas
+        </p>
         <p className="mb-4">{error}</p>
         <Button onClick={() => load()}>Tentar novamente</Button>
       </div>
@@ -410,7 +519,13 @@ export function StatisticsCenterView() {
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Análise real dos seus estudos — tempo, desempenho, consistência e prioridades
-            {lastRefresh && <> · atualizado {lastRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</>}
+            {lastRefresh && (
+              <>
+                {" "}
+                · atualizado{" "}
+                {lastRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -436,7 +551,9 @@ export function StatisticsCenterView() {
                 key={r.id}
                 onClick={() => setRange(r.id)}
                 className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  range === r.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  range === r.id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {r.label}
@@ -480,7 +597,9 @@ export function StatisticsCenterView() {
         </div>
 
         <div>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Tipo de estudo</p>
+          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
+            Tipo de estudo
+          </p>
           <select
             value={studyType}
             onChange={(e) => setStudyType(e.target.value)}
@@ -496,17 +615,23 @@ export function StatisticsCenterView() {
         </div>
 
         <div className="sm:col-span-2 lg:col-span-1">
-          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Resumo do período</p>
+          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
+            Resumo do período
+          </p>
           <div className="rounded-lg border bg-card px-3 py-2 text-xs flex items-center justify-between">
             <span className="text-muted-foreground">Sessões analisadas</span>
-            <span className="font-black text-foreground font-mono text-base">{filteredSessions.length}</span>
+            <span className="font-black text-foreground font-mono text-base">
+              {filteredSessions.length}
+            </span>
           </div>
         </div>
       </div>
 
       {!hasAnyData && (
         <div className="rounded-xl border border-dashed p-8 text-center">
-          <p className="text-sm font-semibold text-foreground mb-1">Nenhum estudo registrado no período</p>
+          <p className="text-sm font-semibold text-foreground mb-1">
+            Nenhum estudo registrado no período
+          </p>
           <p className="text-xs text-muted-foreground mb-4">
             Registre uma sessão de estudo para começar a ver suas estatísticas reais.
           </p>
@@ -521,15 +646,43 @@ export function StatisticsCenterView() {
         title="Tempo de estudo"
         subtitle={`Hoje, semana, mês e janelas no período selecionado (fuso ${TIMEZONE.replace("_", " ")})`}
       >
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Metric label="Hoje" value={formatDurationRaw(timeCards.todayMinutes)} sub="sessões de hoje" accent />
-          <Metric label="Semana" value={formatDurationRaw(timeCards.weekMinutes)} sub="segunda → hoje" accent />
-          <Metric label="Mês" value={formatDurationRaw(timeCards.monthMinutes)} sub="dia 1 → hoje" accent />
-          <Metric label="Últimos 30d" value={formatDurationRaw(timeCards.last30Minutes)} sub="janela móvel" />
-          <Metric label="Últimos 90d" value={formatDurationRaw(timeCards.last90Minutes)} sub="janela móvel" />
-          <Metric label="Total no período" value={formatDurationRaw(timeCards.totalMinutes)} sub={`${timeCards.studiedDayCount} dias estudados`} accent />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <Metric
+            label="Hoje"
+            value={formatDurationRaw(timeCards.todayMinutes)}
+            sub="sessões de hoje"
+            accent
+          />
+          <Metric
+            label="Semana"
+            value={formatDurationRaw(timeCards.weekMinutes)}
+            sub="segunda → hoje"
+            accent
+          />
+          <Metric
+            label="Mês"
+            value={formatDurationRaw(timeCards.monthMinutes)}
+            sub="dia 1 → hoje"
+            accent
+          />
+          <Metric
+            label="Últimos 30d"
+            value={formatDurationRaw(timeCards.last30Minutes)}
+            sub="janela móvel"
+          />
+          <Metric
+            label="Últimos 90d"
+            value={formatDurationRaw(timeCards.last90Minutes)}
+            sub="janela móvel"
+          />
+          <Metric
+            label="Total no período"
+            value={formatDurationRaw(timeCards.totalMinutes)}
+            sub={`${timeCards.studiedDayCount} dias estudados`}
+            accent
+          />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Metric
             label="Média por dia estudado"
             value={formatDurationRaw(timeCards.avgPerStudiedDay)}
@@ -559,7 +712,7 @@ export function StatisticsCenterView() {
       </SectionCard>
 
       {/* ===================== MÉTRICAS BASE ===================== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <SectionCard title="Sessões" subtitle="Concluídas e interrompidas">
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
@@ -599,7 +752,9 @@ export function StatisticsCenterView() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Acurácia</span>
-                <span className="font-black">{questionStats.accuracy === null ? "—" : `${Math.round(questionStats.accuracy)}%`}</span>
+                <span className="font-black">
+                  {questionStats.accuracy === null ? "—" : `${Math.round(questionStats.accuracy)}%`}
+                </span>
               </div>
             </div>
           </div>
@@ -618,16 +773,14 @@ export function StatisticsCenterView() {
             <p className="text-xs text-muted-foreground mb-3">foco médio das sessões</p>
             <ProgressBar pct={focusStats.average ?? 0} barClass={focusBarCls(focusStats.average)} />
             <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-              <span>
-                Ativo {formatDurationRaw(focusStats.totalActiveMinutes)}
-              </span>
-              <span>
-                Pausa {formatDurationRaw(focusStats.totalPausedMinutes)}
-              </span>
+              <span>Ativo {formatDurationRaw(focusStats.totalActiveMinutes)}</span>
+              <span>Pausa {formatDurationRaw(focusStats.totalPausedMinutes)}</span>
             </div>
             <div className="flex justify-between mt-1 text-xs text-muted-foreground">
               <span>
-                {focusStats.activeRatio !== null ? `${Math.round(focusStats.activeRatio * 100)}% do tempo ativo` : ""}
+                {focusStats.activeRatio !== null
+                  ? `${Math.round(focusStats.activeRatio * 100)}% do tempo ativo`
+                  : ""}
               </span>
               <span>
                 {focusStats.best !== null ? `melhor ${Math.round(focusStats.best)}%` : ""}
@@ -662,21 +815,32 @@ export function StatisticsCenterView() {
             </div>
             {frequency.daysSinceLastStudy !== null && frequency.daysSinceLastStudy > 0 && (
               <p className="text-[11px] text-amber-600 font-semibold">
-                {frequency.daysSinceLastStudy} dias sem estudar{streaks.current === 0 ? " — quebre o ciclo hoje" : ""}
+                {frequency.daysSinceLastStudy} dias sem estudar
+                {streaks.current === 0 ? " — quebre o ciclo hoje" : ""}
               </p>
             )}
             {streaks.current >= 3 && (
-              <p className="text-[11px] text-emerald-600 font-semibold">🔥 Sequência de {streaks.current} dias!</p>
+              <p className="text-[11px] text-emerald-600 font-semibold">
+                🔥 Sequência de {streaks.current} dias!
+              </p>
             )}
           </div>
         </SectionCard>
       </div>
 
       {/* ===================== EVOLUÇÃO ===================== */}
-      <EvolutionChart data={chartData} rangeDays={effectiveDays} empty={filteredSessions.length === 0} />
+      <EvolutionChart
+        data={chartData}
+        rangeDays={effectiveDays}
+        empty={filteredSessions.length === 0}
+      />
 
       {/* ===================== HEATMAP ===================== */}
-      <SectionCard title="Calendário de atividade" subtitle="Intensidade de estudo por dia (nível por percentil)" action={<HeatmapLegendNote />}>
+      <SectionCard
+        title="Calendário de atividade"
+        subtitle="Intensidade de estudo por dia (nível por percentil)"
+        action={<HeatmapLegendNote />}
+      >
         {heatmap.length > 0 ? (
           <HeatmapCalendar cells={heatmap} now={now} timezone={TIMEZONE} />
         ) : (
@@ -713,10 +877,15 @@ export function StatisticsCenterView() {
               </thead>
               <tbody>
                 {topicStats.slice(0, 50).map((t) => (
-                  <tr key={`${t.disciplineId}-${t.topicName}`} className="border-t border-border/40">
+                  <tr
+                    key={`${t.disciplineId}-${t.topicName}`}
+                    className="border-t border-border/40"
+                  >
                     <td className="py-2 pr-2 font-semibold">{t.topicName}</td>
                     <td className="py-2 pr-2 text-muted-foreground">{t.disciplineName}</td>
-                    <td className="py-2 pr-2 text-right font-mono">{formatDurationRaw(t.minutes)}</td>
+                    <td className="py-2 pr-2 text-right font-mono">
+                      {formatDurationRaw(t.minutes)}
+                    </td>
                     <td className="py-2 pr-2 text-right">{t.questions}</td>
                     <td className="py-2 pr-2 text-right font-bold">
                       {t.accuracy === null ? "—" : `${Math.round(t.accuracy)}%`}
@@ -734,28 +903,78 @@ export function StatisticsCenterView() {
 
       {/* ===================== QUESTÕES ===================== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SectionCard title="Questões ao longo do tempo" subtitle="Volume diário e acurácia em linha">
+        <SectionCard
+          title="Questões ao longo do tempo"
+          subtitle="Volume diário e acurácia em linha"
+        >
           {questionTrend.length === 0 ? (
             <EmptyState message="Sem questões registradas no período." />
           ) : (
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={questionTrend} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                <ComposedChart
+                  data={questionTrend}
+                  margin={{ top: 5, right: 10, bottom: 5, left: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={24} />
-                  <YAxis yAxisId="q" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={28} />
-                  <YAxis yAxisId="a" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={30} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={shortDate}
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={24}
+                  />
+                  <YAxis
+                    yAxisId="q"
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={28}
+                  />
+                  <YAxis
+                    yAxisId="a"
+                    orientation="right"
+                    domain={[0, 100]}
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={30}
+                  />
                   <Tooltip content={<QTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} formatter={(v) => <span style={{ color: "hsl(var(--muted-foreground))" }}>{v}</span>} />
-                  <Bar yAxisId="q" dataKey="questions" name="Questões" fill="#2563EB" radius={[3, 3, 0, 0]} barSize={Math.max(2, Math.min(10, 360 / questionTrend.length))} />
-                  <Line yAxisId="a" type="monotone" dataKey="accuracy" name="Acurácia %" stroke="#22c55e" strokeWidth={2} dot={false} />
+                  <Legend
+                    wrapperStyle={{ fontSize: "11px" }}
+                    formatter={(v) => (
+                      <span style={{ color: "hsl(var(--muted-foreground))" }}>{v}</span>
+                    )}
+                  />
+                  <Bar
+                    yAxisId="q"
+                    dataKey="questions"
+                    name="Questões"
+                    fill="#2563EB"
+                    radius={[3, 3, 0, 0]}
+                    barSize={Math.max(2, Math.min(10, 360 / questionTrend.length))}
+                  />
+                  <Line
+                    yAxisId="a"
+                    type="monotone"
+                    dataKey="accuracy"
+                    name="Acurácia %"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={false}
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="Mapa de erros" subtitle="Onde os erros se concentram (rever antes de avançar)">
+        <SectionCard
+          title="Mapa de erros"
+          subtitle="Onde os erros se concentram (rever antes de avançar)"
+        >
           <ErrorMap
             disciplineStats={disciplineStats}
             topicStats={topicStats.filter((t) => t.wrong > 0)}
@@ -768,18 +987,40 @@ export function StatisticsCenterView() {
       <SectionCard
         title="Produtividade"
         subtitle="Índice 0-100 com fórmula documentada abaixo"
-        action={productivity.score !== null ? <span className="text-3xl font-black text-[#2563EB] font-mono">{productivity.score}</span> : null}
+        action={
+          productivity.score !== null ? (
+            <span className="text-3xl font-black text-[#2563EB] font-mono">
+              {productivity.score}
+            </span>
+          ) : null
+        }
       >
         {productivity.score === null ? (
           <div>
             <EmptyState message="Complete ao menos 3 sessões no período para calcular o índice de produtividade — a fórmula soma tempo ativo (40%), acurácia (30%), foco (20%) e constância (10%)." />
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Metric label="Tempo ativo (40%)" value={`${productivity.breakdown.activeRatioScore}%`} sub="minutos ativos ÷ duração total" />
-            <Metric label="Acurácia (30%)" value={`${productivity.breakdown.accuracyScore}%`} sub="com ≥5 questões no período" />
-            <Metric label="Foco (20%)" value={`${productivity.breakdown.focusScore}%`} sub="foco médio das sessões" />
-            <Metric label="Constância (10%)" value={`${productivity.breakdown.consistencyScore}%`} sub="dias estudados nos últimos 7" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Metric
+              label="Tempo ativo (40%)"
+              value={`${productivity.breakdown.activeRatioScore}%`}
+              sub="minutos ativos ÷ duração total"
+            />
+            <Metric
+              label="Acurácia (30%)"
+              value={`${productivity.breakdown.accuracyScore}%`}
+              sub="com ≥5 questões no período"
+            />
+            <Metric
+              label="Foco (20%)"
+              value={`${productivity.breakdown.focusScore}%`}
+              sub="foco médio das sessões"
+            />
+            <Metric
+              label="Constância (10%)"
+              value={`${productivity.breakdown.consistencyScore}%`}
+              sub="dias estudados nos últimos 7"
+            />
           </div>
         )}
       </SectionCard>
@@ -803,7 +1044,9 @@ export function StatisticsCenterView() {
                   <Icon className="h-4 w-4 mt-0.5 shrink-0 text-foreground/70" />
                   <div>
                     <p className="text-xs font-bold text-foreground">{ins.title}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{ins.message}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                      {ins.message}
+                    </p>
                   </div>
                 </div>
               )
@@ -823,17 +1066,25 @@ export function StatisticsCenterView() {
         ) : (
           <div className="space-y-3">
             {priorities.map((p, i) => (
-              <div key={p.disciplineId} className="flex items-start gap-3 rounded-lg border bg-card p-3">
+              <div
+                key={p.disciplineId}
+                className="flex items-start gap-3 rounded-lg border bg-card p-3"
+              >
                 <span className="w-6 h-6 rounded-full bg-[#2563EB]/10 text-[#2563EB] text-xs font-black flex items-center justify-center shrink-0">
                   {i + 1}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-xs font-bold">{p.name}</p>
-                    <span className="text-xs font-black font-mono text-[#2563EB]">{p.score}<span className="text-muted-foreground font-semibold">/100</span></span>
+                    <span className="text-xs font-black font-mono text-[#2563EB]">
+                      {p.score}
+                      <span className="text-muted-foreground font-semibold">/100</span>
+                    </span>
                   </div>
                   {p.reasons.length > 0 && (
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{p.reasons.join(" · ")}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {p.reasons.join(" · ")}
+                    </p>
                   )}
                   <p className="text-[11px] text-foreground/80 mt-1 font-medium">{p.action}</p>
                 </div>
@@ -854,32 +1105,90 @@ export function StatisticsCenterView() {
             ? formatPlanningSubtitle(planning)
             : "Sem plano ativo — crie um plano no concurso para acompanhar aqui"
         }
-        action={planning.hasPlan && planning.adherencePct !== null ? (
-          <span className={`text-xs font-black ${adherenceClass(planning.adherencePct)}`}>
-            {Math.round(planning.adherencePct)}% da meta semanal
-          </span>
-        ) : null}
+        action={
+          planning.hasPlan && planning.adherencePct !== null ? (
+            <span className={`text-xs font-black ${adherenceClass(planning.adherencePct)}`}>
+              {Math.round(planning.adherencePct)}% da meta semanal
+            </span>
+          ) : null
+        }
       >
         {!planning.hasPlan ? (
           <EmptyState message="Quando houver um plano ativo, o gráfico mostra o planejado por dia da semana (pela grade do plano) contra o realizado." />
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Metric label="Meta semanal" value={formatDurationRaw(planning.weeklyTargetMinutes)} sub="minutos planejados" />
-              <Metric label="Realizado na semana" value={formatDurationRaw(planning.actualWeekMinutes)} sub={`${planning.actualWeekDays} dias`} accent />
-              <Metric label="Aderência" value={planning.adherencePct === null ? "—" : `${Math.round(planning.adherencePct)}%`} sub="realizado ÷ meta semanal" />
-              <Metric label="Questões da semana" value={String(planning.actualWeekQuestions)} sub={planning.weeklyTargetQuestions > 0 ? `meta ${planning.weeklyTargetQuestions}` : "sem meta"} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <Metric
+                label="Meta semanal"
+                value={formatDurationRaw(planning.weeklyTargetMinutes)}
+                sub="minutos planejados"
+              />
+              <Metric
+                label="Realizado na semana"
+                value={formatDurationRaw(planning.actualWeekMinutes)}
+                sub={`${planning.actualWeekDays} dias`}
+                accent
+              />
+              <Metric
+                label="Aderência"
+                value={
+                  planning.adherencePct === null ? "—" : `${Math.round(planning.adherencePct)}%`
+                }
+                sub="realizado ÷ meta semanal"
+              />
+              <Metric
+                label="Questões da semana"
+                value={String(planning.actualWeekQuestions)}
+                sub={
+                  planning.weeklyTargetQuestions > 0
+                    ? `meta ${planning.weeklyTargetQuestions}`
+                    : "sem meta"
+                }
+              />
             </div>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={planning.series} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                <ComposedChart
+                  data={planning.series}
+                  margin={{ top: 5, right: 10, bottom: 5, left: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={32} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={40} tickFormatter={(v: number) => formatDurationRaw(v)} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={shortDate}
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={32}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={40}
+                    tickFormatter={(v: number) => formatDurationRaw(v)}
+                  />
                   <Tooltip content={<PlanTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} formatter={(v) => <span style={{ color: "hsl(var(--muted-foreground))" }}>{v}</span>} />
-                  <Bar dataKey="actualMinutes" name="Realizado" fill="#2563EB" radius={[3, 3, 0, 0]} />
-                  <Line type="stepAfter" dataKey="plannedMinutes" name="Planejado" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                  <Legend
+                    wrapperStyle={{ fontSize: "11px" }}
+                    formatter={(v) => (
+                      <span style={{ color: "hsl(var(--muted-foreground))" }}>{v}</span>
+                    )}
+                  />
+                  <Bar
+                    dataKey="actualMinutes"
+                    name="Realizado"
+                    fill="#2563EB"
+                    radius={[3, 3, 0, 0]}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="plannedMinutes"
+                    name="Planejado"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    dot={false}
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -893,8 +1202,12 @@ export function StatisticsCenterView() {
         subtitle="Status das disciplinas do seu concurso e cobertura geral"
         action={
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-black text-[#2563EB] font-mono">{edital.percentage}%</span>
-            <div className="w-28"><ProgressBar pct={edital.percentage} /></div>
+            <span className="text-2xl font-black text-[#2563EB] font-mono">
+              {edital.percentage}%
+            </span>
+            <div className="w-28">
+              <ProgressBar pct={edital.percentage} />
+            </div>
           </div>
         }
       >
@@ -902,7 +1215,7 @@ export function StatisticsCenterView() {
           <EmptyState message="Adicione um concurso (edital) para acompanhar a cobertura por disciplina." />
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <Metric label="Total" value={edital.total} sub="disciplinas no edital" />
               <Metric label="Concluídas" value={edital.completed} sub="status CONCLUÍDA" />
               <Metric label="Em estudo" value={edital.studying} sub="status EM_ESTUDO" />
@@ -924,7 +1237,9 @@ export function StatisticsCenterView() {
                     <tr key={d.disciplineId} className="border-t border-border/40">
                       <td className="py-2 pr-2 font-semibold">{d.name}</td>
                       <td className="py-2 pr-2 text-muted-foreground">{d.area ?? "—"}</td>
-                      <td className="py-2 pr-2 text-right font-mono">{formatDurationRaw(d.studiedMinutes)}</td>
+                      <td className="py-2 pr-2 text-right font-mono">
+                        {formatDurationRaw(d.studiedMinutes)}
+                      </td>
                       <td className="py-2 pr-2 text-right">
                         {daysSinceLastStudyLabel(d.daysSinceLastStudy)}
                       </td>
@@ -947,7 +1262,10 @@ export function StatisticsCenterView() {
       </SectionCard>
 
       {/* ===================== HORÁRIOS ===================== */}
-      <SectionCard title="Períodos do dia" subtitle="Manhã, tarde, noite e madrugada — por tempo e desempenho registrado">
+      <SectionCard
+        title="Períodos do dia"
+        subtitle="Manhã, tarde, noite e madrugada — por tempo e desempenho registrado"
+      >
         <HoursSection hours={hoursOfDay} empty={filteredSessions.length === 0} />
       </SectionCard>
 
@@ -1010,14 +1328,16 @@ function filterAttempts(
 ) {
   if (isAllRange) {
     return attempts.filter((a) => {
-      if (disciplineId !== "all" && a.disciplineId !== disciplineId && a.disciplineId !== null) return false
+      if (disciplineId !== "all" && a.disciplineId !== disciplineId && a.disciplineId !== null)
+        return false
       return true
     })
   }
   const min = rangeKeys[0]
   const max = rangeKeys[rangeKeys.length - 1]
   return attempts.filter((a) => {
-    if (disciplineId !== "all" && a.disciplineId !== disciplineId && a.disciplineId !== null) return false
+    if (disciplineId !== "all" && a.disciplineId !== disciplineId && a.disciplineId !== null)
+      return false
     if (!a.answeredAt) return true
     const k = dateKeyOf(a.answeredAt, timezone)
     if (!k || !min || !max) return false
@@ -1126,7 +1446,15 @@ function Donut({ value, size }: { value: number | null; size: number }) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-        <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" strokeWidth="3.8" className="text-muted/40" />
+        <circle
+          cx="18"
+          cy="18"
+          r="15.9"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3.8"
+          className="text-muted/40"
+        />
         <circle
           cx="18"
           cy="18"
@@ -1139,7 +1467,10 @@ function Donut({ value, size }: { value: number | null; size: number }) {
           className={value === null ? "opacity-30" : ""}
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center font-black font-mono" style={{ fontSize: size / 4.6 }}>
+      <div
+        className="absolute inset-0 flex items-center justify-center font-black font-mono"
+        style={{ fontSize: size / 4.6 }}
+      >
         {value === null ? "—" : `${v}%`}
       </div>
     </div>
@@ -1147,7 +1478,11 @@ function Donut({ value, size }: { value: number | null; size: number }) {
 }
 
 function HeatmapLegendNote() {
-  return <span className="text-[10px] text-muted-foreground">níveis por percentil de minutos por dia</span>
+  return (
+    <span className="text-[10px] text-muted-foreground">
+      níveis por percentil de minutos por dia
+    </span>
+  )
 }
 
 function formatEvolutionValue(metric: string, value: number): string {
@@ -1181,10 +1516,25 @@ type EvolutionDataPoint = {
 type ChartTooltipProps = {
   active?: boolean
   label?: string
-  payload?: { value?: number; payload?: EvolutionDataPoint & { actualMinutes?: number; plannedMinutes?: number; actualSessions?: number } }[]
+  payload?: {
+    value?: number
+    payload?: EvolutionDataPoint & {
+      actualMinutes?: number
+      plannedMinutes?: number
+      actualSessions?: number
+    }
+  }[]
 }
 
-function EvolutionChart({ data, rangeDays, empty }: { data: EvolutionDataPoint[]; rangeDays: number; empty: boolean }) {
+function EvolutionChart({
+  data,
+  rangeDays,
+  empty,
+}: {
+  data: EvolutionDataPoint[]
+  rangeDays: number
+  empty: boolean
+}) {
   const [metric, setMetric] = useState("minutos")
   const lineBased = metric === "acuracia" || metric === "foco"
   let color = "#2563EB"
@@ -1204,7 +1554,9 @@ function EvolutionChart({ data, rangeDays, empty }: { data: EvolutionDataPoint[]
               key={m.id}
               onClick={() => setMetric(m.id)}
               className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                metric === m.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                metric === m.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {m.label}
@@ -1226,13 +1578,39 @@ function EvolutionChart({ data, rangeDays, empty }: { data: EvolutionDataPoint[]
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} minTickGap={24} />
-              <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={38} tickFormatter={fmt} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={24}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+                width={38}
+                tickFormatter={fmt}
+              />
               <Tooltip content={<EvoTooltip metric={metric} />} />
               {lineBased ? (
-                <Line type="monotone" dataKey={metric} stroke={color} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                <Line
+                  type="monotone"
+                  dataKey={metric}
+                  stroke={color}
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 5 }}
+                />
               ) : (
-                <Area type="monotone" dataKey={metric} stroke={color} strokeWidth={2.5} fill="url(#evoFill)" dot={false} />
+                <Area
+                  type="monotone"
+                  dataKey={metric}
+                  stroke={color}
+                  strokeWidth={2.5}
+                  fill="url(#evoFill)"
+                  dot={false}
+                />
               )}
             </AreaChart>
           </ResponsiveContainer>
@@ -1250,13 +1628,15 @@ function EvoTooltip({ active, payload, label, metric }: ChartTooltipProps & { me
     <div className="rounded-lg border bg-card p-3 shadow-lg text-xs space-y-1">
       <p className="font-semibold mb-1">{label}</p>
       <p>
-        <span className="text-muted-foreground">{EVO_METRICS.find((m) => m.id === metric)?.label}: </span>
-        <span className="font-bold">
-          {formatEvolutionValue(metric, v ?? 0)}
+        <span className="text-muted-foreground">
+          {EVO_METRICS.find((m) => m.id === metric)?.label}:{" "}
         </span>
+        <span className="font-bold">{formatEvolutionValue(metric, v ?? 0)}</span>
       </p>
       {(full?.sessoes ?? 0) > 0 && <p className="text-muted-foreground">{full?.sessoes} sessões</p>}
-      {(full?.questoes ?? 0) > 0 && <p className="text-muted-foreground">{full?.questoes} questões</p>}
+      {(full?.questoes ?? 0) > 0 && (
+        <p className="text-muted-foreground">{full?.questoes} questões</p>
+      )}
     </div>
   )
 }
@@ -1289,9 +1669,17 @@ function PlanTooltip({ active, payload, label }: ChartTooltipProps) {
   return (
     <div className="rounded-lg border bg-card p-3 shadow-lg text-xs space-y-0.5">
       <p className="font-semibold mb-1">{label}</p>
-      <p><span className="text-muted-foreground">Realizado: </span><span className="font-bold">{formatDurationRaw(p?.actualMinutes ?? 0)}</span></p>
-      <p><span className="text-muted-foreground">Planejado: </span><span className="font-bold">{formatDurationRaw(p?.plannedMinutes ?? 0)}</span></p>
-      {(p?.actualSessions ?? 0) > 0 && <p className="text-muted-foreground">{p?.actualSessions} sessões</p>}
+      <p>
+        <span className="text-muted-foreground">Realizado: </span>
+        <span className="font-bold">{formatDurationRaw(p?.actualMinutes ?? 0)}</span>
+      </p>
+      <p>
+        <span className="text-muted-foreground">Planejado: </span>
+        <span className="font-bold">{formatDurationRaw(p?.plannedMinutes ?? 0)}</span>
+      </p>
+      {(p?.actualSessions ?? 0) > 0 && (
+        <p className="text-muted-foreground">{p?.actualSessions} sessões</p>
+      )}
     </div>
   )
 }
@@ -1300,7 +1688,15 @@ function PlanTooltip({ active, payload, label }: ChartTooltipProps) {
 
 type SortKey = "tempo" | "questoes" | "acuracia" | "prioridade" | "erros"
 
-function DisciplinasSection({ stats, totalMinutes: _totalMinutes, empty }: { stats: DisciplineStat[]; totalMinutes: number; empty: boolean }) {
+function DisciplinasSection({
+  stats,
+  totalMinutes: _totalMinutes,
+  empty,
+}: {
+  stats: DisciplineStat[]
+  totalMinutes: number
+  empty: boolean
+}) {
   const [sort, setSort] = useState<SortKey>("tempo")
 
   const sorted = useMemo(() => {
@@ -1326,7 +1722,11 @@ function DisciplinasSection({ stats, totalMinutes: _totalMinutes, empty }: { sta
       title="Desempenho por disciplina"
       subtitle="Fórmulas documentadas: acurácia = acertos ÷ questões · tendência = 2ª metade ÷ 1ª metade do período · classificação pelas regras do painel"
       action={
-        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground print:hidden">
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          className="rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground print:hidden"
+        >
           <option value="tempo">Por tempo</option>
           <option value="questoes">Por questões</option>
           <option value="acuracia">Por acurácia</option>
@@ -1347,12 +1747,16 @@ function DisciplinasSection({ stats, totalMinutes: _totalMinutes, empty }: { sta
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0">
                     <p className="text-xs font-bold truncate">{d.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{d.area ?? "Geral"} · {d.sessions} sessões</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {d.area ?? "Geral"} · {d.sessions} sessões
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <ClassificationChip classification={d.classification} />
                     {d.daysSinceLastStudy !== null && (
-                      <span className={`text-[10px] font-bold ${d.daysSinceLastStudy > 30 ? "text-rose-600" : "text-muted-foreground"}`}>
+                      <span
+                        className={`text-[10px] font-bold ${d.daysSinceLastStudy > 30 ? "text-rose-600" : "text-muted-foreground"}`}
+                      >
                         {d.daysSinceLastStudy === 0 ? "hoje" : `${d.daysSinceLastStudy}d`}
                       </span>
                     )}
@@ -1363,17 +1767,21 @@ function DisciplinasSection({ stats, totalMinutes: _totalMinutes, empty }: { sta
                   <div className="flex-1">
                     <ProgressBar pct={pct} height="h-2.5" />
                   </div>
-                  <span className="text-xs font-black font-mono whitespace-nowrap">{formatDurationRaw(d.minutes)}</span>
+                  <span className="text-xs font-black font-mono whitespace-nowrap">
+                    {formatDurationRaw(d.minutes)}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 text-[11px]">
                   <div>
                     <p className="text-muted-foreground">Questões</p>
                     <p className="font-bold">{d.questions}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Acurácia</p>
-                    <p className="font-bold">{d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}</p>
+                    <p className="font-bold">
+                      {d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Erros</p>
@@ -1381,7 +1789,9 @@ function DisciplinasSection({ stats, totalMinutes: _totalMinutes, empty }: { sta
                   </div>
                   <div>
                     <p className="text-muted-foreground">Foco</p>
-                    <p className="font-bold">{d.focusAvg === null ? "—" : `${Math.round(d.focusAvg)}%`}</p>
+                    <p className="font-bold">
+                      {d.focusAvg === null ? "—" : `${Math.round(d.focusAvg)}%`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Tendência</p>
@@ -1392,8 +1802,13 @@ function DisciplinasSection({ stats, totalMinutes: _totalMinutes, empty }: { sta
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>{Math.round(d.shareOfTotalMinutes)}% do tempo total · atenção {d.attentionScore}/100</span>
-                  <span>páginas {d.pages} · flashcards {d.flashcards}</span>
+                  <span>
+                    {Math.round(d.shareOfTotalMinutes)}% do tempo total · atenção {d.attentionScore}
+                    /100
+                  </span>
+                  <span>
+                    páginas {d.pages} · flashcards {d.flashcards}
+                  </span>
                 </div>
               </div>
             )
@@ -1404,16 +1819,36 @@ function DisciplinasSection({ stats, totalMinutes: _totalMinutes, empty }: { sta
   )
 }
 
-function TendenciaChip({ trend, delta }: { trend: "UP" | "DOWN" | "STABLE"; delta: number | null }) {
-  if (trend === "UP") return <span className="text-emerald-600">▲ {delta === null ? "" : `+${Math.round(delta)}%`}</span>
-  if (trend === "DOWN") return <span className="text-rose-600">▼ {delta === null ? "" : `${Math.round(delta)}%`}</span>
+function TendenciaChip({
+  trend,
+  delta,
+}: {
+  trend: "UP" | "DOWN" | "STABLE"
+  delta: number | null
+}) {
+  if (trend === "UP")
+    return (
+      <span className="text-emerald-600">▲ {delta === null ? "" : `+${Math.round(delta)}%`}</span>
+    )
+  if (trend === "DOWN")
+    return <span className="text-rose-600">▼ {delta === null ? "" : `${Math.round(delta)}%`}</span>
   return <span className="text-muted-foreground">■ estável</span>
 }
 
 // ─── Mapa de erros ──────────────────────────────────────────────────────────
 
-function ErrorMap({ disciplineStats, topicStats, empty }: { disciplineStats: DisciplineStat[]; topicStats: TopicStat[]; empty: boolean }) {
-  const byDiscipline = [...disciplineStats].sort((a, b) => b.wrong - a.wrong).filter((d) => d.wrong > 0)
+function ErrorMap({
+  disciplineStats,
+  topicStats,
+  empty,
+}: {
+  disciplineStats: DisciplineStat[]
+  topicStats: TopicStat[]
+  empty: boolean
+}) {
+  const byDiscipline = [...disciplineStats]
+    .sort((a, b) => b.wrong - a.wrong)
+    .filter((d) => d.wrong > 0)
   const byTopic = [...topicStats].sort((a, b) => b.wrong - a.wrong).slice(0, 5)
 
   if (empty || (byDiscipline.length === 0 && byTopic.length === 0)) {
@@ -1435,7 +1870,10 @@ function ErrorMap({ disciplineStats, topicStats, empty }: { disciplineStats: Dis
             <div key={d.disciplineId} className="flex items-center gap-2 text-xs">
               <span className="w-40 truncate font-semibold">{d.name}</span>
               <div className="flex-1 h-2 bg-muted/40 rounded-full overflow-hidden">
-                <div className="h-full bg-rose-500 rounded-full" style={{ width: `${(d.wrong / maxErr) * 100}%` }} />
+                <div
+                  className="h-full bg-rose-500 rounded-full"
+                  style={{ width: `${(d.wrong / maxErr) * 100}%` }}
+                />
               </div>
               <span className="font-black text-rose-600 w-6 text-right">{d.wrong}</span>
             </div>
@@ -1447,8 +1885,13 @@ function ErrorMap({ disciplineStats, topicStats, empty }: { disciplineStats: Dis
           <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2">Por tópico</p>
           <div className="space-y-1.5">
             {byTopic.map((t) => (
-              <div key={`${t.disciplineId}-${t.topicName}`} className="flex items-center justify-between text-xs border border-border/40 rounded-md px-2.5 py-1.5">
-                <span className="truncate font-medium">{t.topicName} <span className="text-muted-foreground">· {t.disciplineName}</span></span>
+              <div
+                key={`${t.disciplineId}-${t.topicName}`}
+                className="flex items-center justify-between text-xs border border-border/40 rounded-md px-2.5 py-1.5"
+              >
+                <span className="truncate font-medium">
+                  {t.topicName} <span className="text-muted-foreground">· {t.disciplineName}</span>
+                </span>
                 <span className="font-black text-rose-600">{t.wrong} erros</span>
               </div>
             ))}
@@ -1472,14 +1915,21 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
         <EmptyState message="Nenhum item de revisão ainda. Quando o motor de repetição espaçada tiver itens, eles aparecem aqui com a taxa de conclusão." />
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <Metric label="Pendentes" value={revision.totalPending} sub="em fila" />
-            <Metric label="Atrasadas" value={revision.overdue} sub="vencidas" accent={revision.overdue > 0} />
+            <Metric
+              label="Atrasadas"
+              value={revision.overdue}
+              sub="vencidas"
+              accent={revision.overdue > 0}
+            />
             <Metric label="Para hoje" value={revision.dueToday} sub="vencimento de hoje" />
             <Metric label="Concluídas 30d" value={revision.completedLast30} sub="últimos 30 dias" />
             <Metric
               label="Taxa de conclusão"
-              value={revision.completionRate === null ? "—" : `${Math.round(revision.completionRate)}%`}
+              value={
+                revision.completionRate === null ? "—" : `${Math.round(revision.completionRate)}%`
+              }
               sub="concluídas ÷ (concluídas + pendentes)"
             />
           </div>
@@ -1498,7 +1948,11 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
                   {revision.byDiscipline.map((d) => (
                     <tr key={d.disciplineId} className="border-t border-border/40">
                       <td className="py-2 pr-2 font-semibold">{d.name}</td>
-                      <td className={`py-2 pr-2 text-right font-bold ${d.overdue > 0 ? "text-rose-600" : ""}`}>{d.overdue}</td>
+                      <td
+                        className={`py-2 pr-2 text-right font-bold ${d.overdue > 0 ? "text-rose-600" : ""}`}
+                      >
+                        {d.overdue}
+                      </td>
                       <td className="py-2 pr-2 text-right">{d.dueSoon}</td>
                       <td className="py-2 text-right">{d.total}</td>
                     </tr>
@@ -1533,7 +1987,9 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
           <tr className="text-muted-foreground text-[10px] uppercase tracking-wider">
             <th className="text-left py-2 pr-2 font-bold">Comparação</th>
             {CMP_COLUMNS.map((c) => (
-              <th key={c.key} className="text-right py-2 px-1.5 font-bold min-w-16">{c.label}</th>
+              <th key={c.key} className="text-right py-2 px-1.5 font-bold min-w-16">
+                {c.label}
+              </th>
             ))}
           </tr>
         </thead>
@@ -1549,9 +2005,7 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
                 const isPp = c.key === "accuracy" || c.key === "focus"
                 return (
                   <td key={c.key} className="py-2.5 px-1.5 text-right">
-                    <p className="font-bold">
-                      {metricCmpValue(m, c.key)}
-                    </p>
+                    <p className="font-bold">{metricCmpValue(m, c.key)}</p>
                     <p>
                       <DeltaBadge delta={m?.delta ?? null} suffix={isPp ? "pp" : ""} />
                     </p>
@@ -1577,7 +2031,8 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
           <p className="text-xs font-bold">Análise de melhor horário</p>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          {analysis.notEnoughDataMessage ?? "Ainda não temos dados suficientes para identificar seu melhor horário."}
+          {analysis.notEnoughDataMessage ??
+            "Ainda não temos dados suficientes para identificar seu melhor horário."}
         </p>
       </div>
     )
@@ -1601,21 +2056,35 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
           <span className="text-sm font-mono text-muted-foreground">{ob.range}</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Foco médio</p>
-            <p className="text-lg font-black text-foreground">{ob.focusAvg !== null ? `${Math.round(ob.focusAvg)}%` : "—"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Foco médio
+            </p>
+            <p className="text-lg font-black text-foreground">
+              {ob.focusAvg !== null ? `${Math.round(ob.focusAvg)}%` : "—"}
+            </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Acerto</p>
-            <p className="text-lg font-black text-foreground">{ob.accuracy !== null ? `${Math.round(ob.accuracy)}%` : "—"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Acerto
+            </p>
+            <p className="text-lg font-black text-foreground">
+              {ob.accuracy !== null ? `${Math.round(ob.accuracy)}%` : "—"}
+            </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tempo estudado</p>
-            <p className="text-lg font-black text-foreground">{formatDurationRaw(ob.totalMinutes)}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Tempo estudado
+            </p>
+            <p className="text-lg font-black text-foreground">
+              {formatDurationRaw(ob.totalMinutes)}
+            </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Questões</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Questões
+            </p>
             <p className="text-lg font-black text-foreground">{ob.questions}</p>
           </div>
         </div>
@@ -1626,28 +2095,36 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
       </div>
 
       {/* === MELHOR FOCO & MELHOR ACERTO === */}
-      {(bf || ba) && (bf?.period !== ba?.period) && (
+      {(bf || ba) && bf?.period !== ba?.period && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {bf && (
             <div className="rounded-lg border border-border/60 p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="text-base">{"🧠"}</span>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Melhor foco</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Melhor foco
+                </p>
               </div>
               <p className="text-sm font-bold text-foreground">{bf.label}</p>
               <p className="text-xs font-mono text-muted-foreground">{bf.range}</p>
-              <p className="text-lg font-black text-[#2563EB] mt-1">{bf.focusAvg !== null ? `${Math.round(bf.focusAvg)}%` : "—"}</p>
+              <p className="text-lg font-black text-[#2563EB] mt-1">
+                {bf.focusAvg !== null ? `${Math.round(bf.focusAvg)}%` : "—"}
+              </p>
             </div>
           )}
           {ba && (
             <div className="rounded-lg border border-border/60 p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="text-base">{"🎯"}</span>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Melhor acerto</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Melhor acerto
+                </p>
               </div>
               <p className="text-sm font-bold text-foreground">{ba.label}</p>
               <p className="text-xs font-mono text-muted-foreground">{ba.range}</p>
-              <p className="text-lg font-black text-[#2563EB] mt-1">{ba.accuracy !== null ? `${Math.round(ba.accuracy)}%` : "—"}</p>
+              <p className="text-lg font-black text-[#2563EB] mt-1">
+                {ba.accuracy !== null ? `${Math.round(ba.accuracy)}%` : "—"}
+              </p>
             </div>
           )}
         </div>
@@ -1688,16 +2165,22 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
                       )}
                     </td>
                     <td className="py-2.5 px-2 text-right">
-                      <span className={`font-bold ${b.focusAvg !== null ? "text-foreground" : "text-muted-foreground"}`}>
+                      <span
+                        className={`font-bold ${b.focusAvg !== null ? "text-foreground" : "text-muted-foreground"}`}
+                      >
                         {b.focusAvg !== null ? `${Math.round(b.focusAvg)}%` : "—"}
                       </span>
                     </td>
                     <td className="py-2.5 px-2 text-right">
-                      <span className={`font-bold ${b.accuracy !== null ? "text-foreground" : "text-muted-foreground"}`}>
+                      <span
+                        className={`font-bold ${b.accuracy !== null ? "text-foreground" : "text-muted-foreground"}`}
+                      >
                         {b.accuracy !== null ? `${Math.round(b.accuracy)}%` : "—"}
                       </span>
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">{formatDurationRaw(b.totalMinutes)}</td>
+                    <td className="py-2.5 px-2 text-right font-mono font-bold">
+                      {formatDurationRaw(b.totalMinutes)}
+                    </td>
                     <td className="py-2.5 px-2 text-right font-bold">{b.sessions}</td>
                   </tr>
                 )
@@ -1711,7 +2194,10 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
           {analysis.buckets.map((b) => {
             const isBest = ob.period === b.period
             return (
-              <div key={b.period} className={`text-[10px] ${isBest ? "text-[#2563EB] font-semibold" : "text-muted-foreground"}`}>
+              <div
+                key={b.period}
+                className={`text-[10px] ${isBest ? "text-[#2563EB] font-semibold" : "text-muted-foreground"}`}
+              >
                 <span className="font-mono">{b.range}</span>
                 {" — "}
                 <span>Tempo: {formatDurationRaw(b.totalMinutes)}</span>
@@ -1742,14 +2228,22 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {hours.map((h) => (
-        <div key={h.period} className={`rounded-lg border p-3 ${h.best ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/60"}`}>
+        <div
+          key={h.period}
+          className={`rounded-lg border p-3 ${h.best ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/60"}`}
+        >
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold">{h.label}</p>
-            {h.best && <span className="text-[10px] font-black text-emerald-600">MELHOR RENDIMENTO</span>}
+            {h.best && (
+              <span className="text-[10px] font-black text-emerald-600">MELHOR RENDIMENTO</span>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-2">
             <div className="flex-1 h-2 bg-muted/40 rounded-full overflow-hidden">
-              <div className="h-full bg-[#2563EB] rounded-full" style={{ width: `${(h.minutes / maxMinutes) * 100}%` }} />
+              <div
+                className="h-full bg-[#2563EB] rounded-full"
+                style={{ width: `${(h.minutes / maxMinutes) * 100}%` }}
+              />
             </div>
             <span className="text-xs font-black font-mono">{formatDurationRaw(h.minutes)}</span>
           </div>
@@ -1764,12 +2258,15 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
             </div>
             <div>
               <p className="text-muted-foreground">Acurácia</p>
-              <p className="font-bold">{h.accuracy === null ? "—" : `${Math.round(h.accuracy)}%`}</p>
+              <p className="font-bold">
+                {h.accuracy === null ? "—" : `${Math.round(h.accuracy)}%`}
+              </p>
             </div>
           </div>
           {h.best && (
             <p className="text-[10px] text-emerald-600 mt-1.5">
-              Melhor desempenho registrado (maior acurácia com ≥ 5 questões) — considere fixar a prática nesse horário.
+              Melhor desempenho registrado (maior acurácia com ≥ 5 questões) — considere fixar a
+              prática nesse horário.
             </p>
           )}
         </div>
@@ -1780,7 +2277,18 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
 
 // ─── Relatório ──────────────────────────────────────────────────────────────
 
-function ReportTable({ rows }: { rows: { id: string; label: string; current: string; previous: string; deltaLabel: string; positive: boolean }[] }) {
+function ReportTable({
+  rows,
+}: {
+  rows: {
+    id: string
+    label: string
+    current: string
+    previous: string
+    deltaLabel: string
+    positive: boolean
+  }[]
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -1798,7 +2306,11 @@ function ReportTable({ rows }: { rows: { id: string; label: string; current: str
               <td className="py-2 pr-2 font-semibold">{r.label}</td>
               <td className="py-2 pr-2 text-right font-bold">{r.current}</td>
               <td className="py-2 pr-2 text-right text-muted-foreground">{r.previous}</td>
-              <td className={`py-2 text-right font-black ${r.positive ? "text-emerald-600" : "text-rose-600"}`}>{r.deltaLabel}</td>
+              <td
+                className={`py-2 text-right font-black ${r.positive ? "text-emerald-600" : "text-rose-600"}`}
+              >
+                {r.deltaLabel}
+              </td>
             </tr>
           ))}
         </tbody>

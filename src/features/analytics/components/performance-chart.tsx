@@ -1,15 +1,16 @@
 "use client"
 
 import { useState } from "react"
+
 import {
-  LineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
 } from "recharts"
 
 type Period = "7d" | "30d" | "60d" | "6m" | "12m"
@@ -79,11 +80,13 @@ export function PerformanceChart({ initialData = [] }: { initialData?: Performan
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h3 className="font-semibold text-sm">Evolução de Desempenho</h3>
-          <p className="text-xs text-muted-foreground">Aproveitamento e volume de questões ao longo do tempo</p>
+          <p className="text-xs text-muted-foreground">
+            Aproveitamento e volume de questões ao longo do tempo
+          </p>
         </div>
 
         {/* Period filter */}
-        <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+        <div className="flex gap-1 bg-muted/50 p-1 rounded-lg flex-wrap">
           {PERIODS.map((p) => (
             <button
               key={p.id}
@@ -101,7 +104,7 @@ export function PerformanceChart({ initialData = [] }: { initialData?: Performan
       </div>
 
       {/* Rendimento filter */}
-      <div className="flex items-center gap-3 text-xs">
+      <div className="flex items-center gap-3 text-xs flex-wrap">
         <span className="text-muted-foreground font-medium">% Mínimo:</span>
         <div className="flex gap-1">
           {[0, 40, 60, 70, 80].map((v) => (
@@ -129,53 +132,55 @@ export function PerformanceChart({ initialData = [] }: { initialData?: Performan
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              tickLine={false}
-              axisLine={false}
-              width={30}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }}
-              formatter={(value) => <span style={{ color: "hsl(var(--muted-foreground))" }}>{value}</span>}
-            />
-            <Line
-              type="monotone"
-              dataKey="aproveitamento"
-              name="Aproveitamento %"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2.5}
-              dot={false}
-              activeDot={{ r: 5 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="acertos"
-              name="Acertos"
-              stroke="#22c55e"
-              strokeWidth={1.5}
-              dot={false}
-              strokeDasharray="4 2"
-            />
-            <Line
-              type="monotone"
-              dataKey="erros"
-              name="Erros"
-              stroke="#ef4444"
-              strokeWidth={1.5}
-              dot={false}
-              strokeDasharray="4 2"
-            />
-          </LineChart>
-        </ResponsiveContainer>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+                width={30}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }}
+                formatter={(value) => (
+                  <span style={{ color: "hsl(var(--muted-foreground))" }}>{value}</span>
+                )}
+              />
+              <Line
+                type="monotone"
+                dataKey="aproveitamento"
+                name="Aproveitamento %"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="acertos"
+                name="Acertos"
+                stroke="#22c55e"
+                strokeWidth={1.5}
+                dot={false}
+                strokeDasharray="4 2"
+              />
+              <Line
+                type="monotone"
+                dataKey="erros"
+                name="Erros"
+                stroke="#ef4444"
+                strokeWidth={1.5}
+                dot={false}
+                strokeDasharray="4 2"
+              />
+            </LineChart>
+          </ResponsiveContainer>
         )}
       </div>
     </div>
