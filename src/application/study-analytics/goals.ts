@@ -8,9 +8,11 @@ export function getWeeklyGoalProgress(ctx: AnalyticsContext, weeklyTargetHours: 
   return ctx.getCache('weekly_goal', () => {
     const { weeklyMinutes } = getBaseAggregations(ctx)
     
-    const targetMinutes = weeklyTargetHours ? weeklyTargetHours * 60 : 0
+    // Sanity check: se weeklyTargetHours for > 168 (horas semanais normais), foi passado em minutos
+    const safeHours = weeklyTargetHours && weeklyTargetHours > 168 ? weeklyTargetHours / 60 : weeklyTargetHours
+    const targetMinutes = safeHours && safeHours > 0 ? Math.round(safeHours * 60) : 0
     const percentage = targetMinutes > 0 
-      ? Math.min(100, Math.round((weeklyMinutes / targetMinutes) * 100))
+      ? Math.round((weeklyMinutes / targetMinutes) * 100)
       : 0
       
     const remainingMinutes = targetMinutes > 0 ? Math.max(0, targetMinutes - weeklyMinutes) : 0
@@ -32,9 +34,11 @@ export function getDailyGoalProgress(ctx: AnalyticsContext, weeklyTargetHours: n
   return ctx.getCache('daily_goal', () => {
     const { dailyMinutes } = getBaseAggregations(ctx)
     
-    const targetMinutes = weeklyTargetHours ? Math.round((weeklyTargetHours * 60) / activeDaysPerWeek) : 0
+    const safeHours = weeklyTargetHours && weeklyTargetHours > 168 ? weeklyTargetHours / 60 : weeklyTargetHours
+    const safeDays = Math.max(1, Math.min(7, activeDaysPerWeek))
+    const targetMinutes = safeHours && safeHours > 0 ? Math.round((safeHours * 60) / safeDays) : 0
     const percentage = targetMinutes > 0 
-      ? Math.min(100, Math.round((dailyMinutes / targetMinutes) * 100))
+      ? Math.round((dailyMinutes / targetMinutes) * 100)
       : 0
       
     const remainingMinutes = targetMinutes > 0 ? Math.max(0, targetMinutes - dailyMinutes) : 0

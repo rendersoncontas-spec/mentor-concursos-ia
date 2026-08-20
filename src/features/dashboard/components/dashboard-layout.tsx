@@ -63,7 +63,7 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
     if (result.success) {
       toast.success("Home personalizada com sucesso!")
     } else {
-      toast.error("Erro ao salvar personalização.")
+      toast.error(result.error || "Erro ao salvar personalização.")
     }
   }
 

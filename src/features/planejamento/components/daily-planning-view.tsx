@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dialog"
 import { isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
+import { cn } from "@/lib/utils"
 
 import { type StudyCycleBlock } from "./planning-view"
 
@@ -440,7 +441,7 @@ export function DailyPlanningView({
     lastEvent && !lastEvent.revertedAt && !replanInfo?.replanPaused && !replanInfo?.sanityInvalid
   const showPendencyPanel =
     (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
-    (showPendencies || !replanInfo?.enabled) &&
+    showPendencies &&
     !replanInfo?.sanityInvalid
 
   const renderEmptyState = () => {
@@ -664,7 +665,26 @@ export function DailyPlanningView({
           </span>
         </div>
 
-        <div className="bg-amber-500/10 rounded-xl p-2.5 px-3.5 flex items-center justify-between">
+        <div
+          role={(replanInfo?.totalPendingMinutes ?? 0) > 0 ? "button" : undefined}
+          onClick={() => {
+            if ((replanInfo?.totalPendingMinutes ?? 0) > 0) {
+              setShowPendencies((v) => !v)
+            }
+          }}
+          className={cn(
+            "bg-amber-500/10 rounded-xl p-2.5 px-3.5 flex items-center justify-between",
+            (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
+              "cursor-pointer hover:bg-amber-500/20 transition-colors",
+          )}
+          title={
+            (replanInfo?.totalPendingMinutes ?? 0) > 0
+              ? showPendencies
+                ? "Clique para ocultar detalhes"
+                : "Clique para ver detalhes das pendências"
+              : undefined
+          }
+        >
           <span className="text-[10px] font-extrabold uppercase text-amber-600 tracking-wider">
             Pendente
           </span>

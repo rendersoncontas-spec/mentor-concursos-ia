@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { buildIsoFromSaoPauloDateTime } from "@/lib/sao-paulo"
 
 export async function saveStudySessionAction(data: Record<string, unknown>) {
   try {
@@ -170,14 +171,21 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       insertPayload["started_at"] = startedAtISO
       insertPayload["finished_at"] = finishedAtISO
     } else if (data["study_date"]) {
-      // Manual com data retroativa
-      insertPayload["started_at"] = new Date(String(data["study_date"]) + "T12:00:00").toISOString()
-      insertPayload["finished_at"] = insertPayload["started_at"]
+      // Manual com data e horário informados
+      const studyDate = String(data["study_date"]).trim()
+      const studyTime = data["study_time"] ? String(data["study_time"]).trim() : null
+      const startedAt = buildIsoFromSaoPauloDateTime(studyDate, studyTime)
+      insertPayload["started_at"] = startedAt
+      const durationMs = (activeMinutesFinal || 0) * 60 * 1000
+      insertPayload["finished_at"] = new Date(
+        new Date(startedAt).getTime() + durationMs,
+      ).toISOString()
     } else {
-      // Manual sem data específica
+      // Manual sem data específica -> horário atual
       const now = new Date().toISOString()
       insertPayload["started_at"] = now
-      insertPayload["finished_at"] = now
+      const durationMs = (activeMinutesFinal || 0) * 60 * 1000
+      insertPayload["finished_at"] = new Date(new Date(now).getTime() + durationMs).toISOString()
     }
 
     // 6. Salva no study_history e retorna a sessão REAL criada (com disciplina),

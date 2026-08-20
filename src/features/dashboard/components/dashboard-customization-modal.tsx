@@ -61,7 +61,7 @@ export function DashboardCustomizationModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 my-4">
-          {editedLayout
+          {[...editedLayout]
             .sort((a, b) => (WIDGET_REGISTRY[a.widget_id]?.name || "").localeCompare(WIDGET_REGISTRY[b.widget_id]?.name || ""))
             .map((item) => {
               const widgetInfo = WIDGET_REGISTRY[item.widget_id]

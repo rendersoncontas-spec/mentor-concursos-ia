@@ -74,6 +74,14 @@ function dedupeUserDisciplines(rows: UserDisciplineRow[], activeTargetId: string
   })
 }
 
+export async function invalidateStatisticsCenterCache(userId?: string): Promise<void> {
+  if (userId) {
+    cache.delete(userId)
+  } else {
+    cache.clear()
+  }
+}
+
 async function fetchActivePlan(supabase: Supabase, userId: string): Promise<ActivePlan | null> {
   const { data: plan } = await supabase
     .from("study_plans")
@@ -101,14 +109,26 @@ async function fetchActivePlan(supabase: Supabase, userId: string): Promise<Acti
 
   if (planItems.length === 0) return null
 
-  // Carga semanal = soma da duração dos itens do plano (colunas reais de study_plans
-  // não possuem metas; as metas semanais do perfil ficam em profiles).
-  const weeklyHours = planItems.reduce((acc, it) => acc + it.durationMinutes, 0)
+  // Busca as metas configuradas pelo usuário no perfil
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("weekly_study_hours, weekly_questions_goal, weekly_study_days_goal")
+    .eq("id", userId)
+    .maybeSingle()
+
+  // Carga semanal em HORAS:
+  // Se o usuário tem weekly_study_hours no perfil (ex: 25h), usamos esse valor exato.
+  // Caso contrário, calculamos pela soma dos minutos dos blocos convertida para horas (ex: 1260m / 60 = 21h).
+  const totalItemMinutes = planItems.reduce((acc, it) => acc + it.durationMinutes, 0)
+  const calculatedHours = totalItemMinutes > 0 ? Math.round(totalItemMinutes / 60) : null
+  const weeklyHours = (profile?.weekly_study_hours && profile.weekly_study_hours > 0)
+    ? profile.weekly_study_hours
+    : calculatedHours
 
   return {
-    weeklyHours: weeklyHours > 0 ? weeklyHours : null,
-    weeklyQuestions: null,
-    weeklyDays: null,
+    weeklyHours: weeklyHours && weeklyHours > 0 ? weeklyHours : null,
+    weeklyQuestions: profile?.weekly_questions_goal ?? null,
+    weeklyDays: profile?.weekly_study_days_goal ?? null,
     items: planItems,
   }
 }

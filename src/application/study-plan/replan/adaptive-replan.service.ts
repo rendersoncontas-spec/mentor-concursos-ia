@@ -37,11 +37,9 @@ export const FEATURE = "adaptive-planning"
 // ---------------------------------------------------------------------------
 // REGRA 0 — KILL-SWITCH DE MANUTENÇÃO
 // ---------------------------------------------------------------------------
-// Pausado POR PADRÃO até a validação de idempotência passar. Com o replan
-// pausado NENHUM novo bloco é criado e NENHUMA pendência é redistribuída
-// (apenas leitura/auditoria). Reativar definindo ADAPTIVE_REPLAN_MAINTENANCE
-// como "false" no ambiente.
-export const REPLAN_MAINTENANCE_PAUSED = process.env["ADAPTIVE_REPLAN_MAINTENANCE"] !== "false"
+// Ativo por padrão. Caso seja necessário pausar em ambiente de produção,
+// defina ADAPTIVE_REPLAN_MAINTENANCE="true" no ambiente.
+export const REPLAN_MAINTENANCE_PAUSED = process.env["ADAPTIVE_REPLAN_MAINTENANCE"] === "true"
 
 // ---------------------------------------------------------------------------
 // Tipos de apoio

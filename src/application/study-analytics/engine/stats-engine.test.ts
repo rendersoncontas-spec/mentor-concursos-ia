@@ -556,6 +556,155 @@ test("computePlanning sem plano retorna hasPlan false", () => {
   assert.equal(p.adherencePct, null)
 })
 
+test("computePlanning: cenário real 25h semanais e 6h09min estudados (369 min) -> 24.6%", () => {
+  const plan: ActivePlan = {
+    weeklyHours: 25,
+    weeklyQuestions: 50,
+    weeklyDays: 5,
+    items: [
+      { dayOfWeek: 1, durationMinutes: 300, disciplineId: "d1" },
+      { dayOfWeek: 2, durationMinutes: 300, disciplineId: "d2" },
+      { dayOfWeek: 3, durationMinutes: 300, disciplineId: "d3" },
+      { dayOfWeek: 4, durationMinutes: 300, disciplineId: "d4" },
+      { dayOfWeek: 5, durationMinutes: 300, disciplineId: "d5" },
+    ],
+  }
+  const buckets: DailyBucket[] = lastNDays(7, NOW, TZ).map((date) => {
+    let minutes = 0
+    // Simula 6h09min = 369 minutos estudados na semana
+    if (date === "2026-08-10") minutes = 189
+    else if (date === "2026-08-11") minutes = 180
+    return {
+      date,
+      minutes,
+      activeMinutes: minutes,
+      pausedMinutes: 0,
+      sessions: minutes > 0 ? 1 : 0,
+      completedSessions: minutes > 0 ? 1 : 0,
+      interruptedSessions: 0,
+      pages: 0,
+      questions: 10,
+      correct: 8,
+      wrong: 2,
+      accuracy: 80,
+      flashcards: 0,
+      focusSum: 0,
+      focusCount: 0,
+      focusAvg: null,
+      attempts: 10,
+    }
+  })
+  const p = computePlanning(plan, buckets, NOW, TZ)
+  assert.equal(p.hasPlan, true)
+  assert.equal(p.weeklyTargetMinutes, 1500) // 25h = 1500 min
+  assert.equal(p.actualWeekMinutes, 369)   // 6h09min = 369 min
+  assert.ok(Math.abs((p.adherencePct ?? 0) - 24.6) < 0.1) // 369 / 1500 = 24.6%
+})
+
+test("computePlanning: cenário 20h meta e 10h estudadas -> 50% de aderência", () => {
+  const plan: ActivePlan = {
+    weeklyHours: 20,
+    weeklyQuestions: null,
+    weeklyDays: null,
+    items: [{ dayOfWeek: 1, durationMinutes: 1200, disciplineId: "d1" }],
+  }
+  const buckets: DailyBucket[] = [{
+    date: "2026-08-10",
+    minutes: 600, // 10h
+    activeMinutes: 600,
+    pausedMinutes: 0,
+    sessions: 2,
+    completedSessions: 2,
+    interruptedSessions: 0,
+    pages: 0,
+    questions: 0,
+    correct: 0,
+    wrong: 0,
+    accuracy: null,
+    flashcards: 0,
+    focusSum: 0,
+    focusCount: 0,
+    focusAvg: null,
+    attempts: 0,
+  }]
+  const p = computePlanning(plan, buckets, NOW, TZ)
+  assert.equal(p.weeklyTargetMinutes, 1200) // 20h = 1200 min
+  assert.equal(p.actualWeekMinutes, 600)
+  assert.equal(p.adherencePct, 50)
+})
+
+test("computePlanning: cenário 25h meta e 25h estudadas -> 100% de aderência", () => {
+  const plan: ActivePlan = {
+    weeklyHours: 25,
+    weeklyQuestions: null,
+    weeklyDays: null,
+    items: [{ dayOfWeek: 1, durationMinutes: 1500, disciplineId: "d1" }],
+  }
+  const buckets: DailyBucket[] = [{
+    date: "2026-08-10",
+    minutes: 1500, // 25h
+    activeMinutes: 1500,
+    pausedMinutes: 0,
+    sessions: 5,
+    completedSessions: 5,
+    interruptedSessions: 0,
+    pages: 0,
+    questions: 0,
+    correct: 0,
+    wrong: 0,
+    accuracy: null,
+    flashcards: 0,
+    focusSum: 0,
+    focusCount: 0,
+    focusAvg: null,
+    attempts: 0,
+  }]
+  const p = computePlanning(plan, buckets, NOW, TZ)
+  assert.equal(p.adherencePct, 100)
+})
+
+test("computePlanning: cenário 25h meta e 30h estudadas -> 120% de aderência (sem corte a 100%)", () => {
+  const plan: ActivePlan = {
+    weeklyHours: 25,
+    weeklyQuestions: null,
+    weeklyDays: null,
+    items: [{ dayOfWeek: 1, durationMinutes: 1500, disciplineId: "d1" }],
+  }
+  const buckets: DailyBucket[] = [{
+    date: "2026-08-10",
+    minutes: 1800, // 30h
+    activeMinutes: 1800,
+    pausedMinutes: 0,
+    sessions: 6,
+    completedSessions: 6,
+    interruptedSessions: 0,
+    pages: 0,
+    questions: 0,
+    correct: 0,
+    wrong: 0,
+    accuracy: null,
+    flashcards: 0,
+    focusSum: 0,
+    focusCount: 0,
+    focusAvg: null,
+    attempts: 0,
+  }]
+  const p = computePlanning(plan, buckets, NOW, TZ)
+  assert.equal(p.adherencePct, 120) // 1800 / 1500 = 120%
+})
+
+test("computePlanning: proteção defensiva se weeklyHours for >168 (minutos passados por engano)", () => {
+  const plan: ActivePlan = {
+    weeklyHours: 1260, // 1260 minutos passados por engano (21h)
+    weeklyQuestions: null,
+    weeklyDays: null,
+    items: [{ dayOfWeek: 1, durationMinutes: 1260, disciplineId: "d1" }],
+  }
+  const p = computePlanning(plan, [], NOW, TZ)
+  // 1260 minutos = 21h, NUNCA 75.600 minutos / 1260h
+  assert.equal(p.weeklyTargetMinutes, 1260)
+})
+
 // ─── Revisões ───────────────────────────────────────────────────────────────
 
 test("computeRevisionStatistics classifica por vencimento", () => {

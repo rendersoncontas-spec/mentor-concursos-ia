@@ -42,17 +42,28 @@ export async function getDashboardLayoutAction(): Promise<{
       .eq("user_id", user.id)
       .order("position_order")
 
-    if (error || !data || data.length === 0) {
-      return { success: true, data: getDashboardLayoutConfig() }
-    }
+    let loadedLayout: WidgetConfigItem[] = []
 
-    const loadedLayout: WidgetConfigItem[] = data.map((item) => ({
-      widget_id: item.widget_id,
-      position_order: item.position_order,
-      col_span: Math.min(3, Math.max(1, item.col_span)) as 1 | 2 | 3,
-      row_span: item.row_span || 1,
-      visible: item.visible,
-    }))
+    if (!error && data && data.length > 0) {
+      loadedLayout = data.map((item) => ({
+        widget_id: item.widget_id,
+        position_order: item.position_order,
+        col_span: (Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3),
+        row_span: item.row_span || 1,
+        visible: Boolean(item.visible),
+      }))
+    } else if (user.user_metadata && Array.isArray(user.user_metadata["dashboard_layout"])) {
+      // Fallback: carregar de user_metadata
+      loadedLayout = (user.user_metadata["dashboard_layout"] as WidgetConfigItem[]).map((item, idx) => ({
+        widget_id: item.widget_id,
+        position_order: item.position_order ?? idx + 1,
+        col_span: (Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3),
+        row_span: item.row_span || 1,
+        visible: Boolean(item.visible),
+      }))
+    } else {
+      loadedLayout = getDashboardLayoutConfig()
+    }
 
     // Garante que novos widgets criados no futuro estejam presentes na lista do usuário
     const existingIds = new Set(loadedLayout.map((w) => w.widget_id))
@@ -83,19 +94,25 @@ export async function saveDashboardLayoutAction(
       user_id: user.id,
       widget_id: item.widget_id,
       position_order: index + 1,
-      col_span: item.col_span,
+      col_span: Math.min(3, Math.max(1, item.col_span || 1)),
       row_span: item.row_span || 1,
-      visible: item.visible,
+      visible: Boolean(item.visible),
       updated_at: new Date().toISOString(),
     }))
 
-    const { error } = await supabase
+    // 1. Tenta salvar na tabela user_dashboard_layouts se existir
+    const { error: dbError } = await supabase
       .from("user_dashboard_layouts")
       .upsert(recordsToUpsert, { onConflict: "user_id,widget_id" })
 
-    if (error) {
-      console.error("Erro ao salvar layout no Supabase:", error)
-      return { success: false, error: "Falha ao salvar no banco de dados." }
+    // 2. Salva em user_metadata como fallback resiliente garantido
+    const { error: metaError } = await supabase.auth.updateUser({
+      data: { dashboard_layout: recordsToUpsert },
+    })
+
+    if (dbError && metaError) {
+      console.error("Erro ao salvar layout no Supabase e em user_metadata:", { dbError, metaError })
+      return { success: false, error: "Falha ao salvar personalização no banco." }
     }
 
     return { success: true }
@@ -116,7 +133,18 @@ export async function resetDashboardLayoutAction(): Promise<{
       data: { user },
     } = await supabase.auth.getUser()
     if (user) {
-      await supabase.from("user_dashboard_layouts").delete().eq("user_id", user.id)
+      try {
+        await supabase.from("user_dashboard_layouts").delete().eq("user_id", user.id)
+      } catch {
+        // Ignora se tabela não existir
+      }
+      try {
+        await supabase.auth.updateUser({
+          data: { dashboard_layout: null },
+        })
+      } catch {
+        // Ignora
+      }
     }
     return { success: true, data: getDashboardLayoutConfig() }
   } catch (err) {

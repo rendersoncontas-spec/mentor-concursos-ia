@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
+import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 import { weeklyGoalsSchema, type WeeklyGoalsInput } from "./goals.schema"
 
 export async function saveWeeklyGoalsAction(data: WeeklyGoalsInput) {
@@ -31,7 +32,9 @@ export async function saveWeeklyGoalsAction(data: WeeklyGoalsInput) {
       return { success: false, error: "Falha ao salvar metas." }
     }
 
+    await invalidateStatisticsCenterCache(userData.user.id)
     revalidatePath("/dashboard")
+    revalidatePath("/estatisticas")
     return { success: true }
   } catch (err: unknown) {
     console.error("Erro na server action de metas:", err)

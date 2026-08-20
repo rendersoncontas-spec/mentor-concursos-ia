@@ -45,6 +45,11 @@ export function getTimeInSaoPaulo(value: string | Date | null | undefined): stri
   return timeFormatter.format(date).replace("24:", "00:")
 }
 
+/** Retorna o horário atual "HH:mm" no fuso de São Paulo. */
+export function currentTimeInSaoPaulo(): string {
+  return timeFormatter.format(new Date()).replace("24:", "00:")
+}
+
 /** Formata "YYYY-MM-DD" como "DD/MM/YYYY". */
 export function formatDayLabel(yyyyMmDd: string): string {
   const [y, m, d] = yyyyMmDd.split("-")
@@ -56,4 +61,25 @@ export function formatDayLabel(yyyyMmDd: string): string {
 export function formatStudyDateInSaoPaulo(value: string | Date | null | undefined): string {
   const day = getDayInSaoPaulo(value)
   return day ? formatDayLabel(day) : ""
+}
+
+/**
+ * Converte data "YYYY-MM-DD" e hora "HH:mm" no fuso de São Paulo (UTC-3) para ISO string UTC.
+ * Se a hora não for informada, usa o horário atual de São Paulo.
+ */
+export function buildIsoFromSaoPauloDateTime(
+  dateStr?: string | null,
+  timeStr?: string | null,
+): string {
+  const d = dateStr?.trim() || todayKeyInSaoPaulo()
+  let t = timeStr?.trim()
+  if (!t) {
+    t = currentTimeInSaoPaulo()
+  }
+  const timeWithSec = t.length === 5 ? `${t}:00` : t.length === 8 ? t : `${t}:00`
+  const dateObj = new Date(`${d}T${timeWithSec}-03:00`)
+  if (isNaN(dateObj.getTime())) {
+    return new Date().toISOString()
+  }
+  return dateObj.toISOString()
 }

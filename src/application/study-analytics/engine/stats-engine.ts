@@ -1997,7 +1997,22 @@ export function computePlanning(
     }
   }
 
-  const weeklyTargetMinutes = Math.max(0, Math.round((plan.weeklyHours ?? 0) * 60))
+  // Carga semanal em minutos:
+  // 1. Se plan.weeklyHours estiver definido e <= 168 (horas semanais normais), converte para minutos (horas * 60).
+  // 2. Se plan.weeklyHours for > 168 (horas totais possíveis na semana = 168), trata como valor já em minutos (defensivo).
+  // 3. Se plan.weeklyHours for null/0, calcula pela soma da duração dos itens do plano (que já são em minutos).
+  let weeklyTargetMinutes = 0
+  if (typeof plan.weeklyHours === "number" && plan.weeklyHours > 0) {
+    if (plan.weeklyHours > 168) {
+      weeklyTargetMinutes = Math.round(plan.weeklyHours)
+    } else {
+      weeklyTargetMinutes = Math.round(plan.weeklyHours * 60)
+    }
+  } else {
+    const itemsSum = plan.items.reduce((acc, it) => acc + (it.durationMinutes || 0), 0)
+    weeklyTargetMinutes = Math.max(0, Math.round(itemsSum))
+  }
+
   const weeklyTargetQuestions = Math.max(0, plan.weeklyQuestions ?? 0)
   const weeklyTargetDays = Math.max(0, plan.weeklyDays ?? 0)
 

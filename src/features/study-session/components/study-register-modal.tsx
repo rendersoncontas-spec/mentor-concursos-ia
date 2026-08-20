@@ -33,6 +33,13 @@ import {
 } from "@/application/study-session/get-disciplines.action"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
+import {
+  buildIsoFromSaoPauloDateTime,
+  currentTimeInSaoPaulo,
+  getDayInSaoPaulo,
+  getTimeInSaoPaulo,
+  todayKeyInSaoPaulo,
+} from "@/lib/sao-paulo"
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -98,6 +105,7 @@ const sessionSchema = z
     manual_minutes_field: z.coerce.number().min(0).max(59).optional(),
     manual_seconds: z.coerce.number().min(0).max(59).optional(),
     study_date: z.string().optional(),
+    study_time: z.string().optional(),
     duration_minutes: z.coerce.number().min(1).optional(),
   })
   .refine(
@@ -119,23 +127,26 @@ const sessionSchema = z
   .refine(
     (data) => {
       if (data.is_manual_mode) {
-        const totalMinutes =
-          (data.manual_hours || 0) * 60 +
-          (data.manual_minutes_field || 0) +
-          (data.manual_seconds || 0) / 60
-        return totalMinutes >= 1
+        const totalSec =
+          (data.manual_hours || 0) * 3600 +
+          (data.manual_minutes_field || 0) * 60 +
+          (data.manual_seconds || 0)
+        return totalSec > 0
       }
       return true
     },
-    { message: "Tempo mínimo de 1 minuto", path: ["manual_minutes_field"] },
+    {
+      message: "Duração deve ser maior que zero",
+      path: ["manual_minutes_field"],
+    },
   )
 
-type SessionFormValues = z.infer<typeof sessionSchema>
+export type SessionFormValues = z.infer<typeof sessionSchema>
 
 interface StudyRegisterModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  sessionToEdit?: StudyHistory & { disciplines?: { name?: string } | null }
+  sessionToEdit?: SavedStudySession | null
   mode?: "create" | "edit"
 }
 
@@ -203,7 +214,8 @@ export function StudyRegisterModal({
       manual_hours: 0,
       manual_minutes_field: 0,
       manual_seconds: 0,
-      study_date: new Date().toISOString().split("T")[0],
+      study_date: todayKeyInSaoPaulo(),
+      study_time: currentTimeInSaoPaulo(),
     },
   })
 
@@ -215,6 +227,7 @@ export function StudyRegisterModal({
   const watchManualHours = useWatch({ control: form.control, name: "manual_hours" }) || 0
   const watchManualMinutes = useWatch({ control: form.control, name: "manual_minutes_field" }) || 0
   const watchStudyDate = useWatch({ control: form.control, name: "study_date" })
+  const watchStudyTime = useWatch({ control: form.control, name: "study_time" })
 
   // Pre-fill form when entering edit mode
   useEffect(() => {
@@ -243,8 +256,11 @@ export function StudyRegisterModal({
         manual_minutes_field: (sessionToEdit.duration_minutes || 0) % 60,
         manual_seconds: 0,
         study_date: sessionToEdit.started_at
-          ? new Date(sessionToEdit.started_at).toISOString().split("T")[0]
-          : new Date().toISOString().split("T")[0],
+          ? getDayInSaoPaulo(sessionToEdit.started_at)
+          : todayKeyInSaoPaulo(),
+        study_time: sessionToEdit.started_at
+          ? getTimeInSaoPaulo(sessionToEdit.started_at)
+          : currentTimeInSaoPaulo(),
       })
     } else if (open && !isEditMode) {
       form.reset({
@@ -268,7 +284,8 @@ export function StudyRegisterModal({
         manual_hours: 0,
         manual_minutes_field: 0,
         manual_seconds: 0,
-        study_date: new Date().toISOString().split("T")[0],
+        study_date: todayKeyInSaoPaulo(),
+        study_time: currentTimeInSaoPaulo(),
       })
     }
   }, [form, open, isEditMode, sessionToEdit])
@@ -372,10 +389,6 @@ export function StudyRegisterModal({
           metadata,
         }
 
-        if (data.study_date) {
-          updatePayload["started_at"] = new Date(data.study_date + "T12:00:00").toISOString()
-        }
-
         const totalMinutes =
           (Number(data.manual_hours) || 0) * 60 +
           (Number(data.manual_minutes_field) || 0) +
@@ -385,10 +398,15 @@ export function StudyRegisterModal({
         updatePayload["active_minutes"] = totalMinutes
         updatePayload["paused_minutes"] = 0
 
-        const startDateStr = updatePayload["started_at"] || sessionToEdit.started_at
-        if (startDateStr) {
+        if (data.study_date) {
+          const startedAt = buildIsoFromSaoPauloDateTime(data.study_date, data.study_time)
+          updatePayload["started_at"] = startedAt
           updatePayload["finished_at"] = new Date(
-            new Date(String(startDateStr)).getTime() + totalMinutes * 60 * 1000,
+            new Date(startedAt).getTime() + totalMinutes * 60 * 1000,
+          ).toISOString()
+        } else if (sessionToEdit.started_at) {
+          updatePayload["finished_at"] = new Date(
+            new Date(sessionToEdit.started_at).getTime() + totalMinutes * 60 * 1000,
           ).toISOString()
         }
 
@@ -481,6 +499,7 @@ export function StudyRegisterModal({
             focusPercentage: null,
             completedCycles: 0,
             study_date: data.study_date,
+            study_time: data.study_time,
           }
 
           const res = await saveStudySessionAction(directPayload)
@@ -558,10 +577,84 @@ export function StudyRegisterModal({
 
   const renderDynamicFields = () => {
     if (
+      watchType === "TEORIA" ||
+      watchType === "REVISAO" ||
+      watchType === "LEITURA" ||
+      watchType === "RESUMO"
+    ) {
+      return (
+        <div className="grid grid-cols-3 gap-2">
+          <FormField
+            control={form.control}
+            name="pages_read"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground font-medium truncate block" title="Páginas Estudadas">
+                  Páginas
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    className="h-8 text-xs font-mono"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="questions_answered"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground font-medium truncate block" title="Questões Respondidas">
+                  Questões
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    className="h-8 text-xs font-mono"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="questions_correct"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground font-medium truncate block" title="Acertos">
+                  Acertos
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    className="h-8 text-xs font-mono"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      )
+    }
+    if (
       watchType === "QUESTOES" ||
       watchType === "SIMULADO" ||
       watchType === "VIDEOAULA" ||
-      watchType === "RESUMO"
+      watchType === "OUTRO"
     ) {
       return (
         <div className="grid grid-cols-2 gap-3">
@@ -726,31 +819,6 @@ export function StudyRegisterModal({
             )}
           />
         </div>
-      )
-    }
-    if (watchType === "TEORIA" || watchType === "LEITURA" || watchType === "RESUMO") {
-      return (
-        <FormField
-          control={form.control}
-          name="pages_read"
-          render={({ field }) => (
-            <FormItem className="max-w-[200px]">
-              <FormLabel className="text-xs text-muted-foreground font-medium">
-                Páginas Estudadas
-              </FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="0"
-                  className="h-8 text-xs font-mono"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
       )
     }
     return null
@@ -939,23 +1007,17 @@ export function StudyRegisterModal({
                       </div>
 
                       {/* Disciplina Selecionada Badge */}
-                      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/30 border border-border/40 min-h-[32px]">
-                        {watchDisciplineName ? (
-                          <>
-                            <span
-                              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
-                              style={{ backgroundColor: selectedColor }}
-                            />
-                            <span className="text-xs font-semibold text-foreground truncate">
-                              {watchDisciplineName}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/70 italic">
-                            Selecione uma disciplina
+                      {watchDisciplineName && (
+                        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/30 border border-border/40 min-h-[32px]">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                            style={{ backgroundColor: selectedColor }}
+                          />
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {watchDisciplineName}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Meio do Card: Display do Tempo / Inputs Manuais */}
@@ -1154,29 +1216,56 @@ export function StudyRegisterModal({
                           </div>
                         </div>
 
-                        <div>
-                          <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
-                            Data do Estudo
-                          </Label>
-                          <FormField
-                            control={form.control}
-                            name="study_date"
-                            render={({ field }) => (
-                              <FormItem className="space-y-0">
-                                <FormControl>
-                                  <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-xl px-3 py-1.5">
-                                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                                    <Input
-                                      type="date"
-                                      className="h-6 p-0 border-0 text-xs font-mono bg-transparent shadow-none focus-visible:ring-0"
-                                      {...field}
-                                    />
-                                  </div>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
+                              Data do Estudo
+                            </Label>
+                            <FormField
+                              control={form.control}
+                              name="study_date"
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-xl px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                      <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                      <Input
+                                        type="date"
+                                        className="h-6 p-0 border-0 text-xs font-mono bg-transparent shadow-none focus-visible:ring-0 w-full"
+                                        {...field}
+                                      />
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div>
+                            <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
+                              Horário de Início
+                            </Label>
+                            <FormField
+                              control={form.control}
+                              name="study_time"
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-xl px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                      <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                      <Input
+                                        type="time"
+                                        className="h-6 p-0 border-0 text-xs font-mono bg-transparent shadow-none focus-visible:ring-0 w-full"
+                                        {...field}
+                                      />
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1513,7 +1602,10 @@ export function StudyRegisterModal({
                       <span>•</span>
                       <span>{STUDY_TYPE_LABELS[watchType] || watchType}</span>
                       <span>•</span>
-                      <span>{formatDateBR(watchStudyDate)}</span>
+                      <span>
+                        {formatDateBR(watchStudyDate)}
+                        {isManualMode && watchStudyTime ? ` às ${watchStudyTime}` : ""}
+                      </span>
                     </div>
 
                     {/* Botões de Ação */}
