@@ -301,6 +301,12 @@
   .animated-underline:hover::after {
     @apply w-full;
   }
+
+  /* ── Mobile Safety Utilities ──────────────── */
+  /* Prevent any element from overflowing its container */
+  .contain-size { min-width: 0; max-width: 100%; }
+  /* Allow text to break anywhere on small screens */
+  .break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
 }
 
 /* ── Animations ──────────────────────────── */

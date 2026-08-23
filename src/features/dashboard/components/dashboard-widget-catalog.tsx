@@ -31,11 +31,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 import { RemindersWidget } from "@/features/dashboard/components/reminders-widget"
+import { ManualStudyTimeModal } from "@/features/dashboard/components/manual-study-time-modal"
+import { DayDetailModal } from "@/features/dashboard/components/day-detail-modal"
 import { DailyPlanningView } from "@/features/planejamento/components/daily-planning-view"
 import { type StudyCycleBlock } from "@/features/planejamento/components/planning-view"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { getDailyMessage } from "./daily-message-banner"
+
+import { StudyCycleWidget } from "@/features/study-cycle/components/study-cycle-widget"
 
 export interface DashboardWidgetProps {
   snapshot: DashboardSnapshot
@@ -65,24 +69,24 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
 
   if (colSpan === 1) {
     return (
-      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO DE ESTUDO
           </span>
-          <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] sm:text-[11px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
             {pct === null ? "—" : `${pct}%`}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 my-auto">
+        <div className="grid grid-cols-2 gap-3 my-auto">
           <div>
-            <span className="text-[9px] text-muted-foreground font-bold uppercase block">Hoje</span>
+            <span className="text-[10px] sm:text-[11px] text-muted-foreground font-bold uppercase block mb-0.5">Hoje</span>
             <span className="text-sm sm:text-base font-black text-foreground font-mono leading-tight">
               {formatMin(dailyMins)}
             </span>
           </div>
           <div className="text-right">
-            <span className="text-[9px] text-muted-foreground font-bold uppercase block">
+            <span className="text-[10px] sm:text-[11px] text-muted-foreground font-bold uppercase block mb-0.5">
               Semana
             </span>
             <span className="text-sm sm:text-base font-black text-[#2563EB] font-mono leading-tight">
@@ -215,12 +219,12 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
 
   if (colSpan === 1) {
     return (
-      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-emerald-600" /> DESEMPENHO
           </span>
-          <span className="text-[10px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
             {accuracy}%
           </span>
         </div>
@@ -237,7 +241,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+        <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-muted-foreground">
           <span>Total</span>
           <span className="font-mono text-foreground font-extrabold">{total} questões</span>
         </div>
@@ -427,12 +431,12 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
 
   if (colSpan === 1) {
     return (
-      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
             <Flame className="w-3.5 h-3.5 text-orange-500" /> CONSTÂNCIA
           </span>
-          <span className="text-[10px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] sm:text-[11px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full font-mono">
             {streak}d
           </span>
         </div>
@@ -441,14 +445,14 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
             <span className="text-xl sm:text-2xl font-black text-foreground font-mono leading-tight">
               {streak}
             </span>
-            <span className="text-[10px] text-muted-foreground font-bold ml-1">dias seguidos</span>
+            <span className="text-[10px] sm:text-[11px] text-muted-foreground font-bold ml-1">dias seguidos</span>
           </div>
-          <div className="text-right text-[10px] text-muted-foreground font-bold leading-tight">
+          <div className="text-right text-[10px] sm:text-[11px] text-muted-foreground font-bold leading-tight">
             Recorde: <span className="text-orange-500 font-extrabold">{longest}d</span>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-1 pt-1 border-t border-border/50">
-          <span className="text-[9px] font-extrabold uppercase text-muted-foreground tracking-wider">
+        <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-border/50">
+          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
             Registro diário
           </span>
           <div className="flex items-center gap-1">
@@ -546,7 +550,7 @@ export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
 
   return (
     <div className="w-full">
-      <DailyPlanningView blocks={cycleBlocks} history={history ?? []} />
+      <DailyPlanningView blocks={cycleBlocks} history={history ?? []} embedded={true} />
     </div>
   )
 }
@@ -1031,7 +1035,7 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
 // 14. WIDGET: Lembretes
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetLembretes({ snapshot: _snapshot, colSpan: _colSpan }: DashboardWidgetProps) {
-  return <RemindersWidget className="border-0 bg-transparent shadow-none" />
+  return <RemindersWidget embedded={true} className="p-4" />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1061,58 +1065,304 @@ export function WidgetMensagemDia(_props: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 16. WIDGET: Calendário
 // ─────────────────────────────────────────────────────────────────────────────
-export function WidgetCalendario({ colSpan: _colSpan }: DashboardWidgetProps) {
+
+function getIntensityClass(mins: number): string {
+  if (mins <= 0) return ""
+  if (mins < 60) return "bg-emerald-500/10"
+  if (mins < 180) return "bg-emerald-500/25"
+  if (mins < 300) return "bg-emerald-500/40"
+  if (mins < 480) return "bg-emerald-500/60"
+  return "bg-emerald-500/80"
+}
+
+function formatCompactTimeShort(mins: number): string {
+  if (mins <= 0) return ""
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h${m < 10 ? "0" : ""}${m}`
+}
+
+function formatFullTime(mins: number): string {
+  if (mins <= 0) return ""
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h === 0) return `${m} min`
+  if (m === 0) return `${h}h`
+  return `${h}h${m}min`
+}
+
+function formatHM(mins: number): string {
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h${m}min`
+}
+
+const MONTH_NAMES = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+]
+
+export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidgetProps) {
   const [currentDate, setCurrentDate] = React.useState(new Date())
-  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
-  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay()
+  const [dailyTotals, setDailyTotals] = React.useState<
+    { date: string; minutes: number }[]
+  >([])
+  const [monthlyStats, setMonthlyStats] = React.useState<{
+    totalMinutes: number
+    averageMinutes: number
+    daysStudied: number
+  } | null>(null)
+  const [detailOpen, setDetailOpen] = React.useState(false)
+  const [selectedDate, setSelectedDate] = React.useState("")
+  const [manualModalOpen, setManualModalOpen] = React.useState(false)
+  const [manualDate, setManualDate] = React.useState("")
+
+  const daysInMonth = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth() + 1,
+    0,
+  ).getDate()
+  const firstDayOfMonth = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    1,
+  ).getDay()
+
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth() + 1
+  const paddedMonth = String(month).padStart(2, "0")
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() + 1 === month
+
+  const dailyTargetMinutes = snapshot?.user?.weekly_study_hours
+    ? Math.round((snapshot.user.weekly_study_hours * 60) / 7)
+    : null
+
+  const fetchTotals = React.useCallback(async () => {
+    try {
+      const { getMonthlyDailyTotalsAction, getMonthlyStatsAction } = await import(
+        "@/application/study-history/study-history.actions"
+      )
+      const [totalsRes, statsRes] = await Promise.all([
+        getMonthlyDailyTotalsAction(year, month),
+        getMonthlyStatsAction(year, month),
+      ])
+      if (totalsRes.data) setDailyTotals(totalsRes.data)
+      if (statsRes.data) setMonthlyStats(statsRes.data)
+    } catch {
+      // silent fail
+    }
+  }, [year, month])
+
+  React.useEffect(() => {
+    void fetchTotals()
+  }, [fetchTotals])
 
   const changeMonth = (delta: number) => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1))
+    setCurrentDate(new Date(year, currentDate.getMonth() + delta, 1))
   }
 
+  const getMinutesForDay = (day: number) => {
+    const dateKey = `${year}-${paddedMonth}-${String(day).padStart(2, "0")}`
+    return dailyTotals.find((d) => d.date === dateKey)?.minutes ?? 0
+  }
+
+  const handleDayClick = (day: number) => {
+    const dateKey = `${year}-${paddedMonth}-${String(day).padStart(2, "0")}`
+    const mins = getMinutesForDay(day)
+    if (mins > 0) {
+      setSelectedDate(dateKey)
+      setDetailOpen(true)
+    } else {
+      setManualDate(dateKey)
+      setManualModalOpen(true)
+    }
+  }
+
+  const monthName = MONTH_NAMES[currentDate.getMonth()] ?? ""
+  const weekDays = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
+
   return (
-    <div className="p-3 flex flex-col h-full bg-card">
-      <div className="flex items-center justify-between mb-3 px-1">
-        <span className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
-          {currentDate.toLocaleDateString("pt-BR", { month: "short" }).toUpperCase()}.
-        </span>
-        <div className="flex items-center gap-1">
-          <button onClick={() => changeMonth(-1)} className="p-0.5 hover:bg-muted rounded">
-            <ChevronLeft className="w-3 h-3" />
+    <div className="p-3 sm:p-4 flex flex-col h-full bg-card">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => changeMonth(-1)}
+            className="p-1.5 hover:bg-muted rounded-md cursor-pointer transition-colors"
+            aria-label="Mês anterior"
+          >
+            <ChevronLeft className="w-5 h-5 text-muted-foreground" />
           </button>
-          <button onClick={() => changeMonth(1)} className="p-0.5 hover:bg-muted rounded">
-            <ChevronRightIcon className="w-3 h-3" />
+          <div className="text-center min-w-[140px]">
+            <h3 className="text-base sm:text-lg font-bold text-foreground uppercase tracking-wide">
+              {monthName} {year}
+            </h3>
+          </div>
+          <button
+            onClick={() => changeMonth(1)}
+            className="p-1.5 hover:bg-muted rounded-md cursor-pointer transition-colors"
+            aria-label="Próximo mês"
+          >
+            <ChevronRightIcon className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5 text-center">
-        {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => (
-          <div key={i} className="text-[9px] font-bold text-muted-foreground pb-1">
+      {/* Stats do mês */}
+      {monthlyStats && monthlyStats.totalMinutes > 0 && (
+        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 text-xs sm:text-sm text-muted-foreground flex-wrap">
+          <span>
+            Total: <strong className="text-foreground font-mono">{formatHM(monthlyStats.totalMinutes)}</strong>
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span>
+            Média: <strong className="text-foreground font-mono">{formatHM(monthlyStats.averageMinutes)}</strong>/dia
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span>
+            <strong className="text-foreground font-mono">{monthlyStats.daysStudied}</strong> dias
+          </span>
+        </div>
+      )}
+
+      {/* Grid do calendário */}
+      <div className="grid grid-cols-7 gap-[3px] sm:gap-1 text-center">
+        {/* Cabeçalho dos dias da semana */}
+        {weekDays.map((d, i) => (
+          <div key={i} className="text-xs sm:text-sm font-bold text-muted-foreground pb-1.5">
             {d}
           </div>
         ))}
+
+        {/* Dias vazios */}
         {Array.from({ length: firstDayOfMonth }).map((_, i) => (
           <div key={`empty-${i}`} />
         ))}
+
+        {/* Dias do mês */}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1
-          const isToday =
-            day === new Date().getDate() &&
-            currentDate.getMonth() === new Date().getMonth() &&
-            currentDate.getFullYear() === new Date().getFullYear()
+          const dateKey = `${year}-${paddedMonth}-${String(day).padStart(2, "0")}`
+          const isToday = isCurrentMonth && dateKey === todayStr
+          const mins = getMinutesForDay(day)
+          const intensityClass = getIntensityClass(mins)
+          const goalPct =
+            dailyTargetMinutes && mins > 0
+              ? Math.min(100, Math.round((mins / dailyTargetMinutes) * 100))
+              : null
+
           return (
-            <div
+            <button
               key={i}
-              className={`text-[10px] p-0.5 rounded font-medium flex items-center justify-center aspect-square ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}
+              onClick={() => handleDayClick(day)}
+              aria-label={`${day} de ${monthName} de ${year}${mins > 0 ? `, ${formatFullTime(mins)} estudados` : ""}`}
+              className={`relative rounded-lg font-medium flex flex-col items-center justify-center
+                p-1 sm:p-1.5 min-h-[52px] sm:min-h-[60px]
+                cursor-pointer transition-all duration-150
+                hover:brightness-110 hover:scale-[1.02]
+                ${intensityClass} ${
+                isToday
+                  ? "ring-2 ring-primary shadow-sm"
+                  : mins > 0
+                    ? "hover:ring-1 hover:ring-emerald-500/30"
+                    : "hover:bg-muted/60"
+              }`}
+              title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatFullTime(mins)} estudados` : " — Clique para registrar estudo"}`}
             >
-              {day}
-            </div>
+              {/* Dia */}
+              <span
+                className={`text-sm sm:text-base leading-none font-bold ${
+                  isToday && mins > 0
+                    ? "text-primary font-extrabold"
+                    : isToday
+                      ? "text-primary"
+                      : mins > 0
+                        ? "text-foreground"
+                        : "text-foreground/60"
+                }`}
+              >
+                {day}
+              </span>
+
+              {/* Label HOJE */}
+              {isToday && (
+                <span className="text-[9px] sm:text-[10px] leading-none font-extrabold uppercase tracking-wider text-primary mt-0.5">
+                  Hoje
+                </span>
+              )}
+
+              {/* Tempo estudado */}
+              {mins > 0 && (
+                <span className="text-xs sm:text-sm leading-none font-bold mt-0.5 text-emerald-600 dark:text-emerald-400">
+                  {formatCompactTimeShort(mins)}
+                </span>
+              )}
+
+              {/* Percentual da meta */}
+              {goalPct !== null && (
+                <span
+                  className={`text-[10px] sm:text-xs leading-none font-semibold mt-0.5 ${
+                    goalPct >= 100
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {goalPct}%
+                </span>
+              )}
+            </button>
           )
         })}
       </div>
+
+      {/* Legenda do heatmap */}
+      <div className="flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-border/50">
+        <span className="text-[10px] sm:text-xs text-muted-foreground mr-1">Menos</span>
+        {[
+          "bg-emerald-500/10",
+          "bg-emerald-500/25",
+          "bg-emerald-500/40",
+          "bg-emerald-500/60",
+          "bg-emerald-500/80",
+        ].map((cls, i) => (
+          <div
+            key={i}
+            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-sm ${cls}`}
+          />
+        ))}
+        <span className="text-[10px] sm:text-xs text-muted-foreground ml-1">Mais</span>
+      </div>
+
+      {/* Modal de detalhes do dia */}
+      <DayDetailModal
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        date={selectedDate}
+      />
+
+      {/* Modal de registro manual (para dias sem estudo) */}
+      <ManualStudyTimeModal
+        open={manualModalOpen}
+        onOpenChange={setManualModalOpen}
+        dateStr={manualDate}
+        onSaved={fetchTotals}
+      />
     </div>
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 18. WIDGET: Ciclo de Estudo
+// ─────────────────────────────────────────────────────────────────────────────
+function WidgetCicloEstudoWrapper(_props: DashboardWidgetProps) {
+  return <StudyCycleWidget embedded={true} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1222,5 +1472,11 @@ export const WIDGET_REGISTRY: Record<
     description: "Uma mensagem motivacional para começar o dia.",
     defaultSpan: 1,
     component: WidgetMensagemDia,
+  },
+  ciclo_estudo: {
+    name: "Ciclo de Estudo",
+    description: "Ciclo de estudo ativo com progresso e próxima matéria.",
+    defaultSpan: 1,
+    component: WidgetCicloEstudoWrapper,
   },
 }

@@ -120,12 +120,12 @@ export function AppHeader({
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/90 backdrop-blur-sm px-3 sm:px-6 w-full">
       {/* Esquerda: Menu Hamburger + Logo em Mobile */}
-      <div className="flex items-center gap-2 md:hidden">
+      <div className="flex items-center gap-2.5 md:hidden">
         {onOpenMenu && (
           <button
             type="button"
             onClick={onOpenMenu}
-            className="p-2 -ml-1 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+            className="w-10 h-10 -ml-1 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-all flex items-center justify-center cursor-pointer"
             aria-label="Abrir menu de navegação"
             title="Abrir menu"
           >
@@ -152,24 +152,24 @@ export function AppHeader({
       <div className="hidden md:block" />
 
       {/* Direita: Ações Superiores + Avatar do Usuário */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Botão ? (Ajuda / Suporte) */}
         <button
           onClick={() => toast.info("Central de Ajuda e Suporte do NomeIA")}
-          className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center hover:bg-[#1D4ED8] transition-colors shadow-xs shrink-0"
+          className="w-9 h-9 rounded-full bg-[#2563EB] text-white flex items-center justify-center hover:bg-[#1D4ED8] transition-colors shadow-xs shrink-0"
           title="Ajuda e Suporte"
         >
-          <HelpCircle className="h-4 w-4" />
+          <HelpCircle className="h-4.5 w-4.5" />
         </button>
 
         {/* Botão Notificações */}
         <button
           onClick={() => toast.info("Nenhuma nova notificação no momento.")}
-          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative shrink-0"
+          className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative shrink-0 flex items-center justify-center"
           title="Notificações"
         >
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#2563EB]" />
+          <Bell className="h-4.5 w-4.5" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#2563EB]" />
         </button>
 
         {/* Botão de Personalização do Home */}
@@ -177,22 +177,22 @@ export function AppHeader({
           onClick={() => {
             window.dispatchEvent(new CustomEvent("open-dashboard-customization"))
           }}
-          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+          className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
           title="Personalizar Home"
         >
-          <Settings className="h-4 w-4" />
+          <Settings className="h-4.5 w-4.5" />
         </button>
 
         {/* Botão Modo Noturno / Tema */}
         <button
           onClick={toggleDarkMode}
-          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+          className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
           title="Alternar Tema"
         >
           {resolvedTheme === "dark" ? (
-            <Sun className="h-4 w-4 text-amber-400" />
+            <Sun className="h-4.5 w-4.5 text-amber-400" />
           ) : (
-            <Moon className="h-4 w-4" />
+            <Moon className="h-4.5 w-4.5" />
           )}
         </button>
 
@@ -200,7 +200,7 @@ export function AppHeader({
         <div className="relative shrink-0" ref={menuRef}>
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="w-9 h-9 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xs focus:outline-none overflow-hidden"
+            className="w-10 h-10 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xs focus:outline-none overflow-hidden"
             title="Menu do Usuário"
             aria-haspopup="menu"
             aria-expanded={isUserMenuOpen}

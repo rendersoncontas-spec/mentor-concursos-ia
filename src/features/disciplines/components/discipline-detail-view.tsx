@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react"
 
-import { ArrowLeft, ChevronDown, GraduationCap, MessageSquare } from "lucide-react"
+import { ArrowLeft, ChevronDown, GraduationCap, MessageSquare, Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { type DisciplineDetailStats } from "@/application/disciplines/discipline-actions"
@@ -87,22 +87,25 @@ export function DisciplineDetailView({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
+            className="flex-1 sm:flex-initial bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
+            <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
           </Button>
 
           {targetName && (
             <Button
               variant="outline"
-              className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+              className="flex-1 sm:flex-initial bg-card/90 hover:bg-accent/70 dark:bg-card/70 border border-border/80 text-foreground font-semibold text-xs sm:text-[13px] gap-2 rounded-xl h-9 sm:h-10 px-3 shadow-xs"
             >
-              <GraduationCap className="h-4 w-4" />
-              {targetName}
-              <ChevronDown className="h-3.5 w-3.5" />
+              <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+              </div>
+              <span className="truncate max-w-[160px] sm:max-w-[220px]">{targetName}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-1 shrink-0" />
             </Button>
           )}
         </div>

@@ -40,7 +40,7 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col h-full",
+        "group relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col h-full",
         isDragging && "shadow-xl opacity-80 ring-2 ring-[#2563EB] z-50",
         colSpanClass
       )}
@@ -49,13 +49,13 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
       <div 
         {...attributes}
         {...listeners}
-        className="absolute top-2 right-2 p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 cursor-grab active:cursor-grabbing z-20 transition-colors"
+        className="absolute top-2.5 right-2.5 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/70 cursor-grab active:cursor-grabbing z-20 transition-all opacity-30 group-hover:opacity-100 focus-within:opacity-100"
         title="Arraste para reorganizar"
       >
-        <GripVertical className="w-4 h-4" />
+        <GripVertical className="w-3.5 h-3.5" />
       </div>
       
-      <div className="flex-1 w-full overflow-hidden pr-8">
+      <div className="flex-1 w-full h-full min-w-0">
         {children}
       </div>
     </div>

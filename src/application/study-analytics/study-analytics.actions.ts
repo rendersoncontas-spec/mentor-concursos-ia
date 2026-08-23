@@ -484,6 +484,7 @@ export interface RecentHistoryEntry {
   date: string
   disciplineId: string
   minutes: number
+  studyPlanItemId: string | null
 }
 
 // Histórico recente de estudo (por dia) para o widget "Estudos de Hoje": dados
@@ -500,7 +501,7 @@ export async function getRecentStudyHistoryAction(
     const since = new Date(Date.now() - days * 86_400_000).toISOString()
     const { data: rows, error } = await supabase
       .from("study_history")
-      .select("discipline_id, duration_minutes, started_at")
+      .select("discipline_id, duration_minutes, started_at, study_plan_item_id")
       .eq("user_id", user.id)
       .gte("started_at", since)
       .order("started_at", { ascending: false })
@@ -520,6 +521,7 @@ export async function getRecentStudyHistoryAction(
         date: String(startedAt).split("T")[0] ?? "",
         disciplineId,
         minutes,
+        studyPlanItemId: typeof r.study_plan_item_id === "string" ? r.study_plan_item_id : null,
       })
     }
 

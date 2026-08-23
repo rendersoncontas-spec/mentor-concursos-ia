@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react"
 
 import { toast } from "sonner"
+import { Plus } from "lucide-react"
 
 import {
   resetDashboardLayoutAction,
@@ -10,7 +11,7 @@ import {
 } from "@/application/dashboard/dashboard-layout.action"
 import { Button } from "@/components/ui/button"
 import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
-import { DailyMessageBanner } from "@/features/dashboard/components/daily-message-banner"
+import { getDailyMessage } from "@/features/dashboard/components/daily-message-banner"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { UserExamModal } from "@/features/dashboard/components/user-exam-modal"
 import { WeeklyGoalsModal } from "@/features/dashboard/components/weekly-goals-modal"
@@ -75,42 +76,55 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
     }
   }
 
-  // Obter apenas widgets visíveis na grade (mensagem_dia fica no topo fixo em destaque)
+  // Obter apenas widgets visíveis na grade
   const visibleWidgets = layout
     .filter((item) => item.visible && item.widget_id !== "mensagem_dia")
     .sort((a, b) => a.position_order - b.position_order)
 
   return (
     <div className="flex flex-col min-h-full bg-background/50">
-      <div className="flex-1 p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 w-full pb-20">
-        {/* 1. Header: Título e Saudação */}
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-[28px] font-black text-foreground tracking-tight leading-none">
-            Home
-          </h1>
-          <p className="text-xs sm:text-[13px] font-semibold text-muted-foreground mt-1">
-            Olá, <span className="text-[#2563EB]">{snapshot?.user?.name || "Estudante"}</span>! Hoje
-            é {capitalizedDate}. 👋 Bem-vindo de volta.
-          </p>
-        </div>
+      <div className="flex-1 px-4 sm:px-5 pt-4 pb-20 space-y-3 sm:space-y-3.5 w-full max-w-full">
+        {/* 1. Header: Saudação + Frase Motivacional */}
+        {(() => {
+          const msg = getDailyMessage()
+          return (
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 min-w-0 pb-1">
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight leading-snug">
+                  Olá, <span className="text-[#2563EB] dark:text-blue-400 font-extrabold">{snapshot?.user?.name || "Estudante"}</span>! 👋
+                </h1>
+                <p className="text-xs sm:text-[13px] font-medium text-muted-foreground leading-relaxed">
+                  Hoje é {capitalizedDate}. Bem-vindo de volta.
+                </p>
+                <p
+                  className="text-xs sm:text-[14px] font-medium italic text-foreground/85 leading-relaxed pt-0.5"
+                  style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                >
+                  <span className="not-italic text-[#2563EB] dark:text-blue-400 mr-1.5" aria-hidden="true">✨</span>
+                  &ldquo;{msg.text}&rdquo;
+                  <span className="text-[11px] font-semibold text-muted-foreground/60 not-italic ml-1.5">
+                    — {msg.author}
+                  </span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-2.5 w-full md:w-auto shrink-0 pt-1 md:pt-0">
+                <Button
+                  onClick={() => {
+                    setIsRegisterModalOpen(true)
+                    window.dispatchEvent(new CustomEvent("study-center-opened"))
+                  }}
+                  className="flex-1 md:flex-initial bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer rounded-xl h-9 sm:h-10 shrink-0 whitespace-nowrap min-w-0"
+                >
+                  <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
+                  <span>Adicionar Estudo</span>
+                </Button>
+                <TargetSelectorDropdown initialActiveTargetName={examName} className="flex-1 md:flex-initial md:w-[260px] lg:w-[290px] min-w-0" />
+              </div>
+            </div>
+          )
+        })()}
 
-        {/* 2. Mensagem do Dia: Faixa Compacta e Elegante no Topo */}
-        <DailyMessageBanner />
-
-        {/* 3. Ações Principais: Adicionar Estudo e Seletor de Cargo */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-2.5 w-full min-w-0">
-          <Button
-            onClick={() => {
-              setIsRegisterModalOpen(true)
-              window.dispatchEvent(new CustomEvent("study-center-opened"))
-            }}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 shadow-2xs cursor-pointer w-full sm:w-auto h-8.5 shrink-0"
-          >
-            Adicionar Estudo
-          </Button>
-          <TargetSelectorDropdown initialActiveTargetName={examName} className="w-full sm:w-auto" />
-        </div>
-
+        {/* 2. Widgets do Dashboard (inclui TempodeEstudo, Desempenho, Constância, etc.) */}
         <DashboardDndContext items={visibleWidgets} onReorder={handleReorder}>
           {visibleWidgets.map((item) => {
             const widgetInfo = WIDGET_REGISTRY[item.widget_id]

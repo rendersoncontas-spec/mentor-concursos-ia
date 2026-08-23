@@ -268,7 +268,7 @@ export function EditalAccordion({
   return (
     <div className="space-y-6">
       {/* Top Header Buttons */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 pb-1">
         <div>
           <h1 className="text-2xl font-black text-foreground">Edital Verticalizado</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -276,17 +276,18 @@ export function EditalAccordion({
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex items-center gap-2 sm:gap-2.5 w-full md:w-auto shrink-0">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 h-9 shadow-xs"
+            className="flex-1 md:flex-initial bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
+            <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
           </Button>
 
           <TargetSelectorDropdown
             initialActiveTargetName={activeTargetName ?? null}
-            className="w-full sm:w-auto"
+            className="flex-1 md:flex-initial md:w-[260px] lg:w-[290px] min-w-0"
           />
         </div>
       </div>

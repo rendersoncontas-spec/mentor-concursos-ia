@@ -57,13 +57,54 @@ CommandInput.displayName = CommandPrimitive.Input.displayName
 const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
-  <CommandPrimitive.List
-    ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden p-1", className)}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const innerRef = React.useRef<HTMLDivElement>(null)
+  const combinedRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      (innerRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+      if (typeof ref === "function") ref(node)
+      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node
+    },
+    [ref],
+  )
+
+  React.useEffect(() => {
+    const el = innerRef.current
+    if (!el) return
+
+    const handleTouchMoveCapture = (e: TouchEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el
+      const touch = e.touches[0]
+      if (!touch) return
+
+      const delta = touch.clientY
+      const atTop = scrollTop <= 0 && delta > 0
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && delta < 0
+
+      if (!atTop && !atBottom) {
+        e.stopPropagation()
+      }
+    }
+
+    el.addEventListener("touchmove", handleTouchMoveCapture, { capture: true, passive: true })
+    return () => {
+      el.removeEventListener("touchmove", handleTouchMoveCapture, { capture: true } as EventListenerOptions)
+    }
+  }, [])
+
+  return (
+    <CommandPrimitive.List
+      ref={combinedRef}
+      className={cn(
+        "max-h-[300px] overflow-y-auto overflow-x-hidden p-1",
+        "scroll-smooth [touch-action:pan-y]",
+        "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20",
+        className,
+      )}
+      {...props}
+    />
+  )
+})
 
 CommandList.displayName = CommandPrimitive.List.displayName
 

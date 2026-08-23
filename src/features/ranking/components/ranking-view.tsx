@@ -45,6 +45,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+import {
+  formatDuration,
+  minutesToSeconds,
+  formatMetricValue,
+  formatAccumulated,
+  getMetricValue,
+  calculateDistanceAhead,
+  formatDistance,
+  type RankingMetric,
+} from "../lib/ranking-engine"
+
 import { PublicStudyProfileModal } from "./public-study-profile-modal"
 
 export interface RankingStudent {
@@ -63,7 +74,6 @@ export interface RankingStudent {
 }
 
 export type RankingPeriod = "today" | "this_week" | "last_week" | "this_month" | "general"
-type RankingMetric = "TEMPO" | "QUESTOES" | "PAGINAS"
 
 interface GlobalRankingData {
   totalParticipants: number
@@ -172,29 +182,11 @@ function metricValueFor(student: RankingStudent, metric: RankingMetric): string 
 
 // Valor numérico da métrica (para cálculos de distância/progresso)
 function metricNumber(student: RankingStudent, metric: RankingMetric): number {
-  if (metric === "TEMPO") return student.totalMinutes
-  if (metric === "QUESTOES") return student.questions
-  return student.pages
-}
-
-// Formata distâncias de forma curta e motivacional
-function formatGap(metric: RankingMetric, diff: number): string {
-  if (metric === "TEMPO") {
-    if (diff < 60) return `${Math.max(0, diff)}min`
-    const h = Math.floor(diff / 60)
-    const m = Math.round(diff % 60)
-    return m > 0 ? `${h}h${m}min` : `${h}h`
-  }
-  if (metric === "QUESTOES") return `${diff} ${diff === 1 ? "questão" : "questões"}`
-  return `${diff} ${diff === 1 ? "página" : "páginas"}`
+  return getMetricValue(student, metric)
 }
 
 function formatGoalTime(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = Math.round(minutes % 60)
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h${pad(m)}`
+  return formatDuration(minutesToSeconds(minutes))
 }
 
 function errorMessage(err: unknown): string {
@@ -710,40 +702,45 @@ export function RankingView() {
                 const nextStudent =
                   idx < rankedStudents.length - 1 ? (rankedStudents[idx + 1] ?? null) : null
 
+                const aheadDistance = prevStudent
+                  ? calculateDistanceAhead(
+                      metricNumber(prevStudent, activeTab),
+                      metricNumber(student, activeTab),
+                      activeTab,
+                    )
+                  : 0
+                const behindDistance = nextStudent
+                  ? calculateDistanceAhead(
+                      metricNumber(student, activeTab),
+                      metricNumber(nextStudent, activeTab),
+                      activeTab,
+                    )
+                  : 0
+
                 return (
                   <div
                     key={student.id || `pos-${student.rank}`}
                     id={isYou ? "minha-posicao-ranking" : undefined}
                     className="scroll-mt-8"
                   >
-                    {isYou &&
-                      prevStudent &&
-                      metricNumber(prevStudent, activeTab) > metricNumber(student, activeTab) && (
-                        <GapLine
-                          icon={<ArrowUp className="h-3.5 w-3.5" />}
-                          text={`Faltam ${formatGap(
-                            activeTab,
-                            metricNumber(prevStudent, activeTab) - metricNumber(student, activeTab),
-                          )} para ultrapassar #${prevStudent.rank} ${cleanStudentName(prevStudent.name)}`}
-                        />
-                      )}
+                    {isYou && prevStudent && aheadDistance > 0 && (
+                      <GapLine
+                        icon={<ArrowUp className="h-3.5 w-3.5" />}
+                        text={`Faltam ${formatDistance(aheadDistance, activeTab)} para ultrapassar #${prevStudent.rank} ${cleanStudentName(prevStudent.name)}`}
+                      />
+                    )}
                     <RankRankingRow
                       student={student}
                       metric={activeTab}
                       isYou={isYou}
                       onSelect={handleOpenProfile}
                     />
-                    {isYou &&
-                      nextStudent &&
-                      metricNumber(student, activeTab) > metricNumber(nextStudent, activeTab) && (
-                        <GapLine
-                          icon={<ArrowDown className="h-3.5 w-3.5" />}
-                          text={`Você tem ${formatGap(
-                            activeTab,
-                            metricNumber(student, activeTab) - metricNumber(nextStudent, activeTab),
-                          )} de vantagem sobre #${nextStudent.rank} ${cleanStudentName(nextStudent.name)}`}
-                        />
-                      )}
+                    {isYou && nextStudent && behindDistance > 0 && (
+                      <GapLine
+                        icon={<ArrowDown className="h-3.5 w-3.5" />}
+                        text={`Você tem ${formatDistance(behindDistance, activeTab)} de vantagem sobre #${nextStudent.rank} ${cleanStudentName(nextStudent.name)}`}
+                      />
+                    )}
                   </div>
                 )
               })}
@@ -874,6 +871,15 @@ function SuaPosicaoCard({
   let message = "Estude hoje e comece a subir no Ranking Global."
 
   if (student && hasActivity && rank > 0) {
+    // Calcular distância até o usuário imediatamente à frente
+    const distanceToLeader = aboveValue !== null
+      ? calculateDistanceAhead(aboveValue, value, metric)
+      : 0
+
+    // Verificar se está empatado com o usuário à frente
+    const isTiedWithAbove =
+      aboveValue !== null && aboveValue === value
+
     if (isOnlyParticipant) {
       message = "Você é o líder absoluto do Ranking Global agora!"
       goalLabel = "Continue estudando para manter sua liderança."
@@ -882,13 +888,21 @@ function SuaPosicaoCard({
       message = "Parabéns! Você está no topo da liderança."
       goalLabel =
         belowValue !== null && below
-          ? `Vantagem de ${formatGap(metric, value - belowValue)} sobre o 2º`
+          ? `Vantagem de ${formatDistance(calculateDistanceAhead(value, belowValue, metric), metric)} sobre o 2º`
           : "Defenda seu primeiro lugar"
       progress = 100
+    } else if (isTiedWithAbove) {
+      const aheadName = above ? cleanStudentName(above.name) : "o líder"
+      message = `Você está empatado com ${aheadName}.`
+      goalLabel = "Objetivo: Conquistar o 1º lugar"
+      progress =
+        aboveValue !== null && aboveValue > 0
+          ? Math.min(100, Math.round((value / aboveValue) * 100))
+          : 0
     } else if (rank === 2) {
       message =
-        aboveValue !== null && aboveValue > value
-          ? `Faltam apenas ${formatGap(metric, aboveValue - value)} para assumir a liderança.`
+        distanceToLeader > 0
+          ? `Faltam apenas ${formatDistance(distanceToLeader, metric)} para assumir a liderança.`
           : "Você é o 2º colocado. Falta pouco para o topo!"
       goalLabel = "Objetivo: Conquistar o 1º lugar"
       progress =
@@ -897,8 +911,8 @@ function SuaPosicaoCard({
           : 0
     } else if (rank === 3) {
       message =
-        aboveValue !== null && aboveValue > value
-          ? `Faltam ${formatGap(metric, aboveValue - value)} para alcançar o 2º lugar.`
+        distanceToLeader > 0
+          ? `Faltam ${formatDistance(distanceToLeader, metric)} para alcançar o 2º lugar.`
           : "Você está no pódio! Mantenha a dedicação."
       goalLabel = "Objetivo: Subir para o 2º lugar"
       progress =
@@ -907,8 +921,8 @@ function SuaPosicaoCard({
           : 100
     } else if (rank <= 10) {
       message =
-        aboveValue !== null && aboveValue > value
-          ? `Você está a ${formatGap(metric, aboveValue - value)} de passar o #${above?.rank}.`
+        distanceToLeader > 0
+          ? `Você está a ${formatDistance(distanceToLeader, metric)} de passar o #${above?.rank}.`
           : "Você está no TOP 10! Acelere para entrar no pódio."
       goalLabel = `Objetivo: Ultrapassar o #${above?.rank ?? rank - 1}`
       progress =
@@ -921,8 +935,8 @@ function SuaPosicaoCard({
         positionsToTop10 === 1 ? "posição" : "posições"
       } para conquistar uma vaga no TOP 10.`
       goalLabel =
-        aboveValue !== null && aboveValue > value
-          ? `Faltam ${formatGap(metric, aboveValue - value)} para o #${above?.rank}`
+        distanceToLeader > 0
+          ? `Faltam ${formatDistance(distanceToLeader, metric)} para o #${above?.rank}`
           : "Mantenha o foco nos estudos diários"
       progress =
         aboveValue !== null && aboveValue > 0
@@ -993,6 +1007,8 @@ function renderAboveTargetBanner(
   isTop1: boolean,
 ) {
   if (above) {
+    const distance = calculateDistanceAhead(metricNumber(above, metric), userValue, metric)
+
     return (
       <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-primary/20 bg-primary/[0.03] p-3.5">
         <Avatar student={above} sizeClass="h-12 w-12 text-sm shadow-sm" imgSize={96} />
@@ -1012,7 +1028,7 @@ function renderAboveTargetBanner(
             Faltam
           </span>
           <span className="text-sm font-black text-primary tabular-nums">
-            {formatGap(metric, metricNumber(above, metric) - userValue)}
+            {distance > 0 ? formatDistance(distance, metric) : "Empatado"}
           </span>
         </div>
       </div>
@@ -1054,6 +1070,9 @@ function renderBelowDefenseBanner(
   isOnlyParticipant: boolean,
 ) {
   if (below && belowValue !== null && userValue >= belowValue) {
+    const advantage = calculateDistanceAhead(userValue, belowValue, metric)
+    const advantageFormatted = formatDistance(advantage, metric)
+
     return (
       <div className="flex items-center gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
         <Eye className="h-4 w-4 shrink-0 text-amber-500" />
@@ -1062,7 +1081,7 @@ function renderBelowDefenseBanner(
           <span className="text-amber-600 dark:text-amber-400">{cleanStudentName(below.name)}</span>{" "}
           (#{below.rank}) está a apenas{" "}
           <span className="text-amber-600 dark:text-amber-400 tabular-nums font-black">
-            {formatGap(metric, userValue - belowValue)}
+            {advantageFormatted}
           </span>{" "}
           de você.
         </p>
@@ -1392,7 +1411,7 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
   const goal = personal?.weeklyGoal
   const achieved = goal ? formatGoalTime(goal.achievedMinutes) : "0h"
   const target = goal ? formatGoalTime(goal.targetMinutes) : "20h"
-  const remaining = goal ? formatGap("TEMPO", goal.remainingMinutes) : "—"
+  const remaining = goal ? formatGoalTime(goal.remainingMinutes) : "—"
   const percentage = goal?.percentage ?? 0
   const done = !!goal && goal.remainingMinutes <= 0 && goal.achievedMinutes > 0
 

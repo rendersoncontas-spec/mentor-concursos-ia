@@ -167,32 +167,38 @@ export function TargetSelectorDropdown({
 
   return (
     <div
-      className={cn("relative text-left w-full sm:w-auto min-w-0 max-w-full", className)}
+      className={cn("relative text-left min-w-0 max-w-full", className)}
       ref={dropdownRef}
     >
       {/* Botão Trigger Principal */}
       <Button
         ref={buttonRef}
+        type="button"
         variant="outline"
         onClick={toggleDropdown}
         disabled={isPending}
+        title={buttonLabel}
         className={cn(
-          "w-full sm:w-auto justify-between sm:justify-start border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2 cursor-pointer transition-all shadow-2xs min-w-0 max-w-full h-9",
-          isOpen && "bg-[#2563EB]/15 ring-2 ring-[#2563EB]/30",
+          "w-full justify-between bg-card/90 hover:bg-accent/70 dark:bg-card/70 border border-border/80 hover:border-primary/40 text-foreground font-semibold text-xs sm:text-[13px] gap-2 cursor-pointer transition-all shadow-xs rounded-xl h-9 sm:h-10 px-2.5 sm:px-3 min-w-0 max-w-full group",
+          isOpen && "border-primary/60 ring-2 ring-primary/20 bg-accent/50",
         )}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin text-[#2563EB] shrink-0" />
+            <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+            </div>
           ) : (
-            <GraduationCap className="h-4 w-4 shrink-0" />
+            <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
+              <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+            </div>
           )}
-          <span className="truncate flex-1 min-w-0 text-left">{buttonLabel}</span>
+          <span className="truncate flex-1 min-w-0 text-left text-foreground/90 font-semibold">{buttonLabel}</span>
         </div>
         <ChevronDown
           className={cn(
-            "h-3.5 w-3.5 shrink-0 transition-transform duration-200 ml-1",
-            isOpen && "rotate-180",
+            "h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0 transition-transform duration-200 ml-1",
+            isOpen && "rotate-180 text-primary",
           )}
         />
       </Button>
@@ -202,7 +208,7 @@ export function TargetSelectorDropdown({
         <div
           ref={dropdownRef}
           style={dropdownStyle}
-          className="rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200"
+          className="rounded-2xl border border-border bg-popover/95 backdrop-blur-md p-3 text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150"
         >
           {/* Cabeçalho do Dropdown */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border px-1">

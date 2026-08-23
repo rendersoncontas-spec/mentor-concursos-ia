@@ -60,6 +60,9 @@ interface StudySessionState {
   planItemId: string | null
   /** Origem da sessão: "PLAN" (Cronograma) ou "FREE" (Central/Livre). */
   source: "PLAN" | "FREE" | null
+  /** Vínculo com o ciclo de estudo ativo. */
+  cycleId?: string | null
+  cycleItemId?: string | null
 }
 
 interface StudyContextType {
@@ -73,6 +76,8 @@ interface StudyContextType {
     plannedSeconds?: number
     planItemId?: string | null
     source?: "PLAN" | "FREE" | null
+    cycleId?: string | null
+    cycleItemId?: string | null
   }) => void
   minimizeSession: () => void
   restoreSession: () => void
@@ -365,6 +370,8 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       plannedSeconds?: number
       planItemId?: string | null
       source?: "PLAN" | "FREE" | null
+      cycleId?: string | null
+      cycleItemId?: string | null
     }) => {
       const technique = data.technique || "LIVRE"
       const now = Date.now()
@@ -386,6 +393,8 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         pausedSeconds: 0,
         planItemId: data.planItemId || null,
         source: data.source || null,
+        cycleId: data.cycleId || null,
+        cycleItemId: data.cycleItemId || null,
       })
       if (focusSound.selectedSound !== "off") {
         void focusSound.startSound(focusSound.selectedSound)
@@ -515,6 +524,9 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
               )
             : null,
         completedCycles: 0,
+        // Vínculo com o ciclo de estudo
+        cycle_id: session.cycleId || null,
+        cycle_item_id: session.cycleItemId || null,
       }
 
       if (!snapshot.discipline_id) {

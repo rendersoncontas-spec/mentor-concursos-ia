@@ -72,6 +72,9 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       focus_sound_volume: data["focus_sound_volume"] ?? null,
       reviews_completed: data["reviews_completed"] || 0,
       is_manual_mode: data["is_manual_mode"] === true || data["is_manual_mode"] === "true",
+      // Vínculo com o ciclo de estudo
+      cycle_id: data["cycle_id"] || null,
+      cycle_item_id: data["cycle_item_id"] || null,
     }
 
     // 3. Calcular duração real
@@ -214,6 +217,7 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     revalidatePath("/estatisticas")
     revalidatePath("/disciplines")
     revalidatePath("/home")
+    revalidatePath("/ciclos")
 
     return { success: true, historyId: historyData.id, session: historyData }
   } catch (err: unknown) {

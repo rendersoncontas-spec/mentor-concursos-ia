@@ -47,9 +47,11 @@ import { type StudyCycleBlock } from "./planning-view"
 
 interface DailyPlanningViewProps {
   blocks: StudyCycleBlock[]
-  history?: { date: string; disciplineId: string; minutes: number }[]
+  history?: { date: string; disciplineId: string; minutes: number; studyPlanItemId?: string | null }[]
   onReplan?: () => void
   onSwitchToCiclo?: () => void
+  embedded?: boolean
+  className?: string
 }
 
 interface DayTask {
@@ -65,6 +67,7 @@ interface DayTask {
   studiedMinutes: number
   manuallyClosed: boolean
   manualPendingMinutes: number
+  hasPending: boolean
 }
 
 type PlannedBlockForView = StudyCycleBlock & {
@@ -87,6 +90,8 @@ export function DailyPlanningView({
   history = [],
   onReplan,
   onSwitchToCiclo,
+  embedded = false,
+  className,
 }: DailyPlanningViewProps) {
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -293,13 +298,6 @@ export function DailyPlanningView({
     return hDate === selectedDateStr
   })
 
-  // Calculate minutes studied per discipline on the selected day
-  const studiedMinutesByDiscipline = new Map<string, number>()
-  historyForDay.forEach((h) => {
-    const current = studiedMinutesByDiscipline.get(h.disciplineId) || 0
-    studiedMinutesByDiscipline.set(h.disciplineId, current + h.minutes)
-  })
-
   // Total studied minutes on the selected day
   const completedMinutes = historyForDay.reduce((sum, h) => sum + h.minutes, 0)
 
@@ -376,10 +374,75 @@ export function DailyPlanningView({
     return selectedList
   })()
 
+  // Calculate minutes studied per block on the selected day
+  // Distributes session minutes across blocks, never duplicating.
+  // Priority: 1) direct link via studyPlanItemId, 2) same discipline in order.
+  const studiedMinutesByBlock = (() => {
+    const result = new Map<string, number>()
+
+    // Pass 1: Direct link via studyPlanItemId (highest priority)
+    const consumed = new Map<number, number>() // session index → minutes already consumed
+    historyForDay.forEach((h, sessionIdx) => {
+      if (!h.studyPlanItemId) return
+      const targetBlock = dayBlocks.find((b) => b.itemId === h.studyPlanItemId)
+      if (!targetBlock) return
+
+      const alreadyUsed = consumed.get(sessionIdx) ?? 0
+      const remaining = Math.max(0, h.minutes - alreadyUsed)
+      if (remaining <= 0) return
+
+      const current = result.get(targetBlock.id) ?? 0
+      const room = Math.max(0, targetBlock.durationMinutes - current)
+      const share = Math.min(remaining, room)
+      result.set(targetBlock.id, current + share)
+      consumed.set(sessionIdx, alreadyUsed + share)
+    })
+
+    // Pass 2: Same discipline fallback (distribute remaining to blocks in order)
+    const sessionsByDiscipline = new Map<number, { minutes: number; remaining: number }>()
+    historyForDay.forEach((h, sessionIdx) => {
+      const used = consumed.get(sessionIdx) ?? 0
+      const remaining = Math.max(0, h.minutes - used)
+      if (remaining <= 0) return
+      const current = sessionsByDiscipline.get(sessionIdx) ?? { minutes: h.minutes, remaining: 0 }
+      sessionsByDiscipline.set(sessionIdx, { ...current, remaining })
+    })
+
+    // Group blocks by discipline
+    const blocksByDiscipline = new Map<string, PlannedBlockForView[]>()
+    for (const block of dayBlocks) {
+      const list = blocksByDiscipline.get(block.disciplineId) ?? []
+      list.push(block)
+      blocksByDiscipline.set(block.disciplineId, list)
+    }
+
+    // Distribute remaining sessions to blocks of the same discipline
+    for (const [sessionIdx, session] of sessionsByDiscipline) {
+      const h = historyForDay[sessionIdx]
+      if (!h || session.remaining <= 0) continue
+
+      const disciplineBlocks = (blocksByDiscipline.get(h.disciplineId) ?? [])
+        .sort((a, b) => dayBlocks.indexOf(a) - dayBlocks.indexOf(b))
+
+      let remaining = session.remaining
+      for (const block of disciplineBlocks) {
+        if (remaining <= 0) break
+        const current = result.get(block.id) ?? 0
+        const room = Math.max(0, block.durationMinutes - current)
+        const share = Math.min(remaining, room)
+        result.set(block.id, current + share)
+        remaining -= share
+      }
+    }
+
+    return result
+  })()
+
   // Map blocks to scheduled tasks, marking completed based on REAL history for this date
-  const getTaskStatus = (completed: boolean, index: number) => {
+  const getTaskStatus = (completed: boolean, studiedMinutes: number, hasPending: boolean) => {
     if (completed) return "CONCLUIDO"
-    if (index === 0) return "EM_ANDAMENTO"
+    if (studiedMinutes > 0) return "EM_ANDAMENTO"
+    if (hasPending) return "PENDENCIA"
     return "PENDENTE"
   }
 
@@ -388,16 +451,11 @@ export function DailyPlanningView({
     studied: number,
     duration: number,
     manuallyClosed: boolean,
-    manualPendingMinutes: number,
+    _manualPendingMinutes: number,
   ) => {
-    if (manuallyClosed) {
-      return manualPendingMinutes > 0
-        ? `Concluído com ${manualPendingMinutes} min pendentes`
-        : "Concluído manualmente"
-    }
-    if (completed) return `Concluído — ${studied || 0} min estudados`
-    if (studied) return `Em andamento — ${studied} de ${duration} min`
-    return "Aguardando início"
+    if (completed) return `${studied || 0} min estudados`
+    if (studied > 0) return `${studied} de ${duration} min estudados`
+    return `${duration} min planejados`
   }
 
   const scheduledTasks: DayTask[] = dayBlocks.map((block, idx) => {
@@ -405,10 +463,11 @@ export function DailyPlanningView({
     const startStr = `${hourStart.toString().padStart(2, "0")}:00`
     const endStr = `${(hourStart + Math.max(1, Math.round(block.durationMinutes / 60))).toString().padStart(2, "0")}:00`
 
-    const studiedMins = studiedMinutesByDiscipline.get(block.disciplineId) || 0
+    const studiedMins = studiedMinutesByBlock.get(block.id) || 0
     const isCompletedByHistory = studiedMins >= block.durationMinutes && studiedMins > 0
     const manuallyClosed = block.manuallyClosed ?? false
     const isCompleted = manuallyClosed || isCompletedByHistory
+    const blockHasPending = !isCompleted && (block.origin ?? "BASE") !== "BASE"
 
     return {
       id: block.id,
@@ -423,7 +482,8 @@ export function DailyPlanningView({
       studiedMinutes: studiedMins,
       manuallyClosed,
       manualPendingMinutes: block.manualPendingMinutes ?? 0,
-      status: getTaskStatus(isCompleted, idx),
+      hasPending: blockHasPending,
+      status: getTaskStatus(isCompleted, studiedMins, blockHasPending),
     }
   })
 
@@ -491,15 +551,21 @@ export function DailyPlanningView({
   }
 
   return (
-    <div className="bg-card border rounded-xl p-3.5 sm:p-4.5 shadow-2xs space-y-3.5">
+    <div
+      className={cn(
+        "p-3.5 sm:p-4.5 space-y-3.5 w-full",
+        !embedded && "bg-card border rounded-xl shadow-2xs",
+        className,
+      )}
+    >
       {/* Linha 1: Controles de Data e Navegação */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 border-b pb-2.5">
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-start justify-between gap-3 border-b pb-2.5">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
             <CalendarIcon className="w-4 h-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base sm:text-lg font-black text-foreground capitalize leading-tight">
                 {dateFormatted}
               </h2>
@@ -522,12 +588,13 @@ export function DailyPlanningView({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button
             variant="outline"
             size="icon"
             onClick={handlePrevDay}
-            className="h-8 w-8 rounded-lg"
+            className="h-10 w-10 rounded-lg"
+            aria-label="Dia anterior"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -536,7 +603,7 @@ export function DailyPlanningView({
               variant="outline"
               size="sm"
               onClick={handleGoToday}
-              className="h-8 px-3 rounded-lg text-xs font-bold text-[#2563EB] border-[#2563EB]/30"
+              className="h-10 px-3 rounded-lg text-xs font-bold text-[#2563EB] border-[#2563EB]/30 hidden sm:flex"
             >
               Ir para Hoje
             </Button>
@@ -545,7 +612,8 @@ export function DailyPlanningView({
             variant="outline"
             size="icon"
             onClick={handleNextDay}
-            className="h-8 w-8 rounded-lg"
+            className="h-10 w-10 rounded-lg"
+            aria-label="Próximo dia"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -710,78 +778,135 @@ export function DailyPlanningView({
           renderEmptyState()
         ) : (
           <div className="space-y-2.5">
-            {scheduledTasks.map((task) => (
-              <div
-                key={task.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 border rounded-xl hover:border-primary/40 transition-all bg-muted/20"
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="w-1.5 self-stretch rounded-full"
-                    style={{ backgroundColor: task.color }}
-                  />
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {task.timeSlot}
-                      </span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
-                        {task.durationMinutes} min
-                      </span>
-                      {task.origin !== "BASE" && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#2563EB]/10 text-[#2563EB]">
-                          Pendência
-                        </span>
-                      )}
+            {scheduledTasks.map((task) => {
+              const progressPct = task.durationMinutes > 0
+                ? Math.min(100, Math.round((task.studiedMinutes / task.durationMinutes) * 100))
+                : 0
+              const remaining = Math.max(0, task.durationMinutes - task.studiedMinutes)
+              const status = task.completed
+                ? "CONCLUIDO"
+                : task.studiedMinutes > 0
+                  ? "EM_ANDAMENTO"
+                  : task.hasPending
+                    ? "PENDENCIA"
+                    : "PENDENTE"
+
+              return (
+                <div
+                  key={task.id}
+                  className="flex flex-col gap-3 p-3 sm:p-3.5 border rounded-xl hover:border-primary/40 transition-all bg-muted/20"
+                >
+                  {/* Header: color bar + discipline + time slot + badges */}
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="w-1.5 self-stretch rounded-full shrink-0"
+                      style={{ backgroundColor: task.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          {/* Line 1: time slot + duration + status badge + pending badge */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-mono font-bold text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              {task.timeSlot}
+                            </span>
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
+                              {task.durationMinutes} min
+                            </span>
+                            {status === "CONCLUIDO" && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Concluído
+                              </span>
+                            )}
+                            {status === "EM_ANDAMENTO" && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                Em andamento
+                              </span>
+                            )}
+                            {status === "PENDENCIA" && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#2563EB]/10 text-[#2563EB]">
+                                Pendência
+                              </span>
+                            )}
+                            {status === "PENDENTE" && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
+                                Pendente
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Line 2: discipline name */}
+                          <h4 className="text-sm font-bold text-foreground truncate">{task.disciplineName}</h4>
+
+                          {/* Line 3: progress text */}
+                          <p className="text-xs text-muted-foreground">
+                            {getTaskProgressText(
+                              task.completed,
+                              task.studiedMinutes,
+                              task.durationMinutes,
+                              task.manuallyClosed,
+                              task.manualPendingMinutes,
+                            )}
+                          </p>
+
+                          {/* Line 4: remaining time (only for in-progress) */}
+                          {status === "EM_ANDAMENTO" && remaining > 0 && (
+                            <p className="text-[11px] font-medium text-muted-foreground/70">
+                              Faltam {remaining} min
+                            </p>
+                          )}
+
+                          {/* Line 5: progress bar (for in-progress and completed) */}
+                          {(status === "EM_ANDAMENTO" || status === "CONCLUIDO") && (
+                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${progressPct}%`,
+                                  backgroundColor:
+                                    status === "CONCLUIDO" ? "#10b981" : task.color || "#2563EB",
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Buttons — inline with content */}
+                        {!task.completed && (
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            {!task.manuallyClosed && task.studiedMinutes > 0 && isToday && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setBlockToClose(task)}
+                                className="h-8 w-[110px] px-0 text-[11px] font-bold rounded-lg cursor-pointer justify-center"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                Concluir
+                              </Button>
+                            )}
+                            <Button
+                              onClick={() => {
+                                toast.success(`Iniciando estudo de ${task.disciplineName}`)
+                                router.push(`/dashboard/study-session?planId=${task.itemId ?? task.id}`)
+                              }}
+                              size="sm"
+                              className="h-8 w-[110px] px-0 text-[11px] font-bold rounded-lg shadow-xs cursor-pointer justify-center"
+                            >
+                              <PlayCircle className="w-3.5 h-3.5 mr-1" />
+                              {task.studiedMinutes > 0 ? "Continuar" : "Iniciar"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <h4 className="text-base font-bold text-foreground">{task.disciplineName}</h4>
-                    <p className="text-xs text-muted-foreground">
-                      {getTaskProgressText(
-                        task.completed,
-                        task.studiedMinutes,
-                        task.durationMinutes,
-                        task.manuallyClosed,
-                        task.manualPendingMinutes,
-                      )}
-                    </p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3 self-end sm:self-center">
-                  {task.completed ? (
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg">
-                      <CheckCircle2 className="w-4 h-4" />
-                      {task.manuallyClosed ? "Concluído hoje" : "Concluído"}
-                    </span>
-                  ) : (
-                    <>
-                      {!task.manuallyClosed && task.studiedMinutes > 0 && isToday && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setBlockToClose(task)}
-                          className="h-9 px-3 text-xs font-bold rounded-xl cursor-pointer"
-                        >
-                          <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                          Marcar como concluído hoje
-                        </Button>
-                      )}
-                      <Button
-                        onClick={() => {
-                          toast.success(`Iniciando estudo de ${task.disciplineName}`)
-                          router.push(`/dashboard/study-session?planId=${task.itemId ?? task.id}`)
-                        }}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs h-9 px-4 rounded-xl shadow-xs cursor-pointer"
-                      >
-                        <PlayCircle className="w-4 h-4 mr-1.5" />
-                        Iniciar Estudo
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

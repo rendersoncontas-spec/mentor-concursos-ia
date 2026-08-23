@@ -17,11 +17,9 @@ export async function createClient() {
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options)
           })
-        } catch (error) {
-          // Este catch previne erro ao chamar setAll em Server Components puros,
-          // onde os cookies não podem ser modificados após a resposta iniciar.
-          // O Middleware lidará com atualizações de token de qualquer forma.
-          console.error("Falha ao configurar cookie no server client:", error)
+        } catch {
+          // Em Server Components puros, cookies não podem ser modificados.
+          // O Middleware intercepta respostas e atualiza tokens via Set-Cookie.
         }
       },
     },

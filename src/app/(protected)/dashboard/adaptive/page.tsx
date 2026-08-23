@@ -211,7 +211,8 @@ export default async function AdaptiveDashboardPage() {
             </p>
           </div>
           <div className="p-0">
-            <table className="w-full text-sm text-left">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left min-w-[500px]">
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-6 py-4 font-medium">Motor</th>
@@ -255,6 +256,7 @@ export default async function AdaptiveDashboardPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </main>

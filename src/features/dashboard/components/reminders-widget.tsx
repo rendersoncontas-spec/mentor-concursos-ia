@@ -34,7 +34,7 @@ function getSavedReminders(): ReminderItem[] {
   }
 }
 
-export function RemindersWidget({ className }: { className?: string }) {
+export function RemindersWidget({ className, embedded = false }: { className?: string; embedded?: boolean }) {
   const [reminders, setReminders] = useState<ReminderItem[]>(getSavedReminders)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -77,7 +77,8 @@ export function RemindersWidget({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between min-h-[300px] h-full",
+        "p-5 space-y-4 flex flex-col justify-between min-h-[300px] h-full w-full",
+        !embedded && "rounded-xl border bg-card shadow-sm",
         className,
       )}
     >

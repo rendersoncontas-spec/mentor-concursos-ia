@@ -61,7 +61,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
   return (
     <div
       className={cn(
-        "fixed bottom-24 right-6 z-50 w-80 sm:w-96 rounded-2xl border shadow-2xl transition-all duration-200 flex flex-col overflow-hidden text-amber-950",
+        "fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-80 md:w-96 rounded-2xl border shadow-2xl transition-all duration-200 flex flex-col overflow-hidden text-amber-950",
         currentColor.bg,
         currentColor.border
       )}

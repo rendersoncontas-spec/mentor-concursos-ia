@@ -12,6 +12,7 @@ import {
   BookOpen,
   CalendarDays,
   CalendarRange,
+  CircleDot,
   FileText,
   GraduationCap,
   Heart,
@@ -62,6 +63,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard", label: "Home", icon: LayoutDashboard },
       { href: "/disciplines", label: "Disciplinas", icon: BookOpen },
+      { href: "/ciclos", label: "Ciclos", icon: CircleDot },
       { href: "/planejamento", label: "Planejamento", icon: CalendarDays },
       { href: "/dashboard/reviews", label: "Revisões", icon: RefreshCcw },
       { href: "/dashboard/history", label: "Histórico", icon: History },
