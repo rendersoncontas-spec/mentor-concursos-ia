@@ -1253,12 +1253,16 @@ export function WidgetMensagemDia(_props: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getIntensityClass(mins: number): string {
-  if (mins <= 0) return ""
-  if (mins < 60) return "bg-emerald-500/10"
-  if (mins < 180) return "bg-emerald-500/25"
-  if (mins < 300) return "bg-emerald-500/40"
-  if (mins < 480) return "bg-emerald-500/60"
-  return "bg-emerald-500/80"
+  if (mins <= 0) return "bg-transparent hover:bg-muted/40 border border-transparent"
+  if (mins < 60)
+    return "bg-emerald-500/15 dark:bg-emerald-600/30 border border-emerald-500/25 dark:border-emerald-500/40"
+  if (mins < 180)
+    return "bg-emerald-500/30 dark:bg-emerald-600/50 border border-emerald-500/35 dark:border-emerald-400/50"
+  if (mins < 300)
+    return "bg-emerald-500/50 dark:bg-emerald-600/70 border border-emerald-600/40 dark:border-emerald-400/60"
+  if (mins < 480)
+    return "bg-emerald-500/70 dark:bg-emerald-500/85 border border-emerald-600/50 dark:border-emerald-300/70"
+  return "bg-emerald-500/90 dark:bg-emerald-500 border border-emerald-700/60 dark:border-emerald-200/80"
 }
 
 function formatCompactTimeShort(mins: number): string {
@@ -1457,7 +1461,210 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
                 isToday
                   ? "ring-2 ring-primary shadow-sm"
                   : mins > 0
-                    ? "hover:ring-1 hover:ring-emerald-500/30"
+                    ? "hover:ring-1 hover:ring-emerald-500/50"
                     : "hover:bg-muted/60"
               }`}
-              title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatFullTime(m
+              title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatFullTime(mins)} estudados` : " — Clique para registrar estudo"}`}
+            >
+              {/* Dia */}
+              <span
+                className={`text-sm sm:text-base leading-none font-extrabold ${
+                  isToday
+                    ? "text-primary font-black"
+                    : mins > 0
+                      ? "text-slate-900 dark:text-white"
+                      : "text-foreground/60"
+                }`}
+              >
+                {day}
+              </span>
+
+              {/* Label HOJE */}
+              {isToday && (
+                <span className="text-[9px] sm:text-[10px] leading-none font-black uppercase tracking-wider text-primary mt-0.5">
+                  Hoje
+                </span>
+              )}
+
+              {/* Tempo estudado */}
+              {mins > 0 && (
+                <span className="text-xs sm:text-sm leading-none font-black mt-1 text-emerald-950 dark:text-emerald-50 drop-shadow-xs">
+                  {formatCompactTimeShort(mins)}
+                </span>
+              )}
+
+              {/* Percentual da meta */}
+              {goalPct !== null && (
+                <span
+                  className={`text-[10px] sm:text-xs leading-none font-black mt-0.5 ${
+                    goalPct >= 100
+                      ? "text-emerald-900 dark:text-emerald-200"
+                      : "text-emerald-800/80 dark:text-emerald-300/80"
+                  }`}
+                >
+                  {goalPct}%
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Legenda do heatmap */}
+      <div className="flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-border/50">
+        <span className="text-[10px] sm:text-xs text-muted-foreground font-semibold mr-1">Menos</span>
+        {[
+          "bg-emerald-500/15 dark:bg-emerald-600/30 border border-emerald-500/25",
+          "bg-emerald-500/30 dark:bg-emerald-600/50 border border-emerald-500/35",
+          "bg-emerald-500/50 dark:bg-emerald-600/70 border border-emerald-600/40",
+          "bg-emerald-500/70 dark:bg-emerald-500/85 border border-emerald-600/50",
+          "bg-emerald-500/90 dark:bg-emerald-500 border border-emerald-700/60",
+        ].map((cls, i) => (
+          <div
+            key={i}
+            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-xs ${cls}`}
+          />
+        ))}
+        <span className="text-[10px] sm:text-xs text-muted-foreground font-semibold ml-1">Mais</span>
+      </div>
+
+      {/* Modal de detalhes do dia */}
+      <DayDetailModal
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        date={selectedDate}
+      />
+
+      {/* Modal de registro manual (para dias sem estudo) */}
+      <ManualStudyTimeModal
+        open={manualModalOpen}
+        onOpenChange={setManualModalOpen}
+        dateStr={manualDate}
+        onSaved={fetchTotals}
+      />
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 18. WIDGET: Ciclo de Estudo
+// ─────────────────────────────────────────────────────────────────────────────
+function WidgetCicloEstudoWrapper(_props: DashboardWidgetProps) {
+  return <StudyCycleWidget embedded={true} />
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGISTRO MASTER DE WIDGETS
+// ─────────────────────────────────────────────────────────────────────────────
+export const WIDGET_REGISTRY: Record<
+  string,
+  {
+    name: string
+    description: string
+    defaultSpan: 1 | 2 | 3
+    component: React.ComponentType<DashboardWidgetProps>
+  }
+> = {
+  calendario: {
+    name: "Calendário",
+    description: "Calendário mensal para visualizar datas e navegar entre os meses.",
+    defaultSpan: 2,
+    component: WidgetCalendario,
+  },
+  tempo_estudo: {
+    name: "Tempo de Estudo",
+    description: "Exibe horas estudadas no dia e semana em relação à sua meta.",
+    defaultSpan: 1,
+    component: WidgetTempoEstudo,
+  },
+  desempenho: {
+    name: "Desempenho Geral",
+    description: "Métricas de acurácia, taxa de acertos e acertos vs erros.",
+    defaultSpan: 1,
+    component: WidgetDesempenho,
+  },
+  progresso_edital: {
+    name: "Progresso no Edital",
+    description: "Percentual de cobertura e disciplinas concluídas.",
+    defaultSpan: 1,
+    component: WidgetProgressoEdital,
+  },
+  estudos_hoje: {
+    name: "Estudos de Hoje (Visão Diária)",
+    description: "Cronograma diário com disciplinas agendadas e botão Iniciar Estudo.",
+    defaultSpan: 3,
+    component: WidgetEstudosHoje,
+  },
+  constancia: {
+    name: "Constância nos Estudos",
+    description: "Sequência de dias consecutivos estudando (Streak).",
+    defaultSpan: 1,
+    component: WidgetConstancia,
+  },
+  questoes: {
+    name: "Questões",
+    description: "Acompanhamento da meta semanal de questões resolvidas.",
+    defaultSpan: 1,
+    component: WidgetQuestoes,
+  },
+  revisoes: {
+    name: "Revisões",
+    description: "Revisões pendentes e agendadas para o dia.",
+    defaultSpan: 1,
+    component: WidgetRevisoes,
+  },
+  desempenho_materia: {
+    name: "Desempenho por Matéria",
+    description: "Tabela com tempo estudado, questões e acurácia por matéria.",
+    defaultSpan: 2,
+    component: WidgetDesempenhoMateria,
+  },
+  ultimas_atividades: {
+    name: "Últimas Atividades",
+    description: "Histórico das últimas sessões de estudo realizadas.",
+    defaultSpan: 1,
+    component: WidgetUltimasAtividades,
+  },
+  metas_estudo: {
+    name: "Metas de Estudo",
+    description: "Barras de progresso para horas, questões e dias ativos.",
+    defaultSpan: 1,
+    component: WidgetMetasEstudo,
+  },
+  ranking: {
+    name: "Ranking",
+    description: "Classificação por pontos das suas matérias e áreas.",
+    defaultSpan: 1,
+    component: WidgetRanking,
+  },
+  conquistas: {
+    name: "Conquistas",
+    description: "Medalhas e marcos de evolução desbloqueados.",
+    defaultSpan: 1,
+    component: WidgetConquistas,
+  },
+  data_prova: {
+    name: "Data da Prova",
+    description: "Exibe a contagem ou data da prova cadastrada.",
+    defaultSpan: 1,
+    component: WidgetDataProva,
+  },
+  lembretes: {
+    name: "Lembretes",
+    description: "Lista de lembretes e avisos importantes.",
+    defaultSpan: 1,
+    component: WidgetLembretes,
+  },
+  mensagem_dia: {
+    name: "Mensagem do Dia",
+    description: "Uma mensagem motivacional para começar o dia.",
+    defaultSpan: 1,
+    component: WidgetMensagemDia,
+  },
+  ciclo_estudo: {
+    name: "Ciclo de Estudo",
+    description: "Ciclo de estudo ativo com progresso e próxima matéria.",
+    defaultSpan: 1,
+    component: WidgetCicloEstudoWrapper,
+  },
+}

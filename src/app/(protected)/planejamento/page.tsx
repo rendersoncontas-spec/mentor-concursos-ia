@@ -5,6 +5,8 @@ import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
 import { PlanejamentoClient } from "@/features/planejamento/components/planejamento-client"
 import { createClient } from "@/infrastructure/supabase/server"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Planejamento de Estudos",
   description: "Gerencie seu ciclo de estudos rotativo e contínuo no NomeIA.",
