@@ -339,10 +339,17 @@ export function DailyPlanningView({
   // Build date string for history filtering (YYYY-MM-DD)
   const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`
 
-  // Filter history for the selected date ONLY
+  // Filter history for the selected date ONLY (respeitando timezone local do estudante)
   const historyForDay = history.filter((h) => {
-    const hDate = h.date.includes("T") ? h.date.split("T")[0] : h.date
-    return hDate === selectedDateStr
+    if (!h.date) return false
+    let hDateStr = h.date
+    if (h.date.includes("T") || h.date.includes("Z")) {
+      const d = new Date(h.date)
+      if (!isNaN(d.getTime())) {
+        hDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      }
+    }
+    return hDateStr === selectedDateStr
   })
 
   // Total studied minutes on the selected day

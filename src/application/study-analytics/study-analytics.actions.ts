@@ -599,7 +599,7 @@ export async function getRecentStudyHistoryAction(
       const disciplineId = typeof r.discipline_id === "string" ? r.discipline_id : ""
       if (!disciplineId) continue
       entries.push({
-        date: String(startedAt).split("T")[0] ?? "",
+        date: new Date(startedAt).toISOString(),
         disciplineId,
         minutes,
         studyPlanItemId: typeof r.study_plan_item_id === "string" ? r.study_plan_item_id : null,
