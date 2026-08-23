@@ -9,6 +9,7 @@ import {
   Award,
   BarChart3,
   Calendar,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -22,7 +23,10 @@ import {
   Sparkles,
   Target,
   Trophy,
+  X,
 } from "lucide-react"
+
+import { cn } from "@/lib/utils"
 
 import {
   type RecentHistoryEntry,
@@ -559,30 +563,129 @@ export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
 // 6. WIDGET: Questões
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
+  const router = useRouter()
   const total = snapshot?.stats?.totalQuestions ?? 0
   const target = snapshot?.analytics?.goals?.questions?.target ?? null
   const achieved = snapshot?.analytics?.goals?.questions?.achieved ?? total
-  const pct =
-    snapshot?.analytics?.goals?.questions?.percentage ??
-    (target && target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : null)
+
+  // Porcentagem REAL (sem travar em 100%, ex: 90 / 50 = 180%)
+  const realPct = target && target > 0 ? Math.round((achieved / target) * 100) : null
+  const progressWidth = Math.min(100, realPct ?? 0)
+
+  // Diferença em relação à meta
+  const diff = target !== null ? achieved - target : null
+
+  // Acertos, Erros e Aproveitamento
+  let correct = snapshot?.stats?.correctQuestions ?? 0
+  let wrong = snapshot?.stats?.wrongQuestions ?? 0
+  let accuracy = snapshot?.stats?.accuracyPercentage ?? null
+
+  if (
+    correct === 0 &&
+    wrong === 0 &&
+    snapshot?.rawDisciplines &&
+    snapshot.rawDisciplines.length > 0
+  ) {
+    correct = snapshot.rawDisciplines.reduce((acc, d) => acc + (d.correctCount || 0), 0)
+    wrong = snapshot.rawDisciplines.reduce((acc, d) => acc + (d.wrongCount || 0), 0)
+  }
+
+  const answeredSum = correct + wrong
+  if (accuracy === null && answeredSum > 0) {
+    accuracy = Math.round((correct / answeredSum) * 100)
+  }
 
   if (colSpan === 1) {
     return (
-      <div className="p-4 flex flex-col justify-between h-full space-y-2">
+      <div
+        className="p-3.5 sm:p-4 flex flex-col justify-between h-full space-y-2.5 cursor-pointer hover:bg-muted/10 transition-colors"
+        onClick={() => router.push("/estatisticas")}
+      >
+        {/* Cabeçalho */}
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
             <HelpCircle className="w-3.5 h-3.5 text-[#2563EB]" /> QUESTÕES
           </span>
-          <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
-            {pct === null ? "—" : `${pct}%`}
-          </span>
+          {realPct !== null ? (
+            <span
+              className={cn(
+                "text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-full font-mono transition-colors",
+                realPct >= 100
+                  ? "text-emerald-600 bg-emerald-500/10 border border-emerald-500/20"
+                  : "text-[#2563EB] bg-[#2563EB]/10"
+              )}
+            >
+              {realPct}% da meta
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              Livre
+            </span>
+          )}
         </div>
-        <div>
-          <div className="text-2xl font-black text-foreground font-mono leading-tight">
-            {achieved}
+
+        {/* Destaque das Questões Realizadas + Comparativo */}
+        <div className="space-y-1.5 my-auto">
+          <div className="flex items-baseline justify-between gap-1.5">
+            <div>
+              <span className="text-2xl sm:text-3xl font-black text-foreground font-mono leading-none tracking-tight">
+                {achieved}
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-muted-foreground font-semibold ml-1.5">
+                resolvidas esta semana
+              </span>
+            </div>
+            {diff !== null && (
+              <span
+                className={cn(
+                  "text-[10px] sm:text-[11px] font-extrabold font-mono shrink-0",
+                  diff >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-amber-600 dark:text-amber-400"
+                )}
+              >
+                {diff >= 0 ? `+${diff} acima` : `${diff} da meta`}
+              </span>
+            )}
           </div>
-          <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
-            {target === null ? "Meta não definida" : `Meta da semana: ${target}`}
+
+          {/* Barra de Progresso com Preenchimento Dinâmico */}
+          <div className="space-y-1">
+            <div className="w-full bg-muted/60 rounded-full h-2 overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  realPct !== null && realPct >= 100
+                    ? "bg-gradient-to-r from-[#2563EB] to-emerald-500"
+                    : "bg-[#2563EB]"
+                )}
+                style={{ width: `${progressWidth}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium">
+              <span>Meta semanal: {target !== null ? target : "—"}</span>
+              <span>
+                {achieved} de {target !== null ? target : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Rodapé: Acertos, Erros e Aproveitamento */}
+        <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-border/50 text-[10px] font-bold">
+          <div className="flex items-center gap-2">
+            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+              <Check className="w-3 h-3 stroke-[2.5]" /> {correct} acertos
+            </span>
+            <span className="text-rose-500 flex items-center gap-0.5">
+              <X className="w-3 h-3 stroke-[2.5]" /> {wrong} erros
+            </span>
+          </div>
+          <div className="text-muted-foreground">
+            Aprov:{" "}
+            <span className="font-mono text-foreground font-black">
+              {accuracy !== null ? `${accuracy}%` : "—"}
+            </span>
           </div>
         </div>
       </div>
@@ -590,26 +693,109 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
   }
 
   return (
-    <div className="p-5 flex flex-col justify-between h-full space-y-3">
+    <div
+      className="p-5 flex flex-col justify-between h-full space-y-3 cursor-pointer hover:bg-muted/10 transition-colors"
+      onClick={() => router.push("/estatisticas")}
+    >
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
           <HelpCircle className="w-4 h-4 text-[#2563EB]" /> META DE QUESTÕES SEMANAL
         </span>
-        <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
-          {target === null ? achieved : `${achieved} / ${target}`}
-        </span>
+        {realPct !== null ? (
+          <span
+            className={cn(
+              "text-xs font-black px-2.5 py-0.5 rounded-full font-mono",
+              realPct >= 100
+                ? "text-emerald-600 bg-emerald-500/10 border border-emerald-500/20"
+                : "text-[#2563EB] bg-[#2563EB]/10"
+            )}
+          >
+            {realPct}% da Meta
+          </span>
+        ) : (
+          <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
+            {achieved} resolvidas
+          </span>
+        )}
       </div>
-      <div className="space-y-2 my-auto">
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-auto">
+        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+            Realizadas
+          </span>
+          <span className="text-2xl font-black font-mono text-foreground">{achieved}</span>
+          <span className="text-[10px] text-muted-foreground font-medium block">
+            esta semana
+          </span>
+        </div>
+
+        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+            Meta Semanal
+          </span>
+          <span className="text-2xl font-black font-mono text-foreground">
+            {target ?? "—"}
+          </span>
+          <span
+            className={cn(
+              "text-[10px] font-bold block",
+              diff !== null && diff >= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-amber-600"
+            )}
+          >
+            {diff !== null
+              ? diff >= 0
+                ? `+${diff} acima`
+                : `${diff} para meta`
+              : "Sem meta"}
+          </span>
+        </div>
+
+        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+            Acertos / Erros
+          </span>
+          <div className="flex items-baseline gap-1 text-2xl font-black font-mono">
+            <span className="text-emerald-600 dark:text-emerald-400">{correct}</span>
+            <span className="text-xs text-muted-foreground font-normal">/</span>
+            <span className="text-rose-500">{wrong}</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground font-medium block">
+            respostas
+          </span>
+        </div>
+
+        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+            Aproveitamento
+          </span>
+          <span className="text-2xl font-black font-mono text-[#2563EB]">
+            {accuracy !== null ? `${accuracy}%` : "—"}
+          </span>
+          <span className="text-[10px] text-muted-foreground font-medium block">
+            taxa de acertos
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-1.5 pt-1 border-t">
         <div className="flex justify-between text-xs font-bold text-muted-foreground">
           <span>Progresso Semanal</span>
           <span className="text-foreground font-mono font-black">
-            {pct === null ? "—" : `${pct}%`}
+            {realPct !== null ? `${realPct}%` : "—"}
           </span>
         </div>
         <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
           <div
-            className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
-            style={{ width: `${pct ?? 0}%` }}
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              realPct !== null && realPct >= 100
+                ? "bg-gradient-to-r from-[#2563EB] to-emerald-500"
+                : "bg-[#2563EB]"
+            )}
+            style={{ width: `${progressWidth}%` }}
           />
         </div>
       </div>
@@ -1274,209 +1460,4 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
                     ? "hover:ring-1 hover:ring-emerald-500/30"
                     : "hover:bg-muted/60"
               }`}
-              title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatFullTime(mins)} estudados` : " — Clique para registrar estudo"}`}
-            >
-              {/* Dia */}
-              <span
-                className={`text-sm sm:text-base leading-none font-bold ${
-                  isToday && mins > 0
-                    ? "text-primary font-extrabold"
-                    : isToday
-                      ? "text-primary"
-                      : mins > 0
-                        ? "text-foreground"
-                        : "text-foreground/60"
-                }`}
-              >
-                {day}
-              </span>
-
-              {/* Label HOJE */}
-              {isToday && (
-                <span className="text-[9px] sm:text-[10px] leading-none font-extrabold uppercase tracking-wider text-primary mt-0.5">
-                  Hoje
-                </span>
-              )}
-
-              {/* Tempo estudado */}
-              {mins > 0 && (
-                <span className="text-xs sm:text-sm leading-none font-bold mt-0.5 text-emerald-600 dark:text-emerald-400">
-                  {formatCompactTimeShort(mins)}
-                </span>
-              )}
-
-              {/* Percentual da meta */}
-              {goalPct !== null && (
-                <span
-                  className={`text-[10px] sm:text-xs leading-none font-semibold mt-0.5 ${
-                    goalPct >= 100
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {goalPct}%
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Legenda do heatmap */}
-      <div className="flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-border/50">
-        <span className="text-[10px] sm:text-xs text-muted-foreground mr-1">Menos</span>
-        {[
-          "bg-emerald-500/10",
-          "bg-emerald-500/25",
-          "bg-emerald-500/40",
-          "bg-emerald-500/60",
-          "bg-emerald-500/80",
-        ].map((cls, i) => (
-          <div
-            key={i}
-            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-sm ${cls}`}
-          />
-        ))}
-        <span className="text-[10px] sm:text-xs text-muted-foreground ml-1">Mais</span>
-      </div>
-
-      {/* Modal de detalhes do dia */}
-      <DayDetailModal
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        date={selectedDate}
-      />
-
-      {/* Modal de registro manual (para dias sem estudo) */}
-      <ManualStudyTimeModal
-        open={manualModalOpen}
-        onOpenChange={setManualModalOpen}
-        dateStr={manualDate}
-        onSaved={fetchTotals}
-      />
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 18. WIDGET: Ciclo de Estudo
-// ─────────────────────────────────────────────────────────────────────────────
-function WidgetCicloEstudoWrapper(_props: DashboardWidgetProps) {
-  return <StudyCycleWidget embedded={true} />
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REGISTRO MASTER DE WIDGETS
-// ─────────────────────────────────────────────────────────────────────────────
-export const WIDGET_REGISTRY: Record<
-  string,
-  {
-    name: string
-    description: string
-    defaultSpan: 1 | 2 | 3
-    component: React.ComponentType<DashboardWidgetProps>
-  }
-> = {
-  calendario: {
-    name: "Calendário",
-    description: "Calendário mensal para visualizar datas e navegar entre os meses.",
-    defaultSpan: 2,
-    component: WidgetCalendario,
-  },
-  tempo_estudo: {
-    name: "Tempo de Estudo",
-    description: "Exibe horas estudadas no dia e semana em relação à sua meta.",
-    defaultSpan: 1,
-    component: WidgetTempoEstudo,
-  },
-  desempenho: {
-    name: "Desempenho Geral",
-    description: "Métricas de acurácia, taxa de acertos e acertos vs erros.",
-    defaultSpan: 1,
-    component: WidgetDesempenho,
-  },
-  progresso_edital: {
-    name: "Progresso no Edital",
-    description: "Percentual de cobertura e disciplinas concluídas.",
-    defaultSpan: 1,
-    component: WidgetProgressoEdital,
-  },
-  estudos_hoje: {
-    name: "Estudos de Hoje (Visão Diária)",
-    description: "Cronograma diário com disciplinas agendadas e botão Iniciar Estudo.",
-    defaultSpan: 3,
-    component: WidgetEstudosHoje,
-  },
-  constancia: {
-    name: "Constância nos Estudos",
-    description: "Sequência de dias consecutivos estudando (Streak).",
-    defaultSpan: 1,
-    component: WidgetConstancia,
-  },
-  questoes: {
-    name: "Questões",
-    description: "Acompanhamento da meta semanal de questões resolvidas.",
-    defaultSpan: 1,
-    component: WidgetQuestoes,
-  },
-  revisoes: {
-    name: "Revisões",
-    description: "Revisões pendentes e agendadas para o dia.",
-    defaultSpan: 1,
-    component: WidgetRevisoes,
-  },
-  desempenho_materia: {
-    name: "Desempenho por Matéria",
-    description: "Tabela com tempo estudado, questões e acurácia por matéria.",
-    defaultSpan: 2,
-    component: WidgetDesempenhoMateria,
-  },
-  ultimas_atividades: {
-    name: "Últimas Atividades",
-    description: "Histórico das últimas sessões de estudo realizadas.",
-    defaultSpan: 1,
-    component: WidgetUltimasAtividades,
-  },
-  metas_estudo: {
-    name: "Metas de Estudo",
-    description: "Barras de progresso para horas, questões e dias ativos.",
-    defaultSpan: 1,
-    component: WidgetMetasEstudo,
-  },
-  ranking: {
-    name: "Ranking",
-    description: "Classificação por pontos das suas matérias e áreas.",
-    defaultSpan: 1,
-    component: WidgetRanking,
-  },
-  conquistas: {
-    name: "Conquistas",
-    description: "Medalhas e marcos de evolução desbloqueados.",
-    defaultSpan: 1,
-    component: WidgetConquistas,
-  },
-  data_prova: {
-    name: "Data da Prova",
-    description: "Exibe a contagem ou data da prova cadastrada.",
-    defaultSpan: 1,
-    component: WidgetDataProva,
-  },
-  lembretes: {
-    name: "Lembretes",
-    description: "Lista de lembretes e avisos importantes.",
-    defaultSpan: 1,
-    component: WidgetLembretes,
-  },
-  mensagem_dia: {
-    name: "Mensagem do Dia",
-    description: "Uma mensagem motivacional para começar o dia.",
-    defaultSpan: 1,
-    component: WidgetMensagemDia,
-  },
-  ciclo_estudo: {
-    name: "Ciclo de Estudo",
-    description: "Ciclo de estudo ativo com progresso e próxima matéria.",
-    defaultSpan: 1,
-    component: WidgetCicloEstudoWrapper,
-  },
-}
+              title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatFullTime(m

@@ -149,7 +149,7 @@ export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
       <aside
         className={cn(
           "relative flex h-screen flex-col shrink-0 border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] transition-[width,transform] duration-300 ease-in-out",
-          effectiveCollapsed ? "w-[var(--sidebar-width-collapsed)]" : "w-[var(--sidebar-width)]",
+          effectiveCollapsed ? "w-[var(--sidebar-width-collapsed)]" : "w-[280px] max-w-[85vw] md:w-[var(--sidebar-width)]",
           // Mobile/tablet: drawer fixo com overlay. Desktop: estático.
           "fixed inset-y-0 left-0 z-50 md:relative",
           isOpen ? "translate-x-0 shadow-2xl md:shadow-none" : "-translate-x-full md:translate-x-0",
@@ -224,14 +224,14 @@ export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
                     priority
                   />
                 </div>
-                <div className="min-w-0 leading-tight">
-                  <p className="text-[16px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] truncate flex items-center">
+                <div className="min-w-0 flex-1 leading-tight pr-6 md:pr-0">
+                  <p className="text-[16px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] flex items-center">
                     <span>Nome</span>
                     <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
                       IA
                     </span>
                   </p>
-                  <p className="text-[10px] font-medium text-[hsl(var(--sidebar-foreground))/0.6] truncate">
+                  <p className="text-[10px] sm:text-[10.5px] font-medium text-[hsl(var(--sidebar-foreground))/0.7] leading-snug mt-0.5 whitespace-normal">
                     Sua preparação rumo à nomeação.
                   </p>
                 </div>

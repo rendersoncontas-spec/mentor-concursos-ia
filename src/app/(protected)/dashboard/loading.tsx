@@ -4,7 +4,7 @@ import { CycleNextCardSkeleton } from "@/features/dashboard/components/cycle-nex
 
 export default function DashboardLoading() {
   return (
-    <div className="flex-1 p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full animate-pulse">
+    <div className="flex-1 p-4 sm:p-5 md:p-6 space-y-6 w-full max-w-full animate-pulse">
       {/* Header Skeleton */}
       <div className="flex justify-between items-center pb-2 border-b">
         <div className="space-y-2">

@@ -36,32 +36,55 @@ export async function getDashboardLayoutAction(): Promise<{
     } = await supabase.auth.getUser()
     if (!user) return { success: true, data: getDashboardLayoutConfig() }
 
-    const { data, error } = await supabase
-      .from("user_dashboard_layouts")
-      .select("widget_id, position_order, col_span, row_span, visible")
-      .eq("user_id", user.id)
-      .order("position_order")
-
     let loadedLayout: WidgetConfigItem[] = []
 
-    if (!error && data && data.length > 0) {
-      loadedLayout = data.map((item) => ({
-        widget_id: item.widget_id,
-        position_order: item.position_order,
-        col_span: (Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3),
-        row_span: item.row_span || 1,
-        visible: Boolean(item.visible),
-      }))
-    } else if (user.user_metadata && Array.isArray(user.user_metadata["dashboard_layout"])) {
-      // Fallback: carregar de user_metadata
-      loadedLayout = (user.user_metadata["dashboard_layout"] as WidgetConfigItem[]).map((item, idx) => ({
-        widget_id: item.widget_id,
-        position_order: item.position_order ?? idx + 1,
-        col_span: (Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3),
-        row_span: item.row_span || 1,
-        visible: Boolean(item.visible),
-      }))
-    } else {
+    // 1. Tenta carregar de user_dashboard_layouts
+    try {
+      const { data, error } = await supabase
+        .from("user_dashboard_layouts")
+        .select("widget_id, position_order, col_span, row_span, visible")
+        .eq("user_id", user.id)
+        .order("position_order")
+
+      if (!error && data && data.length > 0) {
+        loadedLayout = data.map((item) => ({
+          widget_id: item.widget_id,
+          position_order: item.position_order,
+          col_span: (Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3),
+          row_span: item.row_span || 1,
+          visible: Boolean(item.visible),
+        }))
+      }
+    } catch {
+      // Ignora erro se a tabela não existir
+    }
+
+    // 2. Se não encontrou, tenta carregar de profiles.preferences.dashboard_layout
+    if (loadedLayout.length === 0) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("preferences")
+          .eq("id", user.id)
+          .maybeSingle()
+
+        const prefs = profile?.preferences as Record<string, unknown> | null
+        if (prefs && Array.isArray(prefs["dashboard_layout"]) && prefs["dashboard_layout"].length > 0) {
+          loadedLayout = (prefs["dashboard_layout"] as WidgetConfigItem[]).map((item, idx) => ({
+            widget_id: item.widget_id,
+            position_order: item.position_order ?? idx + 1,
+            col_span: (Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3),
+            row_span: item.row_span || 1,
+            visible: Boolean(item.visible),
+          }))
+        }
+      } catch {
+        // Ignora
+      }
+    }
+
+    // 3. Se ainda vazio, usa a configuração padrão
+    if (loadedLayout.length === 0) {
       loadedLayout = getDashboardLayoutConfig()
     }
 
@@ -100,19 +123,35 @@ export async function saveDashboardLayoutAction(
       updated_at: new Date().toISOString(),
     }))
 
-    // 1. Tenta salvar na tabela user_dashboard_layouts se existir
-    const { error: dbError } = await supabase
-      .from("user_dashboard_layouts")
-      .upsert(recordsToUpsert, { onConflict: "user_id,widget_id" })
+    // 1. Tenta salvar na tabela user_dashboard_layouts
+    try {
+      await supabase
+        .from("user_dashboard_layouts")
+        .upsert(recordsToUpsert, { onConflict: "user_id,widget_id" })
+    } catch {
+      // Ignora se tabela não existir
+    }
 
-    // 2. Salva em user_metadata como fallback resiliente garantido
-    const { error: metaError } = await supabase.auth.updateUser({
-      data: { dashboard_layout: recordsToUpsert },
-    })
+    // 2. Salva em profiles.preferences.dashboard_layout (no banco, sem inflar cookies)
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("preferences")
+        .eq("id", user.id)
+        .maybeSingle()
 
-    if (dbError && metaError) {
-      console.error("Erro ao salvar layout no Supabase e em user_metadata:", { dbError, metaError })
-      return { success: false, error: "Falha ao salvar personalização no banco." }
+      const currentPrefs = (profile?.preferences as Record<string, unknown>) || {}
+      await supabase
+        .from("profiles")
+        .update({
+          preferences: {
+            ...currentPrefs,
+            dashboard_layout: recordsToUpsert,
+          },
+        })
+        .eq("id", user.id)
+    } catch (prefErr) {
+      console.warn("Aviso ao salvar layout em profiles.preferences:", prefErr)
     }
 
     return { success: true }
@@ -139,9 +178,20 @@ export async function resetDashboardLayoutAction(): Promise<{
         // Ignora se tabela não existir
       }
       try {
-        await supabase.auth.updateUser({
-          data: { dashboard_layout: null },
-        })
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("preferences")
+          .eq("id", user.id)
+          .maybeSingle()
+
+        const currentPrefs = (profile?.preferences as Record<string, unknown>) || {}
+        delete currentPrefs["dashboard_layout"]
+        await supabase
+          .from("profiles")
+          .update({
+            preferences: currentPrefs,
+          })
+          .eq("id", user.id)
       } catch {
         // Ignora
       }

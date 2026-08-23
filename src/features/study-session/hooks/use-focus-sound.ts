@@ -2,30 +2,43 @@
 
 import { useRef, useState, useCallback, useEffect, useMemo } from "react"
 
-export type FocusSoundId = "off" | "pink_noise" | "white_noise" | "brown_noise" | "rain" | "library" | "cafe"
+export type FocusSoundId =
+  | "off"
+  | "rain"
+  | "library"
+  | "cafe"
+  | "waves"
+  | "fireplace"
+  | "brown_noise"
+  | "pink_noise"
+  | "white_noise"
 
 export const FOCUS_SOUND_OPTIONS: { id: FocusSoundId; label: string; icon: string }[] = [
-  { id: "off", label: "Desativado", icon: "" },
-  { id: "pink_noise", label: "Pink Noise", icon: "" },
-  { id: "white_noise", label: "White Noise", icon: "" },
-  { id: "brown_noise", label: "Brown Noise", icon: "" },
-  { id: "rain", label: "Chuva", icon: "" },
-  { id: "library", label: "Biblioteca", icon: "" },
-  { id: "cafe", label: "Cafeteria", icon: "" },
+  { id: "off", label: "Desativado", icon: "🔇" },
+  { id: "rain", label: "Chuva Suave 🌧️", icon: "🌧️" },
+  { id: "library", label: "Biblioteca Silenciosa 📚", icon: "📚" },
+  { id: "cafe", label: "Cafeteria Aconchegante ☕", icon: "☕" },
+  { id: "waves", label: "Ondas do Mar 🌊", icon: "🌊" },
+  { id: "fireplace", label: "Lareira / Fogueira 🔥", icon: "🔥" },
+  { id: "brown_noise", label: "Brown Noise (Foco Profundo)", icon: "🎧" },
+  { id: "pink_noise", label: "Pink Noise (Aveludado)", icon: "🌸" },
+  { id: "white_noise", label: "White Noise Suave", icon: "⚪" },
 ]
 
 export const FOCUS_SOUND_LABELS: Record<FocusSoundId, string> = {
   off: "",
-  pink_noise: "Pink Noise",
-  white_noise: "White Noise",
-  brown_noise: "Brown Noise",
-  rain: "Chuva",
+  rain: "Chuva Suave",
   library: "Biblioteca",
   cafe: "Cafeteria",
+  waves: "Ondas do Mar",
+  fireplace: "Lareira",
+  brown_noise: "Brown Noise",
+  pink_noise: "Pink Noise",
+  white_noise: "White Noise",
 }
 
 const PREF_KEY = "mentor-focus-sound-pref"
-const DEFAULT_VOLUME = 30
+const DEFAULT_VOLUME = 35
 
 interface FocusSoundPref {
   sound: FocusSoundId
@@ -56,12 +69,10 @@ function savePref(pref: FocusSoundPref) {
   }
 }
 
-interface NoiseNode {
-  source: AudioBufferSourceNode
-  gain: GainNode
-  filter?: BiquadFilterNode
-  lfo?: OscillatorNode
-  lfoGain?: GainNode
+interface AudioGraphNode {
+  sources: (AudioBufferSourceNode | OscillatorNode)[]
+  gains: GainNode[]
+  intervals: number[]
 }
 
 export function useFocusSound() {
@@ -71,7 +82,7 @@ export function useFocusSound() {
   const [isInitialized, setIsInitialized] = useState(false)
 
   const audioContextRef = useRef<AudioContext | null>(null)
-  const noiseNodesRef = useRef<NoiseNode[]>([])
+  const activeGraphRef = useRef<AudioGraphNode | null>(null)
   const masterGainRef = useRef<GainNode | null>(null)
   const currentSoundRef = useRef<FocusSoundId>(selectedSound)
 
@@ -80,22 +91,38 @@ export function useFocusSound() {
   }, [])
 
   const cleanupNodes = useCallback(() => {
-    noiseNodesRef.current.forEach((node) => {
-      try { node.source.stop() } catch { /* already stopped */ }
-      try { node.source.disconnect() } catch { /* */ }
-      try { node.gain.disconnect() } catch { /* */ }
-      try { node.filter?.disconnect() } catch { /* */ }
-      try { node.lfo?.stop() } catch { /* already stopped */ }
-      try { node.lfo?.disconnect() } catch { /* */ }
-      try { node.lfoGain?.disconnect() } catch { /* */ }
-    })
-    noiseNodesRef.current = []
+    if (activeGraphRef.current) {
+      const { sources, gains, intervals } = activeGraphRef.current
+      intervals.forEach((id) => clearInterval(id))
+      sources.forEach((src) => {
+        try {
+          src.stop()
+        } catch {
+          /* already stopped */
+        }
+        try {
+          src.disconnect()
+        } catch {
+          /* */
+        }
+      })
+      gains.forEach((g) => {
+        try {
+          g.disconnect()
+        } catch {
+          /* */
+        }
+      })
+      activeGraphRef.current = null
+    }
   }, [])
 
   const ensureContext = useCallback((): AudioContext | null => {
     if (typeof window === "undefined") return null
     if (!audioContextRef.current) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (!AudioCtx) return null
       audioContextRef.current = new AudioCtx()
       masterGainRef.current = audioContextRef.current.createGain()
@@ -105,203 +132,468 @@ export function useFocusSound() {
     return audioContextRef.current
   }, [])
 
-  const createNoiseBuffer = useCallback((ctx: AudioContext, type: FocusSoundId): AudioBuffer => {
-    const bufferSize = ctx.sampleRate * 4
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-    const data = buffer.getChannelData(0)
+  // Gerador de buffer estéreo suave (livre de chiados secos)
+  const createStereoPinkBuffer = useCallback((ctx: AudioContext, seconds = 6): AudioBuffer => {
+    const bufferSize = ctx.sampleRate * seconds
+    const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate)
+    const left = buffer.getChannelData(0)
+    const right = buffer.getChannelData(1)
 
-    if (type === "white_noise") {
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1
-      }
-    } else if (type === "pink_noise") {
-      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1
-        b0 = 0.99886 * b0 + white * 0.0555179
-        b1 = 0.99332 * b1 + white * 0.0750759
-        b2 = 0.96900 * b2 + white * 0.1538520
-        b3 = 0.86650 * b3 + white * 0.3104856
-        b4 = 0.55000 * b4 + white * 0.5329522
-        b5 = -0.7616 * b5 - white * 0.0168980
-        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.1
-        b6 = white * 0.115926
-      }
-    } else if (type === "brown_noise") {
-      let lastOut = 0
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1
-        lastOut = (lastOut + 0.02 * white) / 1.02
-        data[i] = lastOut * 3.0
-      }
-    } else {
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1
-      }
+    // Voss-McCartney com filtro quente para eliminar qualquer estática irritante
+    let b0L = 0, b1L = 0, b2L = 0, b3L = 0, b4L = 0, b5L = 0
+    let b0R = 0, b1R = 0, b2R = 0, b3R = 0, b4R = 0, b5R = 0
+
+    for (let i = 0; i < bufferSize; i++) {
+      const whiteL = Math.random() * 2 - 1
+      b0L = 0.99886 * b0L + whiteL * 0.0555179
+      b1L = 0.99332 * b1L + whiteL * 0.0750759
+      b2L = 0.96900 * b2L + whiteL * 0.1538520
+      b3L = 0.86650 * b3L + whiteL * 0.3104856
+      b4L = 0.55000 * b4L + whiteL * 0.5329522
+      b5L = -0.7616 * b5L - whiteL * 0.0168980
+      left[i] = (b0L + b1L + b2L + b3L + b4L + b5L + whiteL * 0.25) * 0.12
+
+      const whiteR = Math.random() * 2 - 1
+      b0R = 0.99886 * b0R + whiteR * 0.0555179
+      b1R = 0.99332 * b1R + whiteR * 0.0750759
+      b2R = 0.96900 * b2R + whiteR * 0.1538520
+      b3R = 0.86650 * b3R + whiteR * 0.3104856
+      b4R = 0.55000 * b4R + whiteR * 0.5329522
+      b5R = -0.7616 * b5R - whiteR * 0.0168980
+      right[i] = (b0R + b1R + b2R + b3R + b4R + b5R + whiteR * 0.25) * 0.12
     }
 
     return buffer
   }, [])
 
-  const buildRainNodes = useCallback((ctx: AudioContext): NoiseNode[] => {
-    const nodes: NoiseNode[] = []
+  const createStereoBrownBuffer = useCallback((ctx: AudioContext, seconds = 6): AudioBuffer => {
+    const bufferSize = ctx.sampleRate * seconds
+    const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate)
+    const left = buffer.getChannelData(0)
+    const right = buffer.getChannelData(1)
 
-    const bufferSize = ctx.sampleRate * 4
-    const whiteBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-    const whiteData = whiteBuffer.getChannelData(0)
-    for (let i = 0; i < bufferSize; i++) whiteData[i] = Math.random() * 2 - 1
+    let lastOutL = 0
+    let lastOutR = 0
 
-    const source = ctx.createBufferSource()
-    source.buffer = whiteBuffer
-    source.loop = true
+    for (let i = 0; i < bufferSize; i++) {
+      const whiteL = Math.random() * 2 - 1
+      lastOutL = (lastOutL + 0.02 * whiteL) / 1.02
+      left[i] = lastOutL * 2.8
 
-    const gain = ctx.createGain()
-    gain.gain.value = 0.5
+      const whiteR = Math.random() * 2 - 1
+      lastOutR = (lastOutR + 0.02 * whiteR) / 1.02
+      right[i] = lastOutR * 2.8
+    }
 
-    const lpFilter = ctx.createBiquadFilter()
-    lpFilter.type = "lowpass"
-    lpFilter.frequency.value = 1800
-    lpFilter.Q.value = 0.5
-
-    const hpFilter = ctx.createBiquadFilter()
-    hpFilter.type = "highpass"
-    hpFilter.frequency.value = 400
-
-    source.connect(hpFilter)
-    hpFilter.connect(lpFilter)
-    lpFilter.connect(gain)
-
-    const lfo = ctx.createOscillator()
-    lfo.frequency.value = 0.3
-    const lfoGain = ctx.createGain()
-    lfoGain.gain.value = 200
-    lfo.connect(lfoGain)
-    lfoGain.connect(lpFilter.frequency)
-    lfo.start()
-
-    nodes.push({ source, gain, filter: lpFilter, lfo, lfoGain })
-    return nodes
+    return buffer
   }, [])
 
-  const buildCafeNodes = useCallback((ctx: AudioContext): NoiseNode[] => {
-    const nodes: NoiseNode[] = []
+  // 1. CHUVA SUAVE (Som orgânico, aveludado e dinâmico com rajadas calmas)
+  const buildRainGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const sources: (AudioBufferSourceNode | OscillatorNode)[] = []
+      const gains: GainNode[] = []
+      const intervals: number[] = []
 
-    const bufferSize = ctx.sampleRate * 4
+      const pinkBuf = createStereoPinkBuffer(ctx, 8)
+      const brownBuf = createStereoBrownBuffer(ctx, 8)
 
-    // Layer 1: Brown noise base (ambient hum)
-    const brownBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-    const brownData = brownBuffer.getChannelData(0)
-    let lastOut = 0
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1
-      lastOut = (lastOut + 0.02 * white) / 1.02
-      brownData[i] = lastOut * 2.5
-    }
-    const brownSource = ctx.createBufferSource()
-    brownSource.buffer = brownBuffer
-    brownSource.loop = true
-    const brownGain = ctx.createGain()
-    brownGain.gain.value = 0.15
-    const brownFilter = ctx.createBiquadFilter()
-    brownFilter.type = "lowpass"
-    brownFilter.frequency.value = 500
-    brownSource.connect(brownFilter)
-    brownFilter.connect(brownGain)
-    nodes.push({ source: brownSource, gain: brownGain, filter: brownFilter })
+      // Camada 1: Corpo da chuva (Pink Noise com corte passa-baixas quente)
+      const rainBody = ctx.createBufferSource()
+      rainBody.buffer = pinkBuf
+      rainBody.loop = true
+      const lpFilter = ctx.createBiquadFilter()
+      lpFilter.type = "lowpass"
+      lpFilter.frequency.value = 680
+      lpFilter.Q.value = 0.7
 
-    // Layer 2: Occasional clinks (high-freq bursts)
-    const whiteBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-    const whiteData = whiteBuffer.getChannelData(0)
-    for (let i = 0; i < bufferSize; i++) whiteData[i] = Math.random() * 2 - 1
-    const whiteSource = ctx.createBufferSource()
-    whiteSource.buffer = whiteBuffer
-    whiteSource.loop = true
-    const whiteGain = ctx.createGain()
-    whiteGain.gain.value = 0.08
-    const whiteFilter = ctx.createBiquadFilter()
-    whiteFilter.type = "bandpass"
-    whiteFilter.frequency.value = 3000
-    whiteFilter.Q.value = 2
-    whiteSource.connect(whiteFilter)
-    whiteFilter.connect(whiteGain)
-    nodes.push({ source: whiteSource, gain: whiteGain, filter: whiteFilter })
+      const rainGain = ctx.createGain()
+      rainGain.gain.value = 0.45
 
-    return nodes
-  }, [])
+      // LFO lento para oscilação natural da intensidade da chuva
+      const lfo = ctx.createOscillator()
+      lfo.frequency.value = 0.12
+      const lfoGain = ctx.createGain()
+      lfoGain.gain.value = 160
+      lfo.connect(lfoGain)
+      lfoGain.connect(lpFilter.frequency)
 
-  const buildLibraryNodes = useCallback((ctx: AudioContext): NoiseNode[] => {
-    const nodes: NoiseNode[] = []
+      rainBody.connect(lpFilter)
+      lpFilter.connect(rainGain)
+      rainGain.connect(master)
 
-    const bufferSize = ctx.sampleRate * 4
+      rainBody.start()
+      lfo.start()
+      sources.push(rainBody, lfo)
+      gains.push(rainGain, lfoGain)
 
-    // Very soft brown noise — like HVAC / air conditioning
-    const brownBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-    const brownData = brownBuffer.getChannelData(0)
-    let lastOut = 0
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1
-      lastOut = (lastOut + 0.01 * white) / 1.01
-      brownData[i] = lastOut * 1.5
-    }
-    const brownSource = ctx.createBufferSource()
-    brownSource.buffer = brownBuffer
-    brownSource.loop = true
-    const brownGain = ctx.createGain()
-    brownGain.gain.value = 0.1
-    const brownFilter = ctx.createBiquadFilter()
-    brownFilter.type = "lowpass"
-    brownFilter.frequency.value = 300
-    brownSource.connect(brownFilter)
-    brownFilter.connect(brownGain)
-    nodes.push({ source: brownSource, gain: brownGain, filter: brownFilter })
+      // Camada 2: Grave da tempestade distante (Brown Noise aveludado)
+      const deepThunder = ctx.createBufferSource()
+      deepThunder.buffer = brownBuf
+      deepThunder.loop = true
+      const deepFilter = ctx.createBiquadFilter()
+      deepFilter.type = "lowpass"
+      deepFilter.frequency.value = 220
+      const deepGain = ctx.createGain()
+      deepGain.gain.value = 0.35
 
-    // Occasional page-turn-like rustle
-    const pinkBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-    const pinkData = pinkBuffer.getChannelData(0)
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1
-      b0 = 0.99886 * b0 + white * 0.0555179
-      b1 = 0.99332 * b1 + white * 0.0750759
-      b2 = 0.96900 * b2 + white * 0.1538520
-      b3 = 0.86650 * b3 + white * 0.3104856
-      b4 = 0.55000 * b4 + white * 0.5329522
-      b5 = -0.7616 * b5 - white * 0.0168980
-      pinkData[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.05
-      b6 = white * 0.115926
-    }
-    const pinkSource = ctx.createBufferSource()
-    pinkSource.buffer = pinkBuffer
-    pinkSource.loop = true
-    const pinkGain = ctx.createGain()
-    pinkGain.gain.value = 0.04
-    const pinkFilter = ctx.createBiquadFilter()
-    pinkFilter.type = "bandpass"
-    pinkFilter.frequency.value = 2000
-    pinkFilter.Q.value = 0.7
-    pinkSource.connect(pinkFilter)
-    pinkFilter.connect(pinkGain)
-    nodes.push({ source: pinkSource, gain: pinkGain, filter: pinkFilter })
+      deepThunder.connect(deepFilter)
+      deepFilter.connect(deepGain)
+      deepGain.connect(master)
 
-    return nodes
-  }, [])
+      deepThunder.start()
+      sources.push(deepThunder)
+      gains.push(deepGain)
 
-  const buildNodes = useCallback((ctx: AudioContext, sound: FocusSoundId): NoiseNode[] => {
-    if (sound === "pink_noise" || sound === "white_noise" || sound === "brown_noise") {
-      const buffer = createNoiseBuffer(ctx, sound)
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-      source.loop = true
+      // Camada 3: Gotas suaves aleatórias sintetizadas com ressonância limpa
+      const dropInterval = window.setInterval(() => {
+        if (!audioContextRef.current || audioContextRef.current.state !== "running") return
+        try {
+          const osc = ctx.createOscillator()
+          const dropGain = ctx.createGain()
+          const freq = 1200 + Math.random() * 800
+          osc.type = "sine"
+          osc.frequency.setValueAtTime(freq, ctx.currentTime)
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.6, ctx.currentTime + 0.08)
+
+          dropGain.gain.setValueAtTime(0.02 + Math.random() * 0.02, ctx.currentTime)
+          dropGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08)
+
+          osc.connect(dropGain)
+          dropGain.connect(master)
+          osc.start()
+          osc.stop(ctx.currentTime + 0.09)
+        } catch {}
+      }, 450)
+
+      intervals.push(dropInterval)
+
+      return { sources, gains, intervals }
+    },
+    [createStereoPinkBuffer, createStereoBrownBuffer]
+  )
+
+  // 2. BIBLIOTECA SILENCIOSA (Acústica acolhedora, ar-condicionado suave e paz profunda)
+  const buildLibraryGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const sources: (AudioBufferSourceNode | OscillatorNode)[] = []
+      const gains: GainNode[] = []
+      const intervals: number[] = []
+
+      const brownBuf = createStereoBrownBuffer(ctx, 8)
+
+      // Camada 1: Fundo acústico e ar-condicionado suave
+      const hvacSource = ctx.createBufferSource()
+      hvacSource.buffer = brownBuf
+      hvacSource.loop = true
+
+      const hvacFilter = ctx.createBiquadFilter()
+      hvacFilter.type = "lowpass"
+      hvacFilter.frequency.value = 190
+      hvacFilter.Q.value = 1.0
+
+      const hvacGain = ctx.createGain()
+      hvacGain.gain.value = 0.4
+
+      hvacSource.connect(hvacFilter)
+      hvacFilter.connect(hvacGain)
+      hvacGain.connect(master)
+
+      hvacSource.start()
+      sources.push(hvacSource)
+      gains.push(hvacGain)
+
+      // Camada 2: Ressonância ambiente aveludada
+      const airOsc = ctx.createOscillator()
+      airOsc.type = "sine"
+      airOsc.frequency.value = 68
+      const airGain = ctx.createGain()
+      airGain.gain.value = 0.015
+
+      airOsc.connect(airGain)
+      airGain.connect(master)
+      airOsc.start()
+      sources.push(airOsc)
+      gains.push(airGain)
+
+      return { sources, gains, intervals }
+    },
+    [createStereoBrownBuffer]
+  )
+
+  // 3. CAFETERIA ACONCHEGANTE (Murmúrio distante e caloroso, xícaras sutis)
+  const buildCafeGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const sources: (AudioBufferSourceNode | OscillatorNode)[] = []
+      const gains: GainNode[] = []
+      const intervals: number[] = []
+
+      const pinkBuf = createStereoPinkBuffer(ctx, 8)
+      const brownBuf = createStereoBrownBuffer(ctx, 8)
+
+      // Camada 1: Murmúrio distante suave (Formantes vocais quentes)
+      const murmurSource = ctx.createBufferSource()
+      murmurSource.buffer = pinkBuf
+      murmurSource.loop = true
+
+      const formant1 = ctx.createBiquadFilter()
+      formant1.type = "bandpass"
+      formant1.frequency.value = 480
+      formant1.Q.value = 1.8
+
+      const murmurGain = ctx.createGain()
+      murmurGain.gain.value = 0.28
+
+      murmurSource.connect(formant1)
+      formant1.connect(murmurGain)
+      murmurGain.connect(master)
+
+      murmurSource.start()
+      sources.push(murmurSource)
+      gains.push(murmurGain)
+
+      // Camada 2: Grave do ambiente da cafeteria
+      const ambientBase = ctx.createBufferSource()
+      ambientBase.buffer = brownBuf
+      ambientBase.loop = true
+      const baseFilter = ctx.createBiquadFilter()
+      baseFilter.type = "lowpass"
+      baseFilter.frequency.value = 260
+      const baseGain = ctx.createGain()
+      baseGain.gain.value = 0.35
+
+      ambientBase.connect(baseFilter)
+      baseFilter.connect(baseGain)
+      baseGain.connect(master)
+
+      ambientBase.start()
+      sources.push(ambientBase)
+      gains.push(baseGain)
+
+      // Camada 3: Toque ocasional de louça/xícara de café
+      const clinkInterval = window.setInterval(() => {
+        if (!audioContextRef.current || audioContextRef.current.state !== "running") return
+        if (Math.random() > 0.45) return
+        try {
+          const osc = ctx.createOscillator()
+          const clinkGain = ctx.createGain()
+          const freq = 2200 + Math.random() * 600
+          osc.type = "sine"
+          osc.frequency.setValueAtTime(freq, ctx.currentTime)
+
+          clinkGain.gain.setValueAtTime(0.015, ctx.currentTime)
+          clinkGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12)
+
+          osc.connect(clinkGain)
+          clinkGain.connect(master)
+          osc.start()
+          osc.stop(ctx.currentTime + 0.14)
+        } catch {}
+      }, 3500)
+
+      intervals.push(clinkInterval)
+
+      return { sources, gains, intervals }
+    },
+    [createStereoPinkBuffer, createStereoBrownBuffer]
+  )
+
+  // 4. ONDAS DO MAR (Ritmo hipnótico e relaxante)
+  const buildWavesGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const sources: (AudioBufferSourceNode | OscillatorNode)[] = []
+      const gains: GainNode[] = []
+      const intervals: number[] = []
+
+      const pinkBuf = createStereoPinkBuffer(ctx, 8)
+      const brownBuf = createStereoBrownBuffer(ctx, 8)
+
+      const waveSource = ctx.createBufferSource()
+      waveSource.buffer = pinkBuf
+      waveSource.loop = true
+
+      const waveFilter = ctx.createBiquadFilter()
+      waveFilter.type = "lowpass"
+      waveFilter.frequency.value = 450
+      waveFilter.Q.value = 1.2
+
+      const waveGain = ctx.createGain()
+      waveGain.gain.value = 0.3
+
+      // LFO lento para o vai-e-vem das ondas (ciclo de ~12s)
+      const lfo = ctx.createOscillator()
+      lfo.frequency.value = 0.08
+      const lfoGain = ctx.createGain()
+      lfoGain.gain.value = 350
+
+      lfo.connect(lfoGain)
+      lfoGain.connect(waveFilter.frequency)
+
+      const lfoVol = ctx.createGain()
+      lfoVol.gain.value = 0.22
+      lfo.connect(lfoVol)
+      lfoVol.connect(waveGain.gain)
+
+      waveSource.connect(waveFilter)
+      waveFilter.connect(waveGain)
+      waveGain.connect(master)
+
+      // Base profunda da onda
+      const deepOcean = ctx.createBufferSource()
+      deepOcean.buffer = brownBuf
+      deepOcean.loop = true
+      const deepFilter = ctx.createBiquadFilter()
+      deepFilter.type = "lowpass"
+      deepFilter.frequency.value = 160
+      const deepGain = ctx.createGain()
+      deepGain.gain.value = 0.3
+
+      deepOcean.connect(deepFilter)
+      deepFilter.connect(deepGain)
+      deepGain.connect(master)
+
+      waveSource.start()
+      deepOcean.start()
+      lfo.start()
+
+      sources.push(waveSource, deepOcean, lfo)
+      gains.push(waveGain, deepGain, lfoGain, lfoVol)
+
+      return { sources, gains, intervals }
+    },
+    [createStereoPinkBuffer, createStereoBrownBuffer]
+  )
+
+  // 5. LAREIRA / FOGUEIRA (Calor acústico aconchegante)
+  const buildFireplaceGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const sources: (AudioBufferSourceNode | OscillatorNode)[] = []
+      const gains: GainNode[] = []
+      const intervals: number[] = []
+
+      const brownBuf = createStereoBrownBuffer(ctx, 8)
+
+      const fireBase = ctx.createBufferSource()
+      fireBase.buffer = brownBuf
+      fireBase.loop = true
+      const fireFilter = ctx.createBiquadFilter()
+      fireFilter.type = "lowpass"
+      fireFilter.frequency.value = 240
+      const fireGain = ctx.createGain()
+      fireGain.gain.value = 0.4
+
+      fireBase.connect(fireFilter)
+      fireFilter.connect(fireGain)
+      fireGain.connect(master)
+
+      fireBase.start()
+      sources.push(fireBase)
+      gains.push(fireGain)
+
+      // Estalidos suaves e acolhedores da lenha
+      const crackleInterval = window.setInterval(() => {
+        if (!audioContextRef.current || audioContextRef.current.state !== "running") return
+        if (Math.random() > 0.6) return
+        try {
+          const osc = ctx.createOscillator()
+          const crackleGain = ctx.createGain()
+          osc.type = "sine"
+          osc.frequency.setValueAtTime(600 + Math.random() * 800, ctx.currentTime)
+
+          crackleGain.gain.setValueAtTime(0.018, ctx.currentTime)
+          crackleGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.04)
+
+          osc.connect(crackleGain)
+          crackleGain.connect(master)
+          osc.start()
+          osc.stop(ctx.currentTime + 0.05)
+        } catch {}
+      }, 180)
+
+      intervals.push(crackleInterval)
+
+      return { sources, gains, intervals }
+    },
+    [createStereoBrownBuffer]
+  )
+
+  // 6. BROWN NOISE (Foco profundo, aveludado, zero agudos)
+  const buildBrownNoiseGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const brownBuf = createStereoBrownBuffer(ctx, 8)
+      const src = ctx.createBufferSource()
+      src.buffer = brownBuf
+      src.loop = true
+
+      const filter = ctx.createBiquadFilter()
+      filter.type = "lowpass"
+      filter.frequency.value = 280
+      filter.Q.value = 0.7
+
       const gain = ctx.createGain()
       gain.gain.value = 0.5
-      source.connect(gain)
-      return [{ source, gain }]
-    }
-    if (sound === "rain") return buildRainNodes(ctx)
-    if (sound === "library") return buildLibraryNodes(ctx)
-    if (sound === "cafe") return buildCafeNodes(ctx)
-    return []
-  }, [createNoiseBuffer, buildRainNodes, buildLibraryNodes, buildCafeNodes])
+
+      src.connect(filter)
+      filter.connect(gain)
+      gain.connect(master)
+      src.start()
+
+      return { sources: [src], gains: [gain], intervals: [] }
+    },
+    [createStereoBrownBuffer]
+  )
+
+  // 7. PINK NOISE (Equilíbrio aveludado para foco)
+  const buildPinkNoiseGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const pinkBuf = createStereoPinkBuffer(ctx, 8)
+      const src = ctx.createBufferSource()
+      src.buffer = pinkBuf
+      src.loop = true
+
+      const filter = ctx.createBiquadFilter()
+      filter.type = "lowpass"
+      filter.frequency.value = 420
+      filter.Q.value = 0.7
+
+      const gain = ctx.createGain()
+      gain.gain.value = 0.45
+
+      src.connect(filter)
+      filter.connect(gain)
+      gain.connect(master)
+      src.start()
+
+      return { sources: [src], gains: [gain], intervals: [] }
+    },
+    [createStereoPinkBuffer]
+  )
+
+  // 8. WHITE NOISE SUAVE (Filtrado para eliminar estática áspera)
+  const buildWhiteNoiseGraph = useCallback(
+    (ctx: AudioContext, master: GainNode): AudioGraphNode => {
+      const pinkBuf = createStereoPinkBuffer(ctx, 8)
+      const src = ctx.createBufferSource()
+      src.buffer = pinkBuf
+      src.loop = true
+
+      const filter = ctx.createBiquadFilter()
+      filter.type = "lowpass"
+      filter.frequency.value = 850
+      filter.Q.value = 0.5
+
+      const gain = ctx.createGain()
+      gain.gain.value = 0.35
+
+      src.connect(filter)
+      filter.connect(gain)
+      gain.connect(master)
+      src.start()
+
+      return { sources: [src], gains: [gain], intervals: [] }
+    },
+    [createStereoPinkBuffer]
+  )
 
   const stopSound = useCallback(() => {
     const ctx = audioContextRef.current
@@ -309,90 +601,124 @@ export function useFocusSound() {
     if (ctx && master) {
       try {
         master.gain.setValueAtTime(master.gain.value, ctx.currentTime)
-        master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1)
+        master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15)
       } catch {
         // context may be closed
       }
     }
     setTimeout(() => {
       cleanupNodes()
-    }, 150)
+    }, 180)
     setIsPlaying(false)
   }, [cleanupNodes])
 
-  const startSound = useCallback(async (sound: FocusSoundId) => {
-    if (sound === "off") {
-      stopSound()
-      return
-    }
-
-    const ctx = ensureContext()
-    if (!ctx || !masterGainRef.current) return
-
-    try {
-      if (ctx.state === "suspended") {
-        await ctx.resume()
+  const startSound = useCallback(
+    async (sound: FocusSoundId) => {
+      if (sound === "off") {
+        stopSound()
+        return
       }
-    } catch {
-      // Autoplay policy — will work after user interaction
-    }
 
-    cleanupNodes()
+      const ctx = ensureContext()
+      if (!ctx || !masterGainRef.current) return
 
-    const newNodes = buildNodes(ctx, sound)
-    const master = masterGainRef.current
-    newNodes.forEach((node) => {
-      node.gain.connect(master)
-      try { node.source.start() } catch { /* already started */ }
-    })
-    noiseNodesRef.current = newNodes
+      try {
+        if (ctx.state === "suspended") {
+          await ctx.resume()
+        }
+      } catch {
+        // Autoplay policy — will work after user interaction
+      }
 
-    const vol = volume / 100
-    master.gain.setValueAtTime(master.gain.value, ctx.currentTime)
-    master.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.1)
+      cleanupNodes()
 
-    currentSoundRef.current = sound
-    setIsPlaying(true)
-    setIsInitialized(true)
-  }, [ensureContext, cleanupNodes, buildNodes, volume, stopSound])
+      let graph: AudioGraphNode | null = null
+      if (sound === "rain") graph = buildRainGraph(ctx, masterGainRef.current)
+      else if (sound === "library") graph = buildLibraryGraph(ctx, masterGainRef.current)
+      else if (sound === "cafe") graph = buildCafeGraph(ctx, masterGainRef.current)
+      else if (sound === "waves") graph = buildWavesGraph(ctx, masterGainRef.current)
+      else if (sound === "fireplace") graph = buildFireplaceGraph(ctx, masterGainRef.current)
+      else if (sound === "brown_noise") graph = buildBrownNoiseGraph(ctx, masterGainRef.current)
+      else if (sound === "pink_noise") graph = buildPinkNoiseGraph(ctx, masterGainRef.current)
+      else if (sound === "white_noise") graph = buildWhiteNoiseGraph(ctx, masterGainRef.current)
+
+      activeGraphRef.current = graph
+
+      const vol = volume / 100
+      masterGainRef.current.gain.setValueAtTime(masterGainRef.current.gain.value, ctx.currentTime)
+      masterGainRef.current.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.15)
+
+      currentSoundRef.current = sound
+      setIsPlaying(true)
+      setIsInitialized(true)
+    },
+    [
+      ensureContext,
+      cleanupNodes,
+      buildRainGraph,
+      buildLibraryGraph,
+      buildCafeGraph,
+      buildWavesGraph,
+      buildFireplaceGraph,
+      buildBrownNoiseGraph,
+      buildPinkNoiseGraph,
+      buildWhiteNoiseGraph,
+      volume,
+      stopSound,
+    ]
+  )
 
   const pauseSound = useCallback(() => {
     const ctx = audioContextRef.current
     if (!ctx) return
-    try { ctx.suspend() } catch { /* */ }
+    try {
+      ctx.suspend()
+    } catch {
+      /* */
+    }
     setIsPlaying(false)
   }, [])
 
   const resumeSound = useCallback(async () => {
     const ctx = audioContextRef.current
     if (!ctx) return
-    try { await ctx.resume() } catch { /* */ }
+    try {
+      await ctx.resume()
+    } catch {
+      /* */
+    }
     setIsPlaying(true)
   }, [])
 
-  const selectSound = useCallback((sound: FocusSoundId) => {
-    setSelectedSound(sound)
-    currentSoundRef.current = sound
-    persistPref(sound, volume)
+  const selectSound = useCallback(
+    (sound: FocusSoundId) => {
+      setSelectedSound(sound)
+      currentSoundRef.current = sound
+      persistPref(sound, volume)
 
-    if (sound === "off") {
-      stopSound()
-    } else {
-      void startSound(sound)
-    }
-  }, [persistPref, volume, stopSound, startSound])
+      if (sound === "off") {
+        stopSound()
+      } else {
+        void startSound(sound)
+      }
+    },
+    [persistPref, volume, stopSound, startSound]
+  )
 
-  const changeVolume = useCallback((vol: number) => {
-    setVolume(vol)
-    persistPref(selectedSound, vol)
-    const ctx = audioContextRef.current
-    const master = masterGainRef.current
-    if (ctx && master && isPlaying) {
-      const normalized = vol / 100
-      master.gain.setValueAtTime(master.gain.value, ctx.currentTime)
-      master.gain.linearRampToValueAtTime(normalized, ctx.currentTime + 0.05)
-    }
-  }, [persistPref, selectedSound, isPlaying])
+  const changeVolume = useCallback(
+    (vol: number) => {
+      setVolume(vol)
+      persistPref(selectedSound, vol)
+      const ctx = audioContextRef.current
+      const master = masterGainRef.current
+      if (ctx && master && isPlaying) {
+        const normalized = vol / 100
+        master.gain.setValueAtTime(master.gain.value, ctx.currentTime)
+        master.gain.linearRampToValueAtTime(normalized, ctx.currentTime + 0.05)
+      }
+    },
+    [persistPref, selectedSound, isPlaying]
+  )
 
   const stopAll = useCallback(() => {
     stopSound()
@@ -405,7 +731,11 @@ export function useFocusSound() {
     return () => {
       cleanupNodes()
       if (audioContextRef.current) {
-        try { audioContextRef.current.close() } catch { /* */ }
+        try {
+          audioContextRef.current.close()
+        } catch {
+          /* */
+        }
         audioContextRef.current = null
       }
     }

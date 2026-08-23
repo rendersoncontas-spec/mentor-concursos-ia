@@ -197,15 +197,30 @@ function Avatar({
   student,
   sizeClass,
   imgSize,
+  isYou = false,
 }: {
   student: RankingStudent
   sizeClass: string
   imgSize: number
+  isYou?: boolean
 }) {
-  if (student.avatar) {
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isYou && !student.avatar && typeof window !== "undefined") {
+      const saved =
+        localStorage.getItem("mentor_user_avatar") ||
+        localStorage.getItem("avatar_url")
+      if (saved) setLocalAvatar(saved)
+    }
+  }, [isYou, student.avatar])
+
+  const avatarSrc = student.avatar || (isYou ? localAvatar : null)
+
+  if (avatarSrc) {
     return (
       <Image
-        src={student.avatar}
+        src={avatarSrc}
         alt={student.name}
         width={imgSize}
         height={imgSize}
@@ -1270,6 +1285,7 @@ function PodiumPedestal({
         <div className="relative">
           <Avatar
             student={student}
+            isYou={isYou}
             sizeClass={`${
               isFirst ? "h-16 w-16 sm:h-20 sm:w-20" : "h-12 w-12 sm:h-16 sm:w-16"
             } text-base font-black border-4 ${getPedestalBorderClass(rank)} shadow-lg`}
@@ -1354,7 +1370,12 @@ function RankRankingRow({
       <div className="w-8 shrink-0 text-center">{getRowRankBadge(student.rank)}</div>
 
       {/* Avatar */}
-      <Avatar student={student} sizeClass="h-9 w-9 text-xs font-bold shrink-0" imgSize={72} />
+      <Avatar
+        student={student}
+        isYou={isYou}
+        sizeClass="h-9 w-9 text-xs font-bold shrink-0"
+        imgSize={72}
+      />
 
       {/* Nome + Identificação */}
       <div className="flex-1 min-w-0">

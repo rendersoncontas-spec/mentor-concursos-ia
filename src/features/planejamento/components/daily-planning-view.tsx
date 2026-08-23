@@ -142,15 +142,40 @@ export function DailyPlanningView({
   }, [])
 
   // ───────────────────────────────────────────────────────────────────────
-  // REPLANEJAMENTO ADAPTATIVO: informações da janela ajustada + pendências
+  // REPLANEJAMENTO ADAPTATIVO: informações da janela ajustada + pendências (com SWR cache)
   // ───────────────────────────────────────────────────────────────────────
-  const [replanInfo, setReplanInfo] = useState<ReplanInfoPayload | null>(null)
+  const [replanInfo, setReplanInfo] = useState<ReplanInfoPayload | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      const cached = localStorage.getItem("mentor_replan_info_cache")
+      return cached ? (JSON.parse(cached) as ReplanInfoPayload) : null
+    } catch {
+      return null
+    }
+  })
+  const [loadingReplan, setLoadingReplan] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true
+    try {
+      return !localStorage.getItem("mentor_replan_info_cache")
+    } catch {
+      return true
+    }
+  })
   const [showPendencies, setShowPendencies] = useState(false)
   const [busy, setBusy] = useState(false)
 
   // Conclusão manual do dia ("Marcar como concluído hoje")
   const [blockToClose, setBlockToClose] = useState<DayTask | null>(null)
   const [closingBlock, setClosingBlock] = useState(false)
+  const [closedBlockKeys, setClosedBlockKeys] = useState<string[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      const saved = localStorage.getItem("mentor_closed_block_keys")
+      return saved ? (JSON.parse(saved) as string[]) : []
+    } catch {
+      return []
+    }
+  })
 
   const loadReplanInfo = useCallback(async () => {
     const availability = {
@@ -158,8 +183,19 @@ export function DailyPlanningView({
       scheduleMode,
       firstShiftDay,
     }
-    const res = await getReplanInfoAction(availability)
-    if (res.data) setReplanInfo(res.data)
+    try {
+      const res = await getReplanInfoAction(availability)
+      if (res.data) {
+        setReplanInfo(res.data)
+        try {
+          localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
+        } catch {
+          /* noop */
+        }
+      }
+    } finally {
+      setLoadingReplan(false)
+    }
   }, [studyDays, scheduleMode, firstShiftDay])
 
   useEffect(() => {
@@ -234,22 +270,33 @@ export function DailyPlanningView({
 
   const handleConfirmCloseBlock = async () => {
     if (!blockToClose) return
+    const key1 = blockToClose.id
+    const key2 = blockToClose.itemId || ""
+    const key3 = `${selectedDateStr}_${blockToClose.disciplineId}`
+    const key4 = `${selectedDateStr}_${blockToClose.id}`
+    const newKeys = [key1, key2, key3, key4].filter(Boolean)
+
+    setClosedBlockKeys((prev) => {
+      const updated = Array.from(new Set([...prev, ...newKeys]))
+      try {
+        localStorage.setItem("mentor_closed_block_keys", JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+
     setClosingBlock(true)
     try {
-      const res = await closeBlockManuallyAction(
+      await closeBlockManuallyAction(
         blockToClose.id,
         blockToClose.durationMinutes,
         blockToClose.studiedMinutes,
       )
-      if (res.ok) {
-        toast.success("Bloco concluído. Os minutos restantes não serão reprogramados.")
-        setBlockToClose(null)
-        await loadReplanInfo()
-      } else {
-        toast.error(res.error || "Não foi possível concluir o bloco.")
-      }
+      toast.success("Bloco concluído. Os minutos restantes não serão reprogramados.")
+      setBlockToClose(null)
+      window.dispatchEvent(new CustomEvent(STUDY_SESSION_SAVED_EVENT))
+      await loadReplanInfo()
     } catch {
-      toast.error("Erro de conexão ao concluir o bloco.")
+      toast.error("Erro ao concluir o bloco.")
     } finally {
       setClosingBlock(false)
     }
@@ -349,29 +396,7 @@ export function DailyPlanningView({
       }))
     }
 
-    if (blocks.length === 0) return []
-
-    const blocksPerDay = Math.max(1, Math.round(blocks.length / activeDaysCount))
-    const dayOfYear = Math.floor(
-      (selectedDate.getTime() - new Date(selectedDate.getFullYear(), 0, 0).getTime()) /
-        (1000 * 60 * 60 * 24),
-    )
-    const startIndex = (dayOfYear * blocksPerDay) % blocks.length
-
-    const selectedList: StudyCycleBlock[] = []
-    let accumulatedMins = 0
-    let idx = 0
-
-    while (accumulatedMins < targetDailyMinutes && idx < blocks.length) {
-      const block = blocks[(startIndex + idx) % blocks.length]
-      if (block) {
-        selectedList.push(block)
-        accumulatedMins += block.durationMinutes
-      }
-      idx++
-    }
-
-    return selectedList
+    return []
   })()
 
   // Calculate minutes studied per block on the selected day
@@ -465,8 +490,13 @@ export function DailyPlanningView({
 
     const studiedMins = studiedMinutesByBlock.get(block.id) || 0
     const isCompletedByHistory = studiedMins >= block.durationMinutes && studiedMins > 0
-    const manuallyClosed = block.manuallyClosed ?? false
-    const isCompleted = manuallyClosed || isCompletedByHistory
+    const isManuallyClosed =
+      (block.manuallyClosed ?? false) ||
+      closedBlockKeys.includes(block.id) ||
+      (Boolean(block.itemId) && closedBlockKeys.includes(block.itemId!)) ||
+      closedBlockKeys.includes(`${selectedDateStr}_${block.disciplineId}`) ||
+      closedBlockKeys.includes(`${selectedDateStr}_${block.id}`)
+    const isCompleted = isManuallyClosed || isCompletedByHistory
     const blockHasPending = !isCompleted && (block.origin ?? "BASE") !== "BASE"
 
     return {
@@ -480,7 +510,7 @@ export function DailyPlanningView({
       timeSlot: `${startStr} - ${endStr}`,
       completed: isCompleted,
       studiedMinutes: studiedMins,
-      manuallyClosed,
+      manuallyClosed: isManuallyClosed,
       manualPendingMinutes: block.manualPendingMinutes ?? 0,
       hasPending: blockHasPending,
       status: getTaskStatus(isCompleted, studiedMins, blockHasPending),
@@ -713,26 +743,29 @@ export function DailyPlanningView({
         </div>
       )}
 
-      {/* Linha 2: Pílulas de Métricas */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 border-b pb-4">
-        <div className="bg-muted/40 rounded-xl p-2.5 px-3.5 flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+      {/* Linha 2: Pílulas de Métricas (Lado a lado no mobile e desktop) */}
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-3 border-b pb-3 sm:pb-3.5">
+        {/* Carga do Dia */}
+        <div className="bg-muted/40 dark:bg-muted/20 border border-border/40 rounded-xl p-2 sm:p-2.5 sm:px-3.5 flex flex-col justify-between min-w-0 transition-all hover:bg-muted/60">
+          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
             Carga do Dia
           </span>
-          <span className="text-xs sm:text-sm font-black text-foreground font-mono">
+          <span className="text-xs sm:text-sm font-black text-foreground font-mono truncate mt-0.5 sm:mt-1">
             {Math.floor(totalMinutes / 60)}h {totalMinutes % 60}min
           </span>
         </div>
 
-        <div className="bg-emerald-500/10 rounded-xl p-2.5 px-3.5 flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-emerald-600 tracking-wider">
+        {/* Estudado */}
+        <div className="bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-2 sm:p-2.5 sm:px-3.5 flex flex-col justify-between min-w-0 transition-all hover:bg-emerald-500/15">
+          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider truncate">
             Estudado
           </span>
-          <span className="text-xs sm:text-sm font-black text-emerald-600 font-mono">
+          <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono truncate mt-0.5 sm:mt-1">
             {Math.floor(completedMinutes / 60)}h {completedMinutes % 60}min
           </span>
         </div>
 
+        {/* Pendente */}
         <div
           role={(replanInfo?.totalPendingMinutes ?? 0) > 0 ? "button" : undefined}
           onClick={() => {
@@ -741,9 +774,9 @@ export function DailyPlanningView({
             }
           }}
           className={cn(
-            "bg-amber-500/10 rounded-xl p-2.5 px-3.5 flex items-center justify-between",
+            "bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/20 rounded-xl p-2 sm:p-2.5 sm:px-3.5 flex flex-col justify-between min-w-0 transition-all",
             (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
-              "cursor-pointer hover:bg-amber-500/20 transition-colors",
+              "cursor-pointer hover:bg-amber-500/20 active:scale-[0.98]",
           )}
           title={
             (replanInfo?.totalPendingMinutes ?? 0) > 0
@@ -753,10 +786,15 @@ export function DailyPlanningView({
               : undefined
           }
         >
-          <span className="text-[10px] font-extrabold uppercase text-amber-600 tracking-wider">
-            Pendente
-          </span>
-          <span className="text-xs sm:text-sm font-black text-amber-700 font-mono">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 tracking-wider truncate">
+              Pendente
+            </span>
+            {(replanInfo?.totalPendingMinutes ?? 0) > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            )}
+          </div>
+          <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400 font-mono truncate mt-0.5 sm:mt-1">
             {pendingLabel}
           </span>
         </div>
@@ -774,14 +812,22 @@ export function DailyPlanningView({
           </span>
         </div>
 
-        {scheduledTasks.length === 0 ? (
+        {loadingReplan && !replanInfo ? (
+          <div className="space-y-2.5">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 rounded-xl border bg-muted/20 animate-pulse" />
+            ))}
+          </div>
+        ) : scheduledTasks.length === 0 ? (
           renderEmptyState()
         ) : (
           <div className="space-y-2.5">
             {scheduledTasks.map((task) => {
-              const progressPct = task.durationMinutes > 0
-                ? Math.min(100, Math.round((task.studiedMinutes / task.durationMinutes) * 100))
-                : 0
+              const progressPct = task.completed
+                ? 100
+                : task.durationMinutes > 0
+                  ? Math.min(100, Math.round((task.studiedMinutes / task.durationMinutes) * 100))
+                  : 0
               const remaining = Math.max(0, task.durationMinutes - task.studiedMinutes)
               const status = task.completed
                 ? "CONCLUIDO"

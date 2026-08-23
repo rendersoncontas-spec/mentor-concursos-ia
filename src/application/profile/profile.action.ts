@@ -90,6 +90,68 @@ export interface UpdateProfileInput {
   email?: string | null
 }
 
+export async function uploadAvatarAction(
+  dataUrl: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return { success: false, error: "Usuário não autenticado." }
+    }
+
+    if (!dataUrl) {
+      return { success: true }
+    }
+
+    // Se já for uma URL pública HTTP, retorna ela diretamente
+    if (dataUrl.startsWith("http://") || dataUrl.startsWith("https://")) {
+      return { success: true, url: dataUrl }
+    }
+
+    // Se for data: URL, tenta fazer upload para o bucket avatars do Supabase Storage
+    if (dataUrl.startsWith("data:")) {
+      const parts = dataUrl.split(",")
+      if (parts.length === 2) {
+        const meta = parts[0] ?? ""
+        const base64Data = parts[1] ?? ""
+        const mimeMatch = meta.match(/data:(.*?);/)
+        const mime = mimeMatch?.[1] || "image/jpeg"
+        const ext = mime.split("/")[1] || "jpg"
+
+        const buffer = Buffer.from(base64Data, "base64")
+        const filePath = `${user.id}/avatar.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(filePath, buffer, {
+            contentType: mime,
+            upsert: true,
+          })
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath)
+          if (urlData?.publicUrl) {
+            const cacheBustedUrl = `${urlData.publicUrl}?t=${Date.now()}`
+            return { success: true, url: cacheBustedUrl }
+          }
+        } else {
+          console.warn("Storage avatars upload fallback para profiles:", uploadError)
+        }
+      }
+
+      // Fallback: salva a string comprimida na tabela profiles (seguro e não vai para cookies)
+      return { success: true, url: dataUrl }
+    }
+
+    return { success: true, url: dataUrl }
+  } catch (err: unknown) {
+    console.error("Erro em uploadAvatarAction:", err)
+    return { success: true, url: dataUrl }
+  }
+}
+
 export async function updateProfileAction(
   input: UpdateProfileInput
 ): Promise<{ success: boolean; error?: string; emailPending?: boolean }> {
@@ -134,6 +196,19 @@ export async function updateProfileAction(
       }
     }
 
+    if (updateData["preferences"] && typeof updateData["preferences"] === "object") {
+      const { data: currentProfile } = await supabase
+        .from("profiles")
+        .select("preferences")
+        .eq("id", user.id)
+        .maybeSingle()
+      const existingPrefs = (currentProfile?.preferences as Record<string, unknown>) || {}
+      updateData["preferences"] = {
+        ...existingPrefs,
+        ...(updateData["preferences"] as Record<string, unknown>),
+      }
+    }
+
     if (Object.keys(updateData).length > 0) {
       const { error } = await supabase
         .from("profiles")
@@ -144,10 +219,19 @@ export async function updateProfileAction(
         console.error("Erro ao atualizar profile:", error)
         return { success: false, error: "Falha ao salvar perfil." }
       }
+
+      // Sincroniza full_name nos metadados do auth para consistência entre sessões
+      // NÃO sincroniza avatar_url aqui — se for base64, infla o JWT e causa HTTP 431
+      const metaToUpdate: Record<string, unknown> = {}
+      if (updateData["full_name"] !== undefined) metaToUpdate["full_name"] = updateData["full_name"]
+      if (Object.keys(metaToUpdate).length > 0) {
+        await supabase.auth.updateUser({ data: metaToUpdate }).catch((err) => {
+          console.warn("Aviso ao atualizar metadados de autenticação:", err)
+        })
+      }
     }
 
-    revalidatePath("/dashboard")
-    revalidatePath("/profile")
+    revalidatePath("/", "layout")
     return { success: true, emailPending }
   } catch (err: unknown) {
     console.error("Erro em updateProfileAction:", err)

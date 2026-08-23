@@ -45,7 +45,7 @@ export default async function StudyPlanPage() {
   const hasPlan = planWeek !== null
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl space-y-8">
+    <div className="w-full max-w-full py-6 sm:py-8 px-4 sm:px-6 space-y-8">
       {/* Cabeçalho */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>

@@ -8,7 +8,7 @@ export const metadata = {
 export default function ConquistasPage() {
   return (
     <div className="flex flex-col min-h-full">
-      <div className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
+      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full">
         <ConquistasView />
       </div>
     </div>

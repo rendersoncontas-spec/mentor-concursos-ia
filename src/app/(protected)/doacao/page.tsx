@@ -31,7 +31,7 @@ export default function DoacaoPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full space-y-8">
+      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full space-y-8">
         {/* Top Header */}
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-500">

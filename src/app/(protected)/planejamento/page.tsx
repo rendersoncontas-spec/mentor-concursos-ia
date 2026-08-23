@@ -43,7 +43,7 @@ export default async function PlanejamentoPage() {
         </div>
       </div>
 
-      <div className="flex-1 px-4 md:px-6 max-w-7xl mx-auto w-full pb-10">
+      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full pb-12">
         <PlanejamentoClient initialData={cycleData} />
       </div>
     </div>

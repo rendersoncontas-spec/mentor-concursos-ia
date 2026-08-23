@@ -66,8 +66,16 @@ BEGIN
       b.total_minutes,
       b.questions_count,
       b.pages_count,
-      COALESCE(p.name, 'Estudante') AS name,
-      NULL::text AS avatar_url,
+      COALESCE(
+        CASE WHEN (p.preferences->>'nameType') = 'apelido' AND p.nickname IS NOT NULL AND p.nickname <> '' THEN p.nickname
+             ELSE COALESCE(p.name, p.full_name)
+        END,
+        'Estudante'
+      ) AS name,
+      CASE
+        WHEN (p.preferences->>'avatarType') = 'iniciais' THEN NULL
+        ELSE p.avatar_url
+      END AS avatar_url,
       CASE
         WHEN p.name IS NOT NULL AND p.name LIKE '% %'
           THEN upper(substring(p.name, 1, 1) || substring(p.name, position(' ' in p.name)+1, 1))

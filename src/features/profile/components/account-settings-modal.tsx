@@ -19,11 +19,12 @@ import {
   Trophy,
   User,
   Volume2,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { sendTestEmailAction } from "@/application/email/email.action"
-import { getProfileAction, updateProfileAction } from "@/application/profile/profile.action"
+import { getProfileAction, updateProfileAction, uploadAvatarAction } from "@/application/profile/profile.action"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -187,6 +188,15 @@ export function AccountSettingsModal({
           if (profile.avatar_url) {
             setAvatarImg(profile.avatar_url)
             setAvatarDirty(false)
+            try {
+              localStorage.setItem(avatarKey, profile.avatar_url)
+              localStorage.setItem("mentor_user_avatar", profile.avatar_url)
+            } catch {}
+          } else {
+            const saved = localStorage.getItem(avatarKey) || localStorage.getItem("mentor_user_avatar")
+            if (saved) {
+              setAvatarImg(saved)
+            }
           }
           const prefs = profile.preferences
           setDiasEstudo(
@@ -312,7 +322,17 @@ export function AccountSettingsModal({
         uf: uf || null,
         preferences,
       }
-      if (avatarDirty) update.avatar_url = avatarImg
+
+      let uploadedAvatarUrl: string | null = null
+      if (avatarDirty) {
+        if (avatarImg) {
+          const uploadRes = await uploadAvatarAction(avatarImg)
+          uploadedAvatarUrl = uploadRes.url || avatarImg
+          update.avatar_url = uploadedAvatarUrl
+        } else {
+          update.avatar_url = null
+        }
+      }
       if (email.trim()) update.email = email.trim()
 
       const res = await updateProfileAction(update)
@@ -323,11 +343,16 @@ export function AccountSettingsModal({
       }
 
       if (avatarDirty) {
-        if (avatarImg) {
-          localStorage.setItem(avatarKey, avatarImg)
-        } else {
-          localStorage.removeItem(avatarKey)
-        }
+        try {
+          if (uploadedAvatarUrl) {
+            localStorage.setItem(avatarKey, uploadedAvatarUrl)
+            localStorage.setItem("mentor_user_avatar", uploadedAvatarUrl)
+          } else {
+            localStorage.removeItem(avatarKey)
+            localStorage.removeItem("mentor_user_avatar")
+          }
+        } catch {}
+        setAvatarDirty(false)
         window.dispatchEvent(new Event("avatarUpdated"))
       }
 
@@ -355,10 +380,20 @@ export function AccountSettingsModal({
 
   const handleAddCategory = () => {
     if (!newCategoryInput.trim()) return
-    setCustomCategories([...customCategories, newCategoryInput.trim()])
+    const trimmed = newCategoryInput.trim()
+    if (customCategories.includes(trimmed)) {
+      toast.info("Esta categoria já existe.")
+      return
+    }
+    setCustomCategories([...customCategories, trimmed])
     setNewCategoryInput("")
     setShowAddCat(false)
     toast.success("Categoria personalizada adicionada!")
+  }
+
+  const handleRemoveCategory = (catToRemove: string) => {
+    setCustomCategories(customCategories.filter((c) => c !== catToRemove))
+    toast.info(`Categoria "${catToRemove}" removida.`)
   }
 
   return (
@@ -916,8 +951,20 @@ export function AccountSettingsModal({
 
                       <div className="flex items-center gap-2 flex-wrap">
                         {customCategories.map((cat, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs font-bold">
-                            {cat}
+                          <Badge
+                            key={idx}
+                            variant="outline"
+                            className="text-xs font-bold gap-1.5 pl-2.5 pr-1.5 py-1 flex items-center"
+                          >
+                            <span>{cat}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCategory(cat)}
+                              className="text-muted-foreground hover:text-rose-500 rounded-full p-0.5 transition-colors cursor-pointer"
+                              title={`Remover ${cat}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
                           </Badge>
                         ))}
 

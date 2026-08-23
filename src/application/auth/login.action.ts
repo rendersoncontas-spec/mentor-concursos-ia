@@ -27,6 +27,18 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
         }
       }
 
+      if (authData.user?.user_metadata) {
+        const meta = authData.user.user_metadata as Record<string, unknown>
+        if (meta["avatar_url"] || meta["dashboard_layout"]) {
+          // Limpa metadados pesados do auth para evitar estouro de cookies (HTTP 431)
+          await supabase.auth.updateUser({
+            data: { avatar_url: null, dashboard_layout: null },
+          }).catch((err) => {
+            console.warn("Aviso ao limpar metadados de autenticação no login:", err)
+          })
+        }
+      }
+
       return { success: true }
     } catch (supabaseError) {
       const err = supabaseError as { message?: string } | null | undefined

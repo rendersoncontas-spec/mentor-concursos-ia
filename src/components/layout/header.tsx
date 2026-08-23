@@ -54,30 +54,38 @@ export function AppHeader({
 }: AppHeaderProps) {
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isEditalModalOpen, setIsEditalModalOpen] = useState(false)
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
   const [editalRequestInput, setEditalRequestInput] = useState("")
-  // Fonte de verdade: avatar_url do banco. localStorage é apenas cache de fallback.
+  // Fonte de verdade: avatar_url do banco ou cache persistente
   const [avatarImg, setAvatarImg] = useState<string | null>(avatarUrl ?? null)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const avatarKey = userId ? `mentor_user_avatar_${userId}` : "mentor_user_avatar"
+    setMounted(true)
+  }, [])
 
-    // Fallback: cache local apenas quando não há foto no banco
-    if (!avatarUrl) {
-      const saved = localStorage.getItem(avatarKey)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved) setAvatarImg(saved)
+  useEffect(() => {
+    const avatarKey = userId ? `mentor_user_avatar_${userId}` : "mentor_user_avatar"
+    const saved = localStorage.getItem(avatarKey) || localStorage.getItem("mentor_user_avatar")
+
+    if (avatarUrl) {
+      setAvatarImg(avatarUrl)
+      try {
+        localStorage.setItem(avatarKey, avatarUrl)
+        localStorage.setItem("mentor_user_avatar", avatarUrl)
+      } catch {}
+    } else if (saved) {
+      setAvatarImg(saved)
     }
 
-    // Escutar atualizações de outros componentes
+    // Escutar atualizações de outros componentes (ex: modal de perfil)
     const handleAvatarUpdate = () => {
-      if (avatarUrl) return
-      const updated = localStorage.getItem(avatarKey)
-      setAvatarImg(updated)
+      const updated = localStorage.getItem(avatarKey) || localStorage.getItem("mentor_user_avatar")
+      setAvatarImg(updated || null)
     }
     window.addEventListener("avatarUpdated", handleAvatarUpdate)
     return () => window.removeEventListener("avatarUpdated", handleAvatarUpdate)
@@ -189,7 +197,7 @@ export function AppHeader({
           className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
           title="Alternar Tema"
         >
-          {resolvedTheme === "dark" ? (
+          {mounted && resolvedTheme === "dark" ? (
             <Sun className="h-4.5 w-4.5 text-amber-400" />
           ) : (
             <Moon className="h-4.5 w-4.5" />

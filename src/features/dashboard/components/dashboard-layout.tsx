@@ -28,11 +28,29 @@ export interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProps) {
-  const [layout, setLayout] = useState<WidgetConfigItem[]>(initialLayout)
+  const [layout, setLayout] = useState<WidgetConfigItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("mentor_dashboard_layout")
+        if (saved) return JSON.parse(saved) as WidgetConfigItem[]
+      } catch {}
+    }
+    return initialLayout
+  })
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [isExamModalOpen, setIsExamModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (initialLayout && initialLayout.length > 0) {
+      setLayout(initialLayout)
+      try {
+        localStorage.setItem("mentor_dashboard_layout", JSON.stringify(initialLayout))
+      } catch {}
+    }
+  }, [initialLayout])
+
   useEffect(() => {
     const handleOpenCustomization = () => setIsCustomizationOpen(true)
     window.addEventListener("open-dashboard-customization", handleOpenCustomization)
@@ -52,6 +70,9 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
   const handleReorder = async (newLayout: WidgetConfigItem[]) => {
     setLayout(newLayout)
+    try {
+      localStorage.setItem("mentor_dashboard_layout", JSON.stringify(newLayout))
+    } catch {}
     const result = await saveDashboardLayoutAction(newLayout)
     if (!result.success) {
       toast.error("Erro ao salvar ordem dos widgets.")
@@ -60,6 +81,9 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
   const handleSaveLayout = async (newLayout: WidgetConfigItem[]) => {
     setLayout(newLayout)
+    try {
+      localStorage.setItem("mentor_dashboard_layout", JSON.stringify(newLayout))
+    } catch {}
     const result = await saveDashboardLayoutAction(newLayout)
     if (result.success) {
       toast.success("Home personalizada com sucesso!")
@@ -72,6 +96,9 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
     const result = await resetDashboardLayoutAction()
     if (result.success && result.data) {
       setLayout(result.data)
+      try {
+        localStorage.removeItem("mentor_dashboard_layout")
+      } catch {}
       toast.success("Layout restaurado para o padrão.")
     }
   }

@@ -12,6 +12,11 @@ const PERSONAL_KEYS = [
   "mentor:study_session_state",
   "mentor-study-floating-timer-position-v2",
   "mentor-floating-timer-enabled",
+  "mentor_replan_info_cache",
+  "mentor_closed_block_keys",
+  "mentor_dashboard_layout",
+  "mentor_quick_notes_list_cache",
+  "mentor_quick_notes_active_id",
 ]
 
 export function clearUserLocalData() {

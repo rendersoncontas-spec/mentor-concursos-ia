@@ -21,7 +21,7 @@ export default async function HomologationPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-12">
+    <div className="space-y-8 w-full max-w-full p-4 sm:p-6 pb-12">
       <div className="flex items-center gap-3 bg-amber-500/10 text-amber-500 border border-amber-500/20 p-4 rounded-xl">
         <ShieldCheck className="w-8 h-8 shrink-0" />
         <div>

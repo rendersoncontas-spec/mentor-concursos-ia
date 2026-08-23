@@ -27,7 +27,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         .maybeSingle()
 
       profileName = profileData?.name ?? profileData?.full_name ?? null
-      avatarUrl = profileData?.avatar_url ?? null
+      avatarUrl = profileData?.avatar_url ?? (user.user_metadata?.["avatar_url"] as string | undefined) ?? null
     }
   } catch {
     console.warn("Conexão Supabase indisponível no ProtectedLayout. Modo de desenvolvimento/contingência ativado.")

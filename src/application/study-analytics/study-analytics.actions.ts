@@ -136,7 +136,7 @@ export async function getGlobalRankingAction(period: RankingPeriod = 'this_week'
     const supabase = await createClient()
     const { data: { user: currentUser } } = await supabase.auth.getUser()
 
-    // Usar a RPC que bypassa RLS via SECURITY DEFINER
+    // 1. Usar a RPC que bypassa RLS via SECURITY DEFINER
     const { data: rpcData, error: rpcError } = await supabase
       .rpc('get_global_ranking', {
         p_period: period,
@@ -144,40 +144,42 @@ export async function getGlobalRankingAction(period: RankingPeriod = 'this_week'
         p_week_offset: weekOffset,
       })
 
-    if (rpcError) {
-      console.error("Erro ao chamar RPC get_global_ranking:", rpcError)
-      // Fallback: tentar query direta (caso a RPC não esteja disponível)
-      return await getRankingViaDirectQuery(supabase, period, currentUser?.id, weekOffset)
-    }
+    let rankingData: {
+      totalParticipants: number
+      rankingTempo: RankingEntry[]
+      rankingQuestions: RankingEntry[]
+      rankingPages: RankingEntry[]
+      userStats: {
+        tempo: RankingEntry | null
+        questoes: RankingEntry | null
+        paginas: RankingEntry | null
+      }
+    } | null = null
 
-    // Normaliza a resposta da RPC para o shape esperado pelo cliente:
-    // aceita objeto direto, { result } ou array de linhas e converte
-    // snake_case (user_id, avatar_url, bg_color, questions_count...) em
-    // camelCase (id, avatar, bgColor, questions...).
-    const rawPayload = Array.isArray(rpcData) ? rpcData[0] : rpcData
-    const nestedPayload =
-      rawPayload && typeof rawPayload === 'object' && 'result' in rawPayload
-        ? (rawPayload as RankingRowLike)['result']
-        : rawPayload
-    const payload = Array.isArray(nestedPayload) ? nestedPayload[0] : nestedPayload
+    if (!rpcError && rpcData) {
+      const rawPayload = Array.isArray(rpcData) ? rpcData[0] : rpcData
+      const nestedPayload =
+        rawPayload && typeof rawPayload === 'object' && 'result' in rawPayload
+          ? (rawPayload as RankingRowLike)['result']
+          : rawPayload
+      const payload = Array.isArray(nestedPayload) ? nestedPayload[0] : nestedPayload
 
-    if (payload && typeof payload === 'object') {
-      const typedPayload = payload as RankingRowLike
-      const hasRankingData =
-        typedPayload['totalParticipants'] !== undefined ||
-        Array.isArray(typedPayload['rankingTempo']) ||
-        Array.isArray(typedPayload['rankingQuestions']) ||
-        Array.isArray(typedPayload['rankingPages'])
+      if (payload && typeof payload === 'object') {
+        const typedPayload = payload as RankingRowLike
+        const hasRankingData =
+          typedPayload['totalParticipants'] !== undefined ||
+          Array.isArray(typedPayload['rankingTempo']) ||
+          Array.isArray(typedPayload['rankingQuestions']) ||
+          Array.isArray(typedPayload['rankingPages'])
 
-      if (hasRankingData) {
-        const rankingTempo = normalizeRankingList(typedPayload['rankingTempo'])
-        const rawUserStats =
-          typedPayload['userStats'] && typeof typedPayload['userStats'] === 'object'
-            ? (typedPayload['userStats'] as RankingRowLike)
-            : {}
+        if (hasRankingData) {
+          const rankingTempo = normalizeRankingList(typedPayload['rankingTempo'])
+          const rawUserStats =
+            typedPayload['userStats'] && typeof typedPayload['userStats'] === 'object'
+              ? (typedPayload['userStats'] as RankingRowLike)
+              : {}
 
-        return {
-          data: {
+          rankingData = {
             totalParticipants: toNumber(typedPayload['totalParticipants']) || rankingTempo.length,
             rankingTempo,
             rankingQuestions: normalizeRankingList(typedPayload['rankingQuestions']),
@@ -187,15 +189,97 @@ export async function getGlobalRankingAction(period: RankingPeriod = 'this_week'
               questoes: normalizeRankingList(rawUserStats['questoes'] ? [rawUserStats['questoes']] : [])[0] ?? null,
               paginas: normalizeRankingList(rawUserStats['paginas'] ? [rawUserStats['paginas']] : [])[0] ?? null,
             },
-          },
-          error: null,
+          }
         }
       }
     }
 
-    // Se RPC não retornou dados válidos, usar fallback
-    console.warn("RPC retornou dados, mas não no formato esperado:", rpcData)
-    return await getRankingViaDirectQuery(supabase, period, currentUser?.id)
+    if (!rankingData) {
+      const fallbackResult = await getRankingViaDirectQuery(supabase, period, currentUser?.id, weekOffset)
+      if (fallbackResult.error || !fallbackResult.data) {
+        return fallbackResult
+      }
+      rankingData = fallbackResult.data
+    }
+
+    // 2. ENRIQUECER com profiles reais (avatar_url, nickname e preferências de foto/iniciais)
+    const allStudentIds = [
+      ...rankingData.rankingTempo.map((r) => r.id),
+      ...rankingData.rankingQuestions.map((r) => r.id),
+      ...rankingData.rankingPages.map((r) => r.id),
+      currentUser?.id || '',
+    ].filter(Boolean)
+
+    const uniqueUserIds = Array.from(new Set(allStudentIds))
+
+    if (uniqueUserIds.length > 0) {
+      const { data: profilesList } = await supabase
+        .from('profiles')
+        .select('id, name, full_name, nickname, avatar_url, preferences')
+        .in('id', uniqueUserIds)
+
+      const profileMap = new Map<
+        string,
+        {
+          id: string
+          name: string | null
+          full_name: string | null
+          nickname: string | null
+          avatar_url: string | null
+          preferences: Record<string, unknown>
+        }
+      >()
+
+      profilesList?.forEach((p) => {
+        profileMap.set(p.id, {
+          id: p.id,
+          name: p.name,
+          full_name: p.full_name,
+          nickname: p.nickname,
+          avatar_url: p.avatar_url,
+          preferences: (p.preferences as Record<string, unknown>) || {},
+        })
+      })
+
+      const enrichStudent = (student: RankingEntry | null): RankingEntry | null => {
+        if (!student) return null
+        const prof = profileMap.get(student.id)
+        if (!prof) return student
+
+        const prefs = prof.preferences || {}
+        const avatarType = (prefs['avatarType'] as string) || 'foto'
+        const nameType = (prefs['nameType'] as string) || 'nome'
+
+        const chosenName =
+          nameType === 'apelido' && prof.nickname
+            ? prof.nickname
+            : prof.name || prof.full_name || student.name
+
+        const isUserSelf = currentUser?.id && student.id === currentUser.id
+        const displayName = isUserSelf ? `${chosenName} (Você)` : chosenName
+
+        const avatarUrl =
+          avatarType === 'iniciais' ? '' : prof.avatar_url || student.avatar || ''
+
+        return {
+          ...student,
+          name: displayName,
+          avatar: avatarUrl,
+          initials: initialsFor(chosenName),
+        }
+      }
+
+      rankingData.rankingTempo = rankingData.rankingTempo.map(enrichStudent) as RankingEntry[]
+      rankingData.rankingQuestions = rankingData.rankingQuestions.map(enrichStudent) as RankingEntry[]
+      rankingData.rankingPages = rankingData.rankingPages.map(enrichStudent) as RankingEntry[]
+      rankingData.userStats = {
+        tempo: enrichStudent(rankingData.userStats.tempo),
+        questoes: enrichStudent(rankingData.userStats.questoes),
+        paginas: enrichStudent(rankingData.userStats.paginas),
+      }
+    }
+
+    return { data: rankingData, error: null }
   } catch (error) {
     console.error("Erro em getGlobalRankingAction:", error)
     return { data: null, error: (error as { message?: string }).message }
@@ -203,13 +287,6 @@ export async function getGlobalRankingAction(period: RankingPeriod = 'this_week'
 }
 
 // Fallback: query direta (caso a RPC não esteja disponível no banco).
-// ATENÇÃO: study_history e profiles têm RLS por usuário (auth.uid() = user_id);
-// quando a leitura direta só retorna o próprio usuário, complementamos com a
-// view pública public_study_stats, que agrega dados de TODOS os usuários e
-// foi criada justamente para o ranking global sem RLS (sprint3-history.sql).
-// A view também devolve display_name (docs/fix-ranking-names.sql):
-// sem isso o nome dos demais usuários nunca chega, pois profiles tem RLS por
-// usuário e o SELECT direto só retorna o perfil de quem está logado.
 async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPeriod, currentUserId?: string, weekOffset: number = 0) {
   const now = new Date()
   const getMonday = (d: Date) => {
@@ -241,7 +318,6 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
     startDate = todayStart.toISOString()
   } else if (period === 'this_week') {
     startDate = offsetMonday.toISOString()
-    // Semana anterior (offset < 0): janela fechada de Segunda a Domingo
     if (weekOffset < 0) endDate = offsetSunday.toISOString()
   } else if (period === 'last_week') {
     startDate = lastMonday.toISOString()
@@ -266,8 +342,6 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
 
   const totalsByUser = new Map<string, { totalMinutes: number; questionsCount: number; pagesCount: number }>()
 
-  // Acumula totais do período lendo as linhas que o RLS permite enxergar
-  // (todas quando permissivo; apenas o próprio usuário quando restrito).
   const periodTotals = new Map<string, { totalMinutes: number; questionsCount: number; pagesCount: number }>()
   historyData?.forEach((h) => {
     const entry = periodTotals.get(h.user_id) || { totalMinutes: 0, questionsCount: 0, pagesCount: 0 }
@@ -278,9 +352,6 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
     periodTotals.set(h.user_id, entry)
   })
 
-  // Se a leitura direta só trouxe o próprio usuário, o RLS está filtrando os
-  // demais: usamos a view pública agregada (que consulta todos os usuários e
-  // também devolve o nome/avatar real de cada um, sem passar pelo RLS).
   const rlsLimited = activeUserIds.size <= 1
   const publicInfoMap = new Map<string, { name: string }>()
   if (rlsLimited) {
@@ -312,17 +383,12 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
     if (currentUserId) activeUserIds.add(currentUserId)
   }
 
-  // Garante entrada para todos os usuários ativos (inclusive os que não têm
-  // sessão no período, para o usuário atual ficar na lista final).
   activeUserIds.forEach((uid) => {
     if (!totalsByUser.has(uid)) {
       totalsByUser.set(uid, { totalMinutes: 0, questionsCount: 0, pagesCount: 0 })
     }
   })
 
-  // Totais do período: com RLS permissivo valem para todos; com RLS restrito
-  // substituem a agregação da view apenas para o próprio usuário (sem somar
-  // duas vezes os mesmos minutos).
   if (!rlsLimited) {
     periodTotals.forEach((totals, uid) => {
       if (totalsByUser.has(uid)) totalsByUser.set(uid, totals)
@@ -334,16 +400,20 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
 
   const userIdsArray = Array.from(activeUserIds)
 
-  const profilesMap = new Map<string, { name: string }>()
+  const profilesMap = new Map<string, { name: string; full_name?: string; nickname?: string; avatar_url?: string; preferences?: Record<string, unknown> }>()
   if (userIdsArray.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, full_name, nickname, avatar_url, preferences')
       .in('id', userIdsArray)
 
     profiles?.forEach((p) => {
       profilesMap.set(p.id, {
         name: p.name || 'Estudante',
+        full_name: p.full_name,
+        nickname: p.nickname,
+        avatar_url: p.avatar_url,
+        preferences: (p.preferences as Record<string, unknown>) || {},
       })
     })
   }
@@ -356,12 +426,21 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
   userIdsArray.forEach((uid, idx) => {
     const profile = profilesMap.get(uid)
     const publicInfo = publicInfoMap.get(uid)
-    const rawName = profile?.name || publicInfo?.name || (currentUserId && uid === currentUserId ? 'Você' : `Estudante #${uid.substring(0, 4)}`)
-    const initials = initialsFor(rawName)
+    const pPrefs = (profile?.preferences as Record<string, unknown>) || {}
+    const avatarType = (pPrefs['avatarType'] as string) || 'foto'
+    const nameType = (pPrefs['nameType'] as string) || 'nome'
+
+    const chosenName =
+      nameType === 'apelido' && profile?.nickname
+        ? profile.nickname
+        : profile?.name || profile?.full_name || publicInfo?.name || (currentUserId && uid === currentUserId ? 'Você' : `Estudante #${uid.substring(0, 4)}`)
+
+    const initials = initialsFor(chosenName)
+    const avatar = avatarType === 'iniciais' ? '' : profile?.avatar_url || ''
     const totals = totalsByUser.get(uid) || { totalMinutes: 0, questionsCount: 0, pagesCount: 0 }
 
     userMap.set(uid, {
-      id: uid, name: rawName, avatar: '', initials,
+      id: uid, name: chosenName, avatar, initials,
       bgColor: bgColors[idx % bgColors.length] || 'bg-blue-600',
       ...totals,
     })
@@ -389,8 +468,10 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
   const findUserStats = (ranking: RankingEntry[]) => {
     if (!currentUserId) return null
     const found = ranking.find(r => r.id === currentUserId)
+    const ownProf = profilesMap.get(currentUserId)
+    const ownAvatar = (ownProf?.preferences?.['avatarType'] === 'iniciais') ? '' : (ownProf?.avatar_url || '')
     return found || {
-      rank: ranking.length + 1, id: currentUserId, name: 'Você', avatar: '',
+      rank: ranking.length + 1, id: currentUserId, name: 'Você', avatar: ownAvatar,
       targetContest: 'Global', hours: '0min', totalMinutes: 0, questions: 0, pages: 0,
       initials: 'VC', bgColor: 'bg-blue-600', hasActivity: false,
     }
