@@ -18,8 +18,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    template: "%s — NomeIA",
-    default: "NomeIA — Sua preparação rumo à nomeação",
+    template: "%s | NomeIA",
+    default: "NomeIA",
   },
   description:
     "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",

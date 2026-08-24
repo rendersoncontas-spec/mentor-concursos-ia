@@ -49,7 +49,9 @@ import {
   type SessionStyle,
   buildPlanningPayload,
   formatMinutesLabel,
+  isShiftDayForDate,
   isShiftDayForScale,
+  LS_SHIFT_ANCHOR_DATE,
   planningReason,
   validatePlanningForm,
 } from "@/features/planejamento/lib/planning-form"
@@ -183,6 +185,14 @@ export function PlanningWizardModal({
       if (saved) return parseInt(saved)
     }
     return 2
+  })
+  const [anchorShiftDate, setAnchorShiftDate] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(LS_SHIFT_ANCHOR_DATE)
+      if (saved) return saved
+    }
+    const today = new Date()
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
   })
   const [selectedDays, setSelectedDays] = useState<string[]>([...WEEK_DAY_FULL])
 
@@ -358,9 +368,12 @@ export function PlanningWizardModal({
       const full = WEEK_DAY_FULL[date.getDay()] ?? ""
       if (!selectedDays.includes(full)) return false
       if (dayConfigMode === "semana") return true
+      if (anchorShiftDate) {
+        return !isShiftDayForDate(date, anchorShiftDate, effectiveScale)
+      }
       return !isShiftDayForScale(date.getDate(), firstShiftDay, effectiveScale)
     },
-    [selectedDays, dayConfigMode, firstShiftDay, effectiveScale],
+    [selectedDays, dayConfigMode, firstShiftDay, anchorShiftDate, effectiveScale],
   )
 
   const { daysPerWeek, preview } = useMemo(() => {
@@ -506,6 +519,13 @@ export function PlanningWizardModal({
       )
 
       if (res.success) {
+        if (typeof window !== "undefined") {
+          if (anchorShiftDate) {
+            localStorage.setItem(LS_SHIFT_ANCHOR_DATE, anchorShiftDate)
+          }
+          localStorage.setItem(LS_FIRST_SHIFT, String(firstShiftDay))
+          window.dispatchEvent(new Event("mentor_scale_updated"))
+        }
         toast.success(
           mode === "edit"
             ? "Planejamento atualizado com sucesso!"
@@ -1043,29 +1063,27 @@ export function PlanningWizardModal({
                         </div>
                       )}
 
-                      {/* Dia do primeiro plantão */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <label className="text-[11px] font-extrabold text-muted-foreground shrink-0">
-                          Em qual dia cai seu 1º plantão?
-                        </label>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d, idx) => (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => setFirstShiftDay(idx)}
-                              aria-pressed={firstShiftDay === idx}
-                              className={cn(
-                                "px-3 py-1.5 rounded-lg border-2 text-[11px] font-extrabold transition-all cursor-pointer",
-                                firstShiftDay === idx
-                                  ? "bg-[#2563EB] text-white border-[#2563EB]"
-                                  : "bg-card text-muted-foreground border-muted hover:border-[#2563EB]/60",
-                              )}
-                            >
-                              {d}
-                            </button>
-                          ))}
+                      {/* Data de referência do plantão */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/40 rounded-xl border">
+                        <div>
+                          <label className="text-[11px] font-extrabold text-foreground block">
+                            Data de um plantão de referência
+                          </label>
+                          <span className="text-[10px] text-muted-foreground font-medium">
+                            O sistema calcula a escala contínua automaticamente para todos os meses.
+                          </span>
                         </div>
+                        <Input
+                          type="date"
+                          value={anchorShiftDate}
+                          onChange={(e) => {
+                            setAnchorShiftDate(e.target.value)
+                            if (typeof window !== "undefined" && e.target.value) {
+                              localStorage.setItem(LS_SHIFT_ANCHOR_DATE, e.target.value)
+                            }
+                          }}
+                          className="w-auto h-8 text-xs font-bold font-mono bg-card"
+                        />
                       </div>
                     </div>
                   )}

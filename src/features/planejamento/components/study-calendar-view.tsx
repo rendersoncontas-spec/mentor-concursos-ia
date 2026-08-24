@@ -17,7 +17,15 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getStudyDaysCount, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
+import { getReplanInfoAction } from "@/application/study-plan/replan/adaptive-replan.actions"
+import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive-replan.service"
+import {
+  getStudyDaysCount,
+  isShiftDayForDate,
+  isShiftDayForScale,
+  LS_SHIFT_ANCHOR_DATE,
+} from "@/features/planejamento/lib/planning-form"
+import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { type StudyCycleBlock } from "./planning-view"
 
@@ -95,6 +103,13 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     }
     return 2
   }) // Primeiro plantão padrão dia 2
+  const [anchorShiftDate, setAnchorShiftDate] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(LS_SHIFT_ANCHOR_DATE)
+      if (saved) return saved
+    }
+    return ""
+  })
   const [customShiftDays, setCustomShiftDays] = useState<
     Record<string, "PLANTAO" | "FOLGA_ESTUDO" | "FOLGA_TOTAL">
   >({})
@@ -113,6 +128,8 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
       if (isScheduleMode(savedScale)) setScheduleMode(savedScale)
       const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
       if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay))
+      const savedAnchor = localStorage.getItem(LS_SHIFT_ANCHOR_DATE)
+      if (savedAnchor) setAnchorShiftDate(savedAnchor)
       const savedStudyDays = localStorage.getItem("mentor_user_study_days")
       if (savedStudyDays) setStudyDays(JSON.parse(savedStudyDays))
     }
@@ -172,18 +189,63 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     return `${hrs}h${mins.toString().padStart(2, "0")}m`
   }
 
-  // Verifica se determinado dia é Plantão / Trabalho
+  const [replanInfo, setReplanInfo] = useState<ReplanInfoPayload | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      const cached = localStorage.getItem("mentor_replan_info_cache")
+      return cached ? (JSON.parse(cached) as ReplanInfoPayload) : null
+    } catch {
+      return null
+    }
+  })
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      try {
+        const res = await getReplanInfoAction({
+          studyDays,
+          scheduleMode,
+          firstShiftDay,
+          anchorShiftDate: anchorShiftDate || undefined,
+        })
+        if (active && res.data) {
+          setReplanInfo(res.data)
+          try {
+            localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
+          } catch {}
+        }
+      } catch {}
+    }
+    load()
+    const handleSaved = () => {
+      load()
+    }
+    window.addEventListener(STUDY_SESSION_SAVED_EVENT, handleSaved)
+    return () => {
+      active = false
+      window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handleSaved)
+    }
+  }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate])
+
   const isShiftDay = (dayNum: number) => {
     const key = `${year}-${month}-${dayNum}`
     if (customShiftDays[key] === "PLANTAO") return true
     if (customShiftDays[key] === "FOLGA_ESTUDO") return false
 
-    return isShiftDayForScale(dayNum, firstShiftDay, scheduleMode)
+    const padM = String(month + 1).padStart(2, "0")
+    const padD = String(dayNum).padStart(2, "0")
+    const dateStr = `${year}-${padM}-${padD}`
+    const effectiveAnchor =
+      anchorShiftDate ||
+      `${year}-${padM}-${String(firstShiftDay).padStart(2, "0")}`
+
+    return isShiftDayForDate(dateStr, effectiveAnchor, scheduleMode)
   }
 
   // Helper para buscar disciplinas agendadas no dia
   const getDisciplinesForDay = (dayNum: number) => {
-    if (blocks.length === 0) return []
+    if (blocks.length === 0 && !replanInfo?.hasPlan) return []
 
     const onShift = isShiftDay(dayNum)
 
@@ -196,7 +258,25 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
       if (!studyDays.includes(WEEKDAY_KEYS[dayOfWeek] ?? "")) return []
     }
 
-    // Dias de estudo ativos na semana conforme a escala
+    const padMonth = String(month + 1).padStart(2, "0")
+    const padDay = String(dayNum).padStart(2, "0")
+    const dateStr = `${year}-${padMonth}-${padDay}`
+
+    // 1. Usar blocos reais sincronizados com o servidor / plano ativo
+    const serverBlocks = replanInfo?.dailyBlocks?.[dateStr]
+    if (serverBlocks && serverBlocks.length > 0) {
+      return serverBlocks.map((b) => ({
+        id: b.id,
+        disciplineName: b.disciplineName,
+        disciplineId: b.disciplineId,
+        durationMinutes: b.durationMinutes,
+        studiedMinutes: 0,
+        color: blocks.find((cb) => cb.disciplineId === b.disciplineId)?.color || "#2563EB",
+        completed: !!b.manuallyClosed,
+      }))
+    }
+
+    // 2. Fallback caso ainda não tenha carregado
     const studyDaysCount = getStudyDaysCount(scheduleMode, studyDays)
     const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
     const targetDailyMinutes = Math.max(30, Math.round(totalCycleMinutes / studyDaysCount))
@@ -321,34 +401,34 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
 
       {/* Informação da Escala Selecionada */}
       {scheduleMode !== "normal" && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
-              <strong>{getScaleLabel(scheduleMode)}:</strong> Os estudos são zerados nos dias de
-              plantão/trabalho e concentrados nas folgas!
+              <strong>{getScaleLabel(scheduleMode)}:</strong> Rotação contínua automática para todos os meses (estudos zerados nos plantões).
             </span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px]">Primeiro plantão do mês:</span>
-            <select
-              value={firstShiftDay}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <span className="text-[11px] font-bold">Plantão de referência:</span>
+            <input
+              type="date"
+              value={
+                anchorShiftDate ||
+                `${year}-${String(month + 1).padStart(2, "0")}-${String(firstShiftDay).padStart(2, "0")}`
+              }
               onChange={(e) => {
-                const val = parseInt(e.target.value) || 1
-                setFirstShiftDay(val)
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("mentor_user_first_shift_day", val.toString())
-                  window.dispatchEvent(new Event("mentor_scale_updated"))
+                const val = e.target.value
+                if (val) {
+                  setAnchorShiftDate(val)
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem(LS_SHIFT_ANCHOR_DATE, val)
+                    window.dispatchEvent(new Event("mentor_scale_updated"))
+                  }
+                  toast.success("Data de referência do plantão atualizada!")
                 }
               }}
-              className="bg-card border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none"
-            >
-              {Array.from({ length: 7 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>
-                  Dia {d}
-                </option>
-              ))}
-            </select>
+              className="bg-card border rounded-lg px-2.5 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer font-mono shadow-xs"
+            />
           </div>
         </div>
       )}

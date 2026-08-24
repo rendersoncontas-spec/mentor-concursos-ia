@@ -39,7 +39,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
+import {
+  isShiftDayForDate,
+  isShiftDayForScale,
+  LS_SHIFT_ANCHOR_DATE,
+} from "@/features/planejamento/lib/planning-form"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 import { cn } from "@/lib/utils"
 
@@ -106,6 +110,7 @@ export function DailyPlanningView({
   // Escala de Trabalho e Dias de Estudo salvos
   const [scheduleMode, setScheduleMode] = useState<string>("normal")
   const [firstShiftDay, setFirstShiftDay] = useState<number>(2)
+  const [anchorShiftDate, setAnchorShiftDate] = useState<string>("")
   const [studyDays, setStudyDays] = useState<string[]>([
     "seg",
     "ter",
@@ -122,6 +127,8 @@ export function DailyPlanningView({
       if (savedScale) setScheduleMode(savedScale)
       const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
       if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay, 10))
+      const savedAnchor = localStorage.getItem(LS_SHIFT_ANCHOR_DATE)
+      if (savedAnchor) setAnchorShiftDate(savedAnchor)
       const savedStudyDays = localStorage.getItem("mentor_user_study_days")
       if (savedStudyDays) setStudyDays(JSON.parse(savedStudyDays) as string[])
     }, 0)
@@ -134,6 +141,8 @@ export function DailyPlanningView({
       if (savedScale) setScheduleMode(savedScale)
       const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
       if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay))
+      const savedAnchor = localStorage.getItem(LS_SHIFT_ANCHOR_DATE)
+      if (savedAnchor) setAnchorShiftDate(savedAnchor)
       const savedStudyDays = localStorage.getItem("mentor_user_study_days")
       if (savedStudyDays) setStudyDays(JSON.parse(savedStudyDays))
     }
@@ -182,6 +191,7 @@ export function DailyPlanningView({
       studyDays,
       scheduleMode,
       firstShiftDay,
+      anchorShiftDate: anchorShiftDate || undefined,
     }
     try {
       const res = await getReplanInfoAction(availability)
@@ -196,7 +206,7 @@ export function DailyPlanningView({
     } finally {
       setLoadingReplan(false)
     }
-  }, [studyDays, scheduleMode, firstShiftDay])
+  }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -332,12 +342,15 @@ export function DailyPlanningView({
     setSelectedDate(new Date())
   }
 
-  const isShiftDay = (dayNum: number) => {
-    return isShiftDayForScale(dayNum, firstShiftDay, scheduleMode)
-  }
-
   // Build date string for history filtering (YYYY-MM-DD)
   const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`
+
+  const isShiftDay = (dayNum: number) => {
+    if (anchorShiftDate) {
+      return isShiftDayForDate(selectedDateStr, anchorShiftDate, scheduleMode)
+    }
+    return isShiftDayForScale(dayNum, firstShiftDay, scheduleMode)
+  }
 
   // Filter history for the selected date ONLY (respeitando timezone local do estudante)
   const historyForDay = history.filter((h) => {

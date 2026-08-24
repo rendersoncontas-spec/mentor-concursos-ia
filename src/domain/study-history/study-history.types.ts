@@ -23,9 +23,11 @@ export type StudyType =
   | 'INFORMATIVOS'
   | 'DOUTRINA'
   | 'SIMULADO'
+  | 'DISCURSIVA'
   | 'MONITORIA'
   | 'ESTUDO_IA'
   | 'DISCUSSAO'
+  | 'DUOLINGO'
   | 'OUTRO'
 
 export type StudyTechnique =

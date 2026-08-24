@@ -36,7 +36,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
       getCycleOverviewData(supabase, userId).catch(() => null),
       getTodayStudyItems(supabase, userId).catch(() => []),
-      getStudyHistoryForAnalytics(supabase, userId, 30).catch(() => []),
+      getStudyHistoryForAnalytics(supabase, userId, 0).catch(() => []),
       getPendingReviewsSummary(supabase, userId).catch(() => ({
         count: 0,
         overdue: 0,
@@ -111,22 +111,74 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       answered_at: a.answered_at,
       discipline_id: (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ?? null,
     }))
-    let totalQuestions = attempts.length
-    let correctQuestions = attempts.filter((a: { correct: boolean }) => a.correct).length
 
-    // Add manual questions from study history metadata
-    rawHistory.forEach((session) => {
-      const meta = (session.metadata || {}) as Record<string, unknown>
-      if (meta["questions_answered"]) {
-        totalQuestions += Number(meta["questions_answered"])
-      }
-      if (meta["questions_correct"]) {
-        correctQuestions += Number(meta["questions_correct"])
-      }
-    })
+    // Calcular desempenho por período (Hoje, Semana, Mês, Ano, Total)
+    const now = new Date()
+    const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const startOfWeekMs = getStartOfWeek(now, profile?.week_start_day ?? 1).getTime()
+    const startOfMonthMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    const startOfYearMs = new Date(now.getFullYear(), 0, 1).getTime()
 
-    const wrongQuestions = totalQuestions - correctQuestions
-    const accuracyPercentage = totalQuestions > 0 ? Math.round((correctQuestions / totalQuestions) * 100) : 0
+    const periodThresholds = [
+      { key: "HOJE" as const, minMs: startOfTodayMs },
+      { key: "SEMANA" as const, minMs: startOfWeekMs },
+      { key: "MES" as const, minMs: startOfMonthMs },
+      { key: "ANO" as const, minMs: startOfYearMs },
+      { key: "TOTAL" as const, minMs: 0 },
+    ]
+
+    const performanceByPeriod = {
+      HOJE: { totalQuestions: 0, correctQuestions: 0, wrongQuestions: 0, accuracyPercentage: 0 },
+      SEMANA: { totalQuestions: 0, correctQuestions: 0, wrongQuestions: 0, accuracyPercentage: 0 },
+      MES: { totalQuestions: 0, correctQuestions: 0, wrongQuestions: 0, accuracyPercentage: 0 },
+      ANO: { totalQuestions: 0, correctQuestions: 0, wrongQuestions: 0, accuracyPercentage: 0 },
+      TOTAL: { totalQuestions: 0, correctQuestions: 0, wrongQuestions: 0, accuracyPercentage: 0 },
+    }
+
+    for (const p of periodThresholds) {
+      let pTotal = 0
+      let pCorrect = 0
+
+      // 1. Question Attempts na plataforma
+      for (const a of attempts) {
+        const d = new Date(a.answered_at || a.created_at).getTime()
+        if (d >= p.minMs) {
+          pTotal += 1
+          if (a.correct) {
+            pCorrect += 1
+          }
+        }
+      }
+
+      // 2. Questões manuais ou importadas do histórico de sessões
+      for (const session of rawHistory) {
+        const d = new Date(session.started_at).getTime()
+        if (d >= p.minMs) {
+          const meta = (session.metadata || {}) as Record<string, unknown>
+          const answered = Number(meta["questions_answered"] || 0)
+          const correct = Number(meta["questions_correct"] || 0)
+          if (answered > 0) {
+            pTotal += answered
+            pCorrect += Math.min(answered, Math.max(0, correct))
+          }
+        }
+      }
+
+      const pWrong = Math.max(0, pTotal - pCorrect)
+      const pAccuracy = pTotal > 0 ? Math.round((pCorrect / pTotal) * 100) : 0
+
+      performanceByPeriod[p.key] = {
+        totalQuestions: pTotal,
+        correctQuestions: pCorrect,
+        wrongQuestions: pWrong,
+        accuracyPercentage: pAccuracy,
+      }
+    }
+
+    let totalQuestions = performanceByPeriod.TOTAL.totalQuestions
+    let correctQuestions = performanceByPeriod.TOTAL.correctQuestions
+    let wrongQuestions = performanceByPeriod.TOTAL.wrongQuestions
+    let accuracyPercentage = performanceByPeriod.TOTAL.accuracyPercentage
 
     const typedDisciplines = (disciplines || []) as Array<{ status: string }>
     const disciplinesStats = {
@@ -148,22 +200,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     const targetDays = profile?.weekly_study_days_goal ?? null
     
     // Calcular metas adicionais não presentes na base
-    const startOfWeekMs = getStartOfWeek(new Date(), profile?.week_start_day ?? 1).getTime()
-    
-    let weeklyQuestions = attempts.filter((a) => {
-      const d = new Date(a.answered_at || a.created_at)
-      return d.getTime() >= startOfWeekMs
-    }).length
-
-    rawHistory.forEach((session) => {
-      const d = new Date(session.started_at)
-      if (d.getTime() >= startOfWeekMs) {
-        const meta = (session.metadata || {}) as Record<string, unknown>
-        if (meta["questions_answered"]) {
-          weeklyQuestions += Number(meta["questions_answered"])
-        }
-      }
-    })
+    let weeklyQuestions = performanceByPeriod.SEMANA.totalQuestions
 
     // Revisões concluídas na semana = sessões registradas como revisão no histórico
     const weeklyRevisions = rawHistory.filter((h) => {
@@ -196,6 +233,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         correctQuestions,
         wrongQuestions,
         accuracyPercentage,
+        performanceByPeriod,
         completedTopics,
         pendingTopics,
         editalProgress

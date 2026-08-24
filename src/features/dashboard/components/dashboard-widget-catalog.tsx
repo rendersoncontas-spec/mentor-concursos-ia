@@ -33,7 +33,7 @@ import {
   getRecentStudyHistoryAction,
 } from "@/application/study-analytics/study-analytics.actions"
 import { Button } from "@/components/ui/button"
-import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
+import { type DashboardSnapshot, type PerformancePeriod } from "@/domain/dashboard/dashboard.types"
 import { RemindersWidget } from "@/features/dashboard/components/reminders-widget"
 import { ManualStudyTimeModal } from "@/features/dashboard/components/manual-study-time-modal"
 import { DayDetailModal } from "@/features/dashboard/components/day-detail-modal"
@@ -212,26 +212,101 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. WIDGET: Desempenho Geral
+// 2. WIDGET: Desempenho Geral com Seletor de Período
 // ─────────────────────────────────────────────────────────────────────────────
+
+const PERFORMANCE_PERIOD_OPTIONS: { key: PerformancePeriod; label: string }[] = [
+  { key: "HOJE", label: "Hoje" },
+  { key: "SEMANA", label: "Semana" },
+  { key: "MES", label: "Mês" },
+  { key: "ANO", label: "Ano" },
+  { key: "TOTAL", label: "Total" },
+]
+
+function PerformancePeriodSelector({
+  value,
+  onChange,
+  className,
+}: {
+  value: PerformancePeriod
+  onChange: (period: PerformancePeriod) => void
+  className?: string
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center p-0.5 bg-muted/60 rounded-lg text-[9px] sm:text-[10px] font-bold border border-border/40",
+        className,
+      )}
+    >
+      {PERFORMANCE_PERIOD_OPTIONS.map((opt) => {
+        const isActive = value === opt.key
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onChange(opt.key)
+            }}
+            className={cn(
+              "px-1.5 sm:px-2 py-0.5 rounded-md transition-all duration-150 cursor-pointer select-none",
+              isActive
+                ? "bg-background text-foreground shadow-xs font-black"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/40",
+            )}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
-  const accuracy = snapshot?.stats?.accuracyPercentage ?? 0
-  const total = snapshot?.stats?.totalQuestions ?? 0
-  const correct = snapshot?.stats?.correctQuestions ?? 0
-  const wrong = snapshot?.stats?.wrongQuestions ?? 0
+  const [selectedPeriod, setSelectedPeriod] = React.useState<PerformancePeriod>("SEMANA")
+
+  // Obter dados do período selecionado
+  const defaultPeriodData = {
+    totalQuestions: snapshot?.stats?.totalQuestions ?? 0,
+    correctQuestions: snapshot?.stats?.correctQuestions ?? 0,
+    wrongQuestions: snapshot?.stats?.wrongQuestions ?? 0,
+    accuracyPercentage: snapshot?.stats?.accuracyPercentage ?? 0,
+  }
+
+  const periodStats =
+    snapshot?.stats?.performanceByPeriod?.[selectedPeriod] ?? defaultPeriodData
+
+  const accuracy = periodStats.accuracyPercentage
+  const total = periodStats.totalQuestions
+  const correct = periodStats.correctQuestions
+  const wrong = periodStats.wrongQuestions
   const disciplineRanking = snapshot?.analytics?.rankings?.disciplines || []
+  const periodLabel =
+    PERFORMANCE_PERIOD_OPTIONS.find((o) => o.key === selectedPeriod)?.label || "Semana"
 
   if (colSpan === 1) {
     return (
-      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2.5">
+      <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-            <Target className="w-3.5 h-3.5 text-emerald-600" /> DESEMPENHO
+            <Target className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> DESEMPENHO
           </span>
           <span className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
             {accuracy}%
           </span>
         </div>
+
+        {/* Seletor de Período Compacto */}
+        <div className="flex justify-center w-full">
+          <PerformancePeriodSelector
+            value={selectedPeriod}
+            onChange={setSelectedPeriod}
+            className="w-full justify-between"
+          />
+        </div>
+
         <div className="flex items-center justify-between gap-2 my-auto">
           <div className="text-xl sm:text-2xl font-black text-foreground font-mono leading-tight">
             {accuracy}%
@@ -245,8 +320,8 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-muted-foreground">
-          <span>Total</span>
+        <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-muted-foreground border-t pt-1.5">
+          <span>Total ({periodLabel})</span>
           <span className="font-mono text-foreground font-extrabold">{total} questões</span>
         </div>
       </div>
@@ -256,13 +331,19 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
   if (colSpan === 2) {
     return (
       <div className="p-5 flex flex-col justify-between h-full space-y-3">
-        <div className="flex items-center justify-between border-b pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
             <Target className="w-4 h-4 text-emerald-600" /> DESEMPENHO GERAL
           </span>
-          <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-mono">
-            {accuracy}% Acurácia
-          </span>
+          <div className="flex items-center gap-2">
+            <PerformancePeriodSelector
+              value={selectedPeriod}
+              onChange={setSelectedPeriod}
+            />
+            <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-mono">
+              {accuracy}% Acurácia
+            </span>
+          </div>
         </div>
         <div className="flex items-center justify-between gap-2 my-auto">
           <div className="flex items-center gap-3">
@@ -277,7 +358,8 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             </div>
           </div>
           <div className="text-right text-xs font-bold text-muted-foreground">
-            Total: <span className="font-mono text-foreground font-extrabold">{total}</span>
+            Total ({periodLabel}):{" "}
+            <span className="font-mono text-foreground font-extrabold">{total}</span>
           </div>
         </div>
         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
@@ -292,17 +374,25 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
 
   return (
     <div className="p-6 flex flex-col justify-between h-full space-y-4">
-      <div className="flex items-center justify-between border-b pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
         <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
           <Target className="w-4 h-4 text-emerald-600" /> DESEMPENHO & TAXA DE ACERTO
         </span>
-        <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full font-mono">
-          Aproveitamento: {accuracy}%
-        </span>
+        <div className="flex items-center gap-2">
+          <PerformancePeriodSelector
+            value={selectedPeriod}
+            onChange={setSelectedPeriod}
+          />
+          <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full font-mono">
+            Aproveitamento: {accuracy}%
+          </span>
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="bg-muted/30 p-3 rounded-xl border text-center">
-          <span className="text-[10px] text-muted-foreground font-bold uppercase block">Total</span>
+          <span className="text-[10px] text-muted-foreground font-bold uppercase block">
+            Total ({periodLabel})
+          </span>
           <span className="text-lg font-black text-foreground font-mono">{total}</span>
         </div>
         <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-center">

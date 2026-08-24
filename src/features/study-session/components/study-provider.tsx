@@ -5,7 +5,18 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { useRouter } from "next/navigation"
 
 import * as Sentry from "@sentry/nextjs"
-import { Maximize2, Pause, Play, RefreshCcw, RotateCcw, Square, Volume2 } from "lucide-react"
+
+import {
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  Pause,
+  Play,
+  RefreshCcw,
+  RotateCcw,
+  Square,
+  Volume2,
+} from "lucide-react"
 
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { Button } from "@/components/ui/button"
@@ -145,16 +156,22 @@ function calculateTimes(state: StudySessionState): {
   }
 }
 
-// Posição padrão do balão: centralizado horizontalmente no viewport
+// Posição padrão do balão: centralizado horizontalmente no viewport (ou canto no mobile)
 interface Position {
   x: number
   y: number
 }
 
-function getDefaultPosition(): Position {
-  if (typeof window === "undefined") return { x: 0, y: 10 }
+function getDefaultPosition(isMobile: boolean = false): Position {
+  if (typeof window === "undefined") return { x: 16, y: 16 }
+  if (isMobile) {
+    return {
+      x: 16,
+      y: Math.max(16, window.innerHeight - 80),
+    }
+  }
   const floatingWidth = 250
-  const x = Math.max(0, (window.innerWidth - floatingWidth) / 2)
+  const x = Math.max(16, (window.innerWidth - floatingWidth) / 2)
   const y = 10
   return { x, y }
 }
@@ -164,16 +181,18 @@ function loadSavedPosition(): Position | null {
     const saved = localStorage.getItem(POSITION_KEY)
     if (!saved) return null
     const pos = JSON.parse(saved) as { x: number; y: number }
-    if (typeof window !== "undefined") {
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const floatingWidth = 250
-      const floatingHeight = 60
-      // Garantir que a posição salva seja válida dentro da viewport
-      pos.x = Math.max(0, Math.min(pos.x, vw - floatingWidth))
-      pos.y = Math.max(0, Math.min(pos.y, vh - floatingHeight))
+    if (typeof pos?.x === "number" && typeof pos?.y === "number") {
+      if (typeof window !== "undefined") {
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+        const maxX = Math.max(8, vw - 60)
+        const maxY = Math.max(8, vh - 40)
+        pos.x = Math.max(8, Math.min(pos.x, maxX))
+        pos.y = Math.max(8, Math.min(pos.y, maxY))
+      }
+      return { x: pos.x, y: pos.y }
     }
-    return { x: pos.x, y: pos.y }
+    return null
   } catch {
     return null
   }
@@ -612,6 +631,8 @@ export function useGlobalStudy() {
   return context
 }
 
+
+
 /* ═══════════════════════════════════════════════════════════════
    FLOATING STUDY WIDGET — Mini cronômetro arrastável e persistido
    ═══════════════════════════════════════════════════════════════ */
@@ -630,6 +651,19 @@ function FloatingStudyWidget() {
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [isMobileExpanded, setIsMobileExpanded] = useState(false)
+
+  // Detectar mobile de forma responsiva
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
+
   const dragRef = useRef<{
     startX: number
     startY: number
@@ -644,64 +678,81 @@ function FloatingStudyWidget() {
     if (pos === null && !isDragging) {
       const saved = loadSavedPosition()
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPos(saved || getDefaultPosition())
+      setPos(saved || getDefaultPosition(isMobile))
     }
-  }, [pos, isDragging])
+  }, [pos, isDragging, isMobile])
 
-  // Handlers de arraste com Pointer Events
+  // Handlers de arraste com Pointer Events (funciona para mouse e touch)
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (pos === null) return
       const target = e.target as HTMLElement
-      // Não arrastar se clicou em um botão ou ícone
-      if (target.closest("button")) return
-      e.preventDefault()
-      // Se ainda não foi arrastado, usar posição padrão como base
-      const startX = pos.x ?? e.clientX
-      const startY = pos.y ?? e.clientY
+      // Não arrastar se clicou em um botão
+      if (target.closest("button") || target.closest("a") || target.closest("[role='button']")) return
+
+      const currentX = pos?.x ?? (isMobile ? 16 : Math.max(10, (window.innerWidth - 260) / 2))
+      const currentY = pos?.y ?? (isMobile ? window.innerHeight - 80 : 10)
+
       dragRef.current = {
         startX: e.clientX,
         startY: e.clientY,
-        startPosX: startX,
-        startPosY: startY,
+        startPosX: currentX,
+        startPosY: currentY,
         moved: false,
       }
       setIsDragging(true)
-      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      try {
+        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      } catch {}
+    },
+    [pos, isMobile],
+  )
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragRef.current) return
+      const dx = e.clientX - dragRef.current.startX
+      const dy = e.clientY - dragRef.current.startY
+      if (!dragRef.current.moved && Math.hypot(dx, dy) < 4) return
+      dragRef.current.moved = true
+
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const floatingWidth = containerRef.current?.offsetWidth || (isMobile ? 180 : 250)
+      const floatingHeight = containerRef.current?.offsetHeight || (isMobile ? 48 : 56)
+      const minX = 8
+      const maxX = Math.max(minX, vw - floatingWidth - 8)
+      const minY = 8
+      const maxY = Math.max(minY, vh - floatingHeight - 8)
+
+      const newX = Math.max(minX, Math.min(dragRef.current.startPosX + dx, maxX))
+      const newY = Math.max(minY, Math.min(dragRef.current.startPosY + dy, maxY))
+      setPos({ x: newX, y: newY })
+    },
+    [isMobile],
+  )
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (dragRef.current) {
+        try {
+          if ((e.currentTarget as HTMLElement)?.hasPointerCapture?.(e.pointerId)) {
+            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+          }
+        } catch {}
+        if (dragRef.current.moved && pos) {
+          localStorage.setItem(POSITION_KEY, JSON.stringify(pos))
+        }
+      }
+      dragRef.current = null
+      setIsDragging(false)
     },
     [pos],
   )
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current) return
-    e.preventDefault()
-    setIsDragging(true)
-    const dx = e.clientX - dragRef.current.startX
-    const dy = e.clientY - dragRef.current.startY
-    if (!dragRef.current.moved && Math.abs(dx) + Math.abs(dy) < 5) return
-    dragRef.current.moved = true
-
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const floatingWidth = 250
-    const floatingHeight = 60
-    const newX = Math.max(0, Math.min(dragRef.current.startPosX + dx, vw - floatingWidth))
-    const newY = Math.max(0, Math.min(dragRef.current.startPosY + dy, vh - floatingHeight))
-    setPos({ x: newX, y: newY })
-  }, [])
-
-  const handlePointerUp = useCallback(() => {
-    if (dragRef.current?.moved && pos) {
-      localStorage.setItem(POSITION_KEY, JSON.stringify(pos))
-    }
-    dragRef.current = null
-    setIsDragging(false)
-  }, [pos])
-
   const handleResetPosition = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     localStorage.removeItem(POSITION_KEY)
-    setPos(null) // Isso forçará o uso da posição padrão (centralizada)
+    setPos(null)
   }, [])
 
   // Sessão vinda do Cronograma: restaurar leva de volta à tela do cronômetro do planejamento.
@@ -713,6 +764,15 @@ function FloatingStudyWidget() {
       window.dispatchEvent(new CustomEvent("restore-study-session"))
     }
   }, [router, session])
+
+  const handleTimeClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (dragRef.current?.moved) return
+      handleRestoreFull()
+    },
+    [handleRestoreFull],
+  )
 
   const isStudying = session?.phase === "STUDYING"
 
@@ -736,6 +796,219 @@ function FloatingStudyWidget() {
   }, [pauseSession, isStudying])
 
   if (!session || !session.isMinimized || !floatingTimerEnabled || isCentralOpen) return null
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // VERSÃO MOBILE (< 768px): Mini-player compacto e painel retrátil arrastável
+  // ═════════════════════════════════════════════════════════════════════════
+  if (isMobile) {
+    const defaultY = typeof window !== "undefined" ? window.innerHeight - 80 : 16
+    const posX = pos?.x ?? 16
+    const posY = pos?.y ?? defaultY
+
+    if (!isMobileExpanded) {
+      return (
+        <div
+          ref={containerRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          style={{
+            position: "fixed",
+            left: `${posX}px`,
+            top: `${posY}px`,
+            zIndex: 9999,
+          }}
+          className={cn(
+            "fixed z-[9999] max-w-[calc(100vw-2rem)] w-auto",
+            "flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border/80 rounded-full px-3.5 py-1.5 shadow-2xl select-none",
+            "touch-none cursor-grab active:cursor-grabbing",
+            isDragging ? "opacity-90 scale-105 shadow-blue-500/20" : "transition-transform",
+            "animate-in fade-in zoom-in-95 duration-200"
+          )}
+        >
+          {/* Indicador de Status + Tempo (clicável para restaurar) */}
+          <button
+            type="button"
+            onClick={handleTimeClick}
+            className="flex items-center gap-1.5 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-left"
+            title="Arraste para mover ou clique para abrir"
+          >
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              {isStudying && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span
+                className={cn(
+                  "relative inline-flex rounded-full h-2.5 w-2.5",
+                  isStudying ? "bg-emerald-500" : "bg-amber-500"
+                )}
+              />
+            </span>
+            <span className="font-mono font-black text-sm text-foreground leading-none">
+              {formatTime(session.activeSeconds)}
+            </span>
+          </button>
+
+          {/* Botão Play / Pause Rápido */}
+          {isStudying ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={pauseSession}
+              aria-label="Pausar cronômetro"
+              className="w-7 h-7 rounded-full text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 shrink-0"
+            >
+              <Pause className="w-3.5 h-3.5" />
+            </Button>
+          ) : (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={resumeSession}
+              aria-label="Retomar cronômetro"
+              className="w-7 h-7 rounded-full text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 shrink-0"
+            >
+              <Play className="w-3.5 h-3.5" />
+            </Button>
+          )}
+
+          {/* Botão Expandir Painel Completo */}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setIsMobileExpanded(true)}
+            aria-label="Expandir controles do cronômetro"
+            className="w-7 h-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
+            title="Expandir controles"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </Button>
+        </div>
+      )
+    }
+
+    return (
+      <div
+        ref={containerRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={{
+          position: "fixed",
+          left: `${Math.min(posX, typeof window !== "undefined" ? window.innerWidth - 290 : posX)}px`,
+          top: `${Math.min(posY, typeof window !== "undefined" ? window.innerHeight - 150 : posY)}px`,
+          zIndex: 9999,
+        }}
+        className={cn(
+          "fixed z-[9999] w-[280px] max-w-[calc(100vw-2rem)]",
+          "flex flex-col gap-2 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl p-3 shadow-2xl select-none",
+          "touch-none cursor-grab active:cursor-grabbing",
+          isDragging ? "opacity-90 scale-102 shadow-blue-500/20" : "transition-transform",
+          "animate-in fade-in zoom-in-95 duration-200"
+        )}
+      >
+        {/* Header do mini player expandido */}
+        <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              {isStudying && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span
+                className={cn(
+                  "relative inline-flex rounded-full h-2.5 w-2.5",
+                  isStudying ? "bg-emerald-500" : "bg-amber-500"
+                )}
+              />
+            </span>
+            <span className="font-mono font-black text-base text-foreground">
+              {formatTime(session.activeSeconds)}
+            </span>
+            <span className="text-[10px] font-bold text-muted-foreground ml-1">
+              {isStudying ? "Estudando" : "Pausado"}
+            </span>
+          </div>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setIsMobileExpanded(false)}
+            aria-label="Minimizar para player compacto"
+            className="w-6 h-6 rounded-full text-muted-foreground hover:text-foreground"
+            title="Minimizar"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {focusSoundActiveLabel && isStudying && (
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground px-1">
+            <Volume2 className="h-3 w-3 text-primary" />
+            <span className="truncate">Som: {focusSoundActiveLabel}</span>
+          </div>
+        )}
+
+        {/* Controles de Ação no Mobile */}
+        <div className="flex items-center justify-between gap-1 pt-0.5">
+          {isStudying ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={pauseSession}
+              className="flex-1 gap-1 h-8 text-amber-500 border-amber-500/30 hover:bg-amber-500/10 text-xs font-bold"
+            >
+              <Pause className="w-3.5 h-3.5" /> Pausar
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={resumeSession}
+              className="flex-1 gap-1 h-8 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 text-xs font-bold"
+            >
+              <Play className="w-3.5 h-3.5" /> Retomar
+            </Button>
+          )}
+
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={handleRestoreFull}
+            className="w-8 h-8 text-[#2563EB] border-[#2563EB]/30 hover:bg-[#2563EB]/10 shrink-0"
+            title="Restaurar tela do cronômetro"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </Button>
+
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={resetSession}
+            className="w-8 h-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 shrink-0"
+            title="Resetar cronômetro"
+          >
+            <RefreshCcw className="w-3.5 h-3.5" />
+          </Button>
+
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={handleEndOrOpenCentral}
+            className="w-8 h-8 text-rose-500 border-rose-500/30 hover:bg-rose-500/10 shrink-0"
+            title="Abrir Central Inteligente / Parar"
+          >
+            <Square className="w-3.5 h-3.5 fill-current" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // VERSÃO DESKTOP (>= 768px): Cronômetro completo e arrastável
+  // ═════════════════════════════════════════════════════════════════════════
 
   return (
     <div

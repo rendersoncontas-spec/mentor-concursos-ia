@@ -5,6 +5,7 @@ import {
   type PlanningFormValues,
   buildPlanningPayload,
   getStudyDaysCount,
+  isShiftDayForDate,
   isShiftDayForScale,
   normalizePlanningForm,
   planningReason,
@@ -91,6 +92,42 @@ test("isShiftDayForScale: escala personalizada custom_3x2", () => {
 test("isShiftDayForScale: normal nunca é plantão", () => {
   assert.equal(isShiftDayForScale(2, 2, "normal"), false)
   assert.equal(isShiftDayForScale(15, 2, "normal"), false)
+})
+
+test("isShiftDayForDate: rotação contínua na transição de mês (Agosto -> Setembro)", () => {
+  const anchor = "2026-08-24" // Segunda-feira de plantão na escala 24x72 (ciclo de 4 dias)
+  
+  // Agosto tem 31 dias
+  assert.equal(isShiftDayForDate("2026-08-24", anchor, "24x72"), true)
+  assert.equal(isShiftDayForDate("2026-08-25", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-08-26", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-08-27", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-08-28", anchor, "24x72"), true)
+  assert.equal(isShiftDayForDate("2026-08-29", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-08-30", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-08-31", anchor, "24x72"), false)
+  
+  // Setembro: 1 de Setembro (após 31 de Agosto) cai exatamente 8 dias após a âncora => Plantão!
+  assert.equal(isShiftDayForDate("2026-09-01", anchor, "24x72"), true)
+  assert.equal(isShiftDayForDate("2026-09-02", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-09-03", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-09-04", anchor, "24x72"), false)
+  assert.equal(isShiftDayForDate("2026-09-05", anchor, "24x72"), true)
+})
+
+test("isShiftDayForDate: escala 12x36 alternada dia sim, dia não", () => {
+  const anchor = "2026-08-24"
+  assert.equal(isShiftDayForDate("2026-08-24", anchor, "12x36"), true)
+  assert.equal(isShiftDayForDate("2026-08-25", anchor, "12x36"), false)
+  assert.equal(isShiftDayForDate("2026-08-26", anchor, "12x36"), true)
+  assert.equal(isShiftDayForDate("2026-08-27", anchor, "12x36"), false)
+})
+
+test("isShiftDayForDate: datas anteriores à data âncora (módulo negativo)", () => {
+  const anchor = "2026-08-24"
+  // 4 dias antes de 24/08 é 20/08 => Plantão
+  assert.equal(isShiftDayForDate("2026-08-20", anchor, "24x72"), true)
+  assert.equal(isShiftDayForDate("2026-08-21", anchor, "24x72"), false)
 })
 
 test("getStudyDaysCount: dias por semana por escala", () => {

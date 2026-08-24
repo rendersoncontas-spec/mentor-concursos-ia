@@ -78,12 +78,25 @@ const EMPTY_FILTERS: Filters = {
 }
 
 const STUDY_TYPES = [
-  { value: "TEORIA", label: "Teoria" },
+  { value: "AUDIO", label: "Áudio / Podcast" },
+  { value: "AULA_VIVO", label: "Aula ao Vivo" },
+  { value: "DISCURSIVA", label: "Discursiva / Redação" },
+  { value: "DOUTRINA", label: "Doutrina" },
+  { value: "DUOLINGO", label: "Duolingo" },
+  { value: "ESTUDO_IA", label: "Estudo com IA" },
+  { value: "FLASHCARDS", label: "Flashcards" },
+  { value: "INFORMATIVOS", label: "Informativos" },
+  { value: "JURISPRUDENCIA", label: "Jurisprudência" },
+  { value: "LEI_SECA", label: "Lei Seca" },
+  { value: "LEITURA", label: "Leitura / PDF" },
+  { value: "MAPA_MENTAL", label: "Mapa Mental" },
+  { value: "MONITORIA", label: "Monitoria / Mentoria" },
   { value: "QUESTOES", label: "Questões" },
-  { value: "VIDEOAULA", label: "Videoaula" },
   { value: "RESUMO", label: "Resumo" },
   { value: "REVISAO", label: "Revisão" },
-  { value: "FLASHCARDS", label: "Flashcards" },
+  { value: "SIMULADO", label: "Simulado" },
+  { value: "TEORIA", label: "Teoria" },
+  { value: "VIDEOAULA", label: "Videoaula" },
   { value: "OUTRO", label: "Outros" },
 ]
 

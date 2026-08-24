@@ -17,7 +17,15 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { getStudyDaysCount, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
+import { getReplanInfoAction } from "@/application/study-plan/replan/adaptive-replan.actions"
+import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive-replan.service"
+import {
+  getStudyDaysCount,
+  isShiftDayForDate,
+  isShiftDayForScale,
+  LS_SHIFT_ANCHOR_DATE,
+} from "@/features/planejamento/lib/planning-form"
+import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { type StudyCycleBlock } from "./planning-view"
 
@@ -125,12 +133,22 @@ export function WeeklyPlanningView({
     return ["seg", "ter", "qua", "qui", "sex", "sab"] // Padrão
   })
 
+  const [anchorShiftDate, setAnchorShiftDate] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(LS_SHIFT_ANCHOR_DATE)
+      if (saved) return saved
+    }
+    return ""
+  })
+
   useEffect(() => {
     const handleUpdate = () => {
       const savedScale = localStorage.getItem("mentor_user_work_scale")
       if (isScheduleMode(savedScale)) setScheduleMode(savedScale)
       const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
       if (savedFirstDay) setFirstShiftDay(parseInt(savedFirstDay))
+      const savedAnchor = localStorage.getItem(LS_SHIFT_ANCHOR_DATE)
+      if (savedAnchor) setAnchorShiftDate(savedAnchor)
       const savedStudyDays = localStorage.getItem("mentor_user_study_days")
       if (savedStudyDays) setStudyDays(JSON.parse(savedStudyDays))
     }
@@ -138,8 +156,56 @@ export function WeeklyPlanningView({
     return () => window.removeEventListener("mentor_scale_updated", handleUpdate)
   }, [])
 
-  const isShiftDay = (dayNum: number) => {
-    return isShiftDayForScale(dayNum, firstShiftDay, scheduleMode)
+  const [replanInfo, setReplanInfo] = useState<ReplanInfoPayload | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      const cached = localStorage.getItem("mentor_replan_info_cache")
+      return cached ? (JSON.parse(cached) as ReplanInfoPayload) : null
+    } catch {
+      return null
+    }
+  })
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      try {
+        const res = await getReplanInfoAction({
+          studyDays,
+          scheduleMode,
+          firstShiftDay,
+          anchorShiftDate: anchorShiftDate || undefined,
+        })
+        if (active && res.data) {
+          setReplanInfo(res.data)
+          try {
+            localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
+          } catch {}
+        }
+      } catch {}
+    }
+    load()
+    const handleSaved = () => {
+      load()
+    }
+    window.addEventListener(STUDY_SESSION_SAVED_EVENT, handleSaved)
+    return () => {
+      active = false
+      window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handleSaved)
+    }
+  }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate])
+
+  const isShiftDay = (dateStrOrDayNum: string | number) => {
+    const effectiveAnchor =
+      anchorShiftDate ||
+      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(firstShiftDay).padStart(2, "0")}`
+
+    if (typeof dateStrOrDayNum === "string") {
+      return isShiftDayForDate(dateStrOrDayNum, effectiveAnchor, scheduleMode)
+    }
+    // Fallback se receber dateNum
+    const dStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(dateStrOrDayNum).padStart(2, "0")}`
+    return isShiftDayForDate(dStr, effectiveAnchor, scheduleMode)
   }
 
   const getScaleLabel = (mode: string) => {
@@ -179,7 +245,7 @@ export function WeeklyPlanningView({
       }))
     }
 
-    if (blocks.length === 0) return []
+    if (blocks.length === 0 && !replanInfo?.hasPlan) return []
 
     const onShift = isShiftDay(dateNum)
     if (onShift && scheduleMode !== "normal") return [] // Sem estudos no dia de plantão/escala
@@ -188,6 +254,45 @@ export function WeeklyPlanningView({
       if (!studyDays.includes(WEEKDAY_KEYS[dayIdx] ?? "")) return []
     }
 
+    const dateStr = getDateStringForDay(dayIdx)
+    const historyMinsForDayAndDisc = (discId: string) => {
+      return history
+        .filter((h) => {
+          // Normalize dates to YYYY-MM-DD for comparison
+          const hDate = h.date.includes("T") ? h.date.split("T")[0] : h.date
+          return hDate === dateStr && h.disciplineId === discId
+        })
+        .reduce((sum, h) => sum + h.minutes, 0)
+    }
+
+    // 1. Usar blocos reais sincronizados com o servidor / plano ativo / replanejamento
+    const serverBlocks = replanInfo?.dailyBlocks?.[dateStr]
+    if (serverBlocks && serverBlocks.length > 0) {
+      return serverBlocks.map((b, bIdx) => {
+        const evtId = `server-${b.id || b.itemId}-${dateStr}-${bIdx}`
+        const studiedMinsOnThisDay = historyMinsForDayAndDisc(b.disciplineId)
+        const isCompletedByHistory = studiedMinsOnThisDay >= b.durationMinutes
+        const color = blocks.find((cb) => cb.disciplineId === b.disciplineId)?.color || "#2563EB"
+
+        return {
+          id: evtId,
+          discipline: b.disciplineName,
+          disciplineId: b.disciplineId,
+          time: `${b.durationMinutes} min`,
+          date: `Dia ${dayIdx}`,
+          repeat: "Semanal",
+          topic:
+            b.origin === "REAJUSTE" || b.origin === "CRITICO"
+              ? "Reajuste Adaptativo"
+              : "Revisão e Questões",
+          dayOfWeekIndex: dayIdx,
+          completed: completedTaskIds[evtId] ?? (b.manuallyClosed || isCompletedByHistory),
+          color,
+        }
+      })
+    }
+
+    // 2. Fallback caso ainda não tenha carregado
     const blocksPerDay = Math.max(1, Math.round(blocks.length / studyDaysCount))
     const startIndex = (dateNum * blocksPerDay) % blocks.length
 
@@ -202,17 +307,6 @@ export function WeeklyPlanningView({
         accumulatedMins += b.durationMinutes
       }
       idx++
-    }
-
-    const dateStr = getDateStringForDay(dayIdx)
-    const historyMinsForDayAndDisc = (discId: string) => {
-      return history
-        .filter((h) => {
-          // Normalize dates to YYYY-MM-DD for comparison
-          const hDate = h.date.includes("T") ? h.date.split("T")[0] : h.date
-          return hDate === dateStr && h.disciplineId === discId
-        })
-        .reduce((sum, h) => sum + h.minutes, 0)
     }
 
     return selectedBlocks.map((b, bIdx) => {
@@ -352,34 +446,34 @@ export function WeeklyPlanningView({
       </div>
 
       {scheduleMode !== "normal" && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
-              <strong>{getScaleLabel(scheduleMode)}:</strong> Os estudos são zerados nos dias de
-              plantão/trabalho e concentrados nas folgas!
+              <strong>{getScaleLabel(scheduleMode)}:</strong> Rotação contínua automática para todos os meses (estudos zerados nos plantões).
             </span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px]">Primeiro plantão do mês:</span>
-            <select
-              value={firstShiftDay}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <span className="text-[11px] font-bold">Plantão de referência:</span>
+            <input
+              type="date"
+              value={
+                anchorShiftDate ||
+                `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(firstShiftDay).padStart(2, "0")}`
+              }
               onChange={(e) => {
-                const val = parseInt(e.target.value) || 1
-                setFirstShiftDay(val)
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("mentor_user_first_shift_day", val.toString())
-                  window.dispatchEvent(new Event("mentor_scale_updated"))
+                const val = e.target.value
+                if (val) {
+                  setAnchorShiftDate(val)
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem(LS_SHIFT_ANCHOR_DATE, val)
+                    window.dispatchEvent(new Event("mentor_scale_updated"))
+                  }
+                  toast.success("Data de referência do plantão atualizada!")
                 }
               }}
-              className="bg-card border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none"
-            >
-              {Array.from({ length: 7 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>
-                  Dia {d}
-                </option>
-              ))}
-            </select>
+              className="bg-card border rounded-lg px-2.5 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer font-mono shadow-xs"
+            />
           </div>
         </div>
       )}
@@ -414,6 +508,7 @@ export function WeeklyPlanningView({
           <div className="overflow-x-auto">
             <div className="grid grid-cols-7 min-w-[720px] border rounded-xl overflow-hidden min-h-[460px]">
               {daysHeader.map((d) => {
+                const dayDateStr = getDateStringForDay(d.dayIdx)
                 const dayEvts = getEventsForDay(d.dayIdx, d.dateNum)
                 const hasEvts = dayEvts.length > 0
                 const isAllCompleted = hasEvts && dayEvts.every((e) => e.completed)
@@ -434,7 +529,7 @@ export function WeeklyPlanningView({
                     headerStyle = "bg-[#2563EB] text-white font-black"
                     statusTag = "📅 Programado"
                   }
-                } else if (isShiftDay(d.dateNum)) {
+                } else if (isShiftDay(dayDateStr)) {
                   headerStyle = "bg-rose-500/10 text-rose-500 font-black border-b-rose-500/20"
                   statusTag = "🚨 Plantão"
                 }
@@ -455,7 +550,7 @@ export function WeeklyPlanningView({
 
                     {/* Corpo do Dia com Botão + e Cards de Estudo */}
                     <div className="p-2 flex-1 space-y-2">
-                      {scheduleMode !== "normal" && isShiftDay(d.dateNum) && (
+                      {scheduleMode !== "normal" && isShiftDay(dayDateStr) && (
                         <div className="text-center py-8">
                           <p className="text-[10px] font-bold text-rose-500/80 bg-rose-500/10 p-2 rounded-md">
                             Sem estudos (Plantão)

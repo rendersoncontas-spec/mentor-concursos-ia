@@ -7,7 +7,9 @@ import { DashboardLayout } from "@/features/dashboard/components/dashboard-layou
 import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: {
+    absolute: "NomeIA",
+  },
   description: "Acompanhe seu progresso e planejamento de estudos no NomeIA.",
 }
 

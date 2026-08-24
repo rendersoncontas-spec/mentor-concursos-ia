@@ -172,10 +172,22 @@ const STUDY_TYPE_LABELS: Record<string, string> = {
   TEORIA: "Teoria",
   QUESTOES: "Questões",
   REVISAO: "Revisão",
+  LEI_SECA: "Lei Seca",
+  JURISPRUDENCIA: "Jurisprudência",
+  INFORMATIVOS: "Informativos",
+  DOUTRINA: "Doutrina",
   FLASHCARDS: "Flashcards",
-  AUDIO: "Áudio / Podcast",
+  RESUMO: "Resumo",
+  MAPA_MENTAL: "Mapa Mental",
+  LEITURA: "Leitura / PDF",
   VIDEOAULA: "Videoaula",
+  AUDIO: "Áudio / Podcast",
   SIMULADO: "Simulado",
+  DISCURSIVA: "Discursiva / Redação",
+  AULA_VIVO: "Aula ao Vivo",
+  ESTUDO_IA: "Estudo com IA",
+  MONITORIA: "Monitoria / Mentoria",
+  DUOLINGO: "Duolingo",
   OUTRO: "Outro",
 }
 
@@ -580,7 +592,12 @@ export function StudyRegisterModal({
       watchType === "TEORIA" ||
       watchType === "REVISAO" ||
       watchType === "LEITURA" ||
-      watchType === "RESUMO"
+      watchType === "RESUMO" ||
+      watchType === "LEI_SECA" ||
+      watchType === "JURISPRUDENCIA" ||
+      watchType === "INFORMATIVOS" ||
+      watchType === "DOUTRINA" ||
+      watchType === "MAPA_MENTAL"
     ) {
       return (
         <div className="grid grid-cols-3 gap-2">
@@ -589,8 +606,8 @@ export function StudyRegisterModal({
             name="pages_read"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs text-muted-foreground font-medium truncate block" title="Páginas Estudadas">
-                  Páginas
+                <FormLabel className="text-xs text-muted-foreground font-medium truncate block" title="Páginas / Artigos Estudados">
+                  Páginas/Artigos
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -654,6 +671,11 @@ export function StudyRegisterModal({
       watchType === "QUESTOES" ||
       watchType === "SIMULADO" ||
       watchType === "VIDEOAULA" ||
+      watchType === "DISCURSIVA" ||
+      watchType === "AULA_VIVO" ||
+      watchType === "ESTUDO_IA" ||
+      watchType === "MONITORIA" ||
+      watchType === "DUOLINGO" ||
       watchType === "OUTRO"
     ) {
       return (
@@ -1351,6 +1373,7 @@ export function StudyRegisterModal({
                             <Popover
                               open={disciplinePopoverOpen}
                               onOpenChange={setDisciplinePopoverOpen}
+                              modal={true}
                             >
                               <PopoverTrigger asChild>
                                 <FormControl>
@@ -1382,6 +1405,8 @@ export function StudyRegisterModal({
                                 align="start"
                                 sideOffset={4}
                                 onWheel={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                onTouchMove={(e) => e.stopPropagation()}
                               >
                                 <Command className="w-full max-h-[300px]" shouldFilter={true}>
                                   <CommandInput
@@ -1395,7 +1420,7 @@ export function StudyRegisterModal({
                                       form.setValue("discipline_id", found ? found.id : "")
                                     }}
                                   />
-                                  <CommandList className="max-h-[250px] overflow-y-auto">
+                                  <CommandList className="max-h-[250px] overflow-y-auto overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
                                     <CommandEmpty>Nenhuma disciplina encontrada.</CommandEmpty>
                                     <CommandGroup heading="Sugestões do Plano">
                                       {planDisciplines.length > 0 ? (
@@ -1532,14 +1557,26 @@ export function StudyRegisterModal({
                                     <SelectValue placeholder="Selecione o tipo..." />
                                   </SelectTrigger>
                                 </FormControl>
-                                <SelectContent className="z-[200]">
-                                  <SelectItem value="TEORIA">📖 Teoria</SelectItem>
-                                  <SelectItem value="QUESTOES">✍️ Questões</SelectItem>
-                                  <SelectItem value="REVISAO">🔁 Revisão</SelectItem>
+                                <SelectContent className="z-[200] max-h-[300px] overflow-y-auto">
+                                  <SelectItem value="AUDIO">🎧 Áudio / Podcast</SelectItem>
+                                  <SelectItem value="AULA_VIVO">📡 Aula ao Vivo</SelectItem>
+                                  <SelectItem value="DISCURSIVA">✒️ Discursiva / Redação</SelectItem>
+                                  <SelectItem value="DOUTRINA">📚 Doutrina</SelectItem>
+                                  <SelectItem value="DUOLINGO">🦉 Duolingo</SelectItem>
+                                  <SelectItem value="ESTUDO_IA">🤖 Estudo com IA</SelectItem>
                                   <SelectItem value="FLASHCARDS">🎴 Flashcards</SelectItem>
-                                  <SelectItem value="AUDIO">🎧 Áudio</SelectItem>
-                                  <SelectItem value="VIDEOAULA">🎥 Videoaula</SelectItem>
+                                  <SelectItem value="INFORMATIVOS">📰 Informativos (STF/STJ)</SelectItem>
+                                  <SelectItem value="JURISPRUDENCIA">🏛️ Jurisprudência</SelectItem>
+                                  <SelectItem value="LEI_SECA">⚖️ Lei Seca</SelectItem>
+                                  <SelectItem value="LEITURA">📑 Leitura / PDF</SelectItem>
+                                  <SelectItem value="MAPA_MENTAL">🗺️ Mapa Mental</SelectItem>
+                                  <SelectItem value="MONITORIA">👥 Monitoria / Mentoria</SelectItem>
+                                  <SelectItem value="QUESTOES">✍️ Questões</SelectItem>
+                                  <SelectItem value="RESUMO">📝 Resumo</SelectItem>
+                                  <SelectItem value="REVISAO">🔁 Revisão</SelectItem>
                                   <SelectItem value="SIMULADO">🧪 Simulado</SelectItem>
+                                  <SelectItem value="TEORIA">📖 Teoria</SelectItem>
+                                  <SelectItem value="VIDEOAULA">🎥 Videoaula</SelectItem>
                                   <SelectItem value="OUTRO">⭐ Outro</SelectItem>
                                 </SelectContent>
                               </Select>

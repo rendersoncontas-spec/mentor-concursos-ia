@@ -34,6 +34,7 @@ export const DAILY_STUDY_CAP_HOURS = 3
 export const LS_WEEKLY_HOURS = "mentor_user_weekly_hours"
 export const LS_SCALE = "mentor_user_work_scale"
 export const LS_FIRST_SHIFT = "mentor_user_first_shift_day"
+export const LS_SHIFT_ANCHOR_DATE = "mentor_user_shift_anchor_date"
 export const LS_STUDY_DAYS = "mentor_user_study_days"
 export const LS_MIN_MIN = "mentor_user_session_min_minutes"
 export const LS_MAX_MIN = "mentor_user_session_max_minutes"
@@ -48,6 +49,55 @@ export function formatMinutesLabel(min: number): string {
   const h = Math.floor(min / 60)
   const m = min % 60
   return `${h}h${m > 0 ? `${m}` : ""}`
+}
+
+/** Helper para módulo positivo (ex: mod(-1, 4) === 3). */
+function posMod(n: number, m: number): number {
+  return ((n % m) + m) % m
+}
+
+/**
+ * Retorna se `targetDate` é dia de plantão em relação a uma data de referência `anchorDate`.
+ * Funciona de forma contínua em qualquer mês e ano.
+ */
+export function isShiftDayForDate(
+  targetDate: Date | string,
+  anchorDate: Date | string,
+  scale: string,
+): boolean {
+  if (scale === "normal") return false
+
+  const parseToUtcMidnight = (d: Date | string): number => {
+    if (typeof d === "string") {
+      const parts = d.split("T")[0]?.split("-")
+      if (parts && parts.length === 3) {
+        return Date.UTC(parseInt(parts[0]!, 10), parseInt(parts[1]!, 10) - 1, parseInt(parts[2]!, 10))
+      }
+    }
+    const dateObj = new Date(d)
+    return Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate())
+  }
+
+  const tMs = parseToUtcMidnight(targetDate)
+  const aMs = parseToUtcMidnight(anchorDate)
+  const diffDays = Math.round((tMs - aMs) / (1000 * 60 * 60 * 24))
+
+  if (scale === "12x36") return posMod(diffDays, 2) === 0
+  if (scale === "24x72") return posMod(diffDays, 4) === 0
+  if (scale === "24x48") return posMod(diffDays, 3) === 0
+  if (scale === "5x1") return posMod(diffDays, 6) < 5
+  if (scale === "6x1") return posMod(diffDays, 7) < 6
+  if (scale === "4x2") return posMod(diffDays, 6) < 4
+
+  const custom = CUSTOM_SCALE_RE.exec(scale)
+  if (custom) {
+    const work = parseInt(custom[1] ?? "", 10)
+    const off = parseInt(custom[2] ?? "", 10)
+    const cycle = work + off
+    if (cycle <= 0) return false
+    return posMod(diffDays, cycle) < work
+  }
+  return false
 }
 
 /**

@@ -23,13 +23,14 @@ import {
 const REPLAN_PATHS = ["/planejamento", "/dashboard"]
 
 export interface ReplanAvailabilityInput {
-  studyDays?: string[]
-  scheduleMode?: string
-  firstShiftDay?: number
+  studyDays?: string[] | undefined
+  scheduleMode?: string | undefined
+  firstShiftDay?: number | undefined
+  anchorShiftDate?: string | undefined
 }
 
 function normalizeAvailability(input?: ReplanAvailabilityInput): ReplanAvailability {
-  return {
+  const result: ReplanAvailability = {
     studyDays:
       input?.studyDays && input.studyDays.length > 0
         ? input.studyDays
@@ -40,6 +41,10 @@ function normalizeAvailability(input?: ReplanAvailabilityInput): ReplanAvailabil
         ? input.firstShiftDay
         : DEFAULT_AVAILABILITY.firstShiftDay,
   }
+  if (input?.anchorShiftDate) {
+    result.anchorShiftDate = input.anchorShiftDate
+  }
+  return result
 }
 
 /**

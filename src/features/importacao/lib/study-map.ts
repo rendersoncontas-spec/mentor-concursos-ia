@@ -118,6 +118,24 @@ const EXTERNAL_TYPE_ALIASES: { type: StudyType; aliases: string[] }[] = [
     type: "ESTUDO_IA",
     aliases: ["estudo com ia", "estudo ia", "chatgpt", "ia", "inteligencia artificial"],
   },
+  {
+    type: "DUOLINGO",
+    aliases: ["duolingo", "duo", "idiomas", "idioma", "ingles duolingo", "espanhol duolingo"],
+  },
+  {
+    type: "DISCURSIVA",
+    aliases: [
+      "discursiva",
+      "discursivas",
+      "redacao",
+      "redacoes",
+      "estudo discursivo",
+      "peca",
+      "peca pratica",
+      "peca tecnica",
+      "parecer",
+    ],
+  },
 ]
 
 const ALIAS_LOOKUP: { alias: string; type: StudyType }[] = EXTERNAL_TYPE_ALIASES.flatMap(

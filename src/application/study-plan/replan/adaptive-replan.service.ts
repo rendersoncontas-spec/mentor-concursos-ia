@@ -13,7 +13,7 @@
 import * as Sentry from "@sentry/nextjs"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
+import { isShiftDayForDate, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
 import { todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 import {
@@ -49,6 +49,7 @@ export interface ReplanAvailability {
   studyDays: string[] // ["seg","ter",...]
   scheduleMode: string // "normal" | "12x36" | ...
   firstShiftDay: number // 0-6 (0=dom)
+  anchorShiftDate?: string | undefined // "YYYY-MM-DD"
 }
 
 export const DEFAULT_AVAILABILITY: ReplanAvailability = {
@@ -114,8 +115,16 @@ export interface ReplanSummary {
 
 const DAY_LABEL_BY_WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"]
 
-export function isShiftDay(dateKey: string, firstShiftDay: number, scheduleMode: string): boolean {
+export function isShiftDay(
+  dateKey: string,
+  firstShiftDay: number,
+  scheduleMode: string,
+  anchorShiftDate?: string,
+): boolean {
   if (scheduleMode === "normal") return false
+  if (anchorShiftDate) {
+    return isShiftDayForDate(dateKey, anchorShiftDate, scheduleMode)
+  }
   const dayNum = Number(dateKey.slice(8, 10))
   if (Number.isNaN(dayNum)) return false
   return isShiftDayForScale(dayNum, firstShiftDay, scheduleMode)
@@ -127,7 +136,12 @@ export function isStudyDate(dateKey: string, availability: ReplanAvailability): 
   if (!availability.studyDays.includes(label)) return false
   if (
     availability.scheduleMode !== "normal" &&
-    isShiftDay(dateKey, availability.firstShiftDay, availability.scheduleMode)
+    isShiftDay(
+      dateKey,
+      availability.firstShiftDay,
+      availability.scheduleMode,
+      availability.anchorShiftDate,
+    )
   ) {
     return false
   }

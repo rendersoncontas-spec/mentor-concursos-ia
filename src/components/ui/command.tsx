@@ -72,23 +72,33 @@ const CommandList = React.forwardRef<
     const el = innerRef.current
     if (!el) return
 
-    const handleTouchMoveCapture = (e: TouchEvent) => {
+    let startY = 0
+
+    const handleTouchStart = (e: TouchEvent) => {
+      startY = e.touches[0]?.clientY ?? 0
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const currentY = e.touches[0]?.clientY ?? 0
+      const deltaY = currentY - startY
       const { scrollTop, scrollHeight, clientHeight } = el
-      const touch = e.touches[0]
-      if (!touch) return
+      const isScrollable = scrollHeight > clientHeight
 
-      const delta = touch.clientY
-      const atTop = scrollTop <= 0 && delta > 0
-      const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && delta < 0
+      if (isScrollable) {
+        const atTop = scrollTop <= 0 && deltaY > 0
+        const atBottom = Math.ceil(scrollTop + clientHeight) >= scrollHeight && deltaY < 0
 
-      if (!atTop && !atBottom) {
-        e.stopPropagation()
+        if (!atTop && !atBottom) {
+          e.stopPropagation()
+        }
       }
     }
 
-    el.addEventListener("touchmove", handleTouchMoveCapture, { capture: true, passive: true })
+    el.addEventListener("touchstart", handleTouchStart, { passive: true })
+    el.addEventListener("touchmove", handleTouchMove, { capture: true, passive: true })
     return () => {
-      el.removeEventListener("touchmove", handleTouchMoveCapture, { capture: true } as EventListenerOptions)
+      el.removeEventListener("touchstart", handleTouchStart)
+      el.removeEventListener("touchmove", handleTouchMove, { capture: true } as EventListenerOptions)
     }
   }, [])
 
@@ -97,7 +107,7 @@ const CommandList = React.forwardRef<
       ref={combinedRef}
       className={cn(
         "max-h-[300px] overflow-y-auto overflow-x-hidden p-1",
-        "scroll-smooth [touch-action:pan-y]",
+        "overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]",
         "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20",
         className,
       )}

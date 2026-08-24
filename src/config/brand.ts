@@ -8,8 +8,8 @@ export const BRAND = {
   tagline: "Sua preparação rumo à nomeação.",
   description:
     "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",
-  titleTemplate: "%s — NomeIA",
-  defaultTitle: "NomeIA — Sua preparação rumo à nomeação",
+  titleTemplate: "%s | NomeIA",
+  defaultTitle: "NomeIA",
   defaultEmailFrom: "NomeIA <onboarding@resend.dev>",
   copyright: `© ${new Date().getFullYear()} NomeIA. Todos os direitos reservados.`,
   assets: {

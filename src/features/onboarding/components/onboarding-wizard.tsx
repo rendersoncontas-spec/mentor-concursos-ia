@@ -294,7 +294,7 @@ export function OnboardingWizard() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Qual concurso você quer passar?</FormLabel>
-                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                    <Popover open={openCombobox} onOpenChange={setOpenCombobox} modal={true}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -333,7 +333,12 @@ export function OnboardingWizard() {
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[320px] sm:w-[400px] p-0 shadow-lg border-muted/60" align="start">
+                      <PopoverContent
+                        className="w-[320px] sm:w-[400px] p-0 shadow-lg border-muted/60"
+                        align="start"
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
+                      >
                         <Command shouldFilter={false}>
                           <div className="flex items-center border-b px-3">
                             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />

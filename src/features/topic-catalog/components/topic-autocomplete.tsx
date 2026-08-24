@@ -185,7 +185,11 @@ export function TopicAutocomplete({
               Carregando tópicos...
             </div>
           ) : (
-            <div className="max-h-[260px] overflow-y-auto py-1">
+            <div
+              className="max-h-[260px] overflow-y-auto py-1 overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]"
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {value.trim() ? "SUGESTÕES" : "TÓPICOS SUGERIDOS"}
               </p>

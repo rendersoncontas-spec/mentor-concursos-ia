@@ -100,6 +100,17 @@ export interface DashboardRawDiscipline {
   accuracyPercentage: number
 }
 
+export type PerformancePeriod = "HOJE" | "SEMANA" | "MES" | "ANO" | "TOTAL"
+
+export interface PeriodPerformanceData {
+  totalQuestions: number
+  correctQuestions: number
+  wrongQuestions: number
+  accuracyPercentage: number
+}
+
+export type PerformanceByPeriod = Record<PerformancePeriod, PeriodPerformanceData>
+
 export interface DashboardSnapshot {
   user: DashboardProfile | null
   activeTarget: DashboardTarget | null
@@ -108,6 +119,7 @@ export interface DashboardSnapshot {
     correctQuestions?: number
     wrongQuestions?: number
     accuracyPercentage?: number
+    performanceByPeriod?: PerformanceByPeriod
     completedTopics?: number
     pendingTopics?: number
     editalProgress?: number
