@@ -1,5 +1,6 @@
 import type { AnalyticsContext } from "./types"
-import { getStartOfWeek, getStartOfMonth, formatDateToYYYYMMDD } from "./utils"
+import { formatDateToYYYYMMDD } from "./utils"
+import { computeStudyTimeFromHistory } from "@/lib/study-time-calculator"
 
 type BaseAggregations = {
   dailyMinutes: number
@@ -19,55 +20,32 @@ type BaseAggregations = {
 
 export function getBaseAggregations(ctx: AnalyticsContext): BaseAggregations {
   return ctx.getCache('base_aggregations', () => {
-    let dailyMinutes = 0
-    let weeklyMinutes = 0
-    let monthlyMinutes = 0
-    let totalMinutes = 0
-    let longestSession = 0
     let interruptedSessions = 0
-    
     let sumFocus = 0, countFocus = 0
     let sumEnergy = 0, countEnergy = 0
     let sumDifficulty = 0, countDifficulty = 0
 
-    const now = new Date()
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-    const startOfWeekMs = getStartOfWeek(now, ctx.weekStartDay).getTime()
-    const startOfMonthMs = getStartOfMonth(now).getTime()
-
-    const uniqueDaysStudied = new Set<string>()
+    // Cálculo centralizado e padronizado no fuso de São Paulo conforme preferência do aluno (ctx.weekStartDay)
+    const timeSummary = computeStudyTimeFromHistory(ctx.history, new Date(), ctx.weekStartDay ?? 0)
 
     for (const session of ctx.history) {
-      const startedAtDate = new Date(session.started_at)
-      const startedAtMs = startedAtDate.getTime()
-      const duration = session.duration_minutes || 0
-
-      totalMinutes += duration
-      if (duration > longestSession) longestSession = duration
       if (session.interrupted) interruptedSessions++
-
-      if (startedAtMs >= startOfDay) dailyMinutes += duration
-      if (startedAtMs >= startOfWeekMs) weeklyMinutes += duration
-      if (startedAtMs >= startOfMonthMs) monthlyMinutes += duration
 
       if (session.focus_score) { sumFocus += session.focus_score; countFocus++ }
       if (session.energy_level) { sumEnergy += session.energy_level; countEnergy++ }
       if (session.difficulty) { sumDifficulty += session.difficulty; countDifficulty++ }
-
-      uniqueDaysStudied.add(formatDateToYYYYMMDD(startedAtDate))
     }
 
     const totalSessions = ctx.history.length
-
-    const { currentStreak, longestStreak } = calculateStreaks(uniqueDaysStudied)
+    const { currentStreak, longestStreak } = calculateStreaks(timeSummary.uniqueDaysStudied)
 
     return {
-      dailyMinutes,
-      weeklyMinutes,
-      monthlyMinutes,
-      totalMinutes,
-      longestSession,
-      averageSession: totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0,
+      dailyMinutes: timeSummary.dailyMinutes,
+      weeklyMinutes: timeSummary.weeklyMinutes,
+      monthlyMinutes: timeSummary.monthlyMinutes,
+      totalMinutes: timeSummary.totalMinutes,
+      longestSession: timeSummary.longestSession,
+      averageSession: totalSessions > 0 ? Math.round(timeSummary.totalMinutes / totalSessions) : 0,
       interruptedSessions,
       totalSessions,
       consecutiveStreak: currentStreak,

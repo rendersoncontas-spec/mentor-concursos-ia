@@ -14,7 +14,8 @@ import * as Sentry from "@sentry/nextjs"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { isShiftDayForDate, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
-import { todayKeyInSaoPaulo } from "@/lib/sao-paulo"
+import { getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
+import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
 
 import {
   MAX_DAILY_MINUTES_CAP,
@@ -27,12 +28,194 @@ import {
   addDaysToKey,
   computePendingBlocks,
   computeReplan,
+  distributeWeeklyRemainingGoal,
   pendingOf,
 } from "./replan-engine"
 
 export const REPLAN_LOOKBACK_DAYS = 7
 export const REPLAN_FORWARD_DAYS = 7
 export const FEATURE = "adaptive-planning"
+
+// ---------------------------------------------------------------------------
+// Meta de Estudo vs Carga Planejada
+// ---------------------------------------------------------------------------
+
+export type PeriodFilter = "semana" | "mes" | "ano" | "total"
+
+export interface PeriodGoalData {
+  /** Meta de estudo do período em minutos (ex: semana = weekly_study_hours * 60) */
+  goalMinutes: number
+  /** Tempo efetivamente estudado no período (registros reais do study_history) */
+  studiedMinutes: number
+  /** Tempo restante para atingir a meta */
+  remainingMinutes: number
+  /** Meta diária derivada (goalMinutes / dias do período) */
+  dailyGoalMinutes: number
+  /** Label do período */
+  periodLabel: string
+  /** Data de início do período (YYYY-MM-DD) */
+  periodStart: string
+  /** Data de fim do período (YYYY-MM-DD) */
+  periodEnd: string
+}
+
+/**
+ * Calcula a meta de estudo vs tempo real estudado para um período.
+ * Usa dados REAIS do banco (profiles.weekly_study_hours + study_history)
+ * respeitando o primeiro dia da semana (firstDayOfWeek / week_start_day).
+ */
+export async function getPeriodGoalData(
+  supabase: SupabaseClient,
+  userId: string,
+  period: PeriodFilter,
+  offset = 0,
+): Promise<PeriodGoalData> {
+  const todayKey = todayKeyInSaoPaulo()
+  const today = new Date(`${todayKey}T00:00:00Z`)
+
+  // 1. Buscar meta semanal e preferência de primeiro dia do perfil
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("weekly_study_hours, week_start_day, preferences")
+    .eq("id", userId)
+    .maybeSingle()
+
+  const weeklyGoalHours =
+    (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours ?? 20
+  const weeklyGoalMinutes = weeklyGoalHours * 60
+
+  const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
+  const weekStartDay =
+    prefsFirstDay === "Domingo"
+      ? 0
+      : prefsFirstDay === "Segunda-feira"
+        ? 1
+        : ((profile as { week_start_day?: number } | null)?.week_start_day ?? 0)
+
+  // 2. Calcular range do período
+  let periodStart: Date
+  let periodEnd: Date
+  let periodLabel: string
+  let daysInPeriod: number
+  let periodStartKey: string
+  let periodEndKey: string
+
+  if (period === "semana") {
+    const weekRange = getSaoPauloWeekRange(todayKey, weekStartDay)
+    periodStartKey = weekRange.mondayKey
+    periodEndKey = weekRange.sundayKey
+
+    if (offset !== 0) {
+      periodStartKey = addDaysToKey(weekRange.mondayKey, offset * 7)
+      periodEndKey = addDaysToKey(weekRange.sundayKey, offset * 7)
+    }
+
+    periodStart = new Date(`${periodStartKey}T00:00:00.000Z`)
+    periodEnd = new Date(`${periodEndKey}T23:59:59.999Z`)
+    daysInPeriod = 7
+    const [, sm, sd] = periodStartKey.split("-")
+    const [, em, ed] = periodEndKey.split("-")
+    periodLabel = `${sd}/${sm} a ${ed}/${em}`
+  } else if (period === "mes") {
+    periodStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + offset, 1))
+    periodEnd = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + offset + 1, 0, 23, 59, 59, 999),
+    )
+    daysInPeriod = periodEnd.getUTCDate()
+    periodStartKey = periodStart.toISOString().slice(0, 10)
+    periodEndKey = periodEnd.toISOString().slice(0, 10)
+    periodLabel = periodStart.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+  } else if (period === "ano") {
+    periodStart = new Date(Date.UTC(today.getUTCFullYear() + offset, 0, 1))
+    periodEnd = new Date(Date.UTC(today.getUTCFullYear() + offset, 11, 31, 23, 59, 59, 999))
+    daysInPeriod = 365
+    periodStartKey = periodStart.toISOString().slice(0, 10)
+    periodEndKey = periodEnd.toISOString().slice(0, 10)
+    periodLabel = `${periodStart.getUTCFullYear()}`
+  } else {
+    // total: desde o primeiro registro
+    periodStart = new Date("2020-01-01T00:00:00Z")
+    periodEnd = new Date(today)
+    periodEnd.setUTCHours(23, 59, 59, 999)
+    daysInPeriod = Math.max(
+      1,
+      Math.ceil((periodEnd.getTime() - periodStart.getTime()) / 86_400_000),
+    )
+    periodStartKey = periodStart.toISOString().slice(0, 10)
+    periodEndKey = periodEnd.toISOString().slice(0, 10)
+    periodLabel = "Todo o histórico"
+  }
+
+  // 3. Buscar tempo REALMENTE estudado no período (exclusivo do study_history)
+  const { data: historyData } = await supabase
+    .from("study_history")
+    .select("duration_minutes, started_at")
+    .eq("user_id", userId)
+    .gte("started_at", `${periodStartKey}T00:00:00.000Z`)
+    .lte("started_at", `${periodEndKey}T23:59:59.999Z`)
+    .not("duration_minutes", "is", null)
+
+  const studiedMinutes = (historyData ?? []).reduce((acc, r) => {
+    const row = r as { duration_minutes?: number; started_at?: string }
+    if (!row.started_at) return acc
+    const dateKey = getDayInSaoPaulo(row.started_at)
+    if (dateKey >= periodStartKey && dateKey <= periodEndKey) {
+      return acc + (Number(row.duration_minutes) || 0)
+    }
+    return acc
+  }, 0)
+
+  // 4. Calcular meta do período
+  let goalMinutes: number
+  if (period === "semana") {
+    goalMinutes = weeklyGoalMinutes
+  } else if (period === "mes") {
+    goalMinutes = Math.round(weeklyGoalMinutes * 4.3)
+  } else if (period === "ano") {
+    goalMinutes = weeklyGoalMinutes * 52
+  } else {
+    // total: meta indefinida, usar o total semanal * número de semanas
+    const weeks = Math.max(1, Math.ceil(daysInPeriod / 7))
+    goalMinutes = weeklyGoalMinutes * weeks
+  }
+
+  const remainingMinutes = Math.max(0, goalMinutes - studiedMinutes)
+  const dailyGoalMinutes = Math.round(goalMinutes / Math.max(1, daysInPeriod))
+
+  return {
+    goalMinutes,
+    studiedMinutes,
+    remainingMinutes,
+    dailyGoalMinutes,
+    periodLabel,
+    periodStart: periodStartKey,
+    periodEnd: periodEndKey,
+  }
+}
+
+/**
+ * Retorna o tempo estudado por disciplina em um período específico.
+ * Usado para exibir progresso real por matéria.
+ */
+export async function getStudiedByDiscipline(
+  supabase: SupabaseClient,
+  userId: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<Map<string, number>> {
+  const { data } = await supabase
+    .from("study_history")
+    .select("discipline_id, duration_minutes")
+    .eq("user_id", userId)
+    .gte("started_at", `${periodStart}T00:00:00Z`)
+    .lte("started_at", `${periodEnd}T23:59:59Z`)
+
+  const map = new Map<string, number>()
+  for (const row of (data ?? []) as Array<{ discipline_id: string; duration_minutes: number }>) {
+    map.set(row.discipline_id, (map.get(row.discipline_id) ?? 0) + (row.duration_minutes ?? 0))
+  }
+  return map
+}
 
 // ---------------------------------------------------------------------------
 // REGRA 0 — KILL-SWITCH DE MANUTENÇÃO
@@ -347,21 +530,151 @@ export async function ensureDailyWindow(
   const existing = await loadWindowBlocks(supabase, plan.id, fromKey, toKey)
   const existingDates = new Set(existing.map((b) => b.scheduled_date))
 
+  // 1. Buscar meta semanal do perfil e preferência de início da semana
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("weekly_study_hours, week_start_day, preferences")
+    .eq("id", userId)
+    .maybeSingle()
+
+  const weeklyGoalHours =
+    (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours ?? 20
+  const weeklyGoalMinutes = weeklyGoalHours * 60
+
+  const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
+  const weekStartDay =
+    prefsFirstDay === "Domingo"
+      ? 0
+      : prefsFirstDay === "Segunda-feira"
+        ? 1
+        : ((profile as { week_start_day?: number } | null)?.week_start_day ?? 0)
+
+  // 2. Limites da semana atual
+  const currentWeek = getSaoPauloWeekRange(todayKey, weekStartDay)
+  const activeDaysCount = Math.max(1, availability.studyDays.length)
+  const defaultDailyGoalMinutes = Math.round(weeklyGoalMinutes / activeDaysCount)
+
+  // 3. Tempo REAL estudado na semana atual (vindo exclusivamente de study_history)
+  const { data: weekHistoryData } = await supabase
+    .from("study_history")
+    .select("duration_minutes, started_at")
+    .eq("user_id", userId)
+    .gte("started_at", `${currentWeek.mondayKey}T00:00:00.000Z`)
+    .lte("started_at", `${currentWeek.sundayKey}T23:59:59.999Z`)
+    .not("duration_minutes", "is", null)
+
+  const realStudiedMinutesThisWeek = (weekHistoryData ?? []).reduce((acc, r) => {
+    const row = r as { duration_minutes?: number; started_at?: string }
+    if (!row.started_at) return acc
+    const dateKey = getDayInSaoPaulo(row.started_at)
+    if (dateKey >= currentWeek.mondayKey && dateKey <= currentWeek.sundayKey) {
+      return acc + (Number(row.duration_minutes) || 0)
+    }
+    return acc
+  }, 0)
+
+  // 4. Identificar dias restantes disponíveis para estudo nesta semana (hoje até o fim da semana)
+  const remainingAvailableDaysInWeek = currentWeek.weekDays.filter(
+    (d) => d >= todayKey && isStudyDate(d, availability),
+  )
+
+  // 5. Calcular distribuição estrita do tempo restante
+  const weekDistribution = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes,
+    realStudiedMinutesThisWeek,
+    remainingAvailableDays: remainingAvailableDaysInWeek,
+    maxDailyMinutesCap: MAX_DAILY_MINUTES_CAP,
+  })
+
+  // 6. AJUSTE DE EXCESSO: Se existirem blocos pendentes não concluídos na semana que ultrapassam o teto,
+  // ajustamos/removemos os blocos excedentes (NUNCA tocando no passado ou em sessões concluídas).
+  for (const dateKey of currentWeek.weekDays) {
+    if (dateKey < todayKey) continue
+
+    const blocksOnDate = existing.filter((b) => b.scheduled_date === dateKey)
+    const isAvailable = remainingAvailableDaysInWeek.includes(dateKey)
+    const targetForDay = isAvailable ? (weekDistribution.targetMinutesByDay[dateKey] ?? 0) : 0
+
+    const pendingBlocks = blocksOnDate.filter(
+      (b) => (b.status as string) === "PENDENTE" && (b.status as string) !== "CONCLUIDO_MANUAL",
+    )
+    const totalPlannedOnDay = blocksOnDate.reduce((acc, b) => acc + (b.duration_minutes || 0), 0)
+
+    if (!isAvailable || targetForDay === 0) {
+      // Dia de plantão/bloqueado ou meta semanal já atingida: remover blocos pendentes não iniciados
+      const idsToDelete = pendingBlocks.map((b) => b.id)
+      if (idsToDelete.length > 0) {
+        await supabase.from("study_plan_daily_blocks").delete().in("id", idsToDelete)
+      }
+    } else if (totalPlannedOnDay > targetForDay) {
+      // Excedente no dia: podar blocos pendentes da cauda para não ultrapassar a meta restante
+      let currentDaySum = totalPlannedOnDay
+      for (let i = pendingBlocks.length - 1; i >= 0; i--) {
+        const pb = pendingBlocks[i]
+        if (!pb) continue
+        if (currentDaySum <= targetForDay) break
+
+        const excess = currentDaySum - targetForDay
+        if (pb.duration_minutes <= excess) {
+          // Bloco inteiro é excedente
+          await supabase.from("study_plan_daily_blocks").delete().eq("id", pb.id)
+          currentDaySum -= pb.duration_minutes
+        } else {
+          // Reduz duração do bloco para caber exatamente no alvo do dia
+          const newDuration = pb.duration_minutes - excess
+          if (newDuration >= 15) {
+            await supabase
+              .from("study_plan_daily_blocks")
+              .update({ duration_minutes: newDuration })
+              .eq("id", pb.id)
+            currentDaySum -= excess
+          } else {
+            await supabase.from("study_plan_daily_blocks").delete().eq("id", pb.id)
+            currentDaySum -= pb.duration_minutes
+          }
+        }
+      }
+    }
+  }
+
+  // 7. INSERÇÃO DE NOVOS BLOCOS PARA DATAS QUE AINDA NÃO POSSUEM BLOCOS NA JANELA
   const toInsert: Record<string, unknown>[] = []
   for (let d = -lookbackDays; d <= forwardDays; d++) {
     const dateKey = addDaysToKey(todayKey, d)
     if (existingDates.has(dateKey)) continue
     if (!isStudyDate(dateKey, availability)) continue
 
+    let targetMinutesForDate = 0
+    if (dateKey >= currentWeek.mondayKey && dateKey <= currentWeek.sundayKey) {
+      // Semana atual: respeitar rigorosamente a meta restante da semana
+      targetMinutesForDate = weekDistribution.targetMinutesByDay[dateKey] ?? 0
+    } else if (dateKey > currentWeek.sundayKey) {
+      // Próxima semana: capacidade diária padrão baseada na meta semanal
+      targetMinutesForDate = defaultDailyGoalMinutes
+    } else {
+      // Passado: meta padrão diária
+      targetMinutesForDate = defaultDailyGoalMinutes
+    }
+
+    if (targetMinutesForDate <= 0) continue
+
     const selected = selectBlocksForDate(dateKey, plan.plan_type, items)
+    let accumulated = 0
+
     for (const { item, executionOrder } of selected) {
+      if (accumulated >= targetMinutesForDate) break
+
+      const room = Math.max(0, targetMinutesForDate - accumulated)
+      const adjustedMinutes = Math.min(item.duration_minutes, Math.max(15, room))
+      accumulated += adjustedMinutes
+
       toInsert.push({
         user_id: userId,
         study_plan_id: plan.id,
         item_id: item.id,
         discipline_id: item.discipline_id,
         scheduled_date: dateKey,
-        duration_minutes: item.duration_minutes,
+        duration_minutes: adjustedMinutes,
         execution_order: executionOrder,
         status: "PENDENTE",
         origin: "BASE",
@@ -468,12 +781,37 @@ export async function runAdaptiveReplanning(
       }
     }
 
+    // Buscar tempo estudado por data para descontar da capacidade futura
+    const { data: futureHistoryData } = await supabase
+      .from("study_history")
+      .select("duration_minutes, started_at")
+      .eq("user_id", userId)
+      .gte("started_at", `${todayKey}T00:00:00Z`)
+      .lte("started_at", `${addDaysToKey(todayKey, REPLAN_FORWARD_DAYS)}T23:59:59Z`)
+
+    const studiedByDateFuture = new Map<string, number>()
+    for (const row of (futureHistoryData ?? []) as Array<{
+      duration_minutes: number
+      started_at: string
+    }>) {
+      const dateKey = row.started_at?.split("T")?.[0]
+      if (dateKey) {
+        studiedByDateFuture.set(
+          dateKey,
+          (studiedByDateFuture.get(dateKey) ?? 0) + (row.duration_minutes ?? 0),
+        )
+      }
+    }
+
     for (let d = 1; d <= REPLAN_FORWARD_DAYS; d++) {
       const dateKey = addDaysToKey(todayKey, d)
       const base = futureBaseBlocks.get(dateKey) ?? []
       const baseLoad = base.reduce((acc, b) => acc + b.durationMinutes, 0)
       const isStudyDay = isStudyDate(dateKey, availability)
-      const capacity = isStudyDay ? baseLoad : 0
+      // REGRA: descontar tempo já estudado da capacidade disponível
+      const studiedThisDay = studiedByDateFuture.get(dateKey) ?? 0
+      const effectiveBaseLoad = isStudyDay ? Math.max(0, baseLoad - studiedThisDay) : 0
+      const capacity = effectiveBaseLoad
       const maxDaily = isStudyDay
         ? Math.min(MAX_DAILY_MINUTES_CAP, Math.round(capacity * 1.25) + 15)
         : 0
@@ -887,6 +1225,7 @@ export interface ReplanUiBlock {
   durationMinutes: number
   executionOrder: number
   origin: string
+  status: string
   manuallyClosed: boolean
   manualPendingMinutes: number
 }
@@ -939,6 +1278,7 @@ export async function getReplanInfo(
         durationMinutes: row.duration_minutes,
         executionOrder: row.execution_order,
         origin: row.origin,
+        status: row.status,
         manuallyClosed: row.status === "CONCLUIDO_MANUAL",
         manualPendingMinutes: row.manual_pending_minutes || 0,
       })

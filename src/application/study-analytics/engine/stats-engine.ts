@@ -474,11 +474,17 @@ export function lastNDays(count: number, now: Date, timezone: string = DEFAULT_T
   return keys
 }
 
-/** Segunda-feira da semana (ISO, inicia na segunda-feira) daquela data. */
-export function mondayKeyOf(key: string): string | null {
+/** Início da semana (0=Dom, 1=Seg, etc.) daquela data. */
+export function weekStartKeyOf(key: string, weekStartDay: number = 0): string | null {
   const dow = weekdayOfKey(key)
   if (dow === null || dow === undefined) return null
-  return addDaysToKey(key, (dow + 6) % 7 === 0 ? 0 : -((dow + 6) % 7))
+  const diff = (dow - weekStartDay + 7) % 7
+  return addDaysToKey(key, -diff)
+}
+
+/** Segunda-feira da semana (ISO, inicia na segunda-feira) daquela data. */
+export function mondayKeyOf(key: string): string | null {
+  return weekStartKeyOf(key, 1)
 }
 
 /** Dia da semana 0=Dom..6=Sáb. */
@@ -912,6 +918,7 @@ export function computeTimeCards(
   buckets: DailyBucket[],
   now: Date,
   timezone: string = DEFAULT_TIMEZONE,
+  weekStartDay: number = 0,
 ): TimeCardStatistics {
   const today = todayKey(now, timezone)
   const total = aggregateBuckets(buckets)
@@ -925,8 +932,9 @@ export function computeTimeCards(
   const parts = localParts(now.toISOString(), timezone)
   const monthStart = parts ? dateKeyFromYmd(parts.year, parts.month, 1) : today
   const monthKeys = parts ? keysBetween(monthStart, today) : [today]
-  const weekMondays = mondayKeyOf(today)
-  const weekKeys = weekMondays ? keysBetween(weekMondays, today) : [today]
+  const weekStart = weekStartKeyOf(today, weekStartDay)
+  const weekEnd = addDaysToKey(weekStart ?? today, 6)
+  const weekKeys = weekStart && weekEnd ? keysBetween(weekStart, weekEnd) : [today]
   const monthMinutes = sumIn(monthKeys)
   const weekMinutes = sumIn(weekKeys)
 
@@ -1135,6 +1143,7 @@ export function computeFrequency(
   buckets: DailyBucket[],
   now: Date,
   timezone: string = DEFAULT_TIMEZONE,
+  weekStartDay: number = 0,
 ) {
   const last7 = new Set(
     buckets
@@ -1169,14 +1178,14 @@ export function computeFrequency(
     if (!total.has(k)) gapDays.push(k)
   })
 
-  // Sessão "por semana": média de dias estudados por semana nos últimos 4 domingos-cheios.
-  const monday = mondayKeyOf(today)
+  // Sessão "por semana": média de dias estudados por semana nos últimos 4 períodos.
+  const weekAnchor = weekStartKeyOf(today, weekStartDay)
   let weeklyAvg = 0
-  if (monday) {
+  if (weekAnchor) {
     let totalDays = 0
     let weeks = 0
     for (let w = 0; w < 4; w++) {
-      const weekStart = addDaysToKey(monday, -(w * 7))
+      const weekStart = addDaysToKey(weekAnchor, -(w * 7))
       if (!weekStart) break
       const weekEnd = addDaysToKey(weekStart, 6)
       if (!weekEnd) break
@@ -1867,6 +1876,7 @@ export function computeComparisons(
   buckets: DailyBucket[],
   now: Date,
   timezone: string = DEFAULT_TIMEZONE,
+  weekStartDay: number = 0,
 ): ComparisonRow[] {
   const rows: ComparisonRow[] = []
   const today = todayKey(now, timezone)
@@ -1930,14 +1940,14 @@ export function computeComparisons(
     true,
   )
 
-  const monday = mondayKeyOf(today)
-  const weekKeys = monday ? keysBetween(monday, today) : [today]
+  const weekStart = weekStartKeyOf(today, weekStartDay)
+  const weekKeys = weekStart ? keysBetween(weekStart, today) : [today]
   const prevWeekEnd = addDaysToKey(weekKeys[0] ?? today, -1)
   const prevWeekStart = prevWeekEnd ? addDaysToKey(prevWeekEnd, -6) : null
   addRow(
     "week_vs_prev",
     "Semana atual",
-    "Segunda até hoje vs os 7 dias anteriores",
+    "Semana atual até hoje vs os 7 dias anteriores",
     weekKeys,
     prevWeekStart && prevWeekEnd ? keysBetween(prevWeekStart, prevWeekEnd) : [],
     false,
@@ -1962,9 +1972,9 @@ export function computeComparisons(
   const last30Keys = buckets.slice(-30).map((b) => b.date)
   const prev30Keys = buckets.slice(-60, -30).map((b) => b.date)
   addRow(
-    "30_vs_prev30",
+    "last30_vs_prev",
     "Últimos 30 dias",
-    "Janela móvel de 30 dias vs os 30 anteriores",
+    "Últimos 30 dias corridos vs 30 dias anteriores",
     last30Keys,
     prev30Keys,
     false,
@@ -1982,6 +1992,7 @@ export function computePlanning(
   buckets: DailyBucket[],
   now: Date,
   timezone: string = DEFAULT_TIMEZONE,
+  weekStartDay: number = 0,
 ): PlanningStatistics {
   if (!plan || plan.items.length === 0) {
     return {
@@ -2017,8 +2028,9 @@ export function computePlanning(
   const weeklyTargetDays = Math.max(0, plan.weeklyDays ?? 0)
 
   const today = todayKey(now, timezone)
-  const monday = mondayKeyOf(today)
-  const weekKeys = monday ? keysBetween(monday, today) : [today]
+  const planWeekStart = weekStartKeyOf(today, weekStartDay)
+  const planWeekEnd = addDaysToKey(planWeekStart ?? today, 6)
+  const weekKeys = planWeekStart && planWeekEnd ? keysBetween(planWeekStart, planWeekEnd) : [today]
 
   const byDate = new Map(buckets.map((b) => [b.date, b]))
   const plannedByWeekday = new Map<number, number>()

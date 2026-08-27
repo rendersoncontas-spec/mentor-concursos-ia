@@ -23,7 +23,7 @@ interface CacheEntry {
   payload: StatisticsCenterPayload
 }
 
-const TTL_MS = 5 * 60 * 1000
+const TTL_MS = 0
 const cache = new Map<string, CacheEntry>()
 
 export interface StatisticsCenterPayload {
@@ -34,6 +34,7 @@ export interface StatisticsCenterPayload {
   reviewItems: ReviewItemRow[]
   reviewsCompletedLast30: number
   activePlan: ActivePlan | null
+  weekStartDay?: number
 }
 
 // Limite de segurança: 50.000 sessões carregadas por usuário (muito acima do
@@ -353,12 +354,36 @@ export async function getStatisticsCenterAction(): Promise<{
       reviewsCompletedLast30 = 0
     }
 
-    // 5. Plano de estudo ativo.
+    // 5. Plano de estudo ativo e preferências do perfil.
     let activePlan: ActivePlan | null = null
     try {
       activePlan = await fetchActivePlan(supabase, user.id)
     } catch (err) {
       console.error("[ESTATISTICAS] Falha no plano de estudo:", err)
+    }
+
+    let weekStartDay = 0
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("week_start_day, preferences")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      const prefs = profile?.preferences as Record<string, unknown> | null
+      const firstDayPref = (prefs?.["firstDayOfWeek"] ?? prefs?.["primeiroDia"]) as string | undefined
+
+      if (firstDayPref === "Segunda-feira") {
+        weekStartDay = 1
+      } else if (firstDayPref === "Domingo") {
+        weekStartDay = 0
+      } else if (typeof profile?.["week_start_day"] === "number") {
+        weekStartDay = profile["week_start_day"]
+      } else {
+        weekStartDay = 0
+      }
+    } catch (err) {
+      console.error("[ESTATISTICAS] Falha ao carregar perfil:", err)
     }
 
     const payload: StatisticsCenterPayload = {
@@ -369,6 +394,7 @@ export async function getStatisticsCenterAction(): Promise<{
       reviewItems,
       reviewsCompletedLast30,
       activePlan,
+      weekStartDay,
     }
 
     cache.set(user.id, { at: nowMs, payload })

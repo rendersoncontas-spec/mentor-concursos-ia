@@ -548,9 +548,19 @@ export function StudyRegisterModal({
     }
   }
 
+  const sortedPlanDisciplines = useMemo(
+    () =>
+      [...planDisciplines].sort((a, b) =>
+        a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
+      ),
+    [planDisciplines],
+  )
   const planIds = useMemo(() => new Set(planDisciplines.map((d) => d.id)), [planDisciplines])
   const otherDisciplines = useMemo(
-    () => allDisciplines.filter((d) => !planIds.has(d.id)),
+    () =>
+      allDisciplines
+        .filter((d) => !planIds.has(d.id))
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })),
     [allDisciplines, planIds],
   )
 
@@ -1423,8 +1433,8 @@ export function StudyRegisterModal({
                                   <CommandList className="max-h-[250px] overflow-y-auto overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
                                     <CommandEmpty>Nenhuma disciplina encontrada.</CommandEmpty>
                                     <CommandGroup heading="Sugestões do Plano">
-                                      {planDisciplines.length > 0 ? (
-                                        planDisciplines.map((disc) => (
+                                      {sortedPlanDisciplines.length > 0 ? (
+                                        sortedPlanDisciplines.map((disc) => (
                                           <CommandItem
                                             key={`plan-${disc.id}`}
                                             value={disc.name}

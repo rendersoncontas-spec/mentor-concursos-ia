@@ -531,7 +531,7 @@ export async function getRankingPersonalContextAction(): Promise<{
       history as unknown as StudyHistory[],
       365,
       "America/Sao_Paulo",
-      profile?.week_start_day ?? 1,
+      profile?.week_start_day ?? 0,
     )
     const base = AnalyticsEngine.aggregations.getBase(ctx)
 

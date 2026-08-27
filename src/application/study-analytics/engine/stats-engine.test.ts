@@ -48,6 +48,7 @@ import {
   keysBetween,
   lastNDays,
   mondayKeyOf,
+  weekStartKeyOf,
   monthKeyOf,
   pausedMinutesOf,
   sanitizeAttempt,
@@ -125,6 +126,15 @@ test("mondayKeyOf é segunda-feira anterior ou igual", () => {
   assert.equal(mondayKeyOf("2026-08-11"), "2026-08-10")
   assert.equal(mondayKeyOf("2026-08-10"), "2026-08-10")
   assert.equal(weekdayOfKey("2026-08-11"), 2)
+})
+
+test("weekStartKeyOf calcula corretamente com início no domingo (0) ou segunda (1)", () => {
+  // 27/08/2026 é quinta-feira (dow=4)
+  assert.equal(weekStartKeyOf("2026-08-27", 0), "2026-08-23") // Domingo
+  assert.equal(weekStartKeyOf("2026-08-27", 1), "2026-08-24") // Segunda
+  // 23/08/2026 é domingo (dow=0)
+  assert.equal(weekStartKeyOf("2026-08-23", 0), "2026-08-23") // Domingo
+  assert.equal(weekStartKeyOf("2026-08-23", 1), "2026-08-17") // Segunda anterior
 })
 
 test("lastNDays termina hoje", () => {
@@ -631,6 +641,35 @@ test("computePlanning: cenário 20h meta e 10h estudadas -> 50% de aderência", 
   assert.equal(p.weeklyTargetMinutes, 1200) // 20h = 1200 min
   assert.equal(p.actualWeekMinutes, 600)
   assert.equal(p.adherencePct, 50)
+})
+
+test("computePlanning: respeita weekStartDay = 0 (Domingo) somando 16h02min (962min) de domingo a quinta", () => {
+  const plan: ActivePlan = {
+    weeklyHours: 20,
+    weeklyQuestions: null,
+    weeklyDays: null,
+    items: [{ dayOfWeek: 0, durationMinutes: 1200, disciplineId: "d1" }],
+  }
+  // Domingo 23/08 até Quinta 27/08
+  const testNow = new Date("2026-08-27T18:00:00Z")
+  const buckets: DailyBucket[] = [
+    { date: "2026-08-23", minutes: 255, activeMinutes: 255, pausedMinutes: 0, sessions: 2, completedSessions: 2, interruptedSessions: 0, pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0 }, // 4h15
+    { date: "2026-08-24", minutes: 285, activeMinutes: 285, pausedMinutes: 0, sessions: 2, completedSessions: 2, interruptedSessions: 0, pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0 }, // 4h45
+    { date: "2026-08-25", minutes: 0, activeMinutes: 0, pausedMinutes: 0, sessions: 0, completedSessions: 0, interruptedSessions: 0, pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0 },     // Plantão
+    { date: "2026-08-26", minutes: 240, activeMinutes: 240, pausedMinutes: 0, sessions: 2, completedSessions: 2, interruptedSessions: 0, pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0 }, // 4h00
+    { date: "2026-08-27", minutes: 182, activeMinutes: 182, pausedMinutes: 0, sessions: 1, completedSessions: 1, interruptedSessions: 0, pages: 0, questions: 0, correct: 0, wrong: 0, accuracy: null, flashcards: 0, focusSum: 0, focusCount: 0, focusAvg: null, attempts: 0 }, // 3h02
+  ]
+
+  // Se weekStartDay for 0 (Domingo): soma os 4 dias com estudo = 255 + 285 + 240 + 182 = 962 min (16h02min)
+  const pSunday = computePlanning(plan, buckets, testNow, TZ, 0)
+  assert.equal(pSunday.actualWeekMinutes, 962) // 16h02min
+  assert.equal(pSunday.actualWeekDays, 4)      // 4 dias estudados
+  assert.ok(Math.abs((pSunday.adherencePct ?? 0) - 80.17) < 0.1)
+
+  // Se weekStartDay for 1 (Segunda): ignora domingo 23/08 -> soma apenas 285 + 240 + 182 = 707 min (11h47min)
+  const pMonday = computePlanning(plan, buckets, testNow, TZ, 1)
+  assert.equal(pMonday.actualWeekMinutes, 707) // 11h47min
+  assert.equal(pMonday.actualWeekDays, 3)      // 3 dias
 })
 
 test("computePlanning: cenário 25h meta e 25h estudadas -> 100% de aderência", () => {

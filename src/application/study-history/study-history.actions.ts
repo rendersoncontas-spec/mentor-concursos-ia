@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import * as Sentry from "@sentry/nextjs"
 
+import { reconcileWeeklyPlan } from "@/application/study-plan/weekly-planner.service"
 import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
@@ -20,7 +21,7 @@ import {
   updateStudySession,
 } from "./study-history.service"
 
-const HISTORY_PATHS = ["/dashboard", "/dashboard/history", "/estatisticas", "/disciplines"]
+const HISTORY_PATHS = ["/dashboard", "/dashboard/history", "/estatisticas", "/disciplines", "/planejamento"]
 
 export async function getUserHistoryAction(page: number = 1, pageSize: number = 50) {
   try {
@@ -115,6 +116,7 @@ export async function finishStudySessionAction(
     }
 
     const session = await finishStudySession(supabase, user.id, sessionId, feedback)
+    await reconcileWeeklyPlan(supabase, user.id).catch(() => null)
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: session, error: null }
@@ -223,11 +225,19 @@ export async function getMonthlyDailyTotalsAction(year: number, month: number) {
     if (!user) return { data: [], error: "Usuário não autenticado" }
 
     const paddedMonth = String(month).padStart(2, "0")
-    const startStr = `${year}-${paddedMonth}-01T00:00:00.000-03:00`
-    const nextMonth = month === 12 ? 1 : month + 1
-    const nextYear = month === 12 ? year + 1 : year
-    const paddedNextMonth = String(nextMonth).padStart(2, "0")
-    const nextMonthStartStr = `${nextYear}-${paddedNextMonth}-01T00:00:00.000-03:00`
+    const monthPrefix = `${year}-${paddedMonth}-`
+
+    // Janela com margem de segurança para garantir que nenhum registro seja cortado por fuso
+    const prevMonthDate = new Date(year, month - 1, 0)
+    const prevYear = prevMonthDate.getFullYear()
+    const prevMonthPadded = String(prevMonthDate.getMonth() + 1).padStart(2, "0")
+    const prevDayPadded = String(prevMonthDate.getDate()).padStart(2, "0")
+    const queryStartStr = `${prevYear}-${prevMonthPadded}-${prevDayPadded}T00:00:00.000Z`
+
+    const nextMonthDate = new Date(year, month, 2)
+    const nextY = nextMonthDate.getFullYear()
+    const nextMPadded = String(nextMonthDate.getMonth() + 1).padStart(2, "0")
+    const queryEndStr = `${nextY}-${nextMPadded}-03T00:00:00.000Z`
 
     const allMinutes: DailyTotal[] = []
     let offset = 0
@@ -238,8 +248,8 @@ export async function getMonthlyDailyTotalsAction(year: number, month: number) {
         .from("study_history")
         .select("started_at, duration_minutes")
         .eq("user_id", user.id)
-        .gte("started_at", startStr)
-        .lt("started_at", nextMonthStartStr)
+        .gte("started_at", queryStartStr)
+        .lte("started_at", queryEndStr)
         .not("duration_minutes", "is", null)
         .order("started_at", { ascending: true })
         .range(offset, offset + pageSize - 1)
@@ -249,7 +259,11 @@ export async function getMonthlyDailyTotalsAction(year: number, month: number) {
 
       for (const row of data) {
         const dateStr = getDayInSaoPaulo(row.started_at)
+        if (!dateStr.startsWith(monthPrefix)) continue
+
         const mins = Number(row.duration_minutes) || 0
+        if (mins <= 0) continue
+
         const existing = allMinutes.find((d) => d.date === dateStr)
         if (existing) {
           existing.minutes += mins
@@ -322,6 +336,7 @@ export async function saveManualStudyTimeAction(
         .single()
 
       if (error) throw new Error("Erro ao atualizar registro: " + error.message)
+      await reconcileWeeklyPlan(supabase, user.id).catch(() => null)
       for (const path of HISTORY_PATHS) revalidatePath(path)
       return { data: updated, error: null }
     }
@@ -346,6 +361,7 @@ export async function saveManualStudyTimeAction(
       .single()
 
     if (error) throw new Error("Erro ao registrar estudo: " + error.message)
+    await reconcileWeeklyPlan(supabase, user.id).catch(() => null)
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: created, error: null }
   } catch (error) {
@@ -602,11 +618,19 @@ export async function getMonthlyStatsAction(year: number, month: number) {
     if (!user) return { data: null, error: "Usuário não autenticado" }
 
     const paddedMonth = String(month).padStart(2, "0")
-    const startStr = `${year}-${paddedMonth}-01T00:00:00.000-03:00`
-    const nextMonth = month === 12 ? 1 : month + 1
-    const nextYear = month === 12 ? year + 1 : year
-    const paddedNextMonth = String(nextMonth).padStart(2, "0")
-    const nextMonthStartStr = `${nextYear}-${paddedNextMonth}-01T00:00:00.000-03:00`
+    const monthPrefix = `${year}-${paddedMonth}-`
+
+    // Janela com margem de segurança para fuso
+    const prevMonthDate = new Date(year, month - 1, 0)
+    const prevYear = prevMonthDate.getFullYear()
+    const prevMonthPadded = String(prevMonthDate.getMonth() + 1).padStart(2, "0")
+    const prevDayPadded = String(prevMonthDate.getDate()).padStart(2, "0")
+    const queryStartStr = `${prevYear}-${prevMonthPadded}-${prevDayPadded}T00:00:00.000Z`
+
+    const nextMonthDate = new Date(year, month, 2)
+    const nextY = nextMonthDate.getFullYear()
+    const nextMPadded = String(nextMonthDate.getMonth() + 1).padStart(2, "0")
+    const queryEndStr = `${nextY}-${nextMPadded}-03T00:00:00.000Z`
 
     const allMinutes: Record<string, number> = {}
     let offset = 0
@@ -617,8 +641,8 @@ export async function getMonthlyStatsAction(year: number, month: number) {
         .from("study_history")
         .select("started_at, duration_minutes")
         .eq("user_id", user.id)
-        .gte("started_at", startStr)
-        .lt("started_at", nextMonthStartStr)
+        .gte("started_at", queryStartStr)
+        .lte("started_at", queryEndStr)
         .not("duration_minutes", "is", null)
         .order("started_at", { ascending: true })
         .range(offset, offset + pageSize - 1)
@@ -628,7 +652,11 @@ export async function getMonthlyStatsAction(year: number, month: number) {
 
       for (const row of data) {
         const dateKey = getDayInSaoPaulo(row.started_at)
+        if (!dateKey.startsWith(monthPrefix)) continue
+
         const mins = Number(row.duration_minutes) || 0
+        if (mins <= 0) continue
+
         allMinutes[dateKey] = (allMinutes[dateKey] ?? 0) + mins
       }
 

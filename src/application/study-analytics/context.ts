@@ -10,7 +10,7 @@ export function createAnalyticsContext(
   history: StudyHistory[],
   periodDays: number = 365,
   timezone: string = "America/Sao_Paulo",
-  weekStartDay: number = 1
+  weekStartDay: number = 0
 ): AnalyticsContext {
   
   // Limpamos itens não concluídos / dados corrompidos se necessário

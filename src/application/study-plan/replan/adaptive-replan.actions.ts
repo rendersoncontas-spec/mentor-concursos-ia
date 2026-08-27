@@ -4,16 +4,20 @@ import { revalidatePath } from "next/cache"
 
 import * as Sentry from "@sentry/nextjs"
 
+import { reconcileWeeklyPlan } from "@/application/study-plan/weekly-planner.service"
 import { createClient } from "@/infrastructure/supabase/server"
 
 import {
   DEFAULT_AVAILABILITY,
   REPLAN_MAINTENANCE_PAUSED,
+  type PeriodFilter,
+  type PeriodGoalData,
   type ReplanAvailability,
   type ReplanInfoPayload,
   type ReplanSummary,
   closeBlockManually,
   getAutoReplanPreference,
+  getPeriodGoalData,
   getReplanInfo,
   runAdaptiveReplanning,
   setAutoReplanPreference,
@@ -71,6 +75,8 @@ export async function getReplanInfoAction(
       await runAdaptiveReplanning(supabase, user.id, { trigger: "AUTO", autoEnabled, availability })
     }
 
+    await reconcileWeeklyPlan(supabase, user.id, availability).catch(() => null)
+
     const info = await getReplanInfo(supabase, user.id, availability, autoEnabled)
     return { data: info, error: null }
   } catch (error) {
@@ -98,6 +104,8 @@ export async function runReplanningAction(
       autoEnabled: true,
       availability,
     })
+
+    await reconcileWeeklyPlan(supabase, user.id, availability).catch(() => null)
 
     for (const path of REPLAN_PATHS) revalidatePath(path)
     return { data: summary, error: null }
@@ -185,5 +193,30 @@ export async function setAutoReplanPreferenceAction(
       extra: { feature: "adaptive-planning", step: "set_preference_action" },
     })
     return { ok: false, error: "Erro ao salvar preferência." }
+  }
+}
+
+/**
+ * Dados de meta de estudo vs tempo real para um período.
+ * Retorna: meta, estudado, falta — tudo calculado a partir de registros reais.
+ */
+export async function getPeriodGoalAction(
+  period: PeriodFilter = "semana",
+  offset = 0,
+): Promise<{ data: PeriodGoalData | null; error: string | null }> {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: "Usuário não autenticado" }
+
+    const data = await getPeriodGoalData(supabase, user.id, period, offset)
+    return { data, error: null }
+  } catch (error) {
+    Sentry.captureException(error, {
+      extra: { feature: "adaptive-planning", step: "get_period_goal_action" },
+    })
+    return { data: null, error: "Erro ao carregar dados de meta." }
   }
 }

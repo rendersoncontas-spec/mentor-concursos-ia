@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   description: "Acompanhe seu progresso e planejamento de estudos no NomeIA.",
 }
 
+export const dynamic = "force-dynamic"
+
 export default async function DashboardPage() {
   const supabase = await createClient()
 

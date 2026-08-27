@@ -18,7 +18,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options: _options }) => {
+          cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value)
           })
           supabaseResponse = NextResponse.next({
@@ -32,41 +32,46 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  // Atualiza a sessão e obtém o usuário
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const pathname = request.nextUrl.pathname
+
   const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/register") ||
-    request.nextUrl.pathname.startsWith("/forgot-password")
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/forgot-password")
 
   const isProtectedRoute =
-    request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/profile") ||
-    request.nextUrl.pathname.startsWith("/planejamento")
-    
-  const isOnboardingRoute = request.nextUrl.pathname.startsWith("/onboarding")
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/planejamento") ||
+    pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/estudos") ||
+    pathname.startsWith("/revisoes") ||
+    pathname.startsWith("/historico") ||
+    pathname.startsWith("/estatisticas") ||
+    pathname.startsWith("/concursos") ||
+    pathname.startsWith("/simulados") ||
+    pathname.startsWith("/biblioteca") ||
+    pathname.startsWith("/comunidade") ||
+    pathname.startsWith("/ranking") ||
+    pathname.startsWith("/conquistas") ||
+    pathname.startsWith("/notas") ||
+    pathname.startsWith("/planos")
 
-  // Se não estiver logado e tentar rota protegida ou onboarding
-  if ((isProtectedRoute || isOnboardingRoute) && !user) {
+  if (isProtectedRoute && !user) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/login"
-    redirectUrl.searchParams.set("redirectedFrom", request.nextUrl.pathname)
+    redirectUrl.searchParams.set("redirectedFrom", pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Se estiver logado
-  if (user) {
-    // Redirecionar auth para dashboard
-    if (isAuthRoute) {
-      const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = "/dashboard"
-      return NextResponse.redirect(redirectUrl)
-    }
-
-    // Checagem de Novo Planejamento foi removida para permitir acesso livre ao dashboard.
+  if (user && isAuthRoute) {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = "/dashboard"
+    return NextResponse.redirect(redirectUrl)
   }
 
   return supabaseResponse

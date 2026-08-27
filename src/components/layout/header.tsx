@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { AccountSettingsModal } from "@/features/profile/components/account-settings-modal"
+import { useGlobalStudy } from "@/features/study-session/components/study-provider"
 import { clearUserLocalData } from "@/utils/user-data"
 
 interface AppHeaderProps {
@@ -53,6 +54,7 @@ export function AppHeader({
   onOpenMenu,
 }: AppHeaderProps) {
   const router = useRouter()
+  const { session, formatTime } = useGlobalStudy()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -157,7 +159,33 @@ export function AppHeader({
         </Link>
       </div>
 
-      <div className="hidden md:block" />
+      {/* Centro: Indicador de Sessão Ativa */}
+      <div className="flex items-center gap-2">
+        {session?.isActive && (
+          <button
+            type="button"
+            onClick={() => {
+              if (session.source === "PLAN" && session.planItemId) {
+                router.push(`/dashboard/study-session?planId=${session.planItemId}`)
+              } else if (session.disciplineId) {
+                router.push(`/dashboard/study-session?disciplineId=${session.disciplineId}`)
+              } else {
+                router.push("/dashboard/study-session")
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-full text-xs font-bold transition-all shadow-xs cursor-pointer"
+            title="Clique para voltar ao cronômetro"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="font-mono">{formatTime(session.activeSeconds)}</span>
+            <span className="hidden sm:inline text-muted-foreground font-normal">·</span>
+            <span className="hidden sm:inline truncate max-w-[130px] font-medium">{session.disciplineName}</span>
+          </button>
+        )}
+      </div>
 
       {/* Direita: Ações Superiores + Avatar do Usuário */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">

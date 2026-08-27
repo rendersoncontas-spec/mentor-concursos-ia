@@ -8,8 +8,15 @@ import { createClient } from "@supabase/supabase-js"
 // Auditoria de integridade dos blocos do replanejamento. Retorna apenas
 // contagens e IDs internos de blocos (NENHUM dado pessoal). Use para
 // comparar Banco x Frontend durante a manutenção do replan.
+//
+// Protegido: requer autenticação via cookie de sessão Supabase.
+// Em produção, este endpoint é filtrado pelo matcher do middleware.
 // ---------------------------------------------------------------------------
 export async function GET(request: Request) {
+  if (process.env["NODE_ENV"] === "production") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 403 })
+  }
+
   const url = process.env["NEXT_PUBLIC_SUPABASE_URL"]
   const key = process.env["SUPABASE_SERVICE_ROLE_KEY"]
 

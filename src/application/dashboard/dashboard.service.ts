@@ -6,6 +6,8 @@ import { getStudyHistoryForAnalytics, AnalyticsEngine } from "@/application/stud
 import { getPendingReviewsSummary } from "@/application/review-engine/review-engine.service"
 import { getRecentActivities } from "@/application/study-history/study-history.service"
 import { getStartOfWeek } from "@/application/study-analytics/utils"
+import { getDayInSaoPaulo } from "@/lib/sao-paulo"
+import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
 
 export async function getDashboardData(supabase: SupabaseClient, userId: string): Promise<DashboardSnapshot> {
   try {
@@ -22,7 +24,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("name, weekly_study_hours, weekly_questions_goal, weekly_revisions_goal, weekly_study_days_goal, week_start_day, work_regime, experience_level")
+        .select("name, weekly_study_hours, weekly_questions_goal, weekly_revisions_goal, weekly_study_days_goal, week_start_day, work_regime, experience_level, preferences")
         .eq("id", userId)
         .maybeSingle(),
 
@@ -112,10 +114,19 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       discipline_id: (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ?? null,
     }))
 
+    // Determinar primeiro dia da semana do perfil (0 = Domingo, 1 = Segunda)
+    const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
+    const weekStartDay =
+      prefsFirstDay === "Domingo"
+        ? 0
+        : prefsFirstDay === "Segunda-feira"
+          ? 1
+          : (profile?.week_start_day ?? 0)
+
     // Calcular desempenho por período (Hoje, Semana, Mês, Ano, Total)
     const now = new Date()
     const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-    const startOfWeekMs = getStartOfWeek(now, profile?.week_start_day ?? 1).getTime()
+    const startOfWeekMs = getStartOfWeek(now, weekStartDay).getTime()
     const startOfMonthMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
     const startOfYearMs = new Date(now.getFullYear(), 0, 1).getTime()
 
@@ -192,7 +203,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     const pendingTopics = Math.max(0, disciplinesStats.total - completedTopics)
     const editalProgress = disciplinesStats.total > 0 ? Math.round((completedTopics / disciplinesStats.total) * 100) : 0
 
-    const ctx = AnalyticsEngine.createContext(rawHistory as unknown as Parameters<typeof AnalyticsEngine.createContext>[0], 30, "America/Sao_Paulo", profile?.week_start_day ?? 1)
+    const ctx = AnalyticsEngine.createContext(rawHistory as unknown as Parameters<typeof AnalyticsEngine.createContext>[0], 30, "America/Sao_Paulo", weekStartDay)
     const baseStats = AnalyticsEngine.aggregations.getBase(ctx)
     const targetHours = profile?.weekly_study_hours ?? null
     const targetQuestions = profile?.weekly_questions_goal ?? null
@@ -202,17 +213,32 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     // Calcular metas adicionais não presentes na base
     let weeklyQuestions = performanceByPeriod.SEMANA.totalQuestions
 
-    // Revisões concluídas na semana = sessões registradas como revisão no histórico
+    const weekRange = getSaoPauloWeekRange(now, weekStartDay)
+
+    // Revisões concluídas na semana = sessões registradas como revisão no histórico (Segunda a Domingo)
     const weeklyRevisions = rawHistory.filter((h) => {
-      const d = new Date(h.started_at)
-      return h.completed && d.getTime() >= startOfWeekMs && (h.study_type === "REVISAO" || h.study_source === "REVIEW")
+      if (!h.completed || !h.started_at) return false
+      const dateKey = getDayInSaoPaulo(h.started_at)
+      return (
+        dateKey >= weekRange.mondayKey &&
+        dateKey <= weekRange.sundayKey &&
+        (h.study_type === "REVISAO" || h.study_source === "REVIEW")
+      )
     }).length || 0
     
-    // Dias ativos na semana
+    // Dias ativos na semana (Segunda a Domingo)
     const uniqueDaysThisWeek = new Set(
       rawHistory
-        .filter((h) => new Date(h.started_at).getTime() >= startOfWeekMs)
-        .map((h) => h.started_at.split("T")[0])
+        .filter((h) => {
+          if (!h.started_at) return false
+          const dateKey = getDayInSaoPaulo(h.started_at)
+          return (
+            dateKey >= weekRange.mondayKey &&
+            dateKey <= weekRange.sundayKey &&
+            (Number(h.duration_minutes) || 0) > 0
+          )
+        })
+        .map((h) => getDayInSaoPaulo(h.started_at))
     )
     const weeklyStudyDays = uniqueDaysThisWeek.size
 

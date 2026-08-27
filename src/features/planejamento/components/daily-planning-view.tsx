@@ -23,12 +23,14 @@ import { toast } from "sonner"
 
 import {
   closeBlockManuallyAction,
+  getPeriodGoalAction,
   getReplanInfoAction,
   runReplanningAction,
   setAutoReplanPreferenceAction,
   undoReplanningAction,
 } from "@/application/study-plan/replan/adaptive-replan.actions"
 import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive-replan.service"
+import { type PeriodGoalData } from "@/application/study-plan/replan/adaptive-replan.service"
 import { pendingOf } from "@/application/study-plan/replan/replan-engine"
 import { Button } from "@/components/ui/button"
 import {
@@ -173,6 +175,10 @@ export function DailyPlanningView({
   const [showPendencies, setShowPendencies] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  // Dados de meta de estudo (buscados do banco de dados)
+  const [periodGoal, setPeriodGoal] = useState<PeriodGoalData | null>(null)
+  const [loadingGoal, setLoadingGoal] = useState(true)
+
   // Conclusão manual do dia ("Marcar como concluído hoje")
   const [blockToClose, setBlockToClose] = useState<DayTask | null>(null)
   const [closingBlock, setClosingBlock] = useState(false)
@@ -222,6 +228,37 @@ export function DailyPlanningView({
     window.addEventListener(STUDY_SESSION_SAVED_EVENT, handler)
     return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handler)
   }, [loadReplanInfo])
+
+  // Carregar dados de meta de estudo do período
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const res = await getPeriodGoalAction("semana")
+        if (res.data) {
+          setPeriodGoal(res.data)
+        }
+      } finally {
+        setLoadingGoal(false)
+      }
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Recarregar meta quando uma sessão é salva
+  useEffect(() => {
+    const handler = async () => {
+      try {
+        const res = await getPeriodGoalAction("semana")
+        if (res.data) {
+          setPeriodGoal(res.data)
+        }
+      } catch {
+        /* noop */
+      }
+    }
+    window.addEventListener(STUDY_SESSION_SAVED_EVENT, handler)
+    return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handler)
+  }, [])
 
   const handleManualReplan = async () => {
     setBusy(true)
@@ -763,29 +800,61 @@ export function DailyPlanningView({
         </div>
       )}
 
-      {/* Linha 2: Pílulas de Métricas (Lado a lado no mobile e desktop) */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-3 border-b pb-3 sm:pb-3.5">
-        {/* Carga do Dia */}
-        <div className="bg-muted/40 dark:bg-muted/20 border border-border/40 rounded-xl p-2 sm:p-2.5 sm:px-3.5 flex flex-col justify-between min-w-0 transition-all hover:bg-muted/60">
-          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
-            Carga do Dia
+      {/* Linha 2: Pílulas de Métricas — Meta, Estudado, Falta, Planejado, Pendências */}
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-2 border-b pb-3 sm:pb-3.5">
+        {/* Meta (semanal) */}
+        <div className="bg-primary/5 dark:bg-primary/10 border border-primary/15 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-primary/10">
+          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-primary/70 tracking-wider truncate">
+            Meta
           </span>
-          <span className="text-xs sm:text-sm font-black text-foreground font-mono truncate mt-0.5 sm:mt-1">
-            {Math.floor(totalMinutes / 60)}h {totalMinutes % 60}min
+          <span className="text-[10px] sm:text-xs font-black text-primary font-mono truncate mt-0.5 sm:mt-1">
+            {periodGoal
+              ? `${Math.floor(periodGoal.goalMinutes / 60)}h${periodGoal.goalMinutes % 60 > 0 ? `${periodGoal.goalMinutes % 60}min` : ""}`
+              : "—"}
           </span>
         </div>
 
-        {/* Estudado */}
-        <div className="bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-2 sm:p-2.5 sm:px-3.5 flex flex-col justify-between min-w-0 transition-all hover:bg-emerald-500/15">
-          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider truncate">
+        {/* Estudado (período) */}
+        <div className="bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-emerald-500/15">
+          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider truncate">
             Estudado
           </span>
-          <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono truncate mt-0.5 sm:mt-1">
-            {Math.floor(completedMinutes / 60)}h {completedMinutes % 60}min
+          <span className="text-[10px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono truncate mt-0.5 sm:mt-1">
+            {periodGoal
+              ? `${Math.floor(periodGoal.studiedMinutes / 60)}h${periodGoal.studiedMinutes % 60 > 0 ? `${periodGoal.studiedMinutes % 60}min` : ""}`
+              : loadingGoal
+                ? "..."
+                : "—"}
           </span>
         </div>
 
-        {/* Pendente */}
+        {/* Falta (meta - estudado) */}
+        <div className="bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-amber-500/15">
+          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-amber-600 dark:text-amber-400 tracking-wider truncate">
+            Falta
+          </span>
+          <span className="text-[10px] sm:text-xs font-black text-amber-600 dark:text-amber-400 font-mono truncate mt-0.5 sm:mt-1">
+            {periodGoal
+              ? periodGoal.remainingMinutes <= 0
+                ? "✅ Meta!"
+                : `${Math.floor(periodGoal.remainingMinutes / 60)}h${periodGoal.remainingMinutes % 60 > 0 ? `${periodGoal.remainingMinutes % 60}min` : ""}`
+              : loadingGoal
+                ? "..."
+                : "—"}
+          </span>
+        </div>
+
+        {/* Planejado para hoje */}
+        <div className="bg-muted/40 dark:bg-muted/20 border border-border/40 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-muted/60">
+          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
+            Hoje
+          </span>
+          <span className="text-[10px] sm:text-xs font-black text-foreground font-mono truncate mt-0.5 sm:mt-1">
+            {Math.floor(totalMinutes / 60)}h{totalMinutes % 60 > 0 ? `${totalMinutes % 60}min` : ""}
+          </span>
+        </div>
+
+        {/* Pendências */}
         <div
           role={(replanInfo?.totalPendingMinutes ?? 0) > 0 ? "button" : undefined}
           onClick={() => {
@@ -794,9 +863,9 @@ export function DailyPlanningView({
             }
           }}
           className={cn(
-            "bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/20 rounded-xl p-2 sm:p-2.5 sm:px-3.5 flex flex-col justify-between min-w-0 transition-all",
+            "bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all",
             (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
-              "cursor-pointer hover:bg-amber-500/20 active:scale-[0.98]",
+              "cursor-pointer hover:bg-rose-500/20 active:scale-[0.98]",
           )}
           title={
             (replanInfo?.totalPendingMinutes ?? 0) > 0
@@ -807,14 +876,14 @@ export function DailyPlanningView({
           }
         >
           <div className="flex items-center justify-between gap-1">
-            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 tracking-wider truncate">
-              Pendente
+            <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-rose-600 dark:text-rose-400 tracking-wider truncate">
+              Pendências
             </span>
             {(replanInfo?.totalPendingMinutes ?? 0) > 0 && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
             )}
           </div>
-          <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400 font-mono truncate mt-0.5 sm:mt-1">
+          <span className="text-[10px] sm:text-xs font-black text-rose-600 dark:text-rose-400 font-mono truncate mt-0.5 sm:mt-1">
             {pendingLabel}
           </span>
         </div>
@@ -957,7 +1026,13 @@ export function DailyPlanningView({
                             <Button
                               onClick={() => {
                                 toast.success(`Iniciando estudo de ${task.disciplineName}`)
-                                router.push(`/dashboard/study-session?planId=${task.itemId ?? task.id}`)
+                                const targetDuration =
+                                  task.durationMinutes > 0
+                                    ? Math.max(1, task.durationMinutes - task.studiedMinutes)
+                                    : task.durationMinutes
+                                router.push(
+                                  `/dashboard/study-session?planId=${task.itemId ?? task.id}&duration=${targetDuration}`,
+                                )
                               }}
                               size="sm"
                               className="h-8 w-[110px] px-0 text-[11px] font-bold rounded-lg shadow-xs cursor-pointer justify-center"

@@ -55,7 +55,7 @@ export async function getStudyHistoryForAnalytics(
         energy_level,
         difficulty,
         metadata,
-        disciplines ( name, area )
+        disciplines!left ( name, area )
       `)
       .eq("user_id", userId)
       .not("duration_minutes", "is", null)

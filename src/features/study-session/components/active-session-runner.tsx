@@ -14,6 +14,7 @@ import {
   RefreshCcw,
   RefreshCw,
   Square,
+  Volume2,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -30,6 +31,7 @@ import {
   dispatchStudySessionSaved,
 } from "@/features/study-session/lib/study-session-events"
 
+import { FocusSoundControl } from "./focus-sound-control"
 import { useGlobalStudy } from "./study-provider"
 
 type SessionPhase = "IDLE" | "ACTIVE" | "EVALUATION" | "SUMMARY"
@@ -71,6 +73,12 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     formatTime,
     finalizeAndSaveSession,
     resetSession,
+    updatePlannedSeconds,
+    focusSound,
+    focusSoundVolume,
+    focusSoundIsPlaying,
+    selectFocusSound,
+    changeFocusSoundVolume,
   } = useGlobalStudy()
 
   const [phase, setPhase] = useState<SessionPhase>("IDLE")
@@ -124,6 +132,15 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     planItem?.id,
   ])
 
+  const handleMinimize = useCallback(() => {
+    minimizeSession()
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back()
+    } else {
+      router.push("/dashboard/planejamento")
+    }
+  }, [minimizeSession, router])
+
   // Uma única fonte de verdade (StudyProvider):
   // - Se já existe sessão ativa (recuperada de refresh/aba), apenas continua.
   // - Caso contrário, inicia vinculada ao bloco do cronograma (nunca duas sessões).
@@ -135,6 +152,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       const current = sessionRef.current
       if (current && current.isActive) {
         unminimizeSession()
+        setPhase("ACTIVE")
       } else if (hasPlanContext) {
         startNewSession()
       }
@@ -143,6 +161,36 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Garante que se uma sessão estiver ativa, a fase vá para ACTIVE
+  useEffect(() => {
+    if (session?.isActive && phase === "IDLE") {
+      setPhase("ACTIVE")
+    }
+  }, [session?.isActive, phase])
+
+  // Sincroniza a duração planejada caso o bloco do cronograma tenha tempo customizado (ex: pendência/replanejamento de 28min)
+  useEffect(() => {
+    if (
+      session &&
+      session.isActive &&
+      hasPlanContext &&
+      plannedSeconds > 0 &&
+      session.plannedSeconds !== plannedSeconds &&
+      (session.planItemId === (isPlanLinked ? planItem?.id : null) ||
+        session.disciplineId === disciplineId)
+    ) {
+      updatePlannedSeconds(plannedSeconds)
+    }
+  }, [
+    session,
+    plannedSeconds,
+    hasPlanContext,
+    isPlanLinked,
+    planItem?.id,
+    disciplineId,
+    updatePlannedSeconds,
+  ])
 
   // Reage ao reset (feito na tela ou no widget flutuante): sessão zera e
   // volta ao estado 00:00:00, mantendo disciplina/bloco/tópico para reiniciar.
@@ -320,7 +368,24 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   /* ─── CRONÔMETRO ─── */
   if (phase === "ACTIVE") {
     return (
-      <div className="max-w-2xl mx-auto text-center space-y-8">
+      <div className="max-w-2xl mx-auto text-center space-y-6">
+        {/* Barra superior com botão Minimizar e Voltar */}
+        <div className="flex items-center justify-between w-full max-w-xl mx-auto">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleMinimize}
+            className="gap-1.5 text-muted-foreground hover:text-foreground text-xs font-semibold cursor-pointer"
+            title="Minimizar cronômetro e voltar"
+          >
+            <ArrowLeft className="w-4 h-4" /> Minimizar e voltar
+          </Button>
+          <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/80 bg-muted/50 px-2.5 py-1 rounded-full border border-border/40">
+            Modo Estudo
+          </span>
+        </div>
+
         <div className="flex items-center justify-center gap-3">
           <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
           <h2 className="text-xl font-bold text-foreground">{session.disciplineName}</h2>
@@ -350,12 +415,33 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
           </div>
         )}
 
-        <div className="flex flex-wrap justify-center gap-3 pt-4">
+        {/* Controle de Som de Foco */}
+        <div className="max-w-md mx-auto w-full bg-card/80 backdrop-blur-xs border border-border/70 rounded-2xl p-3.5 shadow-xs text-left">
+          <div className="flex items-center justify-between pb-2 border-b border-border/50 mb-2">
+            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Volume2 className="h-3.5 w-3.5 text-primary" /> Som Ambiente de Foco
+            </span>
+            {focusSound !== "off" && focusSoundIsPlaying && (
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Tocando
+              </span>
+            )}
+          </div>
+          <FocusSoundControl
+            selectedSound={focusSound}
+            volume={focusSoundVolume}
+            isPlaying={focusSoundIsPlaying}
+            onSelectSound={selectFocusSound}
+            onVolumeChange={changeFocusSoundVolume}
+          />
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-3 pt-2">
           {isStudying ? (
             <Button
               size="lg"
               variant="secondary"
-              className="gap-2 w-36"
+              className="gap-2 w-36 cursor-pointer"
               onClick={pauseSession}
               aria-label="Pausar estudo"
             >
@@ -364,7 +450,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
           ) : (
             <Button
               size="lg"
-              className="gap-2 w-36"
+              className="gap-2 w-36 cursor-pointer"
               onClick={resumeSession}
               aria-label="Retomar estudo"
             >
@@ -375,8 +461,8 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
           <Button
             size="lg"
             variant="outline"
-            className="gap-2 w-36"
-            onClick={minimizeSession}
+            className="gap-2 w-36 cursor-pointer"
+            onClick={handleMinimize}
             aria-label="Minimizar cronômetro"
           >
             <Minimize2 className="w-5 h-5" /> Minimizar
@@ -385,7 +471,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
           <Button
             size="lg"
             variant="outline"
-            className="gap-2 w-36 text-muted-foreground hover:text-rose-500"
+            className="gap-2 w-36 text-muted-foreground hover:text-rose-500 cursor-pointer"
             onClick={resetSession}
             disabled={session.activeSeconds + session.pausedSeconds === 0}
             aria-label="Resetar cronômetro"
@@ -396,7 +482,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
           <Button
             size="lg"
             variant="destructive"
-            className="gap-2 w-36"
+            className="gap-2 w-36 cursor-pointer"
             onClick={handleFinish}
             aria-label="Encerrar estudo"
           >

@@ -209,10 +209,10 @@ test("getActivePlanDisciplines: retorna SOMENTE disciplinas do planejamento ativ
   assert.deepEqual(
     result.disciplines.map((d) => d.name),
     [
-      "Tecnologia da Informação (TI)",
       "Direito Constitucional",
       "Direito Tributário",
       "Língua Portuguesa",
+      "Tecnologia da Informação (TI)",
     ],
   )
   assert.equal(
@@ -479,7 +479,7 @@ test("getActivePlanDisciplines: troca de plano ativo atualiza imediatamente as s
   assert.equal(result.hasActivePlan, true)
   assert.deepEqual(
     result.disciplines.map((d) => d.name),
-    ["Inglês", "Direito Administrativo"],
+    ["Direito Administrativo", "Inglês"],
   )
 })
 
@@ -570,6 +570,6 @@ test("getActivePlanDisciplines: isolamento entre contas (Usuário A vs Usuário 
   )
   assert.deepEqual(
     resultB.disciplines.map((d) => d.name),
-    ["Direito Tributário", "Contabilidade"],
+    ["Contabilidade", "Direito Tributário"],
   )
 })

@@ -16,6 +16,7 @@ import {
   computeReplan,
   detectCriticalDelay,
   distributePendencies,
+  distributeWeeklyRemainingGoal,
   pendingOf,
   pickRecoveryHorizon,
   priorityScoreOf,
@@ -917,3 +918,127 @@ test("duplicata BASE com estudo completo zera a pendência (60 realizado)", () =
   const result = computeReplan(input({ pastBlocks: copies, sessions, toleranceMinutes: 0 }))
   assert.equal(result.totalPendingMinutes, 0)
 })
+
+// ============================================================================
+// TESTES DO ALGORITMO DE PLANEJAMENTO SEMANAL (DISTRIBUIÇÃO DA META RESTANTE)
+// ============================================================================
+test("PLANEJAMENTO SEMANAL: Meta 20h (1200min) + estudado 11h47 (707min) -> restante 8h13 (493min)", () => {
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 707,
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"], // Quinta e Sexta (Sábado de plantão)
+  })
+
+  assert.equal(result.remainingMinutesToGoal, 493) // 8h13
+  assert.equal(result.totalDistributedMinutes, 493) // 8h13 total distribuído
+  // Quinta recebe 247min (~4h07) e Sexta recebe 246min (~4h06)
+  assert.equal(result.targetMinutesByDay["2026-08-27"], 247)
+  assert.equal(result.targetMinutesByDay["2026-08-28"], 246)
+  // Total nunca é 17h02 (1022min)
+  assert.notEqual(result.totalDistributedMinutes, 1022)
+  assert.ok(result.totalDistributedMinutes <= 493)
+})
+
+test("PLANEJAMENTO SEMANAL: Sábado de plantão fica com 0 minutos", () => {
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 707,
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"], // Sábado "2026-08-29" NÃO está na lista pois é plantão
+  })
+
+  assert.equal(result.targetMinutesByDay["2026-08-29"], undefined)
+  assert.equal(result.totalDistributedMinutes, 493)
+})
+
+test("PLANEJAMENTO SEMANAL: Meta já atingida (estudado >= meta) -> 0 minutos restantes e nenhum bloco obrigatório", () => {
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 1260, // 21h estudadas
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"],
+  })
+
+  assert.equal(result.remainingMinutesToGoal, 0)
+  assert.equal(result.totalDistributedMinutes, 0)
+  assert.equal(result.targetMinutesByDay["2026-08-27"], 0)
+  assert.equal(result.targetMinutesByDay["2026-08-28"], 0)
+})
+
+test("PLANEJAMENTO SEMANAL: Conclusão de 3h na quinta reduz restante de 8h13 para 5h13 e recalcula sexta", () => {
+  // Estado inicial: faltavam 8h13 distribuídas em Qui (247m) e Sex (246m)
+  // Usuário estuda 3h (180min) na quinta-feira. Total estudado sobe de 707m para 887m (14h47m).
+  const resultAfterThursday = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 887, // 707 + 180 = 887 (14h47)
+    remainingAvailableDays: ["2026-08-28"], // Agora resta somente a sexta-feira disponível
+  })
+
+  assert.equal(resultAfterThursday.remainingMinutesToGoal, 313) // 5h13min
+  assert.equal(resultAfterThursday.totalDistributedMinutes, 313)
+  assert.equal(resultAfterThursday.targetMinutesByDay["2026-08-28"], 313) // Sexta recebe exatamente 5h13
+})
+
+test("PLANEJAMENTO SEMANAL: Teto diário de segurança (maxDailyMinutesCap) é respeitado", () => {
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 0,
+    remainingAvailableDays: ["2026-08-28"], // 1 dia só
+    maxDailyMinutesCap: 480, // Máximo 8h por dia
+  })
+
+  assert.equal(result.remainingMinutesToGoal, 1200)
+  assert.equal(result.targetMinutesByDay["2026-08-28"], 480)
+  assert.equal(result.totalDistributedMinutes, 480)
+})
+
+test("CENÁRIO MEGA-PROMPT: Meta 20h (1200min) + Estudo real 16h02 (962min) -> Restante 3h58 (238min)", () => {
+  // Simulação exata: Dom (2h) + Seg (4h) + Ter (4h) + Qua (6h02) = 16h02 (962min)
+  // Quinta (27/08) e Sexta (28/08) disponíveis, Sábado (29/08) plantão
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200, // 20h
+    realStudiedMinutesThisWeek: 962, // 16h02
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"], // Qui e Sex
+  })
+
+  assert.equal(result.remainingMinutesToGoal, 238) // 3h58
+  assert.equal(result.totalDistributedMinutes, 238) // 3h58
+  // Quinta recebe 119min (1h59) e Sexta recebe 119min (1h59)
+  assert.equal(result.targetMinutesByDay["2026-08-27"], 119)
+  assert.equal(result.targetMinutesByDay["2026-08-28"], 119)
+  // Sábado de plantão nunca recebe minutos
+  assert.equal(result.targetMinutesByDay["2026-08-29"], undefined)
+
+  // NUNCA 7h24 (444m) na quinta e 9h38 (578m) na sexta
+  assert.ok((result.targetMinutesByDay["2026-08-27"] ?? 0) <= 238)
+  assert.ok((result.targetMinutesByDay["2026-08-28"] ?? 0) <= 238)
+})
+
+test("CENÁRIO MEGA-PROMPT: Estudo extra de 1h30 na quinta reduz saldo de 3h58 para 2h28 e ajusta a sexta", () => {
+  // Usuário estuda 1h30 (90min) fora do cronograma na quinta.
+  // Novo estudo real: 962 + 90 = 1052min (17h32)
+  // Restante: 1200 - 1052 = 148min (2h28)
+  const resultAfterExtra = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 1052,
+    remainingAvailableDays: ["2026-08-28"], // Sexta-feira
+  })
+
+  assert.equal(resultAfterExtra.remainingMinutesToGoal, 148) // 2h28
+  assert.equal(resultAfterExtra.totalDistributedMinutes, 148)
+  assert.equal(resultAfterExtra.targetMinutesByDay["2026-08-28"], 148) // Sexta recebe exatamente 2h28
+})
+
+test("CENÁRIO MEGA-PROMPT: Idempotência do cálculo (reexecutar 10 vezes mantém idêntico)", () => {
+  const inputParams = {
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 962,
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"],
+  }
+
+  const firstRun = distributeWeeklyRemainingGoal(inputParams)
+  for (let i = 0; i < 10; i++) {
+    const nextRun = distributeWeeklyRemainingGoal(inputParams)
+    assert.deepEqual(nextRun, firstRun)
+  }
+})
+
+

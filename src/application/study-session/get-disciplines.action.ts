@@ -163,14 +163,8 @@ export async function fetchActivePlanDisciplines(
     }
 
     const planDisciplines = Array.from(disciplineMap.values())
-      .sort((a, b) => {
-        // Se houver scores de prioridade definidos no plano
-        if (b.priorityScore !== a.priorityScore && (a.priorityScore > 0 || b.priorityScore > 0)) {
-          return b.priorityScore - a.priorityScore
-        }
-        return a.firstOrderIndex - b.firstOrderIndex
-      })
       .map((entry) => entry.disc)
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }))
 
     return {
       hasActivePlan: true,

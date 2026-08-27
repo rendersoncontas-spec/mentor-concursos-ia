@@ -10,12 +10,13 @@ export const metadata = {
 }
 
 interface PageProps {
-  searchParams: Promise<{ planId?: string; disciplineId?: string }>
+  searchParams: Promise<{ planId?: string; disciplineId?: string; duration?: string }>
 }
 
 export default async function StudySessionPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams
-  const { planId, disciplineId } = resolvedParams
+  const { planId, disciplineId, duration } = resolvedParams
+  const customDurationMinutes = duration ? parseInt(duration, 10) : undefined
   const supabase = await createClient()
   const {
     data: { user },
@@ -46,6 +47,10 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
         planItem = {
           ...item,
           discipline,
+          duration_minutes:
+            customDurationMinutes && !isNaN(customDurationMinutes) && customDurationMinutes > 0
+              ? customDurationMinutes
+              : item.duration_minutes,
         }
       }
     }
@@ -63,7 +68,10 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
         study_plan_id: "",
         discipline_id: disc.id,
         day_of_week: 0,
-        duration_minutes: 60, // Padrão
+        duration_minutes:
+          customDurationMinutes && !isNaN(customDurationMinutes) && customDurationMinutes > 0
+            ? customDurationMinutes
+            : 60, // Padrão
         priority: 0,
         priority_score: 0,
         recommended_sessions: 0,

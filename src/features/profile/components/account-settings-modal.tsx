@@ -130,12 +130,11 @@ export function AccountSettingsModal({
   const [email, setEmail] = useState(userEmail)
 
   // Form States - Preferencias
-  const [diasEstudo, setDiasEstudo] = useState<string[]>(
-    DEFAULT_PREFERENCES["studyDays"] as string[],
-  )
   const [primeiroDia, setPrimeiroDia] = useState("Domingo")
   const [somTimer, setSomTimer] = useState("Melodia 1")
   const [fusoHorario, setFusoHorario] = useState("(UTC-03:00) Brasília")
+  const [ruimThreshold, setRuimThreshold] = useState<number>(65)
+  const [regularThreshold, setRegularThreshold] = useState<number>(75)
 
   // Form States - Ranking
   const [perfilPublico, setPerfilPublico] = useState(true)
@@ -199,12 +198,24 @@ export function AccountSettingsModal({
             }
           }
           const prefs = profile.preferences
-          setDiasEstudo(
-            prefsValue<string[]>(prefs, "studyDays", DEFAULT_PREFERENCES["studyDays"] as string[]),
-          )
-          setPrimeiroDia(prefsValue<string>(prefs, "firstDayOfWeek", "Domingo"))
+          const initialFirstDay =
+            profile.week_start_day === 1
+              ? "Segunda-feira"
+              : profile.week_start_day === 0
+                ? "Domingo"
+                : prefsValue<string>(prefs, "firstDayOfWeek", "Domingo")
+          setPrimeiroDia(initialFirstDay)
           setSomTimer(prefsValue<string>(prefs, "timerSound", "Melodia 1"))
           setFusoHorario(prefsValue<string>(prefs, "timezone", "(UTC-03:00) Brasília"))
+
+          const perfThresholds = prefsValue<{ ruimMax?: number; regularMax?: number }>(
+            prefs,
+            "performanceThresholds",
+            { ruimMax: 65, regularMax: 75 }
+          )
+          setRuimThreshold(perfThresholds?.ruimMax ?? 65)
+          setRegularThreshold(perfThresholds?.regularMax ?? 75)
+
           setPerfilPublico(prefsValue<boolean>(prefs, "publicProfile", true))
           setTipoFoto(prefsValue<"foto" | "iniciais">(prefs, "avatarType", "foto"))
           setTipoNome(prefsValue<"nome" | "apelido">(prefs, "nameType", "nome"))
@@ -229,6 +240,10 @@ export function AccountSettingsModal({
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChangePassword = async () => {
+    if (!senhaAtual) {
+      toast.error("Informe sua senha atual.")
+      return
+    }
     if (!novaSenha) {
       toast.error("Informe a nova senha.")
       return
@@ -244,6 +259,19 @@ export function AccountSettingsModal({
     setIsChangingPassword(true)
     try {
       const supabase = createClient()
+      const currentEmail = email || userEmail || ""
+      if (currentEmail) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: currentEmail,
+          password: senhaAtual,
+        })
+        if (signInError) {
+          toast.error("Senha atual incorreta. Verifique e tente novamente.")
+          setIsChangingPassword(false)
+          return
+        }
+      }
+
       const { error } = await supabase.auth.updateUser({ password: novaSenha })
       if (error) {
         toast.error("Erro ao alterar senha: " + error.message)
@@ -296,7 +324,6 @@ export function AccountSettingsModal({
     try {
       const fullName = [nome.trim(), sobrenome.trim()].filter(Boolean).join(" ")
       const preferences: Preferences = {
-        studyDays: diasEstudo,
         firstDayOfWeek: primeiroDia,
         timerSound: somTimer,
         timezone: fusoHorario,
@@ -310,6 +337,10 @@ export function AccountSettingsModal({
         notifyImportacoes: notifImportacoes,
         notifyRanking: notifRanking,
         customCategories,
+        performanceThresholds: {
+          ruimMax: ruimThreshold,
+          regularMax: regularThreshold,
+        },
       }
 
       const update: Parameters<typeof updateProfileAction>[0] = {
@@ -320,6 +351,7 @@ export function AccountSettingsModal({
         gender: genero,
         city: cidade.trim() || null,
         uf: uf || null,
+        week_start_day: primeiroDia === "Segunda-feira" ? 1 : 0,
         preferences,
       }
 
@@ -367,14 +399,6 @@ export function AccountSettingsModal({
       toast.error("Erro inesperado ao salvar.")
     } finally {
       setIsSaving(false)
-    }
-  }
-
-  const toggleDia = (dia: string) => {
-    if (diasEstudo.includes(dia)) {
-      setDiasEstudo(diasEstudo.filter((d) => d !== dia))
-    } else {
-      setDiasEstudo([...diasEstudo, dia])
     }
   }
 
@@ -659,53 +683,83 @@ export function AccountSettingsModal({
                 {/* CONTEÚDO TAB 2: Preferências */}
                 {activeTab === "PREFERENCIAS" && (
                   <div className="space-y-5">
-                    {/* Dias de Estudo */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                        DIAS DE ESTUDO
-                      </label>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d, idx) => {
-                          const isSelected = diasEstudo.includes(d)
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => toggleDia(d)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                                isSelected
-                                  ? "bg-[#2563EB] text-white border-[#2563EB]"
-                                  : "border-muted text-muted-foreground hover:border-[#2563EB]"
-                              }`}
-                            >
-                              {d}
-                            </button>
-                          )
-                        })}
+                    {/* Classificação de Desempenho (Ativada e Configurável) */}
+                    <div className="space-y-2.5 bg-muted/20 p-3.5 rounded-xl border">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                          CLASSIFICAÇÃO DE DESEMPENHO
+                        </label>
+                        <span className="text-[10px] text-muted-foreground font-semibold">
+                          Faixas de Acerto (%)
+                        </span>
                       </div>
-                    </div>
 
-                    {/* Espectro de Classificação de Desempenho */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
-                        CLASSIFICAÇÃO DE DESEMPENHO
-                      </label>
-                      <div className="flex h-5 rounded-md overflow-hidden font-bold text-[10px] text-white text-center">
-                        <div className="w-[65%] bg-rose-500 flex items-center justify-center">
+                      {/* Espectro Visual Dinâmico */}
+                      <div className="flex h-6 rounded-md overflow-hidden font-bold text-[10px] text-white text-center shadow-xs transition-all">
+                        <div
+                          style={{ width: `${ruimThreshold}%` }}
+                          className="bg-rose-500 flex items-center justify-center transition-all min-w-[36px]"
+                          title={`Ruim: 0% a ${ruimThreshold}%`}
+                        >
                           Ruim
                         </div>
-                        <div className="w-[10%] bg-amber-400 text-amber-950 flex items-center justify-center">
+                        <div
+                          style={{ width: `${Math.max(0, regularThreshold - ruimThreshold)}%` }}
+                          className="bg-amber-400 text-amber-950 flex items-center justify-center transition-all min-w-[44px]"
+                          title={`Regular: ${ruimThreshold}% a ${regularThreshold}%`}
+                        >
                           Regular
                         </div>
-                        <div className="w-[25%] bg-emerald-500 flex items-center justify-center">
+                        <div
+                          style={{ width: `${Math.max(0, 100 - regularThreshold)}%` }}
+                          className="bg-emerald-500 flex items-center justify-center transition-all min-w-[36px]"
+                          title={`Bom: ${regularThreshold}% a 100%`}
+                        >
                           Bom
                         </div>
                       </div>
-                      <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
-                        <span>0%</span>
-                        <span>65%</span>
-                        <span>75%</span>
-                        <span>100%</span>
+
+                      {/* Controles de Porcentagem */}
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                            Limite Ruim (até %)
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={10}
+                              max={regularThreshold - 1}
+                              value={ruimThreshold}
+                              onChange={(e) => {
+                                const v = Math.max(5, Math.min(regularThreshold - 1, Number(e.target.value) || 0))
+                                setRuimThreshold(v)
+                              }}
+                              className="w-full h-8 px-2.5 rounded-lg border text-xs font-mono font-bold bg-background text-foreground"
+                            />
+                            <span className="text-xs font-bold text-muted-foreground">%</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                            Limite Regular (até %)
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={ruimThreshold + 1}
+                              max={99}
+                              value={regularThreshold}
+                              onChange={(e) => {
+                                const v = Math.max(ruimThreshold + 1, Math.min(99, Number(e.target.value) || 0))
+                                setRegularThreshold(v)
+                              }}
+                              className="w-full h-8 px-2.5 rounded-lg border text-xs font-mono font-bold bg-background text-foreground"
+                            />
+                            <span className="text-xs font-bold text-muted-foreground">%</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 

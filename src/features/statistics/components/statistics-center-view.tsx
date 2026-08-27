@@ -268,7 +268,11 @@ export function StatisticsCenterView() {
           ),
     [filteredSessions, filteredAttempts, rangeKeys, now, isAllRange],
   )
-  const timeCards = useMemo(() => computeTimeCards(buckets, now, TIMEZONE), [buckets, now])
+  const weekStartDay = payload?.weekStartDay ?? 0
+  const timeCards = useMemo(
+    () => computeTimeCards(buckets, now, TIMEZONE, weekStartDay),
+    [buckets, now, weekStartDay],
+  )
   const sessionStats = useMemo(() => computeSessionStatistics(filteredSessions), [filteredSessions])
   const questionStats = useMemo(
     () => computeQuestionStatistics(filteredSessions, filteredAttempts),
@@ -284,7 +288,7 @@ export function StatisticsCenterView() {
       ),
     [buckets, now],
   )
-  const frequency = useMemo(() => computeFrequency(buckets, now, TIMEZONE), [buckets, now])
+  const frequency = useMemo(() => computeFrequency(buckets, now, TIMEZONE, weekStartDay), [buckets, now, weekStartDay])
   const revisionStats = useMemo(
     () =>
       computeRevisionStatistics(
@@ -335,10 +339,13 @@ export function StatisticsCenterView() {
     () => computeTimeOfDayAnalysis(filteredSessions, filteredAttempts, TIMEZONE),
     [filteredSessions, filteredAttempts],
   )
-  const comparisons = useMemo(() => computeComparisons(buckets, now, TIMEZONE), [buckets, now])
+  const comparisons = useMemo(
+    () => computeComparisons(buckets, now, TIMEZONE, weekStartDay),
+    [buckets, now, weekStartDay],
+  )
   const planning = useMemo(
-    () => computePlanning(payload?.activePlan ?? null, buckets, now, TIMEZONE),
-    [payload?.activePlan, buckets, now],
+    () => computePlanning(payload?.activePlan ?? null, buckets, now, TIMEZONE, weekStartDay),
+    [payload?.activePlan, buckets, now, weekStartDay],
   )
   const edital = useMemo(
     () => computeEditalCoverage(payload?.userDisciplines ?? [], disciplineStats, registry, now),

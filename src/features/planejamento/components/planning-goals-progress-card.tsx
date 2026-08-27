@@ -1,10 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { ChevronLeft, ChevronRight, Play, Target } from "lucide-react"
 import { toast } from "sonner"
 
+import { getPeriodGoalAction } from "@/application/study-plan/replan/adaptive-replan.actions"
+import { type PeriodGoalData } from "@/application/study-plan/replan/adaptive-replan.service"
+import { type PeriodFilter as ServicePeriodFilter } from "@/application/study-plan/replan/adaptive-replan.service"
 import { Button } from "@/components/ui/button"
 
 import { type StudyCycleBlock } from "./planning-view"
@@ -37,6 +40,32 @@ export function PlanningGoalsProgressCard({
   const [period, setPeriod] = useState<PeriodFilter>("semana")
   const [currentOffset, setCurrentOffset] = useState(0) // offset for period navigation
 
+  // Dados reais de meta do período (buscados do banco)
+  const [periodGoal, setPeriodGoal] = useState<PeriodGoalData | null>(null)
+  const [loadingGoal, setLoadingGoal] = useState(true)
+
+  // Buscar dados reais de meta quando período ou offset mudam
+  useEffect(() => {
+    let cancelled = false
+    const fetchGoal = async () => {
+      setLoadingGoal(true)
+      try {
+        // Mapear "custom" para "semana" (service não suporta custom)
+        const servicePeriod: ServicePeriodFilter = period === "custom" ? "semana" : period
+        const res = await getPeriodGoalAction(servicePeriod, currentOffset)
+        if (!cancelled && res.data) {
+          setPeriodGoal(res.data)
+        }
+      } catch {
+        /* noop */
+      } finally {
+        if (!cancelled) setLoadingGoal(false)
+      }
+    }
+    void fetchGoal()
+    return () => { cancelled = true }
+  }, [period, currentOffset])
+
   // Dates calculation based on filter & offset
   const today = new Date()
 
@@ -67,24 +96,6 @@ export function PlanningGoalsProgressCard({
     return "Período Personalizado"
   }
 
-  // Multiplier factor based on period (semana = 1, mes = 4.3, ano = 52, total = 12)
-  const getMultiplier = () => {
-    switch (period) {
-      case "semana":
-        return 1
-      case "mes":
-        return 4.3
-      case "ano":
-        return 52
-      case "total":
-        return 12
-      default:
-        return 1
-    }
-  }
-
-  const multiplier = getMultiplier()
-
   // Aggregate total duration and studied minutes per discipline
   const disciplineMap = new Map<
     string,
@@ -111,9 +122,15 @@ export function PlanningGoalsProgressCard({
       })
     }
   })
+  const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
   const disciplineGoals = Array.from(disciplineMap.values()).map((d) => {
-    const targetMinutes = Math.round(d.totalDuration * multiplier)
-    const studiedMinutes = Math.min(targetMinutes, Math.round(d.totalStudied * multiplier))
+    // Usar dados reais do período quando disponíveis
+    const targetMinutes = periodGoal
+      ? Math.round((d.totalDuration / Math.max(1, totalCycleMinutes)) * periodGoal.goalMinutes)
+      : d.totalDuration
+    const studiedMinutes = periodGoal
+      ? Math.round((d.totalStudied / Math.max(1, totalCycleMinutes)) * periodGoal.studiedMinutes)
+      : d.totalStudied
     const missingMinutes = Math.max(0, targetMinutes - studiedMinutes)
     const percentage =
       targetMinutes > 0 ? Math.min(100, Math.round((studiedMinutes / targetMinutes) * 100)) : 0
@@ -128,10 +145,13 @@ export function PlanningGoalsProgressCard({
     }
   })
 
-  // Group total calculation based on all blocks (full weekly goal)
-  const totalTargetMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-  const totalStudiedMinutes = blocks.reduce((acc, b) => acc + b.studiedMinutes, 0)
-  const totalMissingMinutes = Math.max(0, totalTargetMinutes - totalStudiedMinutes)
+  // Usar dados REAIS do banco quando disponíveis, fallback para cálculo local
+  const totalTargetMinutes = periodGoal?.goalMinutes
+    ?? blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
+  const totalStudiedMinutes = periodGoal?.studiedMinutes
+    ?? blocks.reduce((acc, b) => acc + b.studiedMinutes, 0)
+  const totalMissingMinutes = periodGoal?.remainingMinutes
+    ?? Math.max(0, totalTargetMinutes - totalStudiedMinutes)
   const totalPercentage =
     totalTargetMinutes > 0
       ? parseFloat(((totalStudiedMinutes / totalTargetMinutes) * 100).toFixed(1))
@@ -158,7 +178,9 @@ export function PlanningGoalsProgressCard({
               Metas & Progresso do Planejamento
             </h3>
             <p className="text-xs text-muted-foreground font-medium">
-              Acompanhamento de horas definidas vs estudadas por disciplina
+              {periodGoal
+                ? `Meta: ${formatHoursMinutesShort(periodGoal.goalMinutes)} • Estudado: ${formatHoursMinutesShort(periodGoal.studiedMinutes)} • Falta: ${formatHoursMinutesShort(periodGoal.remainingMinutes)}`
+                : "Acompanhamento de horas definidas vs estudadas por disciplina"}
             </p>
           </div>
         </div>
@@ -205,6 +227,43 @@ export function PlanningGoalsProgressCard({
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Overall Period Progress Overview (Parte Superior) */}
+      <div className="bg-muted/30 p-5 rounded-2xl border space-y-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div>
+            <div className="text-2xl sm:text-3xl font-black text-foreground">{totalPercentage}%</div>
+            <p className="text-xs text-muted-foreground font-medium">
+              Tempo total cumprido em {periodGoal?.periodLabel || getDateRangeLabel()}
+            </p>
+          </div>
+
+          <div className="text-xs font-semibold space-y-0.5 sm:text-right">
+            <div
+              className={
+                totalPercentage >= 100
+                  ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                  : "text-amber-600 dark:text-amber-400 font-bold"
+              }
+            >
+              {totalPercentage >= 100
+                ? "🟢 Meta Batida!"
+                : `Falta: ${formatHoursMinutesShort(totalMissingMinutes)}`}
+            </div>
+            <div className="text-muted-foreground">
+              Meta definida: <strong>{formatHoursMinutesShort(totalTargetMinutes)}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Progress Bar */}
+        <div className="w-full bg-muted rounded-full h-3.5 sm:h-4 overflow-hidden border">
+          <div
+            className="h-full bg-gradient-to-r from-[#2563EB] to-emerald-500 rounded-full transition-all duration-700"
+            style={{ width: `${Math.min(totalPercentage, 100)}%` }}
+          />
         </div>
       </div>
 
@@ -279,35 +338,6 @@ export function PlanningGoalsProgressCard({
             </div>
           )
         })}
-      </div>
-
-      {/* Overall Period Progress Footer */}
-      <div className="border-t pt-5 space-y-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div>
-            <div className="text-2xl font-black text-foreground">{totalPercentage}%</div>
-            <p className="text-xs text-muted-foreground font-medium">
-              Tempo total cumprido em {getDateRangeLabel()}
-            </p>
-          </div>
-
-          <div className="text-xs font-semibold space-y-0.5 text-right">
-            <div className="text-amber-600 dark:text-amber-400 font-bold">
-              Falta: {formatHoursMinutesShort(totalMissingMinutes)}
-            </div>
-            <div className="text-muted-foreground">
-              Meta definida: <strong>{formatHoursMinutesShort(totalTargetMinutes)}</strong>
-            </div>
-          </div>
-        </div>
-
-        {/* Global Progress Bar */}
-        <div className="w-full bg-muted rounded-full h-4 overflow-hidden border">
-          <div
-            className="h-full bg-gradient-to-r from-[#2563EB] to-emerald-500 rounded-full transition-all duration-700"
-            style={{ width: `${totalPercentage}%` }}
-          />
-        </div>
       </div>
     </div>
   )

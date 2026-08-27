@@ -41,7 +41,35 @@ export const LS_MAX_MIN = "mentor_user_session_max_minutes"
 export const LS_STYLE = "mentor_user_session_style"
 export const LS_CUSTOM_SCALE = "mentor_user_custom_scale"
 
-const CUSTOM_SCALE_RE = /^custom_(\d+)x(\d+)$/
+export type ScheduleMode =
+  | "normal"
+  | "12x36"
+  | "24x72"
+  | "24x48"
+  | "5x1"
+  | "6x1"
+  | "4x2"
+  | `custom_${number}x${number}`
+
+export const SCHEDULE_MODES = [
+  "normal",
+  "12x36",
+  "24x72",
+  "24x48",
+  "5x1",
+  "6x1",
+  "4x2",
+] as const
+
+export const CUSTOM_SCALE_RE = /^custom_(\d+)x(\d+)$/
+
+export function isScheduleMode(value: string | null): value is ScheduleMode {
+  return (
+    value !== null &&
+    (SCHEDULE_MODES.includes(value as (typeof SCHEDULE_MODES)[number]) ||
+      CUSTOM_SCALE_RE.test(value))
+  )
+}
 
 export function formatMinutesLabel(min: number): string {
   if (min % 60 === 0) return `${min / 60}h`

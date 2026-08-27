@@ -720,3 +720,83 @@ export function computeReplan(input: ReplanInput): ReplanResult {
     horizonDays,
   }
 }
+
+// ----------------------------------------------------------------------------
+// 8. DISTRIBUIÇÃO EXCLUSIVA DO TEMPO RESTANTE DA META SEMANAL
+// ----------------------------------------------------------------------------
+export interface DistributeWeeklyGoalInput {
+  weeklyGoalMinutes: number
+  realStudiedMinutesThisWeek: number
+  remainingAvailableDays: string[] // Ex: ["2026-08-27", "2026-08-28"]
+  minBlockMinutes?: number
+  maxDailyMinutesCap?: number
+}
+
+export interface DistributeWeeklyGoalResult {
+  weeklyGoalMinutes: number
+  realStudiedMinutesThisWeek: number
+  remainingMinutesToGoal: number
+  targetMinutesByDay: Record<string, number>
+  totalDistributedMinutes: number
+}
+
+/**
+ * Calcula e distribui estritamente o tempo restante da meta semanal entre os
+ * dias disponíveis da semana atual.
+ *
+ * Regras essenciais:
+ * 1. tempo_restante_semana = max(0, weeklyGoalMinutes - realStudiedMinutesThisWeek)
+ * 2. Se a meta já foi atingida (restante = 0), não gera nenhum bloco obrigatório (0 min por dia).
+ * 3. Soma do planejamento futuro da semana <= tempo_restante_semana (nunca gera excedente!).
+ * 4. Dias de plantão / bloqueados já são excluídos da lista remainingAvailableDays (recebem 0).
+ */
+export function distributeWeeklyRemainingGoal(
+  input: DistributeWeeklyGoalInput,
+): DistributeWeeklyGoalResult {
+  const remainingMinutesToGoal = Math.max(
+    0,
+    input.weeklyGoalMinutes - input.realStudiedMinutesThisWeek,
+  )
+  const targetMinutesByDay: Record<string, number> = {}
+
+  if (remainingMinutesToGoal === 0 || input.remainingAvailableDays.length === 0) {
+    for (const d of input.remainingAvailableDays) {
+      targetMinutesByDay[d] = 0
+    }
+    return {
+      weeklyGoalMinutes: input.weeklyGoalMinutes,
+      realStudiedMinutesThisWeek: input.realStudiedMinutesThisWeek,
+      remainingMinutesToGoal: 0,
+      targetMinutesByDay,
+      totalDistributedMinutes: 0,
+    }
+  }
+
+  const numDays = input.remainingAvailableDays.length
+  const baseMinutesPerDay = Math.floor(remainingMinutesToGoal / numDays)
+  let remainder = remainingMinutesToGoal % numDays
+
+  let totalDistributed = 0
+  for (let i = 0; i < numDays; i++) {
+    const day = input.remainingAvailableDays[i]
+    if (!day) continue
+    let dayAlloc = baseMinutesPerDay + (remainder > 0 ? 1 : 0)
+    if (remainder > 0) remainder--
+
+    if (input.maxDailyMinutesCap && dayAlloc > input.maxDailyMinutesCap) {
+      dayAlloc = input.maxDailyMinutesCap
+    }
+
+    targetMinutesByDay[day] = dayAlloc
+    totalDistributed += dayAlloc
+  }
+
+  return {
+    weeklyGoalMinutes: input.weeklyGoalMinutes,
+    realStudiedMinutesThisWeek: input.realStudiedMinutesThisWeek,
+    remainingMinutesToGoal,
+    targetMinutesByDay,
+    totalDistributedMinutes: totalDistributed,
+  }
+}
+

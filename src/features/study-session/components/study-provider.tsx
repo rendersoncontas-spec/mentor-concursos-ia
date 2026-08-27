@@ -99,6 +99,7 @@ interface StudyContextType {
   resumeSession: () => void
   endSession: () => void
   updateNotes: (notes: string) => void
+  updatePlannedSeconds: (seconds: number) => void
   formatTime: (seconds: number) => string
   floatingTimerEnabled: boolean
   toggleFloatingTimer: () => void
@@ -200,7 +201,7 @@ function loadSavedPosition(): Position | null {
 
 export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<StudySessionState | null>(null)
-  const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(false)
+  const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(true)
   const [isCentralOpen, setIsCentralOpen] = useState(false)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -489,6 +490,10 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     setSession((prev) => (prev ? { ...prev, notes } : null))
   }, [])
 
+  const updatePlannedSeconds = useCallback((seconds: number) => {
+    setSession((prev) => (prev ? { ...prev, plannedSeconds: seconds } : null))
+  }, [])
+
   const finalizeAndSaveSession = useCallback(
     async (formData?: Record<string, unknown>) => {
       if (!session) return { success: false, error: "Nenhuma sessão ativa" }
@@ -600,6 +605,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         resumeSession,
         endSession,
         updateNotes,
+        updatePlannedSeconds,
         formatTime,
         floatingTimerEnabled,
         toggleFloatingTimer,
@@ -755,11 +761,15 @@ function FloatingStudyWidget() {
     setPos(null)
   }, [])
 
-  // Sessão vinda do Cronograma: restaurar leva de volta à tela do cronômetro do planejamento.
+  // Sessão vinda do Cronograma ou disciplina: restaurar leva de volta à tela do cronômetro.
   // Caso contrário, reabre a Central Inteligente.
   const handleRestoreFull = useCallback(() => {
     if (session?.source === "PLAN" && session?.planItemId) {
       router.push(`/dashboard/study-session?planId=${session.planItemId}`)
+    } else if (session?.disciplineId) {
+      router.push(`/dashboard/study-session?disciplineId=${session.disciplineId}`)
+    } else if (session?.isActive) {
+      router.push("/dashboard/study-session")
     } else if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("restore-study-session"))
     }

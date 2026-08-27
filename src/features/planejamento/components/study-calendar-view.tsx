@@ -20,37 +20,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getReplanInfoAction } from "@/application/study-plan/replan/adaptive-replan.actions"
 import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive-replan.service"
 import {
-  getStudyDaysCount,
-  isShiftDayForDate,
-  isShiftDayForScale,
+  CUSTOM_SCALE_RE,
+  isScheduleMode,
   LS_SHIFT_ANCHOR_DATE,
+  type ScheduleMode,
 } from "@/features/planejamento/lib/planning-form"
+import {
+  getSavedScaleConfig,
+  getStudyPlanDay,
+  isDutyShiftDate,
+  WEEKDAY_KEYS,
+  type SharedPlanConfig,
+} from "@/features/planejamento/lib/study-plan-shared"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { type StudyCycleBlock } from "./planning-view"
-
-type ScheduleMode = "normal" | "12x36" | "24x72" | "24x48" | "5x1" | "6x1" | "4x2"
-
-const SCHEDULE_MODES: readonly ScheduleMode[] = [
-  "normal",
-  "12x36",
-  "24x72",
-  "24x48",
-  "5x1",
-  "6x1",
-  "4x2",
-]
-const WEEKDAY_KEYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const
-
-const CUSTOM_SCALE_RE = /^custom_(\d+)x(\d+)$/
-
-/** Aceita as escalas fixas e também o formato custom_XxY salvo pelo wizard. */
-function isScheduleMode(value: string | null): value is ScheduleMode {
-  return (
-    value !== null &&
-    (SCHEDULE_MODES.includes(value as ScheduleMode) || CUSTOM_SCALE_RE.test(value))
-  )
-}
 
 function getDayCellClass(isToday: boolean, onShift: boolean): string {
   if (isToday) return "border-primary bg-primary/5 shadow-xs"
@@ -229,75 +213,42 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
   }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate])
 
   const isShiftDay = (dayNum: number) => {
-    const key = `${year}-${month}-${dayNum}`
-    if (customShiftDays[key] === "PLANTAO") return true
-    if (customShiftDays[key] === "FOLGA_ESTUDO") return false
-
     const padM = String(month + 1).padStart(2, "0")
     const padD = String(dayNum).padStart(2, "0")
     const dateStr = `${year}-${padM}-${padD}`
-    const effectiveAnchor =
-      anchorShiftDate ||
-      `${year}-${padM}-${String(firstShiftDay).padStart(2, "0")}`
 
-    return isShiftDayForDate(dateStr, effectiveAnchor, scheduleMode)
+    return isDutyShiftDate(dateStr, {
+      scheduleMode,
+      firstShiftDay,
+      anchorShiftDate,
+      studyDays,
+      customShiftDays,
+    })
   }
 
-  // Helper para buscar disciplinas agendadas no dia
+  // Helper para buscar disciplinas agendadas no dia (consome a mesma fonte única de verdade)
   const getDisciplinesForDay = (dayNum: number) => {
-    if (blocks.length === 0 && !replanInfo?.hasPlan) return []
-
-    const onShift = isShiftDay(dayNum)
-
-    // Se estiver de Plantão, folga total de estudos nesse dia
-    if (onShift && scheduleMode !== "normal") return []
-
-    // No modo normal, usamos os dias selecionados pelo usuário
-    if (scheduleMode === "normal") {
-      const dayOfWeek = new Date(year, month, dayNum).getDay()
-      if (!studyDays.includes(WEEKDAY_KEYS[dayOfWeek] ?? "")) return []
-    }
-
     const padMonth = String(month + 1).padStart(2, "0")
     const padDay = String(dayNum).padStart(2, "0")
     const dateStr = `${year}-${padMonth}-${padDay}`
 
-    // 1. Usar blocos reais sincronizados com o servidor / plano ativo
-    const serverBlocks = replanInfo?.dailyBlocks?.[dateStr]
-    if (serverBlocks && serverBlocks.length > 0) {
-      return serverBlocks.map((b) => ({
-        id: b.id,
-        disciplineName: b.disciplineName,
-        disciplineId: b.disciplineId,
-        durationMinutes: b.durationMinutes,
-        studiedMinutes: 0,
-        color: blocks.find((cb) => cb.disciplineId === b.disciplineId)?.color || "#2563EB",
-        completed: !!b.manuallyClosed,
-      }))
-    }
+    const dayInfo = getStudyPlanDay(
+      dateStr,
+      replanInfo,
+      { scheduleMode, firstShiftDay, anchorShiftDate, studyDays, customShiftDays },
+      blocks,
+      [],
+    )
 
-    // 2. Fallback caso ainda não tenha carregado
-    const studyDaysCount = getStudyDaysCount(scheduleMode, studyDays)
-    const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-    const targetDailyMinutes = Math.max(30, Math.round(totalCycleMinutes / studyDaysCount))
-
-    const blocksPerDay = Math.max(1, Math.round(blocks.length / studyDaysCount))
-    const startIndex = (dayNum * blocksPerDay) % blocks.length
-
-    const selectedList: StudyCycleBlock[] = []
-    let accumulatedMins = 0
-    let idx = 0
-
-    while (accumulatedMins < targetDailyMinutes && idx < blocks.length) {
-      const block = blocks[(startIndex + idx) % blocks.length]
-      if (block) {
-        selectedList.push(block)
-        accumulatedMins += block.durationMinutes
-      }
-      idx++
-    }
-
-    return selectedList
+    return dayInfo.blocks.map((b) => ({
+      id: b.id,
+      disciplineName: b.disciplineName,
+      disciplineId: b.disciplineId,
+      durationMinutes: b.durationMinutes,
+      studiedMinutes: b.studiedMinutes,
+      color: b.color || "#2563EB",
+      completed: b.completed,
+    }))
   }
 
   // Alterna o status do dia selecionado entre Plantão, Estudo e Folga
@@ -643,7 +594,9 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                             onClick={() => {
                               setSelectedDayDetail(null)
                               toast.success(`Iniciando ${disc.disciplineName}`)
-                              router.push(`/dashboard/study-session?planId=${disc.id}`)
+                              router.push(
+                                `/dashboard/study-session?planId=${disc.id}&duration=${disc.durationMinutes}`,
+                              )
                             }}
                             className="font-bold text-xs rounded-xl"
                           >

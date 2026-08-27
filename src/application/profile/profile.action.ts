@@ -87,6 +87,7 @@ export interface UpdateProfileInput {
   city?: string | null
   uf?: string | null
   preferences?: Record<string, unknown> | null
+  week_start_day?: number | null
   email?: string | null
 }
 
@@ -174,12 +175,19 @@ export async function updateProfileAction(
       "city",
       "uf",
       "preferences",
+      "week_start_day",
     ]
 
     for (const key of allowedKeys) {
       if (input[key] !== undefined) {
         updateData[key] = input[key] === null ? null : input[key]
       }
+    }
+
+    // Sincroniza week_start_day se firstDayOfWeek estiver nas preferências
+    if (input.preferences && input.preferences["firstDayOfWeek"] !== undefined) {
+      updateData["week_start_day"] =
+        input.preferences["firstDayOfWeek"] === "Segunda-feira" ? 1 : 0
     }
 
     let emailPending = false

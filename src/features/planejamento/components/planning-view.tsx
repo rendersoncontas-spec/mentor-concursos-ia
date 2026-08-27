@@ -71,7 +71,6 @@ export function PlanningView({ initialData }: PlanningViewProps) {
     }
     return []
   })
-  const [completedCyclesCount] = useState(0)
   const [showCompletedOnly, setShowCompletedOnly] = useState(false)
   const [activeBlockId, setActiveBlockId] = useState<string | null>(() => blocks[0]?.id ?? null)
 
@@ -123,14 +122,26 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   // Modo de Edição da Tabela de Sequência
   const [isEditMode, setIsEditMode] = useState(false)
 
-  // Cálculo de estatísticas
+  // Cálculo de estatísticas do ciclo rotativo
   const totalMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-  const studiedMinutes = blocks.reduce(
-    (acc, b) => acc + b.studiedMinutes + (b.completed ? b.durationMinutes : 0),
+  const totalStudiedAllTime = blocks.reduce(
+    (acc, b) => acc + b.studiedMinutes,
     0,
   )
+
+  // Quantidade de ciclos completos realizados
+  const completedCyclesCount =
+    totalMinutes > 0 ? Math.floor(totalStudiedAllTime / totalMinutes) : 0
+
+  // Minutos estudados na rodada atual do ciclo rotativo
+  const currentRoundStudiedMinutes =
+    totalMinutes > 0 ? totalStudiedAllTime % totalMinutes : totalStudiedAllTime
+
+  // Porcentagem de progresso da rodada atual do ciclo (0% a 100%)
   const progressPercentage =
-    totalMinutes > 0 ? Math.min(100, Math.round((studiedMinutes / totalMinutes) * 100)) : 0
+    totalMinutes > 0
+      ? Math.min(100, Math.round((currentRoundStudiedMinutes / totalMinutes) * 100))
+      : 0
 
   const formatHoursMinutes = (min: number) => {
     const h = Math.floor(min / 60)
@@ -163,7 +174,11 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
   const handleStartStudy = (block: StudyCycleBlock) => {
     toast.success(`Iniciando sessão de estudo para ${block.disciplineName}!`)
-    router.push(`/dashboard/study-session?planId=${block.id}`)
+    const targetDuration =
+      block.durationMinutes > 0
+        ? Math.max(1, block.durationMinutes - block.studiedMinutes)
+        : block.durationMinutes
+    router.push(`/dashboard/study-session?planId=${block.id}&duration=${targetDuration}`)
   }
 
   const handleAddDisciplineRow = () => {
@@ -467,10 +482,10 @@ export function PlanningView({ initialData }: PlanningViewProps) {
             <div className="sm:col-span-2 rounded-xl border bg-card p-5 shadow-sm flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
-                  PROGRESSO
+                  PROGRESSO (RODADA {completedCyclesCount + 1})
                 </span>
                 <span className="text-xs font-bold text-foreground">
-                  {formatHoursMinutes(studiedMinutes)} / {formatHoursMinutes(totalMinutes)}
+                  {formatHoursMinutes(currentRoundStudiedMinutes)} / {formatHoursMinutes(totalMinutes)} ({progressPercentage}%)
                 </span>
               </div>
 
@@ -526,12 +541,17 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                   <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-10">
                     {visibleBlocks.map((block) => {
                       const isSelected = activeBlockId === block.id
+                      const blockCycleTarget = block.durationMinutes
+                      const blockRoundStudied = Math.max(
+                        0,
+                        block.studiedMinutes - completedCyclesCount * blockCycleTarget,
+                      )
                       const progressPct =
-                        block.durationMinutes > 0
-                          ? (block.studiedMinutes / block.durationMinutes) * 100
+                        blockCycleTarget > 0
+                          ? (blockRoundStudied / blockCycleTarget) * 100
                           : 0
                       const isCompleted = progressPct >= 100
-                      const remaining = block.durationMinutes - block.studiedMinutes
+                      const remaining = blockCycleTarget - blockRoundStudied
                       const isOver = remaining < 0
 
                       return (
@@ -555,6 +575,10 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                                     <span className="text-emerald-500">
                                       Extra: {formatHoursMinutes(Math.abs(remaining))}
                                     </span>
+                                  ) : remaining === 0 ? (
+                                    <span className="text-emerald-600">
+                                      ✓ Concluído nesta rodada
+                                    </span>
                                   ) : (
                                     <span className="text-orange-500">
                                       Falta: {formatHoursMinutes(remaining)}
@@ -569,7 +593,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                                 <span
                                   className={`text-sm font-black ${isCompleted ? "text-emerald-500" : "text-[#2563EB]"}`}
                                 >
-                                  {progressPct.toFixed(1)}%
+                                  {Math.min(100, progressPct).toFixed(1)}%
                                 </span>
                               </div>
                             </div>

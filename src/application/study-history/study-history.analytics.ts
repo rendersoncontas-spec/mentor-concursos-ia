@@ -1,56 +1,49 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { StudyStats, DisciplineTrend } from "@/domain/study-history/study-history.types"
+import { computeStudyTimeFromHistory } from "@/lib/study-time-calculator"
 
 // ==============================================================================
 // 1. Agregadores Base (Dashboard UI)
 // ==============================================================================
 
 export async function getStudyStats(supabase: SupabaseClient, userId: string): Promise<StudyStats> {
-  const { data: history } = await supabase
-    .from("study_history")
-    .select("started_at, duration_minutes, discipline_id, focus_score, interrupted")
-    .eq("user_id", userId)
-    .not("duration_minutes", "is", null)
+  const [{ data: history }, { data: profile }] = await Promise.all([
+    supabase
+      .from("study_history")
+      .select("started_at, duration_minutes, discipline_id, focus_score, interrupted")
+      .eq("user_id", userId)
+      .not("duration_minutes", "is", null),
+    supabase
+      .from("profiles")
+      .select("week_start_day, preferences")
+      .eq("id", userId)
+      .maybeSingle(),
+  ])
 
   const items = history || []
+  const weekStartDay =
+    profile?.week_start_day ??
+    ((profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"] === "Segunda-feira" ? 1 : 0)
 
-  // Cálculos de tempo
-  const now = new Date()
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime() // Simplificado (Domingo)
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+  // Cálculo de tempo centralizado no fuso de São Paulo conforme preferência do aluno
+  const timeSummary = computeStudyTimeFromHistory(items, new Date(), weekStartDay)
 
-  let dailyMinutes = 0
-  let weeklyMinutes = 0
-  let monthlyMinutes = 0
-  let totalMinutes = 0
-  let longestSession = 0
-  
   let totalFocus = 0
   let focusCount = 0
-
   const disciplineMap = new Map<string, number>()
 
   items.forEach(item => {
-    // Treat started_at as calendar date (YYYY-MM-DD) to avoid timezone shifts
-    const datePart = item.started_at.split('T')[0]
-    const startedAt = new Date(datePart + 'T00:00:00').getTime()
-    const duration = item.duration_minutes || 0
-
-    totalMinutes += duration
-    if (duration > longestSession) longestSession = duration
-
-    if (startedAt >= startOfDay) dailyMinutes += duration
-    if (startedAt >= startOfWeek) weeklyMinutes += duration
-    if (startedAt >= startOfMonth) monthlyMinutes += duration
+    const duration = Number(item.duration_minutes) || 0
 
     if (item.focus_score) {
       totalFocus += item.focus_score
       focusCount++
     }
 
-    const currentDiscMins = disciplineMap.get(item.discipline_id) || 0
-    disciplineMap.set(item.discipline_id, currentDiscMins + duration)
+    if (item.discipline_id) {
+      const currentDiscMins = disciplineMap.get(item.discipline_id) || 0
+      disciplineMap.set(item.discipline_id, currentDiscMins + duration)
+    }
   })
 
   // Disciplina mais estudada
@@ -63,21 +56,17 @@ export async function getStudyStats(supabase: SupabaseClient, userId: string): P
     }
   })
 
-  // TODO: Implementar getBestStudyHour, getBestWeekday baseado em distribuição
-  // TODO: Implementar consecutiveStreak rodando sobre dias únicos
-  const consecutiveStreak = 0 
-
   return {
-    dailyMinutes,
-    weeklyMinutes,
-    monthlyMinutes,
-    totalMinutes,
-    longestSession,
+    dailyMinutes: timeSummary.dailyMinutes,
+    weeklyMinutes: timeSummary.weeklyMinutes,
+    monthlyMinutes: timeSummary.monthlyMinutes,
+    totalMinutes: timeSummary.totalMinutes,
+    longestSession: timeSummary.longestSession,
     bestStudyHour: null, // Stub
     bestWeekday: null, // Stub
     mostStudiedDisciplineId,
     averageFocus: focusCount > 0 ? totalFocus / focusCount : null,
-    consecutiveStreak
+    consecutiveStreak: 0
   }
 }
 
