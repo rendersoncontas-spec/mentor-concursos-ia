@@ -1,24 +1,78 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 
-import { ArrowLeft, ArrowRight, Check, GripVertical, Minus, Plus, Search, X } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Check,
+  Clock,
+  Layers,
+  Minus,
+  Plus,
+  Search,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { createCycleAction } from "@/application/study-cycle/study-cycle.actions"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import type { CycleItemPriority, CreateCycleInput } from "@/domain/study-cycle/study-cycle.types"
+  DEFAULT_MINUTES_BY_DIFFICULTY,
+  getDefaultMinutesByDifficulty,
+  normalizeDifficulty,
+  type CreateCycleInput,
+  type CycleItemDifficulty,
+} from "@/domain/study-cycle/study-cycle.types"
+
+// Reexportação local para conveniência de formatação digital (HH:MM)
+const formatMinutesDigitalLocal = (m: number) => {
+  const h = Math.floor(m / 60)
+  const min = m % 60
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`
+}
 import { cn } from "@/lib/utils"
+
+const DEFAULT_CONCURSO_DISCIPLINES = [
+  "Língua Portuguesa",
+  "Direito Constitucional",
+  "Direito Administrativo",
+  "Raciocínio Lógico e Matemático",
+  "Informática Básica e Avançada",
+  "Direito Tributário",
+  "Contabilidade Geral",
+  "Contabilidade Pública",
+  "Auditoria Governamental",
+  "Administração Geral",
+  "Administração Pública",
+  "Administração Financeira e Orçamentária (AFO)",
+  "Direito Penal",
+  "Direito Processual Penal",
+  "Direito Civil",
+  "Direito Processual Civil",
+  "Legislação Tributária",
+  "Comércio Internacional",
+  "Legislação Aduaneira",
+  "Economia e Finanças Públicas",
+  "Estatística",
+  "Tecnologia da Informação",
+  "Ética no Serviço Público",
+  "Redação Oficial",
+  "Direitos Humanos",
+  "Direito Previdenciário",
+  "Direito do Trabalho",
+  "Direito Processual do Trabalho",
+  "Direito Eleitoral",
+  "Língua Inglesa",
+  "Língua Espanhola",
+]
 
 interface CreateCycleModalProps {
   open: boolean
@@ -28,34 +82,33 @@ interface CreateCycleModalProps {
 }
 
 interface SelectedItem {
-  disciplineId: string
+  disciplineId?: string | undefined
   disciplineName: string
-  priority: CycleItemPriority
+  disciplineArea: string | null
+  difficulty: CycleItemDifficulty
   plannedMinutes: number
 }
 
-type Step = "identification" | "selection" | "review"
+type Step = "identification" | "selection" | "configuration"
 
-const PRIORITY_OPTIONS: { value: CycleItemPriority; label: string }[] = [
-  { value: "ALTA", label: "Alta" },
-  { value: "MEDIA", label: "Média" },
-  { value: "BAIXA", label: "Baixa" },
+const DIFFICULTY_OPTIONS: { value: CycleItemDifficulty; label: string; color: string }[] = [
+  { value: "FACIL", label: "Fácil", color: "text-emerald-600 dark:text-emerald-400" },
+  { value: "MEDIA", label: "Média", color: "text-amber-600 dark:text-amber-400" },
+  { value: "DIFICIL", label: "Difícil", color: "text-rose-600 dark:text-rose-400" },
 ]
-
-const MINUTES_PRESETS = [30, 45, 60, 90, 120, 150]
 
 function formatMinutes(m: number): string {
   const h = Math.floor(m / 60)
   const min = m % 60
   if (h === 0) return `${min}min`
   if (min === 0) return `${h}h`
-  return `${h}h${min}min`
+  return `${h}h ${min}min`
 }
 
 export function CreateCycleModal({
   open,
   onOpenChange,
-  availableDisciplines,
+  availableDisciplines = [],
   onComplete,
 }: CreateCycleModalProps) {
   const [step, setStep] = useState<Step>("identification")
@@ -66,67 +119,116 @@ export function CreateCycleModal({
   const [searchTerm, setSearchTerm] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  useEffect(() => {
-    if (!open) {
-      setStep("identification")
-      setCycleName("")
-      setContestName("")
-      setEditalName("")
-      setSelectedItems([])
-      setSearchTerm("")
-    }
-  }, [open])
+  const resetForm = useCallback(() => {
+    setStep("identification")
+    setCycleName("")
+    setContestName("")
+    setEditalName("")
+    setSelectedItems([])
+    setSearchTerm("")
+  }, [])
 
-  const filteredDisciplines = availableDisciplines.filter(
-    (d) =>
-      d.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      !selectedItems.some((s) => s.disciplineId === d.id)
-  )
+  const handleClose = (newOpen: boolean) => {
+    if (!newOpen) {
+      resetForm()
+    }
+    onOpenChange(newOpen)
+  }
+
+  // Lista combinada de disciplinas para busca rápida
+  const allDisciplineCatalog = useMemo(() => {
+    const list: { id?: string; name: string; area: string | null }[] = []
+    const seenNames = new Set<string>()
+
+    for (const d of availableDisciplines) {
+      if (!seenNames.has(d.name.toLowerCase().trim())) {
+        seenNames.add(d.name.toLowerCase().trim())
+        list.push(d)
+      }
+    }
+
+    for (const name of DEFAULT_CONCURSO_DISCIPLINES) {
+      if (!seenNames.has(name.toLowerCase().trim())) {
+        seenNames.add(name.toLowerCase().trim())
+        list.push({ name, area: "Geral" })
+      }
+    }
+
+    return list
+  }, [availableDisciplines])
+
+  const filteredDisciplines = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim()
+    return allDisciplineCatalog.filter(
+      (d) =>
+        d.name.toLowerCase().includes(term) &&
+        !selectedItems.some((s) => s.disciplineName.toLowerCase() === d.name.toLowerCase())
+    )
+  }, [allDisciplineCatalog, searchTerm, selectedItems])
 
   const handleAddDiscipline = useCallback(
-    (discipline: { id: string; name: string }) => {
+    (discipline: { id?: string; name: string; area: string | null }) => {
+      const trimmed = discipline.name.trim()
+      if (selectedItems.some((s) => s.disciplineName.toLowerCase() === trimmed.toLowerCase())) {
+        toast.error("Esta matéria já foi adicionada ao ciclo.")
+        return
+      }
+
       setSelectedItems((prev) => [
         ...prev,
         {
           disciplineId: discipline.id,
-          disciplineName: discipline.name,
-          priority: "MEDIA" as CycleItemPriority,
-          plannedMinutes: 60,
+          disciplineName: trimmed,
+          disciplineArea: discipline.area || "Geral",
+          difficulty: "MEDIA",
+          plannedMinutes: DEFAULT_MINUTES_BY_DIFFICULTY.MEDIA,
         },
       ])
+      setSearchTerm("")
     },
-    []
+    [selectedItems]
   )
 
-  const handleRemoveDiscipline = useCallback((disciplineId: string) => {
-    setSelectedItems((prev) => prev.filter((i) => i.disciplineId !== disciplineId))
-  }, [])
+  const handleAddCustomDiscipline = useCallback(() => {
+    const trimmed = searchTerm.trim()
+    if (!trimmed) return
+    if (selectedItems.some((s) => s.disciplineName.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error("Esta matéria já está no ciclo!")
+      return
+    }
 
-  const handleUpdatePriority = useCallback((disciplineId: string, priority: CycleItemPriority) => {
-    setSelectedItems((prev) =>
-      prev.map((i) => (i.disciplineId === disciplineId ? { ...i, priority } : i))
+    const existingInDb = availableDisciplines.find(
+      (d) => d.name.toLowerCase() === trimmed.toLowerCase()
     )
-  }, [])
 
-  const handleUpdateMinutes = useCallback((disciplineId: string, minutes: number) => {
-    setSelectedItems((prev) =>
-      prev.map((i) =>
-        i.disciplineId === disciplineId
-          ? { ...i, plannedMinutes: Math.max(5, Math.min(480, minutes)) }
-          : i
-      )
-    )
+    setSelectedItems((prev) => [
+      ...prev,
+      {
+        disciplineId: existingInDb?.id,
+        disciplineName: existingInDb?.name || trimmed,
+        disciplineArea: existingInDb?.area || "Geral",
+        difficulty: "MEDIA",
+        plannedMinutes: DEFAULT_MINUTES_BY_DIFFICULTY.MEDIA,
+      },
+    ])
+    setSearchTerm("")
+    toast.success(`Matéria "${trimmed}" adicionada!`)
+  }, [searchTerm, selectedItems, availableDisciplines])
+
+  const handleRemoveItem = useCallback((index: number) => {
+    setSelectedItems((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
   const handleMoveUp = useCallback((index: number) => {
-    if (index === 0) return
+    if (index <= 0) return
     setSelectedItems((prev) => {
       const next = [...prev]
-      const a = next[index]
-      const b = next[index - 1]
-      if (!a || !b) return prev
-      next[index] = b
-      next[index - 1] = a
+      const temp = next[index - 1]
+      const current = next[index]
+      if (temp && current) {
+        next[index - 1] = current
+        next[index] = temp
+      }
       return next
     })
   }, [])
@@ -135,22 +237,53 @@ export function CreateCycleModal({
     setSelectedItems((prev) => {
       if (index >= prev.length - 1) return prev
       const next = [...prev]
-      const a = next[index]
-      const b = next[index + 1]
-      if (!a || !b) return prev
-      next[index] = b
-      next[index + 1] = a
+      const temp = next[index + 1]
+      const current = next[index]
+      if (temp && current) {
+        next[index + 1] = current
+        next[index] = temp
+      }
       return next
     })
   }, [])
 
-  const handleSubmit = useCallback(async () => {
+  const handleMinutesChange = useCallback((index: number, delta: number) => {
+    setSelectedItems((prev) =>
+      prev.map((item, i) => {
+        if (i === index) {
+          const newMin = Math.max(15, Math.min(360, item.plannedMinutes + delta))
+          return { ...item, plannedMinutes: newMin }
+        }
+        return item
+      })
+    )
+  }, [])
+
+  const handleDifficultyChange = useCallback((index: number, diff: CycleItemDifficulty) => {
+    const normalized = normalizeDifficulty(diff)
+    const defaultMinutes = getDefaultMinutesByDifficulty(normalized)
+    setSelectedItems((prev) =>
+      prev.map((item, i) => {
+        if (i === index) {
+          return { ...item, difficulty: normalized, plannedMinutes: defaultMinutes }
+        }
+        return item
+      })
+    )
+  }, [])
+
+  const totalMinutesPerRound = selectedItems.reduce((acc, i) => acc + i.plannedMinutes, 0)
+
+  const handleCreate = async () => {
     if (!cycleName.trim()) {
-      toast.error("Informe o nome do ciclo.")
+      toast.error("Informe um nome para o ciclo.")
+      setStep("identification")
       return
     }
+
     if (selectedItems.length === 0) {
-      toast.error("Selecione pelo menos uma matéria.")
+      toast.error("Selecione pelo menos uma matéria para o ciclo.")
+      setStep("selection")
       return
     }
 
@@ -162,293 +295,320 @@ export function CreateCycleModal({
         editalName: editalName.trim() || null,
         items: selectedItems.map((item) => ({
           disciplineId: item.disciplineId,
-          priority: item.priority,
+          disciplineName: item.disciplineName,
+          difficulty: item.difficulty,
           plannedMinutes: item.plannedMinutes,
         })),
       }
 
-      const result = await createCycleAction(input)
-      if (result.success) {
-        toast.success("Ciclo criado com sucesso!")
+      const res = await createCycleAction(input)
+
+      if (res.success) {
+        toast.success("Ciclo de estudos criado com sucesso!")
         onOpenChange(false)
+        resetForm()
         onComplete?.()
       } else {
-        toast.error(result.error || "Erro ao criar ciclo.")
+        toast.error(res.error || "Erro ao criar ciclo.")
       }
+    } catch {
+      toast.error("Ocorreu um erro ao criar o ciclo. Tente novamente.")
     } finally {
       setIsSubmitting(false)
     }
-  }, [cycleName, contestName, editalName, selectedItems, onOpenChange, onComplete])
-
-  const totalMinutes = selectedItems.reduce((s, i) => s + i.plannedMinutes, 0)
-
-  const canNextStep =
-    (step === "identification" && cycleName.trim().length > 0) ||
-    (step === "selection" && selectedItems.length > 0)
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0">
-        <div className="sticky top-0 z-10 bg-card border-b px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Criar Ciclo de Estudo</h2>
-              <div className="flex items-center gap-2 mt-1">
-                {(["identification", "selection", "review"] as Step[]).map((s, i) => (
-                  <div key={s} className="flex items-center gap-1">
-                    <div
-                      className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-                        step === s
-                          ? "bg-[#2563EB] text-white"
-                          : i < ["identification", "selection", "review"].indexOf(step)
-                          ? "bg-emerald-500 text-white"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {i < ["identification", "selection", "review"].indexOf(step) ? "✓" : i + 1}
-                    </div>
-                    {i < 2 && (
-                      <div
-                        className={cn(
-                          "w-6 h-0.5",
-                          i < ["identification", "selection", "review"].indexOf(step)
-                            ? "bg-emerald-500"
-                            : "bg-muted"
-                        )}
-                      />
-                    )}
-                  </div>
-                ))}
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+        {/* CABEÇALHO DO MODAL */}
+        <div className="p-5 border-b bg-muted/20">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+              <Layers className="h-5 w-5 text-primary" />
+              Criar Ciclo de Estudos
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* INDICADOR DE ETAPAS */}
+          <div className="flex items-center gap-2 mt-3">
+            {[
+              { key: "identification", label: "1. Identificação" },
+              { key: "selection", label: "2. Matérias" },
+              { key: "configuration", label: "3. Metas & Resumo" },
+            ].map((s) => (
+              <div
+                key={s.key}
+                className={cn(
+                  "flex-1 text-center py-1 rounded-md text-xs font-bold transition-all",
+                  step === s.key
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {s.label}
               </div>
-            </div>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            ))}
           </div>
         </div>
 
-        <div className="p-6">
+        {/* CORPO DO MODAL */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {/* ETAPA 1: IDENTIFICAÇÃO */}
           {step === "identification" && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">
-                  Nome do ciclo <span className="text-destructive">*</span>
-                </label>
+            <div className="space-y-4 max-w-md mx-auto py-2">
+              <div>
+                <label className="text-xs font-bold text-foreground">Nome do Ciclo *</label>
                 <Input
-                  placeholder="Ex: Ciclo Receita Federal"
                   value={cycleName}
                   onChange={(e) => setCycleName(e.target.value)}
+                  placeholder="Ex: Receita Federal - Auditor Fiscal"
+                  className="mt-1"
                   autoFocus
                 />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Dê um nome para identificar a preparação (ex: Ciclo Básico, Polícia Federal, etc).
+                </p>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Concurso</label>
+
+              <div>
+                <label className="text-xs font-bold text-foreground">Concurso Alvo (Opcional)</label>
                 <Input
-                  placeholder="Ex: Receita Federal — Auditor Fiscal"
                   value={contestName}
                   onChange={(e) => setContestName(e.target.value)}
+                  placeholder="Ex: Receita Federal"
+                  className="mt-1"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Edital (opcional)</label>
+
+              <div>
+                <label className="text-xs font-bold text-foreground">Edital / Cargo (Opcional)</label>
                 <Input
-                  placeholder="Ex: Edital Receita Federal 2026"
                   value={editalName}
                   onChange={(e) => setEditalName(e.target.value)}
+                  placeholder="Ex: Auditor Fiscal - Edital 2026"
+                  className="mt-1"
                 />
               </div>
             </div>
           )}
 
+          {/* ETAPA 2: SELEÇÃO DE MATÉRIAS */}
           {step === "selection" && (
             <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar disciplina..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Pesquise uma matéria ou digite para adicionar nova..."
+                    className="pl-9 text-xs"
+                  />
+                </div>
+                {searchTerm.trim() && (
+                  <Button
+                    size="sm"
+                    onClick={handleAddCustomDiscipline}
+                    className="text-xs font-bold bg-primary text-primary-foreground"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Adicionar
+                  </Button>
+                )}
               </div>
 
-              {selectedItems.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Selecionadas ({selectedItems.length})
-                  </p>
-                  <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                    {selectedItems.map((item, index) => (
-                      <div
-                        key={item.disciplineId}
-                        className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2"
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            onClick={() => handleMoveUp(index)}
-                            disabled={index === 0}
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                          >
-                            <Plus className="h-3 w-3 rotate-180" />
-                          </button>
-                          <button
-                            onClick={() => handleMoveDown(index)}
-                            disabled={index === selectedItems.length - 1}
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {item.disciplineName}
-                          </p>
-                        </div>
-                        <Select
-                          value={item.priority}
-                          onValueChange={(v) =>
-                            handleUpdatePriority(item.disciplineId, v as CycleItemPriority)
-                          }
-                        >
-                          <SelectTrigger className="w-20 h-7 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PRIORITY_OPTIONS.map((p) => (
-                              <SelectItem key={p.value} value={p.value} className="text-xs">
-                                {p.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() =>
-                              handleUpdateMinutes(item.disciplineId, item.plannedMinutes - 15)
-                            }
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="text-xs font-bold text-foreground w-10 text-center">
-                            {formatMinutes(item.plannedMinutes)}
-                          </span>
-                          <button
-                            onClick={() =>
-                              handleUpdateMinutes(item.disciplineId, item.plannedMinutes + 15)
-                            }
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveDiscipline(item.disciplineId)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Disponíveis
+              {/* LISTA DE MATÉRIAS SUGERIDAS */}
+              <div className="space-y-1">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Catálogo de disciplinas para concurso (clique para incluir)
                 </p>
-                <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {filteredDisciplines.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-2">
-                      Nenhuma disciplina disponível
-                    </p>
-                  )}
+                <div className="max-h-48 overflow-y-auto border rounded-xl p-1 bg-background divide-y">
                   {filteredDisciplines.map((d) => (
                     <button
-                      key={d.id}
+                      key={d.name}
+                      type="button"
                       onClick={() => handleAddDiscipline(d)}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-muted/50 transition-colors"
+                      className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-muted/80 font-medium flex items-center justify-between transition-colors"
                     >
-                      <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-foreground">{d.name}</span>
-                      {d.area && (
-                        <span className="text-xs text-muted-foreground ml-auto">{d.area}</span>
-                      )}
+                      <span className="font-bold text-foreground">{d.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{d.area || "Geral"}</span>
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* MATÉRIAS JÁ SELECIONADAS */}
+              <div className="space-y-2 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-foreground">
+                    Matérias no Ciclo ({selectedItems.length})
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Você poderá ordenar e definir o tempo no próximo passo
+                  </span>
+                </div>
+
+                {selectedItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic py-3 text-center">
+                    Nenhuma matéria adicionada ainda. Selecione disciplinas acima.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
+                    {selectedItems.map((item, index) => (
+                      <span
+                        key={item.disciplineName}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 border border-primary/20 text-foreground"
+                      >
+                        <span>{item.disciplineName}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(index)}
+                          className="text-muted-foreground hover:text-rose-500"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {step === "review" && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Nome
+          {/* ETAPA 3: CONFIGURAÇÃO DE METAS, ORDENAÇÃO E RESUMO */}
+          {step === "configuration" && (
+            <div className="space-y-5">
+              {/* RESUMO DO CICLO */}
+              <div className="p-4 rounded-xl bg-muted/30 border space-y-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-black text-foreground">
+                    Ciclo: {cycleName}
+                  </span>
+                  <span className="text-xs font-black text-primary">
+                    Tempo por volta: {formatMinutes(totalMinutesPerRound)}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {selectedItems.length} matérias organizadas em sequência rotativa contínua.
                 </p>
-                <p className="text-sm font-semibold text-foreground">{cycleName}</p>
-                {contestName && (
-                  <>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-2">
-                      Concurso
-                    </p>
-                    <p className="text-sm text-foreground">{contestName}</p>
-                  </>
-                )}
-                {editalName && (
-                  <>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-2">
-                      Edital
-                    </p>
-                    <p className="text-sm text-foreground">{editalName}</p>
-                  </>
-                )}
               </div>
 
-              <div className="flex items-center gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Matérias: </span>
-                  <span className="font-bold text-foreground">{selectedItems.length}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Tempo total: </span>
-                  <span className="font-bold text-foreground">{formatMinutes(totalMinutes)}</span>
-                </div>
-              </div>
-
+              {/* SEQUÊNCIA CONFIGURÁVEL */}
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Sequência
-                </p>
-                <div className="space-y-1">
+                <span className="text-xs font-black uppercase tracking-wider text-foreground block">
+                  Sequência do Ciclo (Ajuste tempo, dificuldade e ordem)
+                </span>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {selectedItems.map((item, index) => (
                     <div
-                      key={item.disciplineId}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50"
+                      key={item.disciplineName}
+                      className="p-3 rounded-xl border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
                     >
-                      <span className="text-xs font-bold text-muted-foreground w-5">
-                        {index + 1}.
-                      </span>
-                      <span className="flex-1 text-sm text-foreground">{item.disciplineName}</span>
-                      <span
-                        className={cn(
-                          "text-[10px] font-bold px-1.5 py-0.5 rounded",
-                          item.priority === "ALTA" && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-                          item.priority === "MEDIA" && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-                          item.priority === "BAIXA" && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                        )}
-                      >
-                        {item.priority}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatMinutes(item.plannedMinutes)}
-                      </span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xs font-black text-muted-foreground w-6 text-center">
+                          #{index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-foreground truncate">
+                            {item.disciplineName}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{item.disciplineArea || "Geral"}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* SELETOR DE DIFICULDADE */}
+                        <div className="flex items-center rounded-lg border bg-muted/40 p-0.5 text-[11px] font-bold gap-0.5">
+                          {DIFFICULTY_OPTIONS.map((opt) => {
+                            const isSelected = normalizeDifficulty(item.difficulty) === opt.value
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => handleDifficultyChange(index, opt.value)}
+                                className={cn(
+                                  "px-2.5 py-1 rounded-md transition-all font-bold cursor-pointer select-none",
+                                  isSelected && opt.value === "FACIL" && "bg-emerald-500 text-white font-black shadow-xs ring-1 ring-emerald-600/30",
+                                  isSelected && opt.value === "MEDIA" && "bg-amber-500 text-white font-black shadow-xs ring-1 ring-amber-600/30",
+                                  isSelected && opt.value === "DIFICIL" && "bg-rose-500 text-white font-black shadow-xs ring-1 ring-rose-600/30",
+                                  !isSelected && opt.value === "FACIL" && "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20",
+                                  !isSelected && opt.value === "MEDIA" && "text-muted-foreground hover:text-amber-600 hover:bg-amber-50/60 dark:hover:bg-amber-950/20",
+                                  !isSelected && opt.value === "DIFICIL" && "text-muted-foreground hover:text-rose-600 hover:bg-rose-50/60 dark:hover:bg-rose-950/20"
+                                )}
+                              >
+                                {opt.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {/* AJUSTE DE MINUTOS (Passos de 15 min até 6h) */}
+                        <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5 border">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMinutesChange(index, -15)}
+                            disabled={item.plannedMinutes <= 15}
+                            className="h-6 w-6"
+                            title="-15 min"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+<span className="text-xs font-black w-14 text-center">
+                            {formatMinutesDigitalLocal(item.plannedMinutes)}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMinutesChange(index, 15)}
+                            disabled={item.plannedMinutes >= 360}
+                            className="h-6 w-6"
+                            title="+15 min"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+
+                        {/* ORDENAÇÃO */}
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMoveUp(index)}
+                            disabled={index === 0}
+                            className="h-7 w-7"
+                            title="Mover para cima"
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMoveDown(index)}
+                            disabled={index === selectedItems.length - 1}
+                            className="h-7 w-7"
+                            title="Mover para baixo"
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveItem(index)}
+                            className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                            title="Remover matéria"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -457,40 +617,75 @@ export function CreateCycleModal({
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-card border-t px-6 py-4 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (step === "identification") onOpenChange(false)
-              else if (step === "selection") setStep("identification")
-              else setStep("selection")
-            }}
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            {step === "identification" ? "Cancelar" : "Voltar"}
-          </Button>
-          {step === "review" ? (
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold"
-            >
-              <Check className="h-4 w-4 mr-1" />
-              {isSubmitting ? "Criando..." : "Criar ciclo"}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => setStep(step === "identification" ? "selection" : "review")}
-              disabled={!canNextStep}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold"
-            >
-              Próximo
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
+        {/* RODAPÉ E NAVEGAÇÃO DE PASSOS */}
+        <div className="p-4 border-t bg-muted/20 flex items-center justify-between">
+          <div>
+            {step !== "identification" ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  setStep(step === "configuration" ? "selection" : "identification")
+                }
+                className="text-xs font-bold gap-1"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Voltar
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => handleClose(false)}>
+                Cancelar
+              </Button>
+            )}
+          </div>
+
+          <div>
+            {step === "identification" && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (!cycleName.trim()) {
+                    toast.error("Informe um nome para o ciclo.")
+                    return
+                  }
+                  setStep("selection")
+                }}
+                className="text-xs font-black bg-primary text-primary-foreground gap-1"
+              >
+                Próximo: Matérias
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
+            {step === "selection" && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (selectedItems.length === 0) {
+                    toast.error("Selecione pelo menos uma matéria para o ciclo.")
+                    return
+                  }
+                  setStep("configuration")
+                }}
+                className="text-xs font-black bg-primary text-primary-foreground gap-1"
+              >
+                Próximo: Metas
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
+            {step === "configuration" && (
+              <Button
+                size="sm"
+                onClick={handleCreate}
+                disabled={isSubmitting || selectedItems.length === 0}
+                className="text-xs font-black bg-primary text-primary-foreground gap-1.5 shadow-md"
+              >
+                <Check className="h-4 w-4" />
+                {isSubmitting ? "Criando ciclo..." : "Criar ciclo"}
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

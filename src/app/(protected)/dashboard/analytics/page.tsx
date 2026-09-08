@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { BarChart3 } from "lucide-react"
 
 import { getDashboardData } from "@/application/dashboard/dashboard.service"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { HoursDistributionChart } from "@/features/analytics/components/hours-distribution-chart"
 import { PerformanceChart } from "@/features/analytics/components/performance-chart"
 import { createClient } from "@/infrastructure/supabase/server"
@@ -15,12 +16,10 @@ export const metadata = {
 export default async function AnalyticsDashboardPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  const effectiveUser = await getEffectiveSessionUser(supabase)
+  if (!effectiveUser) redirect("/login")
 
-  const dashboardData = await getDashboardData(supabase, user.id)
+  const dashboardData = await getDashboardData(supabase, effectiveUser.id)
   const stats = dashboardData.analytics.stats
 
   return (

@@ -9,6 +9,7 @@ import {
 } from "@/application/topic-catalog/topic-catalog.service"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
 // Busca os tópicos do catálogo (com subtópicos) de uma disciplina por nome
@@ -19,10 +20,8 @@ export async function getDisciplineCatalogTopicsAction(
     return { success: false, error: "Sistema temporariamente indisponível.", topics: [] }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Não autenticado.", topics: [] }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Não autenticado.", topics: [] }
 
     const discipline = await getCatalogDisciplineByName(supabase, disciplineName)
     if (!discipline) return { success: true, topics: [] }
@@ -52,10 +51,8 @@ export async function getDisciplineDetailStatsAction(
     return { success: false, error: "Sistema temporariamente indisponível.", data: null }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Não autenticado.", data: null }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Não autenticado.", data: null }
 
     const { data: disc } = await supabase
       .from("disciplines")
@@ -68,12 +65,12 @@ export async function getDisciplineDetailStatsAction(
       supabase
         .from("study_history")
         .select("duration_minutes, metadata")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .eq("discipline_id", disc.id),
       supabase
         .from("question_attempts")
         .select("correct")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .eq("discipline_id", disc.id),
     ])
 
@@ -102,15 +99,13 @@ export async function addUserDisciplineAction(name: string) {
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Não autenticado." }
 
     const { data: target } = await supabase
       .from("user_targets")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("is_active", true)
       .limit(1)
       .maybeSingle()
@@ -135,7 +130,7 @@ export async function addUserDisciplineAction(name: string) {
 
     const { error } = await supabase.from("user_disciplines").upsert(
       {
-        user_id: user.id,
+        user_id: effectiveUserId,
         target_id: target?.id || null,
         discipline_id: disc.id,
         status: "STUDYING",
@@ -160,16 +155,14 @@ export async function removeUserDisciplineAction(id: string) {
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Não autenticado." }
 
     const { error } = await supabase
       .from("user_disciplines")
       .delete()
       .eq("id", id)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
 
     if (error) return { success: false, error: error.message }
 
@@ -196,10 +189,8 @@ export async function updateDisciplineAppearanceAction(
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Não autenticado." }
 
     const payload: Record<string, unknown> = {}
     if (data.name !== undefined && data.name.trim()) payload["name"] = data.name.trim()

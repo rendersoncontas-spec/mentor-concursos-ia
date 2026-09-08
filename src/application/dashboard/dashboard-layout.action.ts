@@ -2,6 +2,7 @@
 
 import { type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 
 // Separação de configuração e server actions
 function getDashboardLayoutConfig(): WidgetConfigItem[] {
@@ -22,6 +23,7 @@ function getDashboardLayoutConfig(): WidgetConfigItem[] {
     { widget_id: "lembretes", position_order: 14, col_span: 1 as const, visible: true },
     { widget_id: "mensagem_dia", position_order: 15, col_span: 1 as const, visible: false },
     { widget_id: "calendario", position_order: 16, col_span: 1 as const, visible: true },
+    { widget_id: "ciclo_estudo", position_order: 17, col_span: 1 as const, visible: true },
   ]
 }
 
@@ -31,10 +33,8 @@ export async function getDashboardLayoutAction(): Promise<{
 }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { success: true, data: getDashboardLayoutConfig() }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: true, data: getDashboardLayoutConfig() }
 
     let loadedLayout: WidgetConfigItem[] = []
 
@@ -43,7 +43,7 @@ export async function getDashboardLayoutAction(): Promise<{
       const { data, error } = await supabase
         .from("user_dashboard_layouts")
         .select("widget_id, position_order, col_span, row_span, visible")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .order("position_order")
 
       if (!error && data && data.length > 0) {
@@ -65,7 +65,7 @@ export async function getDashboardLayoutAction(): Promise<{
         const { data: profile } = await supabase
           .from("profiles")
           .select("preferences")
-          .eq("id", user.id)
+          .eq("id", effectiveUserId)
           .maybeSingle()
 
         const prefs = profile?.preferences as Record<string, unknown> | null
@@ -108,13 +108,11 @@ export async function saveDashboardLayoutAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Usuário não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     const recordsToUpsert = layoutItems.map((item, index) => ({
-      user_id: user.id,
+      user_id: effectiveUserId,
       widget_id: item.widget_id,
       position_order: index + 1,
       col_span: Math.min(3, Math.max(1, item.col_span || 1)),
@@ -137,7 +135,7 @@ export async function saveDashboardLayoutAction(
       const { data: profile } = await supabase
         .from("profiles")
         .select("preferences")
-        .eq("id", user.id)
+        .eq("id", effectiveUserId)
         .maybeSingle()
 
       const currentPrefs = (profile?.preferences as Record<string, unknown>) || {}
@@ -149,7 +147,7 @@ export async function saveDashboardLayoutAction(
             dashboard_layout: recordsToUpsert,
           },
         })
-        .eq("id", user.id)
+        .eq("id", effectiveUserId)
     } catch (prefErr) {
       console.warn("Aviso ao salvar layout em profiles.preferences:", prefErr)
     }
@@ -168,12 +166,10 @@ export async function resetDashboardLayoutAction(): Promise<{
 }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (user) {
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (effectiveUserId) {
       try {
-        await supabase.from("user_dashboard_layouts").delete().eq("user_id", user.id)
+        await supabase.from("user_dashboard_layouts").delete().eq("user_id", effectiveUserId)
       } catch {
         // Ignora se tabela não existir
       }
@@ -181,7 +177,7 @@ export async function resetDashboardLayoutAction(): Promise<{
         const { data: profile } = await supabase
           .from("profiles")
           .select("preferences")
-          .eq("id", user.id)
+          .eq("id", effectiveUserId)
           .maybeSingle()
 
         const currentPrefs = (profile?.preferences as Record<string, unknown>) || {}
@@ -191,7 +187,7 @@ export async function resetDashboardLayoutAction(): Promise<{
           .update({
             preferences: currentPrefs,
           })
-          .eq("id", user.id)
+          .eq("id", effectiveUserId)
       } catch {
         // Ignora
       }
@@ -199,6 +195,6 @@ export async function resetDashboardLayoutAction(): Promise<{
     return { success: true, data: getDashboardLayoutConfig() }
   } catch (err) {
     console.error("Erro em resetDashboardLayoutAction:", err)
-    return { success: true, data: getDashboardLayoutConfig() }
+    return { success: false, data: getDashboardLayoutConfig(), error: "Erro ao redefinir layout." }
   }
 }

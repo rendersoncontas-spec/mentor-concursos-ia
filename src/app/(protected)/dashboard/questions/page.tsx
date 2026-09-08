@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { Logo } from "@/components/ui/logo"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
@@ -12,10 +13,8 @@ export const metadata = {
 export default async function QuestionsDashboardPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  const effectiveUser = await getEffectiveSessionUser(supabase)
+  if (!effectiveUser) redirect("/login")
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">

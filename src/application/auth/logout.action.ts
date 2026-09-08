@@ -1,6 +1,8 @@
 "use server"
 
+import { cookies } from "next/headers"
 import { createClient } from "@/infrastructure/supabase/server"
+import { SUPPORT_SESSION_COOKIE_NAME } from "@/application/admin/auth-guard"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
 export async function logoutAction() {
@@ -8,6 +10,9 @@ export async function logoutAction() {
   try {
     const supabase = await createClient()
     await supabase.auth.signOut()
+
+    const cookieStore = await cookies()
+    cookieStore.delete(SUPPORT_SESSION_COOKIE_NAME)
 
     return { success: true }
   } catch (err: unknown) {

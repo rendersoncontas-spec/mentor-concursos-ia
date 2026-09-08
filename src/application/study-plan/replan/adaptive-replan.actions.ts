@@ -1,10 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-
 import * as Sentry from "@sentry/nextjs"
 
 import { reconcileWeeklyPlan } from "@/application/study-plan/weekly-planner.service"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { createClient } from "@/infrastructure/supabase/server"
 
 import {
@@ -61,23 +61,21 @@ export async function getReplanInfoAction(
 ): Promise<{ data: ReplanInfoPayload | null; error: string | null }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     const availability = normalizeAvailability(availabilityInput)
-    const autoEnabled = await getAutoReplanPreference(supabase, user.id)
+    const autoEnabled = await getAutoReplanPreference(supabase, effectiveUserId)
 
     // REGRA 0 — manutenção: não disparar o replanejamento em leitura
     // (abrir página, dashboard, trocar data, F5, salvar sessão).
     if (autoEnabled && !REPLAN_MAINTENANCE_PAUSED) {
-      await runAdaptiveReplanning(supabase, user.id, { trigger: "AUTO", autoEnabled, availability })
+      await runAdaptiveReplanning(supabase, effectiveUserId, { trigger: "AUTO", autoEnabled, availability })
     }
 
-    await reconcileWeeklyPlan(supabase, user.id, availability).catch(() => null)
+    await reconcileWeeklyPlan(supabase, effectiveUserId, availability).catch(() => null)
 
-    const info = await getReplanInfo(supabase, user.id, availability, autoEnabled)
+    const info = await getReplanInfo(supabase, effectiveUserId, availability, autoEnabled)
     return { data: info, error: null }
   } catch (error) {
     Sentry.captureException(error, {
@@ -93,19 +91,17 @@ export async function runReplanningAction(
 ): Promise<{ data: ReplanSummary | null; error: string | null }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     const availability = normalizeAvailability(availabilityInput)
-    const summary = await runAdaptiveReplanning(supabase, user.id, {
+    const summary = await runAdaptiveReplanning(supabase, effectiveUserId, {
       trigger: "MANUAL",
       autoEnabled: true,
       availability,
     })
 
-    await reconcileWeeklyPlan(supabase, user.id, availability).catch(() => null)
+    await reconcileWeeklyPlan(supabase, effectiveUserId, availability).catch(() => null)
 
     for (const path of REPLAN_PATHS) revalidatePath(path)
     return { data: summary, error: null }
@@ -123,12 +119,10 @@ export async function undoReplanningAction(
 ): Promise<{ ok: boolean; error: string | null }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { ok: false, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
-    const result = await undoLastReplanning(supabase, user.id, eventId)
+    const result = await undoLastReplanning(supabase, effectiveUserId, eventId)
     if (result.ok) {
       for (const path of REPLAN_PATHS) revalidatePath(path)
     }
@@ -150,14 +144,12 @@ export async function closeBlockManuallyAction(
 ): Promise<{ ok: boolean; error: string | null }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { ok: false, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
     const result = await closeBlockManually(
       supabase,
-      user.id,
+      effectiveUserId,
       blockId,
       plannedMinutes,
       realizedMinutes,
@@ -180,12 +172,10 @@ export async function setAutoReplanPreferenceAction(
 ): Promise<{ ok: boolean; error: string | null }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { ok: false, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
-    const result = await setAutoReplanPreference(supabase, user.id, enabled)
+    const result = await setAutoReplanPreference(supabase, effectiveUserId, enabled)
     for (const path of REPLAN_PATHS) revalidatePath(path)
     return { ok: result.ok, error: result.error ?? null }
   } catch (error) {
@@ -206,12 +196,10 @@ export async function getPeriodGoalAction(
 ): Promise<{ data: PeriodGoalData | null; error: string | null }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
-    const data = await getPeriodGoalData(supabase, user.id, period, offset)
+    const data = await getPeriodGoalData(supabase, effectiveUserId, period, offset)
     return { data, error: null }
   } catch (error) {
     Sentry.captureException(error, {
@@ -220,3 +208,32 @@ export async function getPeriodGoalAction(
     return { data: null, error: "Erro ao carregar dados de meta." }
   }
 }
+
+/** Puxar pendência de estudo para o cronograma de hoje. */
+export async function pullPendingToTodayAction(
+  disciplineId?: string,
+  availabilityInput?: ReplanAvailabilityInput,
+): Promise<{ ok: boolean; message?: string; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
+
+    const { pullPendingToToday } = await import("./adaptive-replan.service")
+    const availability = normalizeAvailability(availabilityInput)
+    const result = await pullPendingToToday(supabase, effectiveUserId, disciplineId, availability)
+
+    if (result.ok) {
+      for (const path of ["/planejamento", "/dashboard", "/estatisticas", "/ciclos", "/disciplines"]) {
+        revalidatePath(path)
+      }
+    }
+    return result
+  } catch (error) {
+    Sentry.captureException(error, {
+      extra: { feature: "adaptive-planning", step: "pull_pending_to_today_action" },
+    })
+    return { ok: false, error: "Erro ao antecipar pendência." }
+  }
+}
+

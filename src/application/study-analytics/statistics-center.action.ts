@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import {
   sanitizeSession,
@@ -145,15 +146,13 @@ export async function getStatisticsCenterAction(): Promise<{
 
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       return { data: null, error: "Usuário não autenticado.", cached: false }
     }
 
-    const cached = cache.get(user.id)
+    const cached = cache.get(effectiveUserId)
     const nowMs = Date.now()
     if (cached && nowMs - cached.at < TTL_MS) {
       return { data: cached.payload, error: null, cached: true }
@@ -181,7 +180,7 @@ export async function getStatisticsCenterAction(): Promise<{
         const { data: pageData, error: pageError } = await supabase
           .from("study_history")
           .select(SESSION_SELECT)
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .order("started_at", { ascending: true })
           .range(offset, offset + PAGE - 1)
 
@@ -241,7 +240,7 @@ export async function getStatisticsCenterAction(): Promise<{
       const { data: rawAttempts, error: attemptsError } = await supabase
         .from("question_attempts")
         .select("id, correct, answered_at, questions ( discipline_id )")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .order("answered_at", { ascending: false })
         .limit(ATTEMPTS_LIMIT)
 
@@ -266,10 +265,6 @@ export async function getStatisticsCenterAction(): Promise<{
     }
 
     // 3. Registro de disciplinas + user_disciplines (status do edital).
-    //    A mesma disciplina pode existir legitimamente em vários concursos
-    //    (UNIQUE user_id,target_id,discipline_id). O "Progresso no edital" mostra
-    //    UMA linha por disciplina: priorizamos a linha do concurso ativo e
-    //    eliminamos duplicatas por discipline_id antes de montar o payload.
     let userDisciplines: UserDisciplineInput[] = []
     let disciplines: DisciplineMeta[] = []
     try {
@@ -278,7 +273,7 @@ export async function getStatisticsCenterAction(): Promise<{
         const { data: activeTarget } = await supabase
           .from("user_targets")
           .select("id")
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .eq("is_active", true)
           .limit(1)
           .maybeSingle()
@@ -290,7 +285,7 @@ export async function getStatisticsCenterAction(): Promise<{
       const { data: userDisciplineRows, error: udError } = await supabase
         .from("user_disciplines")
         .select("discipline_id, status, target_id, disciplines ( id, name, area )")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
 
       if (!udError) {
         const rows = dedupeUserDisciplines(userDisciplineRows ?? [], activeTargetId)
@@ -321,7 +316,7 @@ export async function getStatisticsCenterAction(): Promise<{
       const { data: reviewRows, error: reviewError } = await supabase
         .from("review_items")
         .select("id, discipline_id, next_review_at")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
 
       if (!reviewError) {
         reviewItems = (reviewRows ?? [])
@@ -347,7 +342,7 @@ export async function getStatisticsCenterAction(): Promise<{
       const { count } = await supabase
         .from("review_history")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("review_date", last30.toISOString())
       reviewsCompletedLast30 = count ?? 0
     } catch {
@@ -357,7 +352,7 @@ export async function getStatisticsCenterAction(): Promise<{
     // 5. Plano de estudo ativo e preferências do perfil.
     let activePlan: ActivePlan | null = null
     try {
-      activePlan = await fetchActivePlan(supabase, user.id)
+      activePlan = await fetchActivePlan(supabase, effectiveUserId)
     } catch (err) {
       console.error("[ESTATISTICAS] Falha no plano de estudo:", err)
     }
@@ -367,7 +362,7 @@ export async function getStatisticsCenterAction(): Promise<{
       const { data: profile } = await supabase
         .from("profiles")
         .select("week_start_day, preferences")
-        .eq("id", user.id)
+        .eq("id", effectiveUserId)
         .maybeSingle()
 
       const prefs = profile?.preferences as Record<string, unknown> | null
@@ -397,7 +392,7 @@ export async function getStatisticsCenterAction(): Promise<{
       weekStartDay,
     }
 
-    cache.set(user.id, { at: nowMs, payload })
+    cache.set(effectiveUserId, { at: nowMs, payload })
     return { data: payload, error: null, cached: false }
   } catch (error) {
     return { data: null, error: (error as { message?: string })?.message ?? "Erro inesperado.", cached: false }

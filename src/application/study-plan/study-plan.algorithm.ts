@@ -32,6 +32,25 @@ const MAX_BLOCK_MINUTES = 60
 const REVIEW_BLOCK_MINUTES = 20
 
 // ==============================================================================
+// Constantes Auditadas de Interleaving - Escala Normalizada 0-100
+// ==============================================================================
+ 
+ /**
+  * Penalidade de mesma disciplina na ordeção comum (não final sprint).
+  * Na escala normalizada 0-100, 100 é o p_score máximo — então penalidade 100
+  * garante que qualquer outra disciplina com score > 0 será preferida.
+  */
+export const SAME_DISCIPLINE_PENALTY = 100
+
+ /**
+  * Penalidade de mesma área quando disciplinas distintas são repetidas.
+  * 50 garante que se duas disciplinas da mesma área têm scores próximos,
+  * a disciplina com maior preferência deixa a do mesmo área ser separada,
+  * mantendo a granularização por área.
+  */
+export const SAME_AREA_PENALTY = 50
+
+// ==============================================================================
 // 2. Funções de Pipeline (Motor de Inteligência)
 // ==============================================================================
 
@@ -139,8 +158,10 @@ function generateWeeklySessions(disciplines: Array<AlgorithmDisciplineInput & { 
 
 /**
  * Ordena a sequência para evitar estudar a mesma disciplina ou área duas vezes seguidas.
+ * Implementa Auditoria de Interleaving: Penalidade reduzida para 100.
+ * Modo Reta Final (isFinalSprint) desativa as penalidades para permitir imersão.
  */
-function balanceSequence(sessions: InternalSession[]): InternalSession[] {
+function balanceSequence(sessions: InternalSession[], isFinalSprint: boolean = false): InternalSession[] {
   const balanced: InternalSession[] = []
   const pool = [...sessions]
 
@@ -155,14 +176,14 @@ function balanceSequence(sessions: InternalSession[]): InternalSession[] {
       if (!candidate) continue
       let score = candidate.priorityScore
       
-      if (lastSession) {
-        // Regra: Evitar repetição da mesma disciplina (-1000 de penalidade)
+      if (lastSession && !isFinalSprint) {
+        // Regra: Evitar repetição da mesma disciplina
         if (candidate.disciplineId === lastSession.disciplineId) {
-          score -= 1000 
+          score -= SAME_DISCIPLINE_PENALTY 
         } 
-        // Regra: Evitar repetição da mesma área (-500 de penalidade)
+        // Regra: Evitar repetição da mesma área
         else if (candidate.disciplineArea && lastSession.disciplineArea && candidate.disciplineArea === lastSession.disciplineArea) {
-          score -= 500 
+          score -= SAME_AREA_PENALTY 
         }
       }
 
@@ -366,8 +387,8 @@ export function calculateWeeklyDistribution(input: AlgorithmInput): AlgorithmIte
 
   const baseSessions = generateWeeklySessions(normalized, studyMinutes)
 
-  // 4. Balanceamento Anti-Repetição
-  const balancedSessions = balanceSequence(baseSessions)
+  // 4. Balanceamento Anti-Repetição (Interleaving Auditado)
+  const balancedSessions = balanceSequence(baseSessions, input.isFinalSprint)
 
   // 5. Injeção de Revisões
   const sessionsWithReviews = insertReviewBlocks(balancedSessions)
@@ -431,6 +452,7 @@ export function calcDisciplineSummary(items: AlgorithmItem[]) {
 
 export interface CycleAlgorithmInput {
   totalCycleMinutes: number
+  isFinalSprint?: boolean
   disciplines: {
     disciplineId: string
     name: string
@@ -528,7 +550,7 @@ export function calculateCycleDistribution(input: CycleAlgorithmInput): Algorith
   })
 
   // 3. Balancear sequência (evita disciplinas/áreas repetidas consecutivas)
-  const balanced = balanceSequence(rawSessions)
+  const balanced = balanceSequence(rawSessions, input.isFinalSprint ?? false)
 
   // 4. Formatar para lista final com ordem de execução sequencial (1, 2, 3...)
   return balanced.map((session, index) => ({

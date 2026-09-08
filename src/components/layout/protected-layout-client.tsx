@@ -5,12 +5,16 @@ import React, { useState } from "react"
 import { FloatingActionButton } from "@/components/layout/floating-action-button"
 import { AppHeader } from "@/components/layout/header"
 import { AppSidebar } from "@/components/layout/sidebar"
+import { SupportModeBanner } from "@/components/layout/support-mode-banner"
+import type { ActiveSupportSession, UserRole } from "@/application/admin/auth-guard"
 
 interface ProtectedLayoutClientProps {
   userEmail: string
   userName: string
   userId: string
   avatarUrl?: string | null
+  userRole?: UserRole
+  supportSession?: ActiveSupportSession | null
   logoutAction: () => Promise<void>
   children: React.ReactNode
 }
@@ -20,6 +24,8 @@ export function ProtectedLayoutClient({
   userName,
   userId,
   avatarUrl = null,
+  userRole = "user",
+  supportSession = null,
   logoutAction,
   children,
 }: ProtectedLayoutClientProps) {
@@ -34,36 +40,52 @@ export function ProtectedLayoutClient({
   }, [])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-muted/30 relative w-full max-w-full">
-      {/* Overlay escuro em telas menores */}
-      {isSidebarOpen && (
-        <div
-          onClick={() => setIsSidebarOpen(false)}
-          className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition-opacity duration-200"
-          aria-hidden="true"
+    <div className="flex flex-col h-screen overflow-hidden bg-muted/30 relative w-full max-w-full">
+      {/* Banner de Modo de Suporte Ativo (se houver sessão em andamento) */}
+      {supportSession && (
+        <SupportModeBanner
+          targetUserName={supportSession.targetUserName}
+          targetUserEmail={supportSession.targetUserEmail}
+          expiresAt={supportSession.expiresAt}
         />
       )}
 
-      {/* Sidebar (Fixo no Desktop / Drawer Flutuante no Mobile) */}
-      <AppSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <div className="flex flex-1 min-h-0 overflow-hidden relative w-full max-w-full">
+        {/* Overlay escuro em telas menores */}
+        {isSidebarOpen && (
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition-opacity duration-200"
+            aria-hidden="true"
+          />
+        )}
 
-      {/* Área de conteúdo que expande para 100% da largura */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full max-w-full">
-        <AppHeader
-          userEmail={userEmail}
-          userName={userName}
-          userId={userId}
-          avatarUrl={avatarUrl}
-          logoutAction={logoutAction}
-          onOpenMenu={() => setIsSidebarOpen(true)}
+        {/* Sidebar (Fixo no Desktop / Drawer Flutuante no Mobile) */}
+        <AppSidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          userRole={userRole}
         />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full">
-          {children}
-        </main>
-      </div>
+        {/* Área de conteúdo que expande para 100% da largura */}
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full max-w-full">
+          <AppHeader
+            userEmail={userEmail}
+            userName={userName}
+            userId={userId}
+            avatarUrl={avatarUrl}
+            logoutAction={logoutAction}
+            onOpenMenu={() => setIsSidebarOpen(true)}
+          />
 
-      <FloatingActionButton />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full">
+            {children}
+          </main>
+        </div>
+
+        <FloatingActionButton />
+      </div>
     </div>
   )
 }
+

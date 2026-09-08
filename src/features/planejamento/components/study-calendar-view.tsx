@@ -370,9 +370,14 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               onChange={(e) => {
                 const val = e.target.value
                 if (val) {
+                  const parts = val.split("-")
+                  const dayNum = parts.length === 3 ? parseInt(parts[2]!, 10) : 1
                   setAnchorShiftDate(val)
+                  setFirstShiftDay(dayNum)
                   if (typeof window !== "undefined") {
                     localStorage.setItem(LS_SHIFT_ANCHOR_DATE, val)
+                    localStorage.setItem("mentor_shift_anchor_date", val)
+                    localStorage.setItem("mentor_user_first_shift_day", String(dayNum))
                     window.dispatchEvent(new Event("mentor_scale_updated"))
                   }
                   toast.success("Data de referência do plantão atualizada!")

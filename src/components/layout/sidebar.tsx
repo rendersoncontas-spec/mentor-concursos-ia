@@ -22,6 +22,7 @@ import {
   ListCheck,
   Medal,
   RefreshCcw,
+  ShieldCheck,
   Trophy,
   X,
 } from "lucide-react"
@@ -47,60 +48,71 @@ function useIsDesktop() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MENU — agrupado por contexto. Rotas e ordem de exibição.
-// Badges inteligentes só devem ser adicionados com dados reais (nada fictício).
-// ─────────────────────────────────────────────────────────────────────────────
 type NavItem = {
   href: string
   label: string
   icon: LucideIcon
 }
 
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Estudos",
-    items: [
-      { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-      { href: "/disciplines", label: "Disciplinas", icon: BookOpen },
-      { href: "/ciclos", label: "Ciclos", icon: CircleDot },
-      { href: "/planejamento", label: "Planejamento", icon: CalendarDays },
-      { href: "/dashboard/reviews", label: "Revisões", icon: RefreshCcw },
-      { href: "/dashboard/history", label: "Histórico", icon: History },
-      { href: "/estatisticas", label: "Estatísticas", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Preparação",
-    items: [
-      { href: "/concursos", label: "Concursos", icon: GraduationCap },
-      { href: "/edital", label: "Edital", icon: FileText },
-      { href: "/planos", label: "Planos", icon: CalendarRange },
-      { href: "/simulados", label: "Simulados", icon: ListCheck },
-      { href: "/biblioteca", label: "Biblioteca", icon: Library },
-    ],
-  },
-  {
-    label: "Comunidade",
-    items: [
-      { href: "/ranking", label: "Ranking", icon: Trophy },
-      { href: "/conquistas", label: "Conquistas", icon: Medal },
-    ],
-  },
-  {
-    label: "Outros",
-    items: [{ href: "/doacao", label: "Doação", icon: Heart }],
-  },
-]
-
 interface AppSidebarProps {
   className?: string
   isOpen?: boolean
   onClose?: () => void
+  userRole?: string
 }
 
-export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
+export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarProps) {
   const pathname = usePathname()
+
+  const navGroups: { label: string; items: NavItem[] }[] = [
+    {
+      label: "Estudos",
+      items: [
+        { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+        { href: "/disciplines", label: "Disciplinas", icon: BookOpen },
+        { href: "/ciclos", label: "Ciclos", icon: CircleDot },
+        { href: "/planejamento", label: "Planejamento", icon: CalendarDays },
+        { href: "/dashboard/reviews", label: "Revisões", icon: RefreshCcw },
+        { href: "/dashboard/history", label: "Histórico", icon: History },
+        { href: "/estatisticas", label: "Estatísticas", icon: BarChart3 },
+      ],
+    },
+    {
+      label: "Preparação",
+      items: [
+        { href: "/concursos", label: "Concursos", icon: GraduationCap },
+        { href: "/edital", label: "Edital", icon: FileText },
+        { href: "/planos", label: "Planos", icon: CalendarRange },
+        { href: "/simulados", label: "Simulados", icon: ListCheck },
+        { href: "/biblioteca", label: "Biblioteca", icon: Library },
+      ],
+    },
+    {
+      label: "Comunidade",
+      items: [
+        { href: "/ranking", label: "Ranking", icon: Trophy },
+        { href: "/conquistas", label: "Conquistas", icon: Medal },
+      ],
+    },
+    ...(userRole === "admin" || userRole === "moderator"
+      ? [
+          {
+            label: "Gestão",
+            items: [
+              {
+                href: "/admin",
+                label: "Administração",
+                icon: ShieldCheck,
+              },
+            ],
+          },
+        ]
+      : []),
+    {
+      label: "Outros",
+      items: [{ href: "/doacao", label: "Doação", icon: Heart }],
+    },
+  ]
   // Estado inicial fixo para evitar mismatch de hydration (não ler window/localStorage aqui).
   // A preferência salva ou o auto-colapso em telas médias é aplicado no efeito abaixo.
   const [collapsed, setCollapsed] = useState(false)
@@ -248,7 +260,7 @@ export function AppSidebar({ className, isOpen, onClose }: AppSidebarProps) {
           aria-label="Menu principal"
           className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 py-5 space-y-5"
         >
-          {NAV_GROUPS.map((group, groupIndex) => (
+          {navGroups.map((group, groupIndex) => (
             <div key={group.label} className="space-y-1">
               {effectiveCollapsed ? (
                 groupIndex > 0 && (

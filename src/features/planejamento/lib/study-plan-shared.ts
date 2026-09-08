@@ -79,7 +79,10 @@ export function getSavedScaleConfig(): SharedPlanConfig {
   const savedFirstDay = localStorage.getItem("mentor_user_first_shift_day")
   const firstShiftDay = savedFirstDay ? parseInt(savedFirstDay, 10) : 2
 
-  const anchorShiftDate = localStorage.getItem("mentor_shift_anchor_date") || ""
+  const anchorShiftDate =
+    localStorage.getItem("mentor_user_shift_anchor_date") ||
+    localStorage.getItem("mentor_shift_anchor_date") ||
+    ""
 
   const savedStudyDays = localStorage.getItem("mentor_user_study_days")
   const studyDays = savedStudyDays

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 
 export interface UserTargetSummary {
   id: string
@@ -20,16 +21,16 @@ export interface UserTargetSummary {
 export async function getUserTargetsAction(): Promise<{ success: boolean; targets?: UserTargetSummary[]; error?: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (userError || !user) {
+    if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
     const { data: rawTargets, error: targetsError } = await supabase
       .from("user_targets")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .order("is_active", { ascending: false })
       .order("created_at", { ascending: false })
 
@@ -44,7 +45,7 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
       const { data: udRows } = await supabase
         .from("user_disciplines")
         .select("id, target_id, status")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
 
       if (udRows) {
         udRows.forEach((r: { target_id?: string | null; status?: string }) => {
@@ -120,9 +121,9 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
 export async function switchActiveTargetAction(targetId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (userError || !user) {
+    if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
@@ -134,7 +135,7 @@ export async function switchActiveTargetAction(targetId: string): Promise<{ succ
     const { error: deactivateError } = await supabase
       .from("user_targets")
       .update({ is_active: false })
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
 
     if (deactivateError) {
       console.error("Erro ao desativar alvos:", deactivateError)
@@ -146,7 +147,7 @@ export async function switchActiveTargetAction(targetId: string): Promise<{ succ
       .from("user_targets")
       .update({ is_active: true })
       .eq("id", targetId)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
 
     if (activateError) {
       console.error("Erro ao ativar novo alvo:", activateError)

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 
 import { reconcileWeeklyPlan } from "@/application/study-plan/weekly-planner.service"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import type { StudyHistoryInsert } from "@/domain/study-history/study-history.types"
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
@@ -26,13 +27,11 @@ const HISTORY_PATHS = ["/dashboard", "/dashboard/history", "/estatisticas", "/di
 export async function getUserHistoryAction(page: number = 1, pageSize: number = 50) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado", total: 0, totalMinutes: 0 }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado", total: 0, totalMinutes: 0 }
 
-    const result = await getUserHistory(supabase, user.id, { page, pageSize })
-    const totalMinutes = await getTotalStudyMinutes(supabase, user.id)
+    const result = await getUserHistory(supabase, effectiveUserId, { page, pageSize })
+    const totalMinutes = await getTotalStudyMinutes(supabase, effectiveUserId)
     return { data: result.data, error: null, total: result.total, totalMinutes }
   } catch (error) {
     return { data: null, error: (error as { message?: string }).message, total: 0, totalMinutes: 0 }
@@ -42,12 +41,10 @@ export async function getUserHistoryAction(page: number = 1, pageSize: number = 
 export async function getMonthlyHistoryAction(year: number, month: number) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
-    const data = await getMonthlyHistory(supabase, user.id, year, month)
+    const data = await getMonthlyHistory(supabase, effectiveUserId, year, month)
     return { data, error: null }
   } catch (error) {
     return { data: null, error: (error as { message?: string }).message ?? null }
@@ -57,12 +54,10 @@ export async function getMonthlyHistoryAction(year: number, month: number) {
 export async function getAllHistoryAction() {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
-    const data = await getAllUserHistory(supabase, user.id)
+    const data = await getAllUserHistory(supabase, effectiveUserId)
     return { data, error: null }
   } catch (error) {
     return { data: null, error: (error as { message?: string }).message ?? null }
@@ -73,15 +68,13 @@ export async function startStudySessionAction(data: Omit<StudyHistoryInsert, "us
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
     }
 
-    const session = await createStudySession(supabase, user.id, data as StudyHistoryInsert)
+    const session = await createStudySession(supabase, effectiveUserId, data as StudyHistoryInsert)
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: session, error: null }
@@ -107,16 +100,14 @@ export async function finishStudySessionAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
     }
 
-    const session = await finishStudySession(supabase, user.id, sessionId, feedback)
-    await reconcileWeeklyPlan(supabase, user.id).catch(() => null)
+    const session = await finishStudySession(supabase, effectiveUserId, sessionId, feedback)
+    await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: session, error: null }
@@ -135,15 +126,13 @@ export async function updateStudySessionAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
     }
 
-    const session = await updateStudySession(supabase, user.id, sessionId, data)
+    const session = await updateStudySession(supabase, effectiveUserId, sessionId, data)
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: session, error: null }
@@ -159,15 +148,13 @@ export async function deleteStudySessionAction(sessionId: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
     }
 
-    await deleteStudySession(supabase, user.id, sessionId)
+    await deleteStudySession(supabase, effectiveUserId, sessionId)
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { error: null }
@@ -183,11 +170,9 @@ export async function cancelStudySessionAction(sessionId: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
     }
 
@@ -196,7 +181,7 @@ export async function cancelStudySessionAction(sessionId: string) {
       .from("study_history")
       .delete()
       .eq("id", sessionId)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
 
     if (error) throw error
 
@@ -219,10 +204,8 @@ export type DailyTotal = { date: string; minutes: number }
 export async function getMonthlyDailyTotalsAction(year: number, month: number) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: [], error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: [], error: "Usuário não autenticado" }
 
     const paddedMonth = String(month).padStart(2, "0")
     const monthPrefix = `${year}-${paddedMonth}-`
@@ -247,7 +230,7 @@ export async function getMonthlyDailyTotalsAction(year: number, month: number) {
       const { data, error } = await supabase
         .from("study_history")
         .select("started_at, duration_minutes")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("started_at", queryStartStr)
         .lte("started_at", queryEndStr)
         .not("duration_minutes", "is", null)
@@ -294,10 +277,8 @@ export async function saveManualStudyTimeAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     if (durationMinutes <= 0) {
       return { data: null, error: "Duração deve ser maior que zero." }
@@ -310,7 +291,7 @@ export async function saveManualStudyTimeAction(
     const { data: existing } = await supabase
       .from("study_history")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .gte("started_at", startOfDay)
       .lte("started_at", endOfDay)
       .eq("study_source", "FREE")
@@ -331,12 +312,12 @@ export async function saveManualStudyTimeAction(
           completed: true,
         })
         .eq("id", existing.id)
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .select()
         .single()
 
       if (error) throw new Error("Erro ao atualizar registro: " + error.message)
-      await reconcileWeeklyPlan(supabase, user.id).catch(() => null)
+      await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
       for (const path of HISTORY_PATHS) revalidatePath(path)
       return { data: updated, error: null }
     }
@@ -345,7 +326,7 @@ export async function saveManualStudyTimeAction(
     const { data: created, error } = await supabase
       .from("study_history")
       .insert({
-        user_id: user.id,
+        user_id: effectiveUserId,
         discipline_id: disciplineId,
         study_source: "FREE",
         started_at: startedAt,
@@ -361,7 +342,7 @@ export async function saveManualStudyTimeAction(
       .single()
 
     if (error) throw new Error("Erro ao registrar estudo: " + error.message)
-    await reconcileWeeklyPlan(supabase, user.id).catch(() => null)
+    await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: created, error: null }
   } catch (error) {
@@ -376,10 +357,8 @@ export async function deleteManualStudyTimeAction(dateStr: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { error: "Usuário não autenticado" }
 
     const startOfDay = buildIsoFromSaoPauloDateTime(dateStr, "00:00")
     const endOfDay = buildIsoFromSaoPauloDateTime(dateStr, "23:59")
@@ -387,7 +366,7 @@ export async function deleteManualStudyTimeAction(dateStr: string) {
     const { error } = await supabase
       .from("study_history")
       .delete()
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .gte("started_at", startOfDay)
       .lte("started_at", endOfDay)
       .eq("study_source", "FREE")
@@ -411,15 +390,13 @@ export async function deleteManualStudyTimeAction(dateStr: string) {
 export async function getDisciplinesForCalendarAction() {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: [], error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: [], error: "Usuário não autenticado" }
 
     const { data, error } = await supabase
       .from("user_disciplines")
       .select("discipline_id, disciplines ( id, name )")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
 
     if (error) throw new Error("Erro ao buscar disciplinas: " + error.message)
 
@@ -454,10 +431,8 @@ export async function getManualEntryForDayAction(dateStr: string): Promise<{
 }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     const startOfDay = buildIsoFromSaoPauloDateTime(dateStr, "00:00")
     const endOfDay = buildIsoFromSaoPauloDateTime(dateStr, "23:59")
@@ -465,7 +440,7 @@ export async function getManualEntryForDayAction(dateStr: string): Promise<{
     const { data, error } = await supabase
       .from("study_history")
       .select("id, duration_minutes, discipline_id, disciplines ( id, name )")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .gte("started_at", startOfDay)
       .lte("started_at", endOfDay)
       .eq("study_source", "FREE")
@@ -514,10 +489,8 @@ export type DayDetail = {
 export async function getDayDetailAction(dateStr: string) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     const startOfDay = buildIsoFromSaoPauloDateTime(dateStr, "00:00")
     const endOfDay = buildIsoFromSaoPauloDateTime(dateStr, "23:59")
@@ -525,7 +498,7 @@ export async function getDayDetailAction(dateStr: string) {
     const { data: sessions, error } = await supabase
       .from("study_history")
       .select("duration_minutes, metadata, discipline_id, disciplines ( id, name )")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .gte("started_at", startOfDay)
       .lte("started_at", endOfDay)
       .not("duration_minutes", "is", null)
@@ -612,10 +585,8 @@ export type MonthlyStats = {
 export async function getMonthlyStatsAction(year: number, month: number) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     const paddedMonth = String(month).padStart(2, "0")
     const monthPrefix = `${year}-${paddedMonth}-`
@@ -640,7 +611,7 @@ export async function getMonthlyStatsAction(year: number, month: number) {
       const { data, error } = await supabase
         .from("study_history")
         .select("started_at, duration_minutes")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("started_at", queryStartStr)
         .lte("started_at", queryEndStr)
         .not("duration_minutes", "is", null)

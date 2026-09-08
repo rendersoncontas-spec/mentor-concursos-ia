@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { getAccuracyByDiscipline } from "@/application/question-analytics/accuracy"
 import { getPerformanceRadar } from "@/application/question-analytics/radar"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { Logo } from "@/components/ui/logo"
 import { createClient } from "@/infrastructure/supabase/server"
 
@@ -14,13 +15,11 @@ export const metadata = {
 export default async function PerformancePage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  const effectiveUser = await getEffectiveSessionUser(supabase)
+  if (!effectiveUser) redirect("/login")
 
-  const radarData = await getPerformanceRadar(supabase, user.id, 30)
-  const accuracyData = await getAccuracyByDiscipline(supabase, user.id, 30)
+  const radarData = await getPerformanceRadar(supabase, effectiveUser.id, 30)
+  const accuracyData = await getAccuracyByDiscipline(supabase, effectiveUser.id, 30)
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">

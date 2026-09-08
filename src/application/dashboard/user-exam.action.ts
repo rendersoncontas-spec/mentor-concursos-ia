@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 
 export interface SaveUserExamInput {
   examName?: string
@@ -13,9 +14,9 @@ export interface SaveUserExamInput {
 export async function saveUserExamAction(input: SaveUserExamInput) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (userError || !user) {
+    if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
@@ -27,7 +28,7 @@ export async function saveUserExamAction(input: SaveUserExamInput) {
     const { data: target } = await supabase
       .from("user_targets")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("is_active", true)
       .limit(1)
       .maybeSingle()
@@ -73,7 +74,7 @@ export async function saveUserExamAction(input: SaveUserExamInput) {
     } else {
       // 2. Criar novo target se não existir
       const { error: insertError } = await supabase.from("user_targets").insert({
-        user_id: user.id,
+        user_id: effectiveUserId,
         target_exam: examName,
         target_role: "Concurseiro",
         main_study_source: metaPayload,
@@ -87,7 +88,7 @@ export async function saveUserExamAction(input: SaveUserExamInput) {
       if (insertError) {
         // Fallback insert com colunas básicas
         const { error: fallbackInsertError } = await supabase.from("user_targets").insert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           target_exam: examName,
           target_role: "Concurseiro",
           main_study_source: metaPayload,
@@ -114,16 +115,16 @@ export async function saveUserExamAction(input: SaveUserExamInput) {
 export async function deleteUserExamAction() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (userError || !user) {
+    if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
     const { data: target } = await supabase
       .from("user_targets")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("is_active", true)
       .limit(1)
       .maybeSingle()

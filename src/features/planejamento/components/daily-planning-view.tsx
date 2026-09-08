@@ -25,6 +25,7 @@ import {
   closeBlockManuallyAction,
   getPeriodGoalAction,
   getReplanInfoAction,
+  pullPendingToTodayAction,
   runReplanningAction,
   setAutoReplanPreferenceAction,
   undoReplanningAction,
@@ -192,6 +193,14 @@ export function DailyPlanningView({
     }
   })
 
+  // Puxar pendência para hoje
+  const [pendingToPull, setPendingToPull] = useState<{
+    disciplineId: string
+    disciplineName: string
+    pendingMinutes: number
+  } | null>(null)
+  const [pullingPending, setPullingPending] = useState(false)
+
   const loadReplanInfo = useCallback(async () => {
     const availability = {
       studyDays,
@@ -347,6 +356,36 @@ export function DailyPlanningView({
     } finally {
       setClosingBlock(false)
     }
+  }
+
+  const handleConfirmPullPending = async () => {
+    if (!pendingToPull) return
+    setPullingPending(true)
+    try {
+      const availability = {
+        studyDays,
+        scheduleMode,
+        firstShiftDay,
+        anchorShiftDate: anchorShiftDate || undefined,
+      }
+      const res = await pullPendingToTodayAction(pendingToPull.disciplineId, availability)
+      if (res.ok) {
+        toast.success(res.message || "Pendência adicionada ao dia de hoje!")
+        setPendingToPull(null)
+        window.dispatchEvent(new CustomEvent(STUDY_SESSION_SAVED_EVENT))
+        await loadReplanInfo()
+      } else {
+        toast.error(res.error || "Erro ao puxar pendência.")
+      }
+    } catch {
+      toast.error("Erro de conexão ao antecipar pendência.")
+    } finally {
+      setPullingPending(false)
+    }
+  }
+
+  const handleKeepInPlan = (p: { disciplineName: string }) => {
+    toast.info(`${p.disciplineName} mantida no cronograma com distribuição automática.`)
   }
 
   if (!mounted) {
@@ -761,16 +800,39 @@ export function DailyPlanningView({
             </span>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {(replanInfo?.pendingByDiscipline ?? []).map((p) => (
               <div
                 key={p.disciplineId}
-                className="flex items-center justify-between bg-background/60 rounded-lg px-2.5 py-1.5"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-background/80 border border-amber-500/20 rounded-lg p-2.5 shadow-xs"
               >
-                <span className="text-xs font-semibold text-foreground">{p.disciplineName}</span>
-                <span className="text-xs font-bold text-amber-700 font-mono">
-                  {formatMinutes(p.pendingMinutes)}
-                </span>
+                <div className="flex items-center justify-between sm:justify-start gap-3">
+                  <span className="text-xs font-bold text-foreground">{p.disciplineName}</span>
+                  <span className="text-xs font-black text-amber-700 dark:text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded-md">
+                    {formatMinutes(p.pendingMinutes)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleKeepInPlan(p)}
+                    className="h-7 px-2 text-[11px] font-semibold text-muted-foreground border-border/60 hover:bg-muted/50 rounded-lg cursor-pointer"
+                  >
+                    Manter no planejamento
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setPendingToPull(p)}
+                    disabled={pullingPending}
+                    className="h-7 px-2.5 text-[11px] font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-lg cursor-pointer shadow-xs"
+                  >
+                    Puxar para hoje
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -1088,6 +1150,56 @@ export function DailyPlanningView({
               className="bg-primary hover:bg-primary/90 rounded-xl cursor-pointer"
             >
               {closingBlock ? "Concluindo..." : "Concluir hoje"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmação — "Puxar para hoje" */}
+      <Dialog
+        open={pendingToPull !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingToPull(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-black text-foreground">
+              <Sparkles className="w-5 h-5 text-[#2563EB]" />
+              Puxar pendência para hoje?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground pt-1.5 leading-relaxed">
+              Ao puxar esta pendência de{" "}
+              <strong className="text-foreground font-semibold">
+                {pendingToPull?.disciplineName} ({formatMinutes(pendingToPull?.pendingMinutes ?? 0)})
+              </strong>{" "}
+              para hoje, o cronograma dos próximos dias será recalculado respeitando a sua capacidade diária e o saldo restante da meta semanal. Deseja continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingToPull(null)}
+              disabled={pullingPending}
+              className="text-xs font-bold rounded-xl cursor-pointer"
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void handleConfirmPullPending()}
+              disabled={pullingPending}
+              className="text-xs font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer"
+            >
+              {pullingPending ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Recalculando...
+                </>
+              ) : (
+                "Sim, puxar para hoje"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

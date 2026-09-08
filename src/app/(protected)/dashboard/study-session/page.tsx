@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { ActiveSessionRunner } from "@/features/study-session/components/active-session-runner"
 import { createClient } from "@/infrastructure/supabase/server"
 
@@ -18,11 +19,9 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
   const { planId, disciplineId, duration } = resolvedParams
   const customDurationMinutes = duration ? parseInt(duration, 10) : undefined
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const effectiveUser = await getEffectiveSessionUser(supabase)
 
-  if (!user) {
+  if (!effectiveUser) {
     redirect("/login")
   }
 

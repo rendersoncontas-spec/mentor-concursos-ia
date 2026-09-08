@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { BookOpen } from "lucide-react"
 
 import { getDisciplinesPageData } from "@/application/disciplines/disciplines.service"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { DisciplinesView } from "@/features/disciplines/components/disciplines-view"
 import { createClient } from "@/infrastructure/supabase/server"
 
@@ -15,12 +16,10 @@ export const metadata = {
 
 export default async function DisciplinesPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  const effectiveUser = await getEffectiveSessionUser(supabase)
+  if (!effectiveUser) redirect("/login")
 
-  const initialData = await getDisciplinesPageData(supabase, user.id)
+  const initialData = await getDisciplinesPageData(supabase, effectiveUser.id)
 
   return (
     <div className="flex flex-col min-h-full">

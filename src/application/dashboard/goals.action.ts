@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 import { weeklyGoalsSchema, type WeeklyGoalsInput } from "./goals.schema"
 
@@ -10,9 +11,9 @@ export async function saveWeeklyGoalsAction(data: WeeklyGoalsInput) {
     const validatedData = weeklyGoalsSchema.parse(data)
     const supabase = await createClient()
 
-    const { data: userData, error: userError } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
     
-    if (userError || !userData.user) {
+    if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
@@ -25,14 +26,14 @@ export async function saveWeeklyGoalsAction(data: WeeklyGoalsInput) {
         weekly_study_days_goal: validatedData.weekly_study_days_goal,
         week_start_day: validatedData.week_start_day
       })
-      .eq("id", userData.user.id)
+      .eq("id", effectiveUserId)
 
     if (error) {
       console.error("Erro ao salvar metas semanais:", error)
       return { success: false, error: "Falha ao salvar metas." }
     }
 
-    await invalidateStatisticsCenterCache(userData.user.id)
+    await invalidateStatisticsCenterCache(effectiveUserId)
     revalidatePath("/dashboard")
     revalidatePath("/estatisticas")
     return { success: true }

@@ -43,7 +43,10 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/register") ||
     pathname.startsWith("/forgot-password")
 
+  const isAdminRoute = pathname.startsWith("/admin")
+
   const isProtectedRoute =
+    isAdminRoute ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/planejamento") ||
@@ -72,6 +75,28 @@ export async function updateSession(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/dashboard"
     return NextResponse.redirect(redirectUrl)
+  }
+
+  if (user && isAdminRoute) {
+    const isAuthorizedEmail = user.email?.toLowerCase() === "rendersonluan@gmail.com"
+    if (!isAuthorizedEmail) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = "/dashboard"
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    const { data: roleRow } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    const role = roleRow?.role
+    if (role !== "admin" && role !== "moderator") {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = "/dashboard"
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
   return supabaseResponse

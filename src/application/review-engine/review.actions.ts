@@ -27,14 +27,14 @@ import {
   updateFlashcard,
 } from "./review.service"
 
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
+
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
 async function requireUser(supabase: Supabase): Promise<{ user: { id: string } } | { user: null }> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { user: null }
-  return { user: { id: user.id } }
+  const effectiveUserId = await getEffectiveUserId(supabase)
+  if (!effectiveUserId) return { user: null }
+  return { user: { id: effectiveUserId } }
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────

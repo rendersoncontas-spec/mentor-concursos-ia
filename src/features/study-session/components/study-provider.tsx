@@ -69,8 +69,8 @@ interface StudySessionState {
   pausedSeconds: number
   /** Vínculo com o bloco do planejamento (study_plan_items.id), quando a sessão veio do Cronograma. */
   planItemId: string | null
-  /** Origem da sessão: "PLAN" (Cronograma) ou "FREE" (Central/Livre). */
-  source: "PLAN" | "FREE" | null
+  /** Origem da sessão: "PLAN" (Cronograma), "CYCLE" (Ciclo) ou "FREE" (Central/Livre). */
+  source: "PLAN" | "FREE" | "CYCLE" | null
   /** Vínculo com o ciclo de estudo ativo. */
   cycleId?: string | null
   cycleItemId?: string | null
@@ -86,7 +86,7 @@ interface StudyContextType {
     technique?: StudyTechnique
     plannedSeconds?: number
     planItemId?: string | null
-    source?: "PLAN" | "FREE" | null
+    source?: "PLAN" | "FREE" | "CYCLE" | null
     cycleId?: string | null
     cycleItemId?: string | null
   }) => void
@@ -389,7 +389,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       technique?: StudyTechnique
       plannedSeconds?: number
       planItemId?: string | null
-      source?: "PLAN" | "FREE" | null
+      source?: "PLAN" | "FREE" | "CYCLE" | null
       cycleId?: string | null
       cycleItemId?: string | null
     }) => {

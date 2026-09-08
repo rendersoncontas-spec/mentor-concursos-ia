@@ -43,7 +43,7 @@ import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-se
 
 import { getDailyMessage } from "./daily-message-banner"
 
-import { StudyCycleWidget } from "@/features/study-cycle/components/study-cycle-widget"
+import { IntelligentCycleWidget } from "@/features/study-cycle/components/intelligent-cycle-widget"
 
 export interface DashboardWidgetProps {
   snapshot: DashboardSnapshot
@@ -1640,7 +1640,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
 // 18. WIDGET: Ciclo de Estudo
 // ─────────────────────────────────────────────────────────────────────────────
 function WidgetCicloEstudoWrapper(_props: DashboardWidgetProps) {
-  return <StudyCycleWidget embedded={true} />
+  return <IntelligentCycleWidget embedded={true} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1753,8 +1753,8 @@ export const WIDGET_REGISTRY: Record<
   },
   ciclo_estudo: {
     name: "Ciclo de Estudo",
-    description: "Ciclo de estudo ativo com progresso e próxima matéria.",
-    defaultSpan: 1,
+    description: "Resumo inteligente do ciclo de estudo ativo com volta, matéria em foco e próxima.",
+    defaultSpan: 3,
     component: WidgetCicloEstudoWrapper,
   },
 }

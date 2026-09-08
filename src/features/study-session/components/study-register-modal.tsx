@@ -31,6 +31,10 @@ import {
   type DisciplineOption,
   getDisciplinesForAutocomplete,
 } from "@/application/study-session/get-disciplines.action"
+import {
+  type DisciplineSuggestion,
+  getStudyDisciplineSuggestions,
+} from "@/application/study-session/get-study-discipline-suggestions.action"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
 import {
@@ -168,6 +172,15 @@ function formatDateBR(dateStr?: string) {
   }
 }
 
+function difficultyLabel(difficulty?: string): string {
+  const upper = (difficulty || "").toUpperCase().trim()
+  if (upper === "FACIL" || upper === "FÁCIL" || upper === "EASY" || upper === "BAIXA")
+    return "Fácil"
+  if (upper === "DIFICIL" || upper === "DIFÍCIL" || upper === "HARD" || upper === "ALTA")
+    return "Difícil"
+  return "Média"
+}
+
 const STUDY_TYPE_LABELS: Record<string, string> = {
   TEORIA: "Teoria",
   QUESTOES: "Questões",
@@ -204,6 +217,10 @@ export function StudyRegisterModal({
   const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null)
   const [planDisciplines, setPlanDisciplines] = useState<DisciplineOption[]>([])
   const [allDisciplines, setAllDisciplines] = useState<DisciplineOption[]>([])
+  const [suggestionsSource, setSuggestionsSource] = useState<
+    "PLAN" | "CYCLE" | "HISTORY" | "NONE"
+  >("NONE")
+  const [suggestions, setSuggestions] = useState<DisciplineSuggestion[]>([])
 
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema) as Resolver<SessionFormValues>,
@@ -330,10 +347,15 @@ export function StudyRegisterModal({
 
   const loadDisciplines = useCallback(async () => {
     try {
-      const result = await getDisciplinesForAutocomplete()
-      setPlanDisciplines(result.planDisciplines)
-      setAllDisciplines(result.allDisciplines)
-      setHasActivePlan(result.hasActivePlan)
+      const [autocompleteResult, suggestionsResult] = await Promise.all([
+        getDisciplinesForAutocomplete(),
+        getStudyDisciplineSuggestions(),
+      ])
+      setPlanDisciplines(autocompleteResult.planDisciplines)
+      setAllDisciplines(autocompleteResult.allDisciplines)
+      setHasActivePlan(autocompleteResult.hasActivePlan)
+      setSuggestionsSource(suggestionsResult.source)
+      setSuggestions(suggestionsResult.suggestions)
     } catch (err) {
       console.error("Erro ao carregar disciplinas:", err)
       Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
@@ -555,6 +577,19 @@ export function StudyRegisterModal({
       ),
     [planDisciplines],
   )
+
+  const suggestionsHeading = useMemo(() => {
+    switch (suggestionsSource) {
+      case "PLAN":
+        return "Sugestões do Planejamento"
+      case "CYCLE":
+        return "Sugestões do Ciclo"
+      case "HISTORY":
+        return "Baseado nas últimas atividades"
+      default:
+        return "Sugestões"
+    }
+  }, [suggestionsSource])
   const planIds = useMemo(() => new Set(planDisciplines.map((d) => d.id)), [planDisciplines])
   const otherDisciplines = useMemo(
     () =>
@@ -1432,20 +1467,28 @@ export function StudyRegisterModal({
                                   />
                                   <CommandList className="max-h-[250px] overflow-y-auto overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
                                     <CommandEmpty>Nenhuma disciplina encontrada.</CommandEmpty>
-                                    <CommandGroup heading="Sugestões do Plano">
-                                      {sortedPlanDisciplines.length > 0 ? (
-                                        sortedPlanDisciplines.map((disc) => (
+                                    <CommandGroup heading={suggestionsHeading}>
+                                      {suggestions.length > 0 ? (
+                                        suggestions.map((sug) => (
                                           <CommandItem
-                                            key={`plan-${disc.id}`}
-                                            value={disc.name}
-                                            onSelect={() => handleSelectDiscipline(disc)}
+                                            key={`${sug.from}-${sug.id}`}
+                                            value={sug.name}
+                                            onSelect={() =>
+                                              handleSelectDiscipline({
+                                                id: sug.id,
+                                                name: sug.name,
+                                                area: sug.area,
+                                                color_hex: sug.color_hex ?? null,
+                                                fromPlan: sug.from === "PLAN",
+                                              })
+                                            }
                                             className="cursor-pointer flex items-center justify-between"
                                           >
                                             <div className="flex items-center gap-2 min-w-0">
                                               <Check
                                                 className={cn(
                                                   "h-4 w-4 shrink-0 text-primary",
-                                                  field.value === disc.name
+                                                  field.value === sug.name
                                                     ? "opacity-100"
                                                     : "opacity-0",
                                                 )}
@@ -1454,25 +1497,36 @@ export function StudyRegisterModal({
                                                 className="w-2.5 h-2.5 rounded-full shrink-0"
                                                 style={{
                                                   backgroundColor: disciplineColorHex(
-                                                    disc.id,
-                                                    disc.color_hex,
+                                                    sug.id,
+                                                    sug.color_hex,
                                                   ),
                                                 }}
                                               />
-                                              <span className="truncate">{disc.name}</span>
+                                              <span className="truncate font-medium">
+                                                {sug.metadata?.isCurrentInCycle && (
+                                                  <span className="text-primary font-black mr-1">
+                                                    ▶
+                                                  </span>
+                                                )}
+                                                {sug.name}
+                                              </span>
+                                              {sug.metadata?.isCurrentInCycle && (
+                                                <span className="text-[10px] font-black text-primary shrink-0">
+                                                  {sug.metadata.studiedMinutes ?? 0} min /{" "}
+                                                  {sug.metadata.plannedMinutes ?? 0} min
+                                                </span>
+                                              )}
                                             </div>
-                                            {disc.area && (
-                                              <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
-                                                {disc.area}
+                                            {sug.metadata?.difficulty && (
+                                              <span className="text-[10px] text-muted-foreground ml-auto pl-2 shrink-0">
+                                                {difficultyLabel(sug.metadata.difficulty)}
                                               </span>
                                             )}
                                           </CommandItem>
                                         ))
                                       ) : (
                                         <div className="px-3 py-2 text-xs text-muted-foreground italic">
-                                          {hasActivePlan === false
-                                            ? "Nenhum planejamento ativo. Crie um planejamento para receber sugestões personalizadas."
-                                            : "Seu planejamento ainda não possui disciplinas."}
+                                          Nenhuma sugestão disponível.
                                         </div>
                                       )}
                                     </CommandGroup>

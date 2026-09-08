@@ -211,6 +211,27 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       }
     }
 
+    // 7. Se a sessão foi iniciada a partir de um Ciclo de Estudo, atualizar o progresso do ciclo
+    // REQUISITO ESTREITO: Somente sessões de origem CYCLE avançam o ciclo rotativo
+    const isCycleSource = data["study_source"] === "CYCLE" || (!data["study_source"] && Boolean(data["cycle_id"]))
+    if (data["cycle_id"] && activeMinutesFinal > 0 && isCycleSource) {
+      try {
+        const { registerCycleStudyProgressAction } = await import(
+          "@/application/study-cycle/study-cycle.actions"
+        )
+        await registerCycleStudyProgressAction({
+          cycleId: String(data["cycle_id"]),
+          cycleItemId: data["cycle_item_id"] ? String(data["cycle_item_id"]) : null,
+          studyHistoryId: historyData.id,
+          durationMinutes: activeMinutesFinal,
+          disciplineId: String(disciplineId),
+          studySource: "CYCLE",
+        })
+      } catch (cycleErr) {
+        console.error("[STUDY_SAVE] Erro ao registrar progresso no ciclo:", cycleErr)
+      }
+    }
+
     // Revalidar páginas que dependem de dados de sessão
     revalidatePath("/dashboard")
     revalidatePath("/dashboard/history")

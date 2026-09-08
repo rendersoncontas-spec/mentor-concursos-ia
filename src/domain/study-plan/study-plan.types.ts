@@ -149,6 +149,7 @@ export interface AlgorithmInput {
   availableDays: DayOfWeek[] // Futuro: dias disponíveis do aluno
   disciplines: AlgorithmDisciplineInput[]
   adaptiveDecisions?: AdaptiveDecision[] // Decisões do Adaptive Learning Engine (ALE)
+  isFinalSprint?: boolean // Modo Reta Final: Desativa penalidades de interleaving
 }
 
 export interface AlgorithmDisciplineInput {

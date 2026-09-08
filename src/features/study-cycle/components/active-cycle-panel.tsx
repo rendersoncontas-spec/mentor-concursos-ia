@@ -1,23 +1,38 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-
-import { CheckCircle2, Clock, ArrowRight, Pause, Play, Square, SkipForward } from "lucide-react"
+import { useCallback, useState } from "react"
 
 import {
-  advanceCycleItemAction,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  CornerDownRight,
+  Edit3,
+  Layers,
+  Pause,
+  Play,
+  RotateCcw,
+  SkipForward,
+  Sparkles,
+  Trophy,
+} from "lucide-react"
+import { toast } from "sonner"
+
+import {
   pauseCycleAction,
-  concludeCycleAction,
+  skipCycleCurrentItemAction,
 } from "@/application/study-cycle/study-cycle.actions"
-import { useGlobalStudy } from "@/features/study-session/components/study-provider"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import type { StudyCycleWithItems } from "@/domain/study-cycle/study-cycle.types"
+import type { CycleOverview } from "@/domain/study-cycle/study-cycle.types"
+import { useGlobalStudy } from "@/features/study-session/components/study-provider"
 import { cn } from "@/lib/utils"
 
 interface ActiveCyclePanelProps {
-  cycle: StudyCycleWithItems
+  overview: CycleOverview
   onRefresh: () => void
+  onSelectAnotherCycle?: (() => void) | undefined
+  onEditCycle?: (() => void) | undefined
 }
 
 function formatMinutes(totalMinutes: number): string {
@@ -25,269 +40,476 @@ function formatMinutes(totalMinutes: number): string {
   const m = totalMinutes % 60
   if (h === 0) return `${m}min`
   if (m === 0) return `${h}h`
-  return `${h}h${m}min`
+  return `${h}h ${m}min`
 }
 
-export function ActiveCyclePanel({ cycle, onRefresh }: ActiveCyclePanelProps) {
-  const { startSession, session, endSession } = useGlobalStudy()
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [blockCompleteMessage, setBlockCompleteMessage] = useState<string | null>(null)
-  const [nextDiscipline, setNextDiscipline] = useState<string | null>(null)
+export function ActiveCyclePanel({
+  overview,
+  onRefresh,
+  onSelectAnotherCycle,
+  onEditCycle,
+}: ActiveCyclePanelProps) {
+  const { startSession, session } = useGlobalStudy()
+  const [isSkipping, setIsSkipping] = useState(false)
+  const [isPausing, setIsPausing] = useState(false)
 
-  const currentIndex = Math.min(cycle.current_item_index, cycle.items.length - 1)
-  const currentItem = cycle.items[currentIndex]
-  const nextItem = cycle.items[currentIndex + 1]
+  const {
+    cycle,
+    items,
+    currentItem,
+    nextItem,
+    currentRound,
+    totalRoundsDone,
+    roundProgressPercentage,
+    totalPlannedMinutesPerRound,
+    totalStudiedMinutesInRound,
+    totalExtraMinutesInRound,
+  } = overview
 
-  const totalPlanned = cycle.items.reduce((s, i) => s + i.planned_minutes, 0)
-  const totalCompleted = cycle.items.reduce((s, i) => s + i.completed_minutes, 0)
-  const progress = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0
-
-  const currentRemaining = currentItem
-    ? Math.max(0, currentItem.planned_minutes - currentItem.completed_minutes)
-    : 0
-
-  const isStudyingThisCycle = session?.isActive && session.disciplineId === currentItem?.discipline_id
+  const isCurrentItemStudying =
+    Boolean(session?.isActive) && session?.cycleId === cycle.id
 
   const handleStartStudy = useCallback(() => {
-    if (!currentItem) return
-    startSession({
-      disciplineName: currentItem.discipline?.name || "Matéria",
-      disciplineId: currentItem.discipline_id,
-      studyType: "TEORIA",
-      plannedSeconds: currentRemaining * 60,
-      source: "PLAN",
-      cycleId: cycle.id,
-      cycleItemId: currentItem.id,
-    })
-  }, [currentItem, currentRemaining, cycle.id, startSession])
-
-  const handleRegisterStudy = useCallback(async () => {
-    if (!currentItem || !session?.isActive) return
-    setIsProcessing(true)
-    try {
-      const elapsedMinutes = Math.floor(session.activeSeconds / 60)
-      if (elapsedMinutes > 0) {
-        const result = await advanceCycleItemAction(cycle.id, elapsedMinutes)
-        if (result.success) {
-          if (result.blockJustCompleted) {
-            setBlockCompleteMessage("Bloco concluído!")
-            setNextDiscipline(
-              nextItem ? (nextItem.discipline?.name || "Próxima matéria") : null
-            )
-            setTimeout(() => {
-              setBlockCompleteMessage(null)
-              setNextDiscipline(null)
-            }, 4000)
-          }
-          endSession()
-          onRefresh()
-        }
-      }
-    } finally {
-      setIsProcessing(false)
+    if (!currentItem) {
+      toast.error("Nenhuma matéria selecionada no ciclo.")
+      return
     }
-  }, [currentItem, session, cycle.id, nextItem, endSession, onRefresh])
+
+    // Passar source: "CYCLE" explícito e o tempo que falta para cumprir a etapa
+    startSession({
+      disciplineName: currentItem.disciplineName,
+      disciplineId: currentItem.disciplineId,
+      studyType: "TEORIA",
+      plannedSeconds: Math.max(1, currentItem.remainingMinutesInRound) * 60,
+      source: "CYCLE",
+      cycleId: cycle.id,
+      cycleItemId: currentItem.itemId,
+    })
+
+    toast.success(`Estudo do ciclo iniciado: ${currentItem.disciplineName}`)
+  }, [currentItem, cycle.id, startSession])
 
   const handlePauseCycle = useCallback(async () => {
-    await pauseCycleAction(cycle.id)
-    onRefresh()
-  }, [cycle.id, onRefresh])
-
-  const handleSkipBlock = useCallback(async () => {
-    if (!currentItem) return
-    setIsProcessing(true)
+    setIsPausing(true)
     try {
-      const remainingMinutes = currentItem.planned_minutes - currentItem.completed_minutes
-      if (remainingMinutes > 0) {
-        const result = await advanceCycleItemAction(cycle.id, remainingMinutes)
-        if (result.success) {
-          setBlockCompleteMessage("Bloco pulado")
-          setNextDiscipline(
-            nextItem ? (nextItem.discipline?.name || "Próxima matéria") : null
-          )
-          setTimeout(() => {
-            setBlockCompleteMessage(null)
-            setNextDiscipline(null)
-          }, 3000)
-          onRefresh()
-        }
+      const res = await pauseCycleAction(cycle.id)
+      if (res.success) {
+        toast.success("Ciclo de estudos pausado.")
+        onRefresh()
+      } else {
+        toast.error("Erro ao pausar ciclo.")
       }
     } finally {
-      setIsProcessing(false)
+      setIsPausing(false)
     }
-  }, [currentItem, cycle.id, nextItem, onRefresh])
+  }, [cycle.id, onRefresh])
 
-  if (!currentItem) {
-    return (
-      <Card className="p-6 text-center space-y-3">
-        <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-        <h3 className="text-lg font-bold text-foreground">Ciclo concluído!</h3>
-        <p className="text-sm text-muted-foreground">
-          Todas as matérias foram concluídas. Parabéns!
-        </p>
-        <Button onClick={handlePauseCycle} variant="outline" size="sm">
-          Pausar ciclo
-        </Button>
-      </Card>
-    )
-  }
-
-  if (blockCompleteMessage) {
-    return (
-      <Card className="p-6 text-center space-y-3 border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-900/10">
-        <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto animate-bounce" />
-        <h3 className="text-lg font-bold text-foreground">{blockCompleteMessage}</h3>
-        {nextDiscipline && (
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Próxima matéria:</p>
-            <p className="text-base font-bold text-foreground">{nextDiscipline}</p>
-          </div>
-        )}
-        <Button onClick={onRefresh} size="sm" className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white">
-          <ArrowRight className="h-4 w-4 mr-1" />
-          Continuar ciclo
-        </Button>
-      </Card>
-    )
-  }
+  const handleSkipCurrent = useCallback(async () => {
+    if (!currentItem) return
+    setIsSkipping(true)
+    try {
+      const res = await skipCycleCurrentItemAction(cycle.id)
+      if (res.success) {
+        toast.success(
+          `Etapa de ${currentItem.disciplineName} pulada. Tempo parcial preservado!`
+        )
+        onRefresh()
+      } else {
+        toast.error("Erro ao pular etapa.")
+      }
+    } finally {
+      setIsSkipping(false)
+    }
+  }, [currentItem, cycle.id, onRefresh])
 
   return (
-    <div className="space-y-4">
-      <Card className="overflow-hidden">
-        <div className="bg-muted/30 px-4 py-3 border-b">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Matéria Atual
-              </p>
-              <h3 className="text-lg font-black text-foreground mt-0.5">
-                {currentItem.discipline?.name || "Matéria"}
-              </h3>
-            </div>
-            <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-1 rounded-full">
-              {currentIndex + 1}/{cycle.items.length}
-            </span>
-          </div>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progresso do bloco</span>
-              <span className="font-bold text-foreground">
-                {formatMinutes(currentItem.completed_minutes)} / {formatMinutes(currentItem.planned_minutes)}
+    <div className="space-y-6">
+      {/* 1. CARD PRINCIPAL DO CICLO ATIVO */}
+      <Card className="overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-card via-card to-primary/5 shadow-md">
+        {/* CABEÇALHO DO CARD */}
+        <div className="border-b border-border/60 px-5 py-4 flex flex-wrap items-center justify-between gap-3 bg-muted/20">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Ciclo Ativo
               </span>
             </div>
-            <div className="h-3 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#2563EB] rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min(
-                    (currentItem.completed_minutes / currentItem.planned_minutes) * 100,
-                    100
-                  )}%`,
-                }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <span>Faltam {formatMinutes(currentRemaining)}</span>
-              </div>
-              <span>Prioridade: {currentItem.priority}</span>
-            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mt-0.5">
+              {cycle.name}
+            </h2>
+            {(cycle.contest_name || cycle.edital_name) && (
+              <p className="text-xs font-semibold text-muted-foreground mt-0.5">
+                {cycle.contest_name}
+                {cycle.edital_name && ` • ${cycle.edital_name}`}
+              </p>
+            )}
           </div>
 
-          {nextItem && (
-            <div className="bg-muted/50 rounded-lg px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Próxima
-              </p>
-              <p className="text-sm font-semibold text-foreground">
-                {nextItem.discipline?.name || "Matéria"}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {!isStudyingThisCycle ? (
-              <Button
-                onClick={handleStartStudy}
-                className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Iniciar estudo
-              </Button>
-            ) : (
-              <Button
-                onClick={handleRegisterStudy}
-                disabled={isProcessing}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                {isProcessing ? "Registrando..." : "Registrar estudo"}
-              </Button>
-            )}
-
-            <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {onEditCycle && (
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1"
-                onClick={handlePauseCycle}
+                onClick={onEditCycle}
+                className="text-xs h-8 gap-1.5 font-bold text-muted-foreground hover:text-foreground"
               >
-                <Pause className="h-3 w-3 mr-1" />
-                Pausar ciclo
+                <Edit3 className="h-3.5 w-3.5" />
+                Editar ciclo
               </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePauseCycle}
+              disabled={isPausing}
+              className="text-xs h-8 gap-1.5 font-bold text-muted-foreground hover:text-foreground"
+            >
+              <Pause className="h-3.5 w-3.5" />
+              Pausar
+            </Button>
+            {onSelectAnotherCycle && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground"
-                onClick={handleSkipBlock}
-                disabled={isProcessing}
+                onClick={onSelectAnotherCycle}
+                className="text-xs h-8 font-bold text-muted-foreground"
               >
-                <SkipForward className="h-3 w-3 mr-1" />
-                Pular
+                Trocar ciclo
               </Button>
+            )}
+          </div>
+        </div>
+
+        {/* MÉTRICAS DE VOLTAS E PROGRESSO DA VOLTA */}
+        <div className="p-5 space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* VOLTA ATUAL */}
+            <div className="p-3.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+              <p className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">
+                Volta Atual
+              </p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-foreground">
+                  {currentRound}ª
+                </span>
+                <span className="text-xs text-muted-foreground font-bold">volta</span>
+              </div>
+            </div>
+
+            {/* VOLTAS COMPLETAS */}
+            <div className="p-3.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+              <p className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">
+                Voltas Concluídas
+              </p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-foreground">
+                  {totalRoundsDone}
+                </span>
+                <span className="text-xs text-muted-foreground font-bold">
+                  {totalRoundsDone === 1 ? "volta feita" : "voltas feitas"}
+                </span>
+              </div>
+            </div>
+
+            {/* TEMPO DA VOLTA */}
+            <div className="p-3.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+              <p className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">
+                Tempo da Volta
+              </p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-foreground">
+                  {formatMinutes(totalPlannedMinutesPerRound)}
+                </span>
+              </div>
+            </div>
+
+            {/* PROGRESSO DA VOLTA */}
+            <div className="p-3.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+              <p className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">
+                Progresso Geral
+              </p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-primary">
+                  {roundProgressPercentage}%
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* BARRA DE PROGRESSO DA VOLTA */}
+          <div className="space-y-2 bg-background/60 p-4 rounded-xl border border-border/60">
+            <div className="flex items-center justify-between text-xs font-black">
+              <span className="text-muted-foreground uppercase tracking-wider">
+                Progresso da Volta {currentRound}
+              </span>
+              <span className="text-primary font-black">{roundProgressPercentage}%</span>
+            </div>
+            <div className="h-3.5 bg-muted rounded-full overflow-hidden p-0.5 border border-border/40">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, roundProgressPercentage)}%` }}
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground font-medium">
+              <span>{formatMinutes(totalStudiedMinutesInRound)} cumpridos nesta volta</span>
+              {totalExtraMinutesInRound > 0 && (
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  +{formatMinutes(totalExtraMinutesInRound)} de tempo extra
+                </span>
+              )}
+              <span>
+                Faltam {formatMinutes(Math.max(0, totalPlannedMinutesPerRound - totalStudiedMinutesInRound))}
+              </span>
+            </div>
+          </div>
+
+          {/* 2. MATÉRIA ATUAL (EM FOCO) */}
+          {currentItem ? (
+            <div className="rounded-2xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 via-background to-primary/5 p-5 sm:p-6 space-y-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider rounded-md bg-primary text-primary-foreground shadow-xs">
+                      ▶ EM FOCO
+                    </span>
+                    <span className="text-xs text-muted-foreground font-bold">
+                      Etapa {(cycle.current_item_index || 0) + 1} de {items.length}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border",
+                        currentItem.difficulty === "FACIL" && "bg-emerald-100 text-emerald-700 border-emerald-500/30 dark:bg-emerald-950/60 dark:text-emerald-400",
+                        currentItem.difficulty === "MEDIA" && "bg-amber-100 text-amber-700 border-amber-500/30 dark:bg-amber-950/60 dark:text-amber-400",
+                        currentItem.difficulty === "DIFICIL" && "bg-rose-100 text-rose-700 border-rose-500/30 dark:bg-rose-950/60 dark:text-rose-400"
+                      )}
+                    >
+                      Dificuldade: {currentItem.difficulty}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
+                    {currentItem.disciplineName}
+                  </h3>
+                  {currentItem.disciplineArea && (
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      Área: {currentItem.disciplineArea}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-left sm:text-right shrink-0 bg-background/80 sm:bg-transparent p-3 sm:p-0 rounded-xl border sm:border-0">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
+                    Meta da Etapa
+                  </span>
+                  <span className="text-2xl font-black text-foreground">
+                    {formatMinutes(currentItem.plannedMinutes)}
+                  </span>
+                </div>
+              </div>
+
+              {/* PROGRESSO DA ETAPA ATUAL */}
+              <div className="space-y-2 bg-background/90 rounded-xl p-4 border border-border/60">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-black text-foreground">
+                    {currentItem.studiedMinutesInRound} min / {currentItem.plannedMinutes} min
+                  </span>
+                  <span className="font-black text-primary">
+                    {currentItem.remainingMinutesInRound > 0
+                      ? `Faltam ${currentItem.remainingMinutesInRound} minutos`
+                      : "Meta da etapa atingida!"}
+                  </span>
+                </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden p-0.5">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round(
+                          (currentItem.studiedMinutesInRound / currentItem.plannedMinutes) * 100
+                        )
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* BOTÕES PRINCIPAIS DE AÇÃO */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+                <Button
+                  onClick={handleStartStudy}
+                  disabled={isCurrentItemStudying}
+                  className="flex-1 h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-sm tracking-wide shadow-md hover:shadow-lg transition-all"
+                >
+                  <Play className="h-5 w-5 mr-2 fill-current" />
+                  {isCurrentItemStudying
+                    ? "Estudo em andamento no cronômetro..."
+                    : currentItem.studiedMinutesInRound > 0
+                    ? `CONTINUAR ESTUDO (${currentItem.remainingMinutesInRound} min restantes)`
+                    : `INICIAR ESTUDO DE ${currentItem.disciplineName.toUpperCase()}`}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSkipCurrent}
+                  disabled={isSkipping || isCurrentItemStudying}
+                  className="h-14 px-5 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted/80 gap-1.5"
+                  title="Pular esta matéria na volta atual, mantendo o tempo já estudado"
+                >
+                  <SkipForward className="h-4 w-4" />
+                  Pular etapa
+                </Button>
+              </div>
+
+              {/* PRÉVIA DA PRÓXIMA MATÉRIA */}
+              {nextItem && (
+                <div className="pt-2 border-t border-border/40 flex items-center gap-2 text-xs text-muted-foreground">
+                  <CornerDownRight className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>
+                    Depois desta:{" "}
+                    <strong className="text-foreground font-black">
+                      {nextItem.disciplineName}
+                    </strong>{" "}
+                    — {formatMinutes(nextItem.plannedMinutes)}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground bg-muted/20 rounded-xl border">
+              Nenhuma matéria configurada neste ciclo de estudos.
+            </div>
+          )}
         </div>
       </Card>
 
-      <Card className="p-4">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-          Sequência do ciclo
-        </h4>
-        <div className="space-y-1.5 max-h-64 overflow-y-auto">
-          {cycle.items.map((item, index) => {
-            const isActive = index === currentIndex
-            const isDone = item.status === "CONCLUIDO"
-            const isPast = index < currentIndex
+      {/* 3. SEQUÊNCIA COMPLETA DO CICLO */}
+      <Card className="p-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between border-b pb-3.5">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
+              Sequência do Ciclo ({items.length} matérias)
+            </h3>
+          </div>
+          <span className="text-xs font-bold text-muted-foreground">
+            {formatMinutes(totalPlannedMinutesPerRound)} / volta
+          </span>
+        </div>
+
+        <div className="space-y-2.5">
+          {items.map((item, index) => {
+            const isCompleted = item.status === "CONCLUIDO"
+            const isCurrent = item.status === "ATUAL"
+            const isSkipped = item.status === "PULADO"
+            const isPending = item.status === "PENDENTE"
+
             return (
               <div
-                key={item.id}
+                key={item.itemId}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                  isActive && "bg-[#2563EB]/10 border border-[#2563EB]/20",
-                  isDone && "opacity-60",
-                  isPast && !isDone && "opacity-50",
-                  !isActive && !isDone && !isPast && "hover:bg-muted/50",
+                  "flex items-center gap-3 p-3.5 rounded-xl border transition-all",
+                  isCurrent &&
+                    "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40",
+                  isCompleted &&
+                    "border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20 text-foreground",
+                  isSkipped &&
+                    "border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 text-foreground",
+                  isPending && "border-border/50 bg-muted/15 opacity-75"
                 )}
               >
-                <span
-                  className={cn(
-                    "flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0",
-                    isDone && "bg-emerald-500 text-white",
-                    isActive && "bg-[#2563EB] text-white",
-                    !isDone && !isActive && "bg-muted text-muted-foreground",
+                {/* ÍCONE DE STATUS */}
+                <div className="shrink-0">
+                  {isCompleted && (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white font-black text-xs shadow-xs" title="Concluída nesta volta">
+                      ✓
+                    </div>
                   )}
-                >
-                  {isDone ? "✓" : index + 1}
-                </span>
-                <span className="flex-1 truncate">{item.discipline?.name || "Matéria"}</span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {formatMinutes(item.completed_minutes)}/{formatMinutes(item.planned_minutes)}
-                </span>
+                  {isCurrent && (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground font-black text-xs animate-pulse shadow-xs" title="Matéria atual">
+                      ▶
+                    </div>
+                  )}
+                  {isSkipped && (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white font-black text-xs shadow-xs" title="Etapa pulada nesta volta (minutos parciais preservados)">
+                      ↷
+                    </div>
+                  )}
+                  {isPending && (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/40 text-muted-foreground font-bold text-xs" title="Pendente">
+                      ○
+                    </div>
+                  )}
+                </div>
+
+                {/* INFORMAÇÕES DA DISCIPLINA */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-muted-foreground">
+                      #{index + 1}
+                    </span>
+                    <h4 className={cn("text-sm font-black truncate", isCurrent && "text-primary")}>
+                      {item.disciplineName}
+                    </h4>
+                    {isCurrent && (
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
+                        Atual
+                      </span>
+                    )}
+                    {isSkipped && (
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                        Pulada
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                    {item.disciplineArea || "Geral"} • Dificuldade: {item.difficulty}
+                  </p>
+                </div>
+
+                {/* TEMPO REALIZADO / META */}
+                <div className="text-right shrink-0 space-y-0.5">
+                  <div className="text-xs font-black text-foreground">
+                    {isCompleted ? (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {item.plannedMinutes}/{item.plannedMinutes} min
+                      </span>
+                    ) : isCurrent ? (
+                      <span className="text-primary font-black">
+                        {item.studiedMinutesInRound}/{item.plannedMinutes} min
+                      </span>
+                    ) : isSkipped ? (
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">
+                        {item.studiedMinutesInRound}/{item.plannedMinutes} min
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground font-medium">
+                        0/{item.plannedMinutes} min
+                      </span>
+                    )}
+                  </div>
+                  {isCurrent && item.remainingMinutesInRound > 0 && (
+                    <p className="text-[10px] font-black text-primary">
+                      Faltam {item.remainingMinutesInRound} min
+                    </p>
+                  )}
+                  {item.extraMinutesInRound > 0 && (
+                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      +{item.extraMinutesInRound} min extra
+                    </p>
+                  )}
+                  {isCompleted && (
+                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      Concluída na volta
+                    </p>
+                  )}
+                  {isSkipped && (
+                    <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                      Incompleta nesta volta
+                    </p>
+                  )}
+                </div>
               </div>
             )
           })}

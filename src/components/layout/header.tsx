@@ -318,8 +318,9 @@ export function AppHeader({
                   setIsUserMenuOpen(false)
                   clearUserLocalData()
                   await logoutAction()
+                  window.location.replace("/login")
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-left cursor-pointer"
               >
                 <LogOut className="h-4 w-4 text-destructive" />
                 Sair

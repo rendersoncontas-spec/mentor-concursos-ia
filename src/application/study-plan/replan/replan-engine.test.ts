@@ -1041,4 +1041,78 @@ test("CENÁRIO MEGA-PROMPT: Idempotência do cálculo (reexecutar 10 vezes mant�
   }
 })
 
+// ============================================================================
+// TESTES DO SISTEMA DE CONTROLE DE PENDÊNCIAS E ANTECIPAÇÃO (ESPEC 16)
+// ============================================================================
+
+test("ESPEC 16.1: Meta 20h (1200min) / estudado 16h51 (1011min) -> restante 3h09 (189min)", () => {
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 1011, // 16h51
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"],
+  })
+
+  assert.equal(result.remainingMinutesToGoal, 189) // 3h09min
+  assert.equal(result.totalDistributedMinutes, 189)
+})
+
+test("ESPEC 16.2: Pendência mantida no planejamento não infla hoje acima da capacidade", () => {
+  const pastBlocks = [block({ blockId: "p-1", durationMinutes: 60, scheduledDate: "2026-08-26" })]
+  const sessions: ReplanSession[] = [
+    session({ id: "s-1", studyPlanItemId: null, durationMinutes: 37, startedAt: "2026-08-26T14:00:00Z" }),
+  ]
+
+  const pendings = computePendingBlocks(pastBlocks, sessions)
+  assert.equal(pendings.length, 1)
+  assert.equal(pendings[0]!.pendingMinutes, 22) // 60 - 37 - 1 (tolerância) = 22min
+
+  // Distribuição automática nos próximos dias
+  const days: ReplanCapacityDay[] = [
+    { date: "2026-08-28", baseLoadMinutes: 60, maxDailyMinutes: 120 },
+  ]
+  const res = computeReplan(input({ pastBlocks, sessions, futureDays: days }))
+  assert.equal(res.ran, true)
+  assert.equal(res.totalPendingMinutes, 22)
+  assert.equal(res.assignmentsByDate["2026-08-28"]?.[0]?.minutes, 22)
+})
+
+test("ESPEC 16.3: Capacidade diária (5h/300min) maior que o restante semanal (3h09/189min) -> não cria blocos excedentes", () => {
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 1011, // 16h51
+    remainingAvailableDays: ["2026-08-27"], // 1 dia com capacidade teórica de 5h
+    maxDailyMinutesCap: 300, // 5h de capacidade
+  })
+
+  // O sistema programa apenas os 189min necessários para bater a meta, sem encher as 5h
+  assert.equal(result.targetMinutesByDay["2026-08-27"], 189) // 3h09min
+  assert.equal(result.totalDistributedMinutes, 189)
+})
+
+test("ESPEC 16.4: Estudo fora do cronograma (5h30 / 330min) é abatido integralmente da meta semanal", () => {
+  // Usuário estuda 5h30 (330min) de matéria não planejada
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200, // 20h
+    realStudiedMinutesThisWeek: 330, // 5h30
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"],
+  })
+
+  assert.equal(result.remainingMinutesToGoal, 870) // 14h30min
+  assert.equal(result.totalDistributedMinutes, 870)
+})
+
+test("ESPEC 16.5: Meta semanal já atingida (estudado >= meta) -> 0 minutos restantes e nenhum bloco criado", () => {
+  const result = distributeWeeklyRemainingGoal({
+    weeklyGoalMinutes: 1200,
+    realStudiedMinutesThisWeek: 1260, // 21h (já passou da meta de 20h)
+    remainingAvailableDays: ["2026-08-27", "2026-08-28"],
+  })
+
+  assert.equal(result.remainingMinutesToGoal, 0)
+  assert.equal(result.totalDistributedMinutes, 0)
+  assert.equal(result.targetMinutesByDay["2026-08-27"], 0)
+  assert.equal(result.targetMinutesByDay["2026-08-28"], 0)
+})
+
+
 

@@ -1,6 +1,7 @@
 import { RotateCcw } from "lucide-react"
 
 import { getCycleOverviewData } from "@/application/study-plan/study-plan.service"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
 import { PlanejamentoClient } from "@/features/planejamento/components/planejamento-client"
 import { createClient } from "@/infrastructure/supabase/server"
@@ -17,12 +18,10 @@ export default async function PlanejamentoPage() {
 
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUser = await getEffectiveSessionUser(supabase)
 
-    if (user) {
-      cycleData = await getCycleOverviewData(supabase, user.id)
+    if (effectiveUser) {
+      cycleData = await getCycleOverviewData(supabase, effectiveUser.id)
     }
   } catch (error) {
     console.error("Erro ao carregar dados do Planejamento:", error)

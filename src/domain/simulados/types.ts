@@ -43,6 +43,7 @@ export interface SimuladoConfigInput {
   name: string
   examName: string | null
   roleName: string | null
+  examBoard?: string | null
   mode: SimuladoMode
   total: number
   disciplineIds: string[]
@@ -221,4 +222,160 @@ export interface SimuladoDraft {
   currentIndex: number
   elapsedMs: number
   savedAt: number
+}
+
+// ============================================================================
+// MÓDULO DE REGISTRO DE SIMULADOS EXTERNOS (novo conceito)
+// ============================================================================
+
+/** Fonte onde o aluno fez o simulado fora do sistema. */
+export type SimuladoRecordSource =
+  | "TEC"
+  | "GRAN"
+  | "ESTRATEGIA"
+  | "QCONCURSOS"
+  | "PDF"
+  | "PROVA_ANTERIOR"
+  | "OUTRO"
+
+/** Regra de pontuação escolhida pelo usuário. */
+export type SimuladoScoringRule = "PERCENTUAL" | "CEBRASPE" | "PENALIZACAO" | "PERSONALIZADO"
+
+/** Penalização padrão CEBRASPE/CESPE: 1 erro anula 1 acerto. */
+export const CEBRASPE_DEFAULT_PENALTY = 1
+
+/** Faixas de desempenho configuradas centralizadas. */
+export const PERFORMANCE_BANDS = {
+  EXCELENTE: { min: 85, label: "Excelente", color: "text-emerald-600", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
+  BOM: { min: 75, label: "Bom", color: "text-sky-600", bg: "bg-sky-500/10", border: "border-sky-500/30" },
+  ATENCAO: { min: 60, label: "Atenção", color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/30" },
+  FRACO: { min: 0, label: "Fraco", color: "text-rose-600", bg: "bg-rose-500/10", border: "border-rose-500/30" },
+} as const
+
+/** Um simulado registrado manualmente pelo aluno (feito fora do sistema). */
+export interface SimuladoRecordInput {
+  id?: string | undefined
+  name: string
+  examName: string
+  roleName: string
+  simuladoDate: string // YYYY-MM-DD
+  source: SimuladoRecordSource
+  sourceCustom?: string | undefined
+  totalQuestions: number
+  totalCorrect: number
+  totalWrong: number
+  totalBlank: number
+  timeSpentSeconds?: number | null | undefined
+  notes?: string | null | undefined
+  scoringRule: SimuladoScoringRule
+  /** Penalização por erro (CEBRASPE/PENALIZACAO). Default 1 = 1 erro anula 1 acerto. */
+  penaltyPerWrong?: number | null | undefined
+  /** Percentual final informado manualmente (PENALIZACAO/PERSONALIZADO). */
+  penaltyScore?: number | null | undefined
+  subjects: SimuladoRecordSubjectInput[]
+  exam_board: string // Banca examinadora (ex: CEBRASPE, FCC, FGV, VUNESP, FUMARC, FUNDEP, IBFC, Instituto AOCP, CETAP, Consulplan, Outra)
+  exam_board_custom?: string | null // Banca personalizada quando "Outra" for selecionada
+}
+
+/** Resultado por matéria informado pelo aluno. */
+export interface SimuladoRecordSubjectInput {
+  disciplineId?: string | null
+  disciplineName: string
+  questionsCount: number
+  correctCount: number
+  wrongCount: number
+  blankCount?: number
+}
+
+/** Linha de registro de simulado completa (com valores computados). */
+export interface SimuladoRecord {
+  id: string
+  userId: string
+  name: string
+  examName: string
+  roleName: string
+  simuladoDate: string
+  source: SimuladoRecordSource
+  sourceCustom: string | null
+  exam_board: string | null
+  exam_board_custom: string | null
+  totalQuestions: number
+  totalCorrect: number
+  totalWrong: number
+  totalBlank: number
+  accuracy: number | null
+  /** Pontuação líquida considerando a regra (ex: CEBRASPE). */
+  netScore?: number | null
+  /** Percentual líquido de aproveitamento (netScore / totalQuestions). */
+  netAccuracy?: number | null
+  timeSpentSeconds: number | null
+  notes: string | null
+  scoringRule: SimuladoScoringRule
+  /** Penalização por erro (CEBRASPE). Null quando não aplicável. */
+  penaltyPerWrong?: number | null
+  penaltyScore: number | null
+  subjects: SimuladoRecordSubject[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SimuladoRecordSubject {
+  disciplineId: string | null
+  disciplineName: string
+  questionsCount: number
+  correctCount: number
+  wrongCount: number
+  blankCount: number
+  accuracy: number | null
+  /** Pontuação líquida por matéria (quando regra CEBRASPE). */
+  netScore?: number | null
+}
+
+/** Estatísticas gerais do painel de simulados. */
+export interface SimuladoPanelStats {
+  totalSimulados: number
+  totalQuestions: number
+  totalCorrect: number
+  totalWrong: number
+  averageAccuracy: number | null
+  bestAccuracy: number | null
+  lastAccuracy: number | null
+  last5AverageAccuracy: number | null
+  worstAccuracy: number | null
+  evolutionPp: number | null
+  trend: "UP" | "STABLE" | "DOWN" | null
+  trendMessage: string | null
+}
+
+/** Ponto do gráfico de evolução. */
+export interface SimuladoEvolutionPoint {
+  simuladoId: string
+  name: string
+  date: string
+  accuracy: number | null
+}
+
+/** Análise por matéria agregada entre simulados. */
+export interface SimuladoSubjectAnalysis {
+  disciplineId: string | null
+  disciplineName: string
+  totalQuestions: number
+  totalCorrect: number
+  accuracy: number | null
+  band: keyof typeof PERFORMANCE_BANDS
+  evolutionPp: number | null
+  history: { simuladoId: string; name: string; date: string; accuracy: number | null }[]
+}
+
+/** Comparação entre dois simulados. */
+export interface SimuladoComparisonResult {
+  firstId: string
+  secondId: string
+  accuracyDeltaPp: number | null
+  subjects: {
+    disciplineName: string
+    firstAccuracy: number | null
+    secondAccuracy: number | null
+    deltaPp: number | null
+  }[]
 }

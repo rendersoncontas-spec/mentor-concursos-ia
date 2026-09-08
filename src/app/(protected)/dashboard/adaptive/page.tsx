@@ -5,6 +5,7 @@ import { Activity, History, ShieldAlert } from "lucide-react"
 
 import { calculateLearningHealthScore } from "@/application/adaptive-learning/adaptive-learning.service"
 import type { AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { Logo } from "@/components/ui/logo"
 import { createClient } from "@/infrastructure/supabase/server"
 
@@ -16,16 +17,14 @@ export const metadata = {
 export default async function AdaptiveDashboardPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  const effectiveUser = await getEffectiveSessionUser(supabase)
+  if (!effectiveUser) redirect("/login")
 
   // Buscar perfil e disciplinas reais do usuário
   const { data: profile } = await supabase
     .from("profiles")
     .select("weekly_study_hours, streak_days")
-    .eq("id", user.id)
+    .eq("id", effectiveUser.id)
     .maybeSingle()
 
   const { data: userDisciplines } = await supabase
@@ -36,7 +35,7 @@ export default async function AdaptiveDashboardPage() {
       disciplines ( id, name )
     `,
     )
-    .eq("user_id", user.id)
+    .eq("user_id", effectiveUser.id)
 
   const realDisciplines = (userDisciplines || []).map((ud) => {
     const joined = ud.disciplines as unknown as { name?: string } | null
@@ -52,7 +51,7 @@ export default async function AdaptiveDashboardPage() {
   })
 
   const realContext: AnalyticsContext = {
-    userId: user.id,
+    userId: effectiveUser.id,
     disciplines: realDisciplines,
     userStats: {
       averageEnergy: 3,
@@ -79,7 +78,7 @@ export default async function AdaptiveDashboardPage() {
       disciplines ( name )
     `,
     )
-    .eq("user_id", user.id)
+    .eq("user_id", effectiveUser.id)
     .order("created_at", { ascending: false })
     .limit(10)
 

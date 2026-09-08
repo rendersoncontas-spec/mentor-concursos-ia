@@ -45,24 +45,24 @@ function discColor(id: string | null): string {
   return DISC_PALETTE[hash % DISC_PALETTE.length] ?? "#3b82f6"
 }
 
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
+
 export default async function ReviewsDashboardPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  const effectiveUser = await getEffectiveSessionUser(supabase)
+  if (!effectiveUser) redirect("/login")
 
   const [backlogCount, memoryStages, retentionData, itemsRes, discRes] = await Promise.all([
-    getReviewBacklog(supabase, user.id),
-    getMemoryStages(supabase, user.id),
-    getAverageRetention(supabase, user.id),
+    getReviewBacklog(supabase, effectiveUser.id),
+    getMemoryStages(supabase, effectiveUser.id),
+    getAverageRetention(supabase, effectiveUser.id),
     supabase
       .from("review_items")
       .select(
         "id, card_front, discipline_id, review_stage, next_review_at, last_review_at, lapses_count, last_interval_days, is_suspended, source_type",
       )
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUser.id)
       .is("deleted_at", null),
     supabase.from("disciplines").select("id, name"),
   ])

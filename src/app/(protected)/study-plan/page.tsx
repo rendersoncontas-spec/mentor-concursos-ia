@@ -29,17 +29,17 @@ function formatMinutes(minutes: number): string {
   return `${h}h ${m}min`
 }
 
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
+
 export default async function StudyPlanPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  const effectiveUser = await getEffectiveSessionUser(supabase)
+  if (!effectiveUser) redirect("/login")
 
   const [planWeek, disciplineSummary] = await Promise.all([
-    getActiveStudyPlan(supabase, user.id),
-    getStudyPlanDisciplineSummary(supabase, user.id),
+    getActiveStudyPlan(supabase, effectiveUser.id),
+    getStudyPlanDisciplineSummary(supabase, effectiveUser.id),
   ])
 
   const hasPlan = planWeek !== null

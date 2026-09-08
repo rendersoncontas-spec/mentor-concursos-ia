@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { createServerClient } from "@supabase/ssr"
 
 import { MentorAIService } from "@/application/mentor-ai/mentor-ai.service"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { env } from "@/config/env"
 import { MentorFeed } from "@/features/mentor-ai/components/mentor-feed"
 
@@ -35,16 +36,14 @@ export default async function MentorPage() {
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const effectiveUser = await getEffectiveSessionUser(supabase)
 
-  if (!user) {
+  if (!effectiveUser) {
     redirect("/login")
   }
 
   // Gera a sessão heurística
-  const mentorResponse = await MentorAIService.generateMentorSession(supabase, user.id)
+  const mentorResponse = await MentorAIService.generateMentorSession(supabase, effectiveUser.id)
 
   return (
     <main className="p-4 sm:p-6 lg:p-8 min-h-screen bg-gray-50/50">

@@ -60,18 +60,18 @@ function mapRowToConcurso(row: any): ConcursoData {
   }
 }
 
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
+
 async function getConcursos(): Promise<ConcursoData[]> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return []
+    const effectiveUser = await getEffectiveSessionUser(supabase)
+    if (!effectiveUser) return []
 
     const { data } = await supabase
       .from("user_targets")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUser.id)
       .order("is_active", { ascending: false })
       .order("created_at", { ascending: false })
 

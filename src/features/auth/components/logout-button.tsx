@@ -21,8 +21,7 @@ export function LogoutButton() {
       const result = await logoutAction()
       if (result.success) {
         toast.success("Desconectado com sucesso!")
-        router.push("/login")
-        router.refresh()
+        window.location.replace("/login")
       } else {
         toast.error(result.error)
       }

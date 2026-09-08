@@ -1,12 +1,11 @@
 import { LogoutButton } from "@/features/auth/components/logout-button"
+import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export default async function ProfilePage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const effectiveUser = await getEffectiveSessionUser(supabase)
 
   return (
     <div className="container py-10 max-w-2xl">
@@ -14,16 +13,19 @@ export default async function ProfilePage() {
 
       <div className="border rounded-lg p-6 space-y-4 shadow-sm bg-card">
         <div>
-          <p className="text-sm text-muted-foreground font-medium">E-mail</p>
-          <p className="text-lg">{user?.email}</p>
+          <p className="text-sm text-muted-foreground font-medium">Nome</p>
+          <p className="text-lg">{effectiveUser?.name}</p>
         </div>
 
         <div>
-          <p className="text-sm text-muted-foreground font-medium">Data de Cadastro</p>
-          <p className="text-md">
-            {user?.created_at
-              ? new Date(user.created_at).toLocaleDateString("pt-BR")
-              : "Desconhecida"}
+          <p className="text-sm text-muted-foreground font-medium">E-mail</p>
+          <p className="text-lg">{effectiveUser?.email}</p>
+        </div>
+
+        <div>
+          <p className="text-sm text-muted-foreground font-medium">Status</p>
+          <p className="text-md capitalize">
+            {effectiveUser?.role === "admin" ? "Administrador" : effectiveUser?.role === "moderator" ? "Moderador" : "Estudante"}
           </p>
         </div>
 

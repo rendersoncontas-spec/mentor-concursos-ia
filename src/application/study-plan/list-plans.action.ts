@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import type { PlanStatus, PlanType } from "@/domain/study-plan/study-plan.types"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
@@ -45,15 +46,15 @@ export interface PlanCardData {
 export async function listPlansAction(): Promise<{ data: PlanCardData[] | null; error: string | null }> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: "Usuário não autenticado" }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     // Busca todos os planos do usuário.
     // Usamos select com fallback gracioso para colunas que podem não existir antes da migration.
     const { data: rawPlans, error } = await supabase
       .from("study_plans")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .order("generated_at", { ascending: false })
 
     if (error) return { data: null, error: error.message }
@@ -65,7 +66,7 @@ export async function listPlansAction(): Promise<{ data: PlanCardData[] | null; 
     const { data: history } = await supabase
       .from("study_history")
       .select("discipline_id, duration_minutes, started_at")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .not("duration_minutes", "is", null)
 
     const historyRows = (history ?? []) as { discipline_id: string; duration_minutes: number; started_at: string }[]
@@ -74,7 +75,7 @@ export async function listPlansAction(): Promise<{ data: PlanCardData[] | null; 
     const { data: activeTarget } = await supabase
       .from("user_targets")
       .select("target_exam")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("is_active", true)
       .limit(1)
       .maybeSingle()
@@ -253,18 +254,18 @@ export async function activatePlanAction(planId: string): Promise<{ success: boo
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Usuário não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     // 1. Desativa todos
-    await supabase.from("study_plans").update({ active: false, status: "ARCHIVED" }).eq("user_id", user.id)
+    await supabase.from("study_plans").update({ active: false, status: "ARCHIVED" }).eq("user_id", effectiveUserId)
 
     // 2. Ativa o plano selecionado
     const { error } = await supabase
       .from("study_plans")
       .update({ active: true, status: "ACTIVE" })
       .eq("id", planId)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
 
     if (error) return { success: false, error: error.message }
     return { success: true }
@@ -280,15 +281,15 @@ export async function togglePausePlanAction(planId: string, currentStatus: PlanS
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Usuário não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     const nextStatus: PlanStatus = currentStatus === "PAUSED" ? "ACTIVE" : "PAUSED"
     const isActive = nextStatus === "ACTIVE"
 
     // Se for reativar, desativa outros ativos primeiro
     if (isActive) {
-      await supabase.from("study_plans").update({ active: false, status: "ARCHIVED" }).eq("user_id", user.id)
+      await supabase.from("study_plans").update({ active: false, status: "ARCHIVED" }).eq("user_id", effectiveUserId)
     }
 
     const { error } = await supabase
@@ -299,7 +300,7 @@ export async function togglePausePlanAction(planId: string, currentStatus: PlanS
         paused_at: nextStatus === "PAUSED" ? new Date().toISOString() : null,
       })
       .eq("id", planId)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
 
     if (error) return { success: false, error: error.message }
     return { success: true, newStatus: nextStatus }
@@ -315,15 +316,15 @@ export async function duplicatePlanAction(planId: string, newName?: string): Pro
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Usuário não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     // 1. Buscar plano original
     const { data: original, error: origError } = await supabase
       .from("study_plans")
       .select("*")
       .eq("id", planId)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .single()
 
     if (origError || !original) return { success: false, error: "Plano original não encontrado." }
@@ -337,7 +338,7 @@ export async function duplicatePlanAction(planId: string, newName?: string): Pro
     if (itemsError || !origItems) return { success: false, error: "Itens do plano original não encontrados." }
 
     // 3. Contar planos para nova versão
-    const { count } = await supabase.from("study_plans").select("*", { count: "exact", head: true }).eq("user_id", user.id)
+    const { count } = await supabase.from("study_plans").select("*", { count: "exact", head: true }).eq("user_id", effectiveUserId)
     const newVersion = (count ?? 0) + 1
 
     const sourceName = original["name"] ? String(original["name"]) : `Plano v${original["version"]}`
@@ -347,7 +348,7 @@ export async function duplicatePlanAction(planId: string, newName?: string): Pro
     const { data: newPlan, error: insertError } = await supabase
       .from("study_plans")
       .insert({
-        user_id: user.id,
+        user_id: effectiveUserId,
         version: newVersion,
         name: finalName,
         description: original["description"] ?? null,
@@ -388,11 +389,11 @@ export async function deletePlanAction(planId: string): Promise<{ success: boole
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: "Usuário não autenticado." }
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     // CASCADE exclui automaticamente os study_plan_items (via FK)
-    const { error } = await supabase.from("study_plans").delete().eq("id", planId).eq("user_id", user.id)
+    const { error } = await supabase.from("study_plans").delete().eq("id", planId).eq("user_id", effectiveUserId)
     if (error) return { success: false, error: error.message }
 
     return { success: true }

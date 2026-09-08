@@ -1479,3 +1479,166 @@ export async function setAutoReplanPreference(
     return { ok: false, error: "Erro ao salvar preferência." }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Puxar Pendência para Hoje (Ação Manual Explícita)
+// ---------------------------------------------------------------------------
+
+export async function pullPendingToToday(
+  supabase: SupabaseClient,
+  userId: string,
+  disciplineId?: string,
+  availability?: ReplanAvailability,
+): Promise<{ ok: boolean; message?: string; error?: string }> {
+  try {
+    const todayKey = todayKeyInSaoPaulo()
+    const avail = availability ?? DEFAULT_AVAILABILITY
+
+    // 1. Bloqueio em dia de plantão
+    if (!isStudyDate(todayKey, avail)) {
+      return {
+        ok: false,
+        error: "Hoje está configurado como plantão/folga. O sistema não agenda estudos obrigatórios em dias de plantão.",
+      }
+    }
+
+    const loaded = await loadActivePlan(supabase, userId)
+    if (!loaded) return { ok: false, error: "Nenhum plano ativo encontrado." }
+    const { plan, items } = loaded
+
+    // 2. Identificar pendências atuais
+    const info = await getReplanInfo(supabase, userId, avail, true)
+    let targets = info.pendingByDiscipline
+    if (disciplineId) {
+      targets = targets.filter((p) => p.disciplineId === disciplineId)
+    }
+    if (targets.length === 0) {
+      return { ok: false, error: "Nenhuma pendência encontrada para antecipar." }
+    }
+
+    // 3. Buscar blocos de hoje
+    const { data: todayBlocksData } = await supabase
+      .from("study_plan_daily_blocks")
+      .select("id, duration_minutes, execution_order, status, discipline_id")
+      .eq("study_plan_id", plan.id)
+      .eq("scheduled_date", todayKey)
+      .order("execution_order", { ascending: true })
+
+    const todayBlocks = (todayBlocksData ?? []) as {
+      id: string
+      duration_minutes: number
+      execution_order: number
+      status: string
+      discipline_id: string
+    }[]
+    const currentTodayMinutes = todayBlocks.reduce((acc, b) => acc + (b.duration_minutes || 0), 0)
+    let nextOrder = todayBlocks.length > 0
+      ? Math.max(...todayBlocks.map((b) => b.execution_order || 0)) + 1
+      : 1
+
+    // 4. Calcular saldo semanal real
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("weekly_study_hours, week_start_day, preferences")
+      .eq("id", userId)
+      .maybeSingle()
+
+    const prefs = profile?.preferences as Record<string, unknown> | null
+    const firstDayPref = prefs?.["firstDayOfWeek"] as string | undefined
+    const weekStartDay =
+      firstDayPref === "Domingo"
+        ? 0
+        : firstDayPref === "Segunda-feira"
+          ? 1
+          : (profile?.week_start_day ?? 0)
+
+    const weekRange = getSaoPauloWeekRange(todayKey, weekStartDay)
+    const { data: weekHistory } = await supabase
+      .from("study_history")
+      .select("duration_minutes")
+      .eq("user_id", userId)
+      .gte("started_at", `${weekRange.mondayKey}T00:00:00.000Z`)
+      .lte("started_at", `${weekRange.sundayKey}T23:59:59.999Z`)
+      .not("duration_minutes", "is", null)
+
+    const studiedSoFar = (weekHistory ?? []).reduce(
+      (acc, h) => acc + ((h as { duration_minutes?: number }).duration_minutes || 0),
+      0,
+    )
+    const weeklyTargetMinutes = Math.max(1, (profile?.weekly_study_hours || 20) * 60)
+    const remainingWeek = Math.max(0, weeklyTargetMinutes - studiedSoFar)
+
+    // 5. Executar reajuste manual para cada pendência alvo
+    let totalPulledMinutes = 0
+    const disciplineNames: string[] = []
+
+    for (const target of targets) {
+      const minutesToPull = target.pendingMinutes
+      if (minutesToPull <= 0) continue
+
+      disciplineNames.push(target.disciplineName)
+
+      // Registrar evento no histórico
+      const { data: eventRow, error: evError } = await supabase
+        .from("study_plan_replan_events")
+        .insert({
+          user_id: userId,
+          study_plan_id: plan.id,
+          trigger: "MANUAL",
+          reason: "manual_pull",
+          pending_minutes: minutesToPull,
+          pending_blocks: 1,
+          redistributed_days: 1,
+          unscheduled_minutes: 0,
+          critical: false,
+          message: `Manual — usuário puxou ${target.disciplineName} (${minutesToPull}min) para hoje`,
+        })
+        .select("id")
+        .single()
+
+      const eventId = eventRow?.id || null
+
+      // Deletar blocos futuros de reajuste dessa disciplina para não duplicar
+      await supabase
+        .from("study_plan_daily_blocks")
+        .delete()
+        .eq("study_plan_id", plan.id)
+        .eq("discipline_id", target.disciplineId)
+        .eq("origin", "REAJUSTE")
+        .gt("scheduled_date", todayKey)
+
+      // Inserir bloco de reajuste em hoje
+      const { error: insError } = await supabase
+        .from("study_plan_daily_blocks")
+        .insert({
+          study_plan_id: plan.id,
+          discipline_id: target.disciplineId,
+          scheduled_date: todayKey,
+          duration_minutes: minutesToPull,
+          execution_order: nextOrder++,
+          origin: "REAJUSTE",
+          status: "PENDENTE",
+          replan_event_id: eventId,
+        })
+
+      if (insError) {
+        Sentry.captureException(insError, { extra: { feature: FEATURE, step: "pull_pending_insert" } })
+      } else {
+        totalPulledMinutes += minutesToPull
+      }
+    }
+
+    // 6. Sincronizar planejamento semanal de forma consistente
+    const { reconcileWeeklyPlan } = await import("@/application/study-plan/weekly-planner.service")
+    await reconcileWeeklyPlan(supabase, userId, avail).catch(() => null)
+
+    return {
+      ok: true,
+      message: `Pendência de ${disciplineNames.join(", ")} (${totalPulledMinutes}min) puxada para hoje com sucesso!`,
+    }
+  } catch (error) {
+    Sentry.captureException(error, { extra: { feature: FEATURE, step: "pull_pending_to_today" } })
+    return { ok: false, error: "Erro ao antecipar pendência para hoje." }
+  }
+}
+

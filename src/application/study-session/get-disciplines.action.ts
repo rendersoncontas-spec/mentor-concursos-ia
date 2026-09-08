@@ -181,6 +181,8 @@ export async function fetchActivePlanDisciplines(
   }
 }
 
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
+
 /**
  * Server Action para buscar as disciplinas do plano ativo do usuário autenticado.
  */
@@ -192,16 +194,13 @@ export async function getActivePlanDisciplines(): Promise<{
 }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (authError || !user) {
+    if (!effectiveUserId) {
       return { hasActivePlan: false, planId: null, planName: null, disciplines: [] }
     }
 
-    return await fetchActivePlanDisciplines(supabase, user.id)
+    return await fetchActivePlanDisciplines(supabase, effectiveUserId)
   } catch (error: unknown) {
     console.error("[getActivePlanDisciplines] Exceção:", error)
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
@@ -225,17 +224,14 @@ export async function getDisciplinesForAutocomplete(): Promise<{
 }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (authError || !user) {
+    if (!effectiveUserId) {
       return { hasActivePlan: false, planDisciplines: [], allDisciplines: [] }
     }
 
     // 1. Buscar disciplinas do plano ativo via service puro
-    const planResult = await fetchActivePlanDisciplines(supabase, user.id)
+    const planResult = await fetchActivePlanDisciplines(supabase, effectiveUserId)
 
     // 2. Buscar todas as disciplinas globais do catálogo do banco
     const { data: allDiscs, error: allDiscsError } = await supabase

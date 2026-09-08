@@ -368,7 +368,7 @@ export async function createSimuladoAction(input: SimuladoConfigInput): Promise<
       .insert({
         user_id: user.id,
         name: input.name?.trim() || modeDefaultName(input.mode),
-        exam_board: input.examName?.split(" - ")[1] ?? null,
+        exam_board: input.examBoard,
         exam_name: input.examName ?? null,
         role_name: input.roleName ?? null,
         style: "Múltipla Escolha",
