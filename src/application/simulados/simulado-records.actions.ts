@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache"
 
-import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import {
   accuracyOf,
   computeNetScore,
@@ -61,9 +60,9 @@ type SubjectRow = {
 }
 
 async function requireUser(supabase: Supabase) {
-  const userId = await getEffectiveUserId(supabase)
-  if (!userId) return null
-  return userId
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  return user.id
 }
 
 function toSource(value: string | null): SimuladoRecordSource {
