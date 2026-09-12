@@ -41,14 +41,29 @@ export function StudyCyclesView() {
 
   const loadData = useCallback(async () => {
     try {
-      const [cyclesData, activeData, disciplinesResult] = await Promise.all([
+      const [cyclesResult, activeData, disciplinesResult] = await Promise.all([
         getCyclesAction(),
         getActiveCycleAction(),
         getDisciplinesForAutocomplete(),
       ])
-      setCycles(cyclesData)
+      setCycles(cyclesResult.data)
       setActiveCycle(activeData)
       setAvailableDisciplines(disciplinesResult?.allDisciplines || [])
+
+      if (cyclesResult.reconcileErrors.length > 0) {
+        const hasMigrationError = cyclesResult.reconcileErrors.some(e =>
+          e.includes("COLUNAS V2") || e.includes("does not exist")
+        )
+        if (hasMigrationError) {
+          toast.error("Erro ao sincronizar estudos com o ciclo. Execute a migration V2 no painel do Supabase.", {
+            duration: 10000,
+          })
+        } else {
+          toast.warning(`Sincronização do ciclo com erros: ${cyclesResult.reconcileErrors[0]}`, {
+            duration: 8000,
+          })
+        }
+      }
     } catch (err) {
       console.error("[StudyCyclesView] Erro ao carregar ciclos:", err)
       toast.error("Erro ao carregar ciclos de estudo.")

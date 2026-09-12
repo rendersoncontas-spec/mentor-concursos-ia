@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { type Resolver, useForm, useWatch } from "react-hook-form"
 
 import { useRouter } from "next/navigation"
@@ -29,12 +29,9 @@ import { z } from "zod"
 import { updateStudySessionAction } from "@/application/study-history/study-history.actions"
 import {
   type DisciplineOption,
-  getDisciplinesForAutocomplete,
-} from "@/application/study-session/get-disciplines.action"
-import {
   type DisciplineSuggestion,
-  getStudyDisciplineSuggestions,
-} from "@/application/study-session/get-study-discipline-suggestions.action"
+} from "@/application/study-session/get-disciplines.action"
+import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
 import {
@@ -214,13 +211,12 @@ export function StudyRegisterModal({
   const isEditMode = mode === "edit" && !!sessionToEdit
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [disciplinePopoverOpen, setDisciplinePopoverOpen] = useState(false)
-  const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null)
-  const [planDisciplines, setPlanDisciplines] = useState<DisciplineOption[]>([])
-  const [allDisciplines, setAllDisciplines] = useState<DisciplineOption[]>([])
-  const [suggestionsSource, setSuggestionsSource] = useState<
-    "PLAN" | "CYCLE" | "HISTORY" | "NONE"
-  >("NONE")
-  const [suggestions, setSuggestions] = useState<DisciplineSuggestion[]>([])
+  const { data: disciplineData, loading: disciplinesLoading } = useDisciplineData()
+  const hasActivePlan = disciplineData?.hasActivePlan ?? null
+  const planDisciplines = disciplineData?.planDisciplines ?? []
+  const allDisciplines = disciplineData?.allDisciplines ?? []
+  const suggestionsSource = disciplineData?.suggestionsSource ?? "NONE"
+  const suggestions = disciplineData?.suggestions ?? []
 
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema) as Resolver<SessionFormValues>,
@@ -344,33 +340,6 @@ export function StudyRegisterModal({
     activeSeconds + pausedSeconds > 0
       ? Math.round((activeSeconds / (activeSeconds + pausedSeconds)) * 100)
       : null
-
-  const loadDisciplines = useCallback(async () => {
-    try {
-      const [autocompleteResult, suggestionsResult] = await Promise.all([
-        getDisciplinesForAutocomplete(),
-        getStudyDisciplineSuggestions(),
-      ])
-      setPlanDisciplines(autocompleteResult.planDisciplines)
-      setAllDisciplines(autocompleteResult.allDisciplines)
-      setHasActivePlan(autocompleteResult.hasActivePlan)
-      setSuggestionsSource(suggestionsResult.source)
-      setSuggestions(suggestionsResult.suggestions)
-    } catch (err) {
-      console.error("Erro ao carregar disciplinas:", err)
-      Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
-        tags: { feature: "discipline-selector" },
-      })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    const timeoutId = window.setTimeout(() => {
-      void loadDisciplines()
-    }, 0)
-    return () => window.clearTimeout(timeoutId)
-  }, [loadDisciplines, open])
 
   const handleMinimize = () => {
     minimizeSession()

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import {
   averageAccuracy,
@@ -129,9 +130,9 @@ function toHeader(row: SimuladoRow): SimuladoHeader {
 }
 
 async function requireUser(supabase: Supabase): Promise<{ user: { id: string } } | { user: null }> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { user: null }
-  return { user: { id: user.id } }
+  const userId = await getEffectiveUserId(supabase)
+  if (!userId) return { user: null }
+  return { user: { id: userId } }
 }
 
 // ─── Busca elegível (pool) sem seleção ──────────────────────────────────────

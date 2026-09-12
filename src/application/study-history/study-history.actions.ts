@@ -10,6 +10,7 @@ import type { StudyHistoryInsert } from "@/domain/study-history/study-history.ty
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import { buildIsoFromSaoPauloDateTime, getDayInSaoPaulo } from "@/lib/sao-paulo"
+import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
 
 import {
   createStudySession,
@@ -22,7 +23,7 @@ import {
   updateStudySession,
 } from "./study-history.service"
 
-const HISTORY_PATHS = ["/dashboard", "/dashboard/history", "/estatisticas", "/disciplines", "/planejamento"]
+const HISTORY_PATHS = ["/dashboard", "/dashboard/history", "/estatisticas", "/disciplines", "/planejamento", "/ciclos"]
 
 export async function getUserHistoryAction(page: number = 1, pageSize: number = 50) {
   try {
@@ -318,6 +319,15 @@ export async function saveManualStudyTimeAction(
 
       if (error) throw new Error("Erro ao atualizar registro: " + error.message)
       await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
+      
+      // Registrar no ciclo se a disciplina estiver no ciclo ativo
+      await registerStudyToCycle({
+        studyHistoryId: updated.id,
+        disciplineId: updated.discipline_id,
+        durationMinutes: updated.duration_minutes || durationMinutes,
+        studySource: "FREE",
+      }).catch((err) => console.error("[saveManualStudyTimeAction] Erro ao registrar no ciclo:", err))
+      
       for (const path of HISTORY_PATHS) revalidatePath(path)
       return { data: updated, error: null }
     }
@@ -343,6 +353,15 @@ export async function saveManualStudyTimeAction(
 
     if (error) throw new Error("Erro ao registrar estudo: " + error.message)
     await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
+    
+    // Registrar no ciclo se a disciplina estiver no ciclo ativo
+    await registerStudyToCycle({
+      studyHistoryId: created.id,
+      disciplineId: created.discipline_id,
+      durationMinutes: created.duration_minutes || durationMinutes,
+      studySource: "FREE",
+    }).catch((err) => console.error("[saveManualStudyTimeAction] Erro ao registrar no ciclo:", err))
+    
     for (const path of HISTORY_PATHS) revalidatePath(path)
     return { data: created, error: null }
   } catch (error) {

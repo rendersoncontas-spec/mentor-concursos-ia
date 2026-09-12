@@ -21,13 +21,14 @@ import {
   deleteCycleAction,
   pauseCycleAction,
   skipCycleCurrentItemAction,
+  getActiveCycleAction,
 } from "@/application/study-cycle/study-cycle.actions"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { CycleOverview, CycleItemProgress } from "@/domain/study-cycle/study-cycle.types"
 import { useGlobalStudy } from "@/features/study-session/components/study-provider"
+import { useCachedServerAction } from "@/hooks/use-cached-server-action"
 import { cn } from "@/lib/utils"
-import { getActiveCycleAction } from "@/application/study-cycle/study-cycle.actions"
 
 function formatMinutes(totalMinutes: number): string {
   const h = Math.floor(totalMinutes / 60)
@@ -56,24 +57,17 @@ interface IntelligentCycleWidgetProps {
 export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: IntelligentCycleWidgetProps) {
   const router = useRouter()
   const { startSession, session } = useGlobalStudy()
-  const [overview, setOverview] = useState<CycleOverview | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isPausing, setIsPausing] = useState(false)
   const [isSkipping, setIsSkipping] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const loadOverview = useCallback(() => {
-    setIsLoading(true)
-    getActiveCycleAction()
-      .then(setOverview)
-      .finally(() => setIsLoading(false))
-  }, [])
-
-  useEffect(() => {
-    loadOverview()
-  }, [loadOverview])
+  const { data: overview, loading: isLoading, refresh } = useCachedServerAction<CycleOverview | null>(
+    "activeCycleOverview",
+    () => getActiveCycleAction(),
+    2 * 60 * 1000, // 2 min — dados mudam quando usuário estuda
+  )
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -92,7 +86,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
       const res = await pauseCycleAction(overview.cycle.id)
       if (res.success) {
         toast.success("Ciclo pausado.")
-        loadOverview()
+        refresh()
       } else {
         toast.error("Erro ao pausar ciclo.")
       }
@@ -100,18 +94,18 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
       setIsPausing(false)
       setIsMenuOpen(false)
     }
-  }, [overview, loadOverview])
+  }, [overview, refresh])
 
   const handleResumeCycle = useCallback(async () => {
     if (!overview) return
     const res = await activateCycleAction(overview.cycle.id)
     if (res.success) {
       toast.success("Ciclo retomado!")
-      loadOverview()
+      refresh()
     } else {
       toast.error("Erro ao retomar ciclo.")
     }
-  }, [overview, loadOverview])
+  }, [overview, refresh])
 
   const handleDeleteCycle = useCallback(async () => {
     if (!overview) return
@@ -120,7 +114,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
       const res = await deleteCycleAction(overview.cycle.id)
       if (res.success) {
         toast.success("Ciclo excluído.")
-        setOverview(null)
+        refresh()
         onDeleteCycle?.()
       } else {
         toast.error("Erro ao excluir ciclo.")
@@ -138,14 +132,14 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
       const res = await skipCycleCurrentItemAction(overview.cycle.id)
       if (res.success) {
         toast.success("Etapa pulada. Tempo parcial preservado!")
-        loadOverview()
+        refresh()
       } else {
         toast.error("Erro ao pular etapa.")
       }
     } finally {
       setIsSkipping(false)
     }
-  }, [overview, loadOverview])
+  }, [overview, refresh])
 
   const handleStartStudy = useCallback(() => {
     if (!overview?.currentItem || !overview.cycle) return
@@ -232,7 +226,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   }
 
   const content = (
-    <div className="p-4 space-y-3.5">
+    <div className="p-4 space-y-3">
       {/* HEADER */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -244,7 +238,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
               Ciclo {cycle.name}
             </p>
             <p className="text-xs font-black text-foreground truncate">
-              {currentRound}ª volta · {roundProgressPercentage}%
+              {currentRound}ª volta · {items.length} {items.length === 1 ? "matéria" : "matérias"} · {roundProgressPercentage}%
               {isPaused && (
                 <span className="ml-1.5 text-amber-600 dark:text-amber-400 text-[10px]">
                   PAUSADO
@@ -304,27 +298,11 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
         </div>
       </div>
 
-      {/* 3 SUB-CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Card 1: VOLTA ATUAL */}
-        <div className="rounded-xl bg-muted/40 border border-border/40 p-3 space-y-1.5">
-          <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">
-            Volta Atual
-          </p>
-          <p className="text-lg font-black text-foreground leading-none">{currentRound}ª</p>
-          <p className="text-[11px] font-bold text-muted-foreground">
-            {items.length} {items.length === 1 ? "matéria" : "matérias"}
-          </p>
-          {totalRoundsDone > 0 && (
-            <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-              {totalRoundsDone} {totalRoundsDone === 1 ? "volta concluída" : "voltas concluídas"}
-            </p>
-          )}
-        </div>
-
-        {/* Card 2: EM FOCO */}
+      {/* MAIN CONTENT: EM FOCO | PRÓXIMA */}
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+        {/* EM FOCO — 3 cols on sm */}
         <div className={cn(
-          "rounded-xl border p-3 space-y-1.5",
+          "sm:col-span-3 rounded-xl border p-3 space-y-2",
           currentItem
             ? "bg-primary/5 border-primary/30"
             : "bg-muted/40 border-border/40"
@@ -334,50 +312,77 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
           </p>
           {currentItem ? (
             <>
-              <p className="text-sm font-black text-foreground leading-tight truncate">
+              <p className="text-sm font-black text-foreground leading-tight" title={currentItem.disciplineName}>
                 {currentItem.disciplineName}
               </p>
-              <p className="text-[11px] font-bold text-muted-foreground">
-                {currentItem.studiedMinutesInRound} / {currentItem.plannedMinutes} min
-              </p>
-              {currentItem.remainingMinutesInRound > 0 && (
-                <p className="text-[10px] font-bold text-primary">
-                  {currentItem.remainingMinutesInRound} min restantes
-                </p>
-              )}
-              {currentItem.isCompletedInRound && (
-                <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                  Concluída nesta volta
-                </p>
-              )}
-              {/* Mini progress bar */}
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-300"
-                  style={{
-                    width: `${Math.min(100, Math.round((currentItem.studiedMinutesInRound / currentItem.plannedMinutes) * 100))}%`,
-                  }}
-                />
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-base font-black text-foreground">
+                  {currentItem.studiedMinutesInRound}
+                </span>
+                <span className="text-[11px] font-bold text-muted-foreground">
+                  / {currentItem.plannedMinutes} min
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="space-y-1">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(100, Math.round((currentItem.studiedMinutesInRound / currentItem.plannedMinutes) * 100))}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-primary">
+                    {Math.min(100, Math.round((currentItem.studiedMinutesInRound / currentItem.plannedMinutes) * 100))}%
+                  </span>
+                  {currentItem.remainingMinutesInRound > 0 && (
+                    <span className="text-[10px] font-bold text-muted-foreground">
+                      Faltam {currentItem.remainingMinutesInRound} min
+                    </span>
+                  )}
+                  {currentItem.isCompletedInRound && (
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      Concluída
+                    </span>
+                  )}
+                </div>
               </div>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground font-medium">Nenhuma matéria</p>
+            <p className="text-xs text-muted-foreground font-medium">Nenhuma matéria em foco</p>
           )}
         </div>
 
-        {/* Card 3: PRÓXIMA */}
-        <div className="rounded-xl bg-muted/40 border border-border/40 p-3 space-y-1.5">
+        {/* PRÓXIMA — 2 cols on sm */}
+        <div className="sm:col-span-2 rounded-xl bg-muted/40 border border-border/40 p-3 space-y-2">
           <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">
             Próxima
           </p>
           {nextItem ? (
             <>
-              <p className="text-sm font-black text-foreground leading-tight truncate">
+              <p className="text-sm font-black text-foreground leading-tight truncate" title={nextItem.disciplineName}>
                 {nextItem.disciplineName}
               </p>
               <p className="text-[11px] font-bold text-muted-foreground">
-                {nextItem.plannedMinutes} min
+                Meta: {nextItem.plannedMinutes} min
               </p>
+              {nextItem.studiedMinutesInRound > 0 && (
+                <>
+                  <p className="text-[11px] font-bold text-muted-foreground">
+                    {nextItem.studiedMinutesInRound} / {nextItem.plannedMinutes} min
+                  </p>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-muted-foreground/40 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min(100, Math.round((nextItem.studiedMinutesInRound / nextItem.plannedMinutes) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </>
           ) : isLastStep && lastSubject ? (
             <>
@@ -394,15 +399,15 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
         </div>
       </div>
 
-      {/* PROGRESS BAR */}
-      <div className="space-y-1.5">
+      {/* ROUND PROGRESS BAR */}
+      <div className="space-y-1">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
             Progresso da volta
           </span>
           <span className="text-xs font-black text-primary">{roundProgressPercentage}%</span>
         </div>
-        <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
           <div
             className="h-full bg-primary rounded-full transition-all duration-500"
             style={{ width: `${Math.min(roundProgressPercentage, 100)}%` }}
@@ -410,41 +415,36 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
         </div>
       </div>
 
-      {/* ROUNDS COMPLETED INFO */}
-      {totalRoundsDone > 0 && (
-        <p className="text-[11px] font-bold text-muted-foreground text-center">
-          {totalRoundsDone} {totalRoundsDone === 1 ? "volta concluída" : "voltas concluídas"}
-        </p>
-      )}
-
-      {/* SKIP STEP BUTTON (only when in progress) */}
-      {currentItem && !isPaused && currentItem.studiedMinutesInRound > 0 && !currentItem.isCompletedInRound && (
+      {/* BUTTONS */}
+      <div className="space-y-1.5">
         <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSkipStep}
-          disabled={isSkipping}
-          className="w-full h-8 text-[11px] font-bold text-muted-foreground hover:text-foreground gap-1.5"
+          onClick={buttonAction}
+          disabled={isDeleting}
+          className={cn(
+            "w-full font-black text-xs h-9 shadow-xs",
+            isPaused
+              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+              : "bg-primary hover:bg-primary/90 text-primary-foreground"
+          )}
         >
-          <SkipForward className="h-3 w-3" />
-          Pular etapa atual
+          {buttonIcon}
+          {buttonLabel}
         </Button>
-      )}
 
-      {/* MAIN BUTTON */}
-      <Button
-        onClick={buttonAction}
-        disabled={isDeleting}
-        className={cn(
-          "w-full font-black text-xs h-9 shadow-xs",
-          isPaused
-            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-            : "bg-primary hover:bg-primary/90 text-primary-foreground"
+        {/* SKIP STEP — secondary */}
+        {currentItem && !isPaused && currentItem.studiedMinutesInRound > 0 && !currentItem.isCompletedInRound && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSkipStep}
+            disabled={isSkipping}
+            className="w-full h-7 text-[11px] font-bold text-muted-foreground hover:text-foreground gap-1.5"
+          >
+            <SkipForward className="h-3 w-3" />
+            Pular etapa atual
+          </Button>
         )}
-      >
-        {buttonIcon}
-        {buttonLabel}
-      </Button>
+      </div>
     </div>
   )
 

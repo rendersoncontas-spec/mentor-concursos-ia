@@ -42,6 +42,7 @@ import { type StudyCycleBlock } from "@/features/planejamento/components/plannin
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { getDailyMessage } from "./daily-message-banner"
+import { useCachedServerAction } from "@/hooks/use-cached-server-action"
 
 import { IntelligentCycleWidget } from "@/features/study-cycle/components/intelligent-cycle-widget"
 
@@ -624,23 +625,17 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
 // 5. WIDGET: Estudos de Hoje (Visão Diária do Ciclo)
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
-  const [history, setHistory] = React.useState<RecentHistoryEntry[] | undefined>(undefined)
+  const { data: history, refresh } = useCachedServerAction<RecentHistoryEntry[]>(
+    "recentStudyHistory:14",
+    () => getRecentStudyHistoryAction(14).then((res) => res.data ?? []),
+    5 * 60 * 1000,
+  )
 
   React.useEffect(() => {
-    let cancelled = false
-    const load = () => {
-      void getRecentStudyHistoryAction(14).then((res) => {
-        if (!cancelled) setHistory(res.data ?? [])
-      })
-    }
-    load()
-    // Atualiza o cronograma imediatamente quando uma sessão é salva (sem F5)
+    const load = () => { void refresh() }
     window.addEventListener(STUDY_SESSION_SAVED_EVENT, load)
-    return () => {
-      cancelled = true
-      window.removeEventListener(STUDY_SESSION_SAVED_EVENT, load)
-    }
-  }, [])
+    return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, load)
+  }, [refresh])
 
   return (
     <div className="w-full">
@@ -1388,14 +1383,6 @@ const MONTH_NAMES = [
 
 export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidgetProps) {
   const [currentDate, setCurrentDate] = React.useState(new Date())
-  const [dailyTotals, setDailyTotals] = React.useState<
-    { date: string; minutes: number }[]
-  >([])
-  const [monthlyStats, setMonthlyStats] = React.useState<{
-    totalMinutes: number
-    averageMinutes: number
-    daysStudied: number
-  } | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
   const [selectedDate, setSelectedDate] = React.useState("")
   const [manualModalOpen, setManualModalOpen] = React.useState(false)
@@ -1424,25 +1411,28 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
     ? Math.round((snapshot.user.weekly_study_hours * 60) / 7)
     : null
 
-  const fetchTotals = React.useCallback(async () => {
-    try {
-      const { getMonthlyDailyTotalsAction, getMonthlyStatsAction } = await import(
-        "@/application/study-history/study-history.actions"
-      )
-      const [totalsRes, statsRes] = await Promise.all([
-        getMonthlyDailyTotalsAction(year, month),
-        getMonthlyStatsAction(year, month),
-      ])
-      if (totalsRes.data) setDailyTotals(totalsRes.data)
-      if (statsRes.data) setMonthlyStats(statsRes.data)
-    } catch {
-      // silent fail
+  const fetchCalendarData = React.useCallback(async () => {
+    const { getMonthlyDailyTotalsAction, getMonthlyStatsAction } = await import(
+      "@/application/study-history/study-history.actions"
+    )
+    const [totalsRes, statsRes] = await Promise.all([
+      getMonthlyDailyTotalsAction(year, month),
+      getMonthlyStatsAction(year, month),
+    ])
+    return {
+      dailyTotals: totalsRes.data ?? [],
+      monthlyStats: statsRes.data ?? null,
     }
   }, [year, month])
 
-  React.useEffect(() => {
-    void fetchTotals()
-  }, [fetchTotals])
+  const { data: calendarData, refresh: refreshCalendar } = useCachedServerAction(
+    `monthlyCalendar:${year}:${month}`,
+    fetchCalendarData,
+    5 * 60 * 1000,
+  )
+
+  const dailyTotals = calendarData?.dailyTotals ?? []
+  const monthlyStats = calendarData?.monthlyStats ?? null
 
   const changeMonth = (delta: number) => {
     setCurrentDate(new Date(year, currentDate.getMonth() + delta, 1))
@@ -1630,7 +1620,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
         open={manualModalOpen}
         onOpenChange={setManualModalOpen}
         dateStr={manualDate}
-        onSaved={fetchTotals}
+        onSaved={refreshCalendar}
       />
     </div>
   )

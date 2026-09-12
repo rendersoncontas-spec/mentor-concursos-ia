@@ -124,26 +124,31 @@ export function buildCycleOverview(
         totalStudiedMinutesInRound += planned
       }
     } else if (isCurrent) {
-      studiedInRound = Math.min(currentItemProgressMin, planned)
-      remainingInRound = Math.max(0, planned - currentItemProgressMin)
+      // Para o item atual, preferimos o progresso persistido no ciclo, mas recuperamos das sessões se for maior
+      const combinedCurrent = Math.max(currentItemProgressMin, roundEntry?.contributed || 0)
+      studiedInRound = Math.min(combinedCurrent, planned)
+      remainingInRound = Math.max(0, planned - studiedInRound)
       extraInRound = roundEntry?.extra || 0
-      isCompletedInRound = currentItemProgressMin >= planned
+      isCompletedInRound = studiedInRound >= planned
       isSkippedInRound = false
       status = "ATUAL"
       totalStudiedMinutesInRound += studiedInRound
     } else if (isFutureInRound) {
-      studiedInRound = 0
-      remainingInRound = planned
-      extraInRound = 0
-      isCompletedInRound = false
+      // Matéria futura estudada antecipadamente: mostra o progresso acumulado nela nesta volta
+      const futureContributed = Math.min(roundEntry?.contributed || 0, planned)
+      studiedInRound = futureContributed
+      remainingInRound = Math.max(0, planned - futureContributed)
+      extraInRound = roundEntry?.extra || 0
+      isCompletedInRound = futureContributed >= planned
       isSkippedInRound = false
       status = "PENDENTE"
+      totalStudiedMinutesInRound += studiedInRound
     }
 
     totalExtraMinutesInRound += extraInRound
 
     const hist = historicalMinutesByItem.get(item.id)
-    const totalStudiedHistoricalMinutes = (hist?.total || 0) + (isCurrent ? currentItemProgressMin : 0)
+    const totalStudiedHistoricalMinutes = hist?.total || 0
 
     return {
       itemId: item.id,

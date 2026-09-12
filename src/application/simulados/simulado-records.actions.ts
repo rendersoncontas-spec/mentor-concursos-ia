@@ -9,6 +9,7 @@ import {
   netAccuracyOf,
   wrongsOf,
 } from "@/application/simulados/simulado-stats.service"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import type {
   SimuladoRecord,
   SimuladoRecordInput,
@@ -60,9 +61,7 @@ type SubjectRow = {
 }
 
 async function requireUser(supabase: Supabase) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  return user.id
+  return await getEffectiveUserId(supabase)
 }
 
 function toSource(value: string | null): SimuladoRecordSource {

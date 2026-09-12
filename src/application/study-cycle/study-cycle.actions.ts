@@ -20,6 +20,7 @@ import type {
   UpdateCycleInput,
 } from "@/domain/study-cycle/study-cycle.types"
 import { createClient } from "@/infrastructure/supabase/server"
+import { reconcileCycleProgress, registerStudyToCycle } from "./cycle-study-registration.service"
 
 async function getUser() {
   const supabase = await createClient()
@@ -36,10 +37,21 @@ function mapDifficultyToPriority(difficulty?: CycleItemDifficulty | string): Cyc
 
 /**
  * Busca todos os ciclos do usuário com seus itens e dados computados.
+ * Retorna ciclos E eventuais erros da reconciliação (para exibir na UI).
  */
-export async function getCyclesAction(): Promise<CycleOverview[]> {
+export async function getCyclesAction(): Promise<{ data: CycleOverview[]; reconcileErrors: string[] }> {
+  const reconcileErrors: string[] = []
   try {
     const { supabase, userId } = await getUser()
+
+    // Auto-reconciliação para garantir que todo estudo do histórico elegível esteja no ciclo
+    const reconcileResult = await reconcileCycleProgress().catch((err) => {
+      console.error("[getCyclesAction] Reconcile error:", err)
+      return { success: false, processed: 0, errors: [String(err)] }
+    })
+    if (reconcileResult.errors.length > 0) {
+      reconcileErrors.push(...reconcileResult.errors)
+    }
 
     const { data: cycles, error } = await supabase
       .from("study_cycles")
@@ -49,7 +61,7 @@ export async function getCyclesAction(): Promise<CycleOverview[]> {
       .order("created_at", { ascending: false })
 
     if (error || !cycles || cycles.length === 0) {
-      return []
+      return { data: [], reconcileErrors }
     }
 
     const cycleIds = cycles.map((c) => c.id)
@@ -79,14 +91,16 @@ export async function getCyclesAction(): Promise<CycleOverview[]> {
       sessionsByCycle.set(s.cycle_id, list)
     }
 
-    return cycles.map((cycle) => {
+    const data = cycles.map((cycle) => {
       const cycleItems = itemsByCycle.get(cycle.id) || []
       const cycleSessions = sessionsByCycle.get(cycle.id) || []
       return buildCycleOverview(cycle as StudyCycle, cycleItems, cycleSessions)
     })
+
+    return { data, reconcileErrors }
   } catch (err) {
     console.error("[getCyclesAction] Erro:", err)
-    return []
+    return { data: [], reconcileErrors }
   }
 }
 
@@ -96,6 +110,9 @@ export async function getCyclesAction(): Promise<CycleOverview[]> {
 export async function getActiveCycleAction(): Promise<CycleOverview | null> {
   try {
     const { supabase, userId } = await getUser()
+
+    // Auto-reconciliação para garantir que todo estudo do histórico elegível esteja no ciclo
+    await reconcileCycleProgress().catch((err) => console.error("[getActiveCycleAction] Reconcile error:", err))
 
     const { data: cycle, error } = await supabase
       .from("study_cycles")
@@ -524,12 +541,11 @@ export async function reorderCycleItemsAction(cycleId: string, orderedItemIds: s
 
 /**
  * Registra o estudo no ciclo rotativo contínuo.
- * Atualiza o cursor do ciclo (índice, volta, voltas completas, progresso da etapa)
- * e insere o registro em study_cycle_sessions como vínculo com o study_history.
- * Inclui verificação de idempotência para evitar avanço duplicado em concorrência.
+ * ATUALIZAÇÃO: Agora usa a lógica unificada que permite qualquer origem de estudo contribuir para o ciclo.
+ * Se cycleId não for fornecido, usa o ciclo ativo.
  */
 export async function registerCycleStudyProgressAction(input: {
-  cycleId: string
+  cycleId?: string
   cycleItemId?: string | null
   studyHistoryId: string
   durationMinutes: number
@@ -538,113 +554,40 @@ export async function registerCycleStudyProgressAction(input: {
 }) {
   try {
     const { supabase, userId } = await getUser()
-    const { cycleId, studyHistoryId, durationMinutes, disciplineId } = input
+    const { cycleId, studyHistoryId, durationMinutes, disciplineId, studySource } = input
 
-    if (!cycleId || durationMinutes <= 0) {
+    if (durationMinutes <= 0) {
       return { success: false, error: "Parâmetros inválidos." }
     }
 
-    // 0. Idempotência: Se já houver sessão com este studyHistoryId no ciclo, ignora duplicações
-    const { data: existingSession } = await supabase
-      .from("study_cycle_sessions")
-      .select("id")
-      .eq("cycle_id", cycleId)
-      .eq("study_history_id", studyHistoryId)
-      .limit(1)
-      .maybeSingle()
-
-    if (existingSession) {
-      return { success: true, alreadyProcessed: true }
-    }
-
-    // 1. Buscar o ciclo
-    const { data: cycle, error: cycleErr } = await supabase
-      .from("study_cycles")
-      .select("*")
-      .eq("id", cycleId)
-      .eq("user_id", userId)
-      .single()
-
-    if (cycleErr || !cycle) {
-      return { success: false, error: "Ciclo não encontrado." }
-    }
-
-    // 2. Buscar itens do ciclo ordenados
-    const { data: items, error: itemsErr } = await supabase
-      .from("study_cycle_items")
-      .select("*, discipline:disciplines(id, name, area, color_hex)")
-      .eq("cycle_id", cycleId)
-      .order("order", { ascending: true })
-
-    if (itemsErr || !items || items.length === 0) {
-      return { success: false, error: "Ciclo sem matérias." }
-    }
-
-    const typedCycle = cycle as StudyCycle
-    const typedItems = items as StudyCycleItemWithDetails[]
-
-    // 3. Determinar o item correspondente:
-    const currentIndex = Math.min(
-      Math.max(0, typedCycle.current_item_index || 0),
-      typedItems.length - 1
-    )
-    const effectiveItem =
-      (input.cycleItemId && typedItems.find((i) => i.id === input.cycleItemId)) ||
-      typedItems[currentIndex] ||
-      typedItems[0]
-
-    if (!effectiveItem) {
-      return { success: false, error: "Matéria do ciclo não encontrada." }
-    }
-
-    // 4. Calcular o avanço do ciclo
-    const advanceResult = calculateCycleAdvance(typedCycle, typedItems, durationMinutes)
-
-    // 5. Inserir em study_cycle_sessions com fallback defensivo
-    const sessionV2Payload = {
-      cycle_id: cycleId,
-      cycle_item_id: effectiveItem.id,
-      study_history_id: studyHistoryId,
-      round_number: typedCycle.current_round || 1,
-      minutes_contributed: advanceResult.minutesContributed,
-      extra_minutes: advanceResult.extraMinutes,
-      discipline_id: disciplineId || effectiveItem.discipline_id,
-    }
-
-    const { error: sessionV2Err } = await supabase.from("study_cycle_sessions").insert(sessionV2Payload)
-
-    if (sessionV2Err) {
-      // Fallback básico para sessões legadas
-      await supabase.from("study_cycle_sessions").insert({
-        cycle_id: cycleId,
-        cycle_item_id: effectiveItem.id,
-        study_history_id: studyHistoryId,
-      })
-    }
-
-    // 6. Atualizar a posição do ciclo no banco com fallback defensivo
-    const { error: updateErr } = await supabase
-      .from("study_cycles")
-      .update({
-        current_item_index: advanceResult.newCurrentItemIndex,
-        current_round: advanceResult.newCurrentRound,
-        total_rounds_done: advanceResult.newTotalRoundsDone,
-        current_item_progress_min: advanceResult.newCurrentItemProgressMin,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", cycleId)
-      .eq("user_id", userId)
-
-    if (updateErr) {
-      // Fallback para campos básicos
-      await supabase
+    // Se cycleId não fornecido, buscar ciclo ativo
+    let targetCycleId = cycleId
+    if (!targetCycleId) {
+      const { data: activeCycle } = await supabase
         .from("study_cycles")
-        .update({
-          current_item_index: advanceResult.newCurrentItemIndex,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", cycleId)
+        .select("id")
         .eq("user_id", userId)
+        .eq("status", "ACTIVE")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      targetCycleId = activeCycle?.id
+    }
+
+    if (!targetCycleId) {
+      return { success: false, error: "Nenhum ciclo ativo encontrado." }
+    }
+
+    // Usar a nova lógica unificada
+    const result = await registerStudyToCycle({
+      studyHistoryId,
+      disciplineId,
+      durationMinutes,
+      studySource: studySource || "CYCLE",
+    })
+
+    if (!result.success) {
+      return { success: false, error: result.error }
     }
 
     revalidatePath("/ciclos")
@@ -652,7 +595,9 @@ export async function registerCycleStudyProgressAction(input: {
 
     return {
       success: true,
-      advanceResult,
+      alreadyProcessed: result.alreadyProcessed,
+      cycleUpdated: result.cycleUpdated,
+      advanceResult: result.advanceResult,
     }
   } catch (err) {
     console.error("[registerCycleStudyProgressAction] Erro inesperado:", err)
@@ -885,6 +830,371 @@ export async function updateFullCycleAction(input: UpdateCycleInput) {
     const message = err instanceof Error ? err.message : "Erro ao atualizar ciclo."
     console.error("[updateFullCycleAction] Erro:", err)
     return { success: false, error: message }
+  }
+}
+
+/**
+ * Reconcilia o progresso do ciclo com o histórico existente.
+ * Executa rebuild completo uma única vez — a reconstrução é determinística.
+ */
+export async function reconcileCycleProgressAction(): Promise<{
+  success: boolean
+  processed: number
+  errors: string[]
+}> {
+  try {
+    const result = await reconcileCycleProgress()
+    revalidatePath("/ciclos")
+    revalidatePath("/dashboard")
+    return result
+  } catch (err) {
+    console.error("[reconcileCycleProgressAction] Erro:", err)
+    return { success: false, processed: 0, errors: ["Erro inesperado na reconciliação."] }
+  }
+}
+
+/**
+ * Debug: retorna detalhes do ciclo ativo, itens e estudos candidatos
+ * para diagnosticar por que estudos não estão contando.
+ */
+export async function debugCycleProgressAction(): Promise<{
+  success: boolean
+  data?: {
+    cycle: any
+    items: any[]
+    candidateStudies: any[]
+    cycleCreatedAt: string
+    itemDetails: { id: string; disciplineId: string; name: string; createdAt: string }[]
+  }
+  error?: string
+}> {
+  try {
+    const { supabase, userId } = await getUser()
+
+    // Buscar ciclo ativo
+    const { data: cycle, error: cycleErr } = await supabase
+      .from("study_cycles")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "ACTIVE")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (cycleErr || !cycle) {
+      return { success: false, error: "Nenhum ciclo ativo encontrado." }
+    }
+
+    // Buscar itens do ciclo
+    const { data: items, error: itemsErr } = await supabase
+      .from("study_cycle_items")
+      .select("*, discipline:disciplines(id, name)")
+      .eq("cycle_id", cycle.id)
+      .order("order", { ascending: true })
+
+    if (itemsErr || !items || items.length === 0) {
+      return { success: false, error: "Ciclo sem matérias." }
+    }
+
+    const cycleDisciplineIds = items.map((i) => i.discipline_id)
+
+    // Buscar TODOS os estudos dessas disciplinas (incluindo já processados)
+    const { data: allStudies, error: studiesErr } = await supabase
+      .from("study_history")
+      .select("id, discipline_id, duration_minutes, study_source, started_at, created_at")
+      .eq("user_id", userId)
+      .not("duration_minutes", "is", null)
+      .gt("duration_minutes", 0)
+      .in("discipline_id", cycleDisciplineIds)
+      .order("started_at", { ascending: true })
+
+    // Buscar quais já estão no ciclo
+    const { data: existingSessions } = await supabase
+      .from("study_cycle_sessions")
+      .select("study_history_id")
+      .eq("cycle_id", cycle.id)
+
+    const existingIds = new Set((existingSessions || []).map((s) => s.study_history_id))
+
+    // Separar por status
+    const candidateStudies = (allStudies || []).map((s) => {
+      const item = items.find((i) => i.discipline_id === s.discipline_id)
+      const studyDate = new Date(s.started_at)
+      const cycleDate = new Date(cycle.created_at)
+      const itemDate = item ? new Date(item.created_at) : null
+
+      const validCycle = studyDate >= cycleDate
+      const validItem = itemDate ? studyDate >= itemDate : false
+      const alreadyProcessed = existingIds.has(s.id)
+
+      return {
+        studyHistoryId: s.id,
+        disciplineId: s.discipline_id,
+        disciplineName: item?.discipline?.name || "N/A",
+        durationMinutes: s.duration_minutes,
+        studySource: s.study_source,
+        startedAt: s.started_at,
+        cycleCreatedAt: cycle.created_at,
+        itemCreatedAt: item?.created_at || null,
+        validForCycle: validCycle,
+        validForItem: validItem,
+        alreadyProcessed,
+        decision: alreadyProcessed 
+          ? "IGNORADO — já processado" 
+          : !validCycle 
+            ? "IGNORADO — anterior ao ciclo" 
+            : !validItem 
+              ? "IGNORADO — anterior à entrada do item no ciclo"
+              : "CONTABILIZADO",
+      }
+    })
+
+    return {
+      success: true,
+      data: {
+        cycle: {
+          id: cycle.id,
+          name: cycle.name,
+          status: cycle.status,
+          created_at: cycle.created_at,
+          current_item_index: cycle.current_item_index,
+          current_round: cycle.current_round,
+          current_item_progress_min: cycle.current_item_progress_min,
+        },
+        items: items.map((i) => ({
+          id: i.id,
+          disciplineId: i.discipline_id,
+          name: i.discipline?.name,
+          order: i.order,
+          created_at: i.created_at,
+          planned_minutes: i.planned_minutes,
+        })),
+        candidateStudies,
+        cycleCreatedAt: cycle.created_at,
+        itemDetails: items.map((i) => ({
+          id: i.id,
+          disciplineId: i.discipline_id,
+          name: i.discipline?.name,
+          createdAt: i.created_at,
+        })),
+      },
+    }
+  } catch (err) {
+    console.error("[debugCycleProgressAction] Erro:", err)
+    return { success: false, error: "Erro ao buscar debug do ciclo." }
+  }
+}
+
+/**
+ * Debug detalhado: Executa a reconciliação passo a passo e mostra exatamente o que acontece.
+ * Retorna diagnóstico completo para identificar falhas.
+ */
+export async function debugReconcileDetailedAction(): Promise<{
+  success: boolean
+  diagnostic: any
+  error?: string
+}> {
+  try {
+    const { supabase, userId } = await getUser()
+    const { normalizeText } = await import("@/features/importacao/lib/subject-matcher")
+    const { getDayInSaoPaulo } = await import("@/lib/sao-paulo")
+    const { calculateCycleAdvance } = await import("./cycle-progress.service")
+
+    // 1. Buscar Ciclo Ativo
+    const { data: cycle, error: cycleErr } = await supabase
+      .from("study_cycles")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "ACTIVE")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (cycleErr || !cycle) {
+      return { success: false, diagnostic: {}, error: "Nenhum ciclo ativo encontrado." }
+    }
+
+    const cycleDayKey = getDayInSaoPaulo(cycle.created_at)
+
+    // 2. Buscar Itens do Ciclo
+    const { data: items } = await supabase
+      .from("study_cycle_items")
+      .select("*, discipline:disciplines(id, name)")
+      .eq("cycle_id", cycle.id)
+      .order("order", { ascending: true })
+
+    if (!items || items.length === 0) {
+      return { success: false, diagnostic: {}, error: "Ciclo sem matérias." }
+    }
+
+    // 3. Buscar histórico de estudos (TODOS, sem filtro por disciplina do ciclo)
+    const { data: allHistory, error: histErr } = await supabase
+      .from("study_history")
+      .select("id, discipline_id, duration_minutes, started_at, created_at, study_source, disciplines(name)")
+      .eq("user_id", userId)
+      .not("duration_minutes", "is", null)
+      .gt("duration_minutes", 0)
+      .order("started_at", { ascending: true })
+
+    // 4. Buscar sessões existentes
+    const { data: existingSessions } = await supabase
+      .from("study_cycle_sessions")
+      .select("*")
+      .eq("cycle_id", cycle.id)
+
+    // Mapas de matching
+    const itemMapById = new Map(items.map(i => [i.discipline_id, i]))
+    const itemMapByName = new Map(items.map(i => [normalizeText(i.discipline?.name || ""), i]))
+
+    // Debug de cada estudo
+    const studyDebug = (allHistory || []).map((study) => {
+      const studyDayKey = getDayInSaoPaulo(study.started_at)
+      const disc = Array.isArray(study.disciplines) ? study.disciplines[0] : study.disciplines
+      const disciplineName = disc?.name || ""
+
+      const matchById = study.discipline_id ? itemMapById.get(study.discipline_id) : null
+      const matchByName = disciplineName ? itemMapByName.get(normalizeText(disciplineName)) : null
+      const cycleItem = matchById || matchByName
+
+      const validForCycle = studyDayKey >= cycleDayKey
+      let validForItem = false
+      if (cycleItem) {
+        const itemDayKey = cycleItem.created_at ? getDayInSaoPaulo(cycleItem.created_at) : cycleDayKey
+        validForItem = studyDayKey >= itemDayKey
+      }
+
+      const alreadyProcessed = (existingSessions || []).some(s => s.study_history_id === study.id)
+
+      return {
+        studyId: study.id,
+        disciplineId: study.discipline_id,
+        disciplineName,
+        durationMinutes: study.duration_minutes,
+        startedAt: study.started_at,
+        studyDayKey,
+        source: study.study_source,
+        matchedCycleItem: cycleItem ? {
+          id: cycleItem.id,
+          disciplineId: cycleItem.discipline_id,
+          name: cycleItem.discipline?.name,
+          order: cycleItem.order,
+          created_at: cycleItem.created_at,
+        } : null,
+        matchType: matchById ? "BY_ID" : matchByName ? "BY_NAME" : "NO_MATCH",
+        validForCycle,
+        validForItem,
+        alreadyProcessed,
+        finalDecision: alreadyProcessed
+          ? "SKIP_JA_PROCESSADO"
+          : !cycleItem
+            ? "SKIP_NAO_E_CICLO"
+            : !validForCycle
+              ? "SKIP_DATA_ANTERIOR_CICLO"
+              : !validForItem
+                ? "SKIP_DATA_ANTERIOR_ITEM"
+                : "PROCESSAR",
+      }
+    })
+
+    // Filtrar apenas os que seriam processados
+    const toProcess = studyDebug.filter(s => s.finalDecision === "PROCESSAR")
+
+    // Simular o que aconteceria
+    let simulation = { current_item_index: 0, current_round: 1, total_rounds_done: 0, current_item_progress_min: 0 }
+    const simulationLog: any[] = []
+
+    for (const study of toProcess) {
+      const cycleItem = itemMapById.get(study.disciplineId) || itemMapByName.get(normalizeText(study.disciplineName))
+      if (!cycleItem) continue
+
+      const currentIndex = simulation.current_item_index
+      const isCurrent = items[currentIndex]?.id === cycleItem.id
+      const isPast = items.findIndex(i => i.id === cycleItem.id) < currentIndex
+
+      let action = ""
+      let minutesContributed = 0
+      let extraMinutes = 0
+
+      if (isCurrent) {
+        const result = calculateCycleAdvance(simulation as any, items as any, study.durationMinutes)
+        minutesContributed = result.minutesContributed
+        extraMinutes = result.extraMinutes
+        simulation.current_item_index = result.newCurrentItemIndex
+        simulation.current_round = result.newCurrentRound
+        simulation.total_rounds_done = result.newTotalRoundsDone
+        simulation.current_item_progress_min = result.newCurrentItemProgressMin
+        action = `AVANÇA cursor para item ${result.newCurrentItemIndex}, progresso ${result.newCurrentItemProgressMin}`
+      } else if (isPast) {
+        minutesContributed = 0
+        extraMinutes = study.durationMinutes
+        action = "EXTRA — matéria já passou"
+      } else {
+        minutesContributed = study.durationMinutes
+        extraMinutes = 0
+        action = `FUTURA — acumula ${study.durationMinutes}min sem mover cursor`
+      }
+
+      simulationLog.push({
+        studyId: study.studyId,
+        disciplineName: study.disciplineName,
+        minutes: study.durationMinutes,
+        minutesContributed,
+        extraMinutes,
+        action,
+        cursorAfter: { ...simulation },
+      })
+    }
+
+    // Estado final simulado
+    const finalCycleState = {
+      current_item_index: simulation.current_item_index,
+      current_round: simulation.current_round,
+      total_rounds_done: simulation.total_rounds_done,
+      current_item_progress_min: simulation.current_item_progress_min,
+    }
+
+    // Estado real no banco
+    const realCycleState = {
+      current_item_index: cycle.current_item_index,
+      current_round: cycle.current_round,
+      total_rounds_done: cycle.total_rounds_done,
+      current_item_progress_min: cycle.current_item_progress_min,
+    }
+
+    return {
+      success: true,
+      diagnostic: {
+        userId,
+        cycle: {
+          id: cycle.id,
+          name: cycle.name,
+          status: cycle.status,
+          created_at: cycle.created_at,
+          cycleDayKey,
+        },
+        items: items.map(i => ({
+          id: i.id,
+          disciplineId: i.discipline_id,
+          name: i.discipline?.name,
+          order: i.order,
+          created_at: i.created_at,
+          planned_minutes: i.planned_minutes,
+          dayKey: getDayInSaoPaulo(i.created_at),
+        })),
+        totalHistoryRecords: allHistory?.length || 0,
+        totalHistoryForCycleDisciplines: studyDebug.filter(s => s.matchedCycleItem).length,
+        studyDebug,
+        toProcessCount: toProcess.length,
+        simulationLog,
+        simulationFinalState: finalCycleState,
+        realCycleState,
+        stateMismatch: JSON.stringify(finalCycleState) !== JSON.stringify(realCycleState),
+        existingSessionsCount: existingSessions?.length || 0,
+      },
+    }
+  } catch (err: any) {
+    console.error("[debugReconcileDetailedAction] Erro:", err)
+    return { success: false, diagnostic: {}, error: err.message }
   }
 }
 

@@ -21,6 +21,7 @@ import type {
 } from "@/features/importacao/lib/types"
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
+import { registerStudiesToCycleBatch } from "@/application/study-cycle/cycle-study-registration.service"
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -479,10 +480,43 @@ export async function importHistoryChunkAction(
       if (resolution.created) createdSubjects.add(record.subjectName.trim())
     }
 
+    let insertedHistoryIds: string[] = []
+
     if (rows.length > 0) {
-      const { error } = await supabase.from("study_history").insert(rows)
+      const { data: inserted, error } = await supabase
+        .from("study_history")
+        .insert(rows)
+        .select("id, discipline_id, duration_minutes, study_source")
+
       if (error) {
         return { success: false, error: `Erro ao gravar histórico: ${error.message}` }
+      }
+
+      insertedHistoryIds = (inserted || []).map((r) => r.id)
+    }
+
+    // Registrar estudos importados no ciclo se a disciplina estiver no ciclo ativo
+    if (insertedHistoryIds.length > 0) {
+      const { data: insertedRows } = await supabase
+        .from("study_history")
+        .select("id, discipline_id, duration_minutes, study_source")
+        .in("id", insertedHistoryIds)
+
+      if (insertedRows && insertedRows.length > 0) {
+        const studiesForCycle = insertedRows
+          .filter((r) => r.duration_minutes && r.duration_minutes > 0)
+          .map((r) => ({
+            studyHistoryId: r.id,
+            disciplineId: r.discipline_id,
+            durationMinutes: r.duration_minutes!,
+            studySource: r.study_source || "IMPORTED",
+          }))
+
+        if (studiesForCycle.length > 0) {
+          await registerStudiesToCycleBatch(studiesForCycle).catch((err) => {
+            console.error("[importHistoryChunkAction] Erro ao registrar no ciclo:", err)
+          })
+        }
       }
     }
 

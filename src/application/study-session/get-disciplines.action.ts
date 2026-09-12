@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs"
 import { type SupabaseClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { buildCycleOverview } from "@/application/study-cycle/cycle-progress.service"
 
 export type DisciplineOption = {
   id: string
@@ -269,5 +270,269 @@ export async function getDisciplinesForAutocomplete(): Promise<{
       tags: { feature: "discipline-selector" },
     })
     return { hasActivePlan: false, planDisciplines: [], allDisciplines: [] }
+  }
+}
+
+export type DisciplineSuggestion = {
+  id: string
+  name: string
+  area: string | null
+  color_hex?: string | null | undefined
+  from: "PLAN" | "CYCLE" | "HISTORY"
+  metadata?: {
+    plannedMinutes?: number | undefined
+    studiedMinutes?: number | undefined
+    difficulty?: string | undefined
+    isCurrentInCycle?: boolean | undefined
+    isNextInCycle?: boolean | undefined
+    lastSessionAt?: string | undefined
+  }
+}
+
+export type StudyCenterData = {
+  hasActivePlan: boolean
+  planDisciplines: DisciplineOption[]
+  allDisciplines: DisciplineOption[]
+  suggestionsSource: "PLAN" | "CYCLE" | "HISTORY" | "NONE"
+  suggestions: DisciplineSuggestion[]
+}
+
+/**
+ * Server Action ÚNICA para o Centro Inteligente de Estudos.
+ *
+ * Substitui a chamada dupla de getDisciplinesForAutocomplete + getStudyDisciplineSuggestions
+ * por uma única chamada com:
+ *   - 1 Supabase client (não 2)
+ *   - 1 auth check (não 2)
+ *   - Queries independentes em paralelo (não sequenciais)
+ *   - Sem duplicação de fetchActivePlanDisciplines
+ *
+ * Fluxo otimizado:
+ *   1. Auth (1×)
+ *   2. Paralelo: [plano + disciplinas_globais]  ← 2 queries simultâneas
+ *   3. Se tem plano → sugestões = plano (sem query extra)
+ *   4. Se não tem plano → paralelo: [ciclo, histórico]  ← 2 queries simultâneas
+ *   5. Retorna tudo junto
+ *
+ * Total: 3-4 queries (vs 6-8 antes).
+ */
+export async function getStudyCenterData(): Promise<StudyCenterData> {
+  const t0 = Date.now()
+  try {
+    const supabase = await createClient()
+    const effectiveUserId = await getEffectiveUserId(supabase)
+
+    if (!effectiveUserId) {
+      return {
+        hasActivePlan: false,
+        planDisciplines: [],
+        allDisciplines: [],
+        suggestionsSource: "NONE",
+        suggestions: [],
+      }
+    }
+
+    // FASE 1: Paralelo — plano ativo + catálogo global (2 queries simultâneas)
+    const [planResult, allDiscsResult] = await Promise.all([
+      fetchActivePlanDisciplines(supabase, effectiveUserId),
+      supabase
+        .from("disciplines")
+        .select("id, name, area, color_hex")
+        .order("name", { ascending: true })
+        .limit(300),
+    ])
+
+    const allDisciplines: DisciplineOption[] = (allDiscsResult.data || []).map((d) => ({
+      id: d.id,
+      name: d.name,
+      area: d.area ?? null,
+      color_hex: d.color_hex ?? null,
+      fromPlan: false,
+    }))
+
+    // FASE 2: Se tem plano ativo com disciplinas → sugestões = plano (zero queries extras)
+    if (planResult.hasActivePlan && planResult.disciplines.length > 0) {
+      console.log(
+        `[getStudyCenterData] ${Date.now() - t0}ms — plano ativo, ${planResult.disciplines.length} sugestões`,
+      )
+      return {
+        hasActivePlan: true,
+        planDisciplines: planResult.disciplines,
+        allDisciplines,
+        suggestionsSource: "PLAN",
+        suggestions: planResult.disciplines.map((d) => ({
+          id: d.id,
+          name: d.name,
+          area: d.area,
+          color_hex: d.color_hex,
+          from: "PLAN" as const,
+        })),
+      }
+    }
+
+    // FASE 3: Sem plano — buscar ciclo e histórico em paralelo (2 queries simultâneas)
+    const [cycleSuggestions, historySuggestions] = await Promise.all([
+      fetchCycleDisciplines(supabase, effectiveUserId),
+      fetchHistoryDisciplines(supabase, effectiveUserId),
+    ])
+
+    let suggestionsSource: "PLAN" | "CYCLE" | "HISTORY" | "NONE" = "NONE"
+    let suggestions: DisciplineSuggestion[] = []
+
+    if (cycleSuggestions.length > 0) {
+      suggestionsSource = "CYCLE"
+      suggestions = cycleSuggestions
+    } else if (historySuggestions.length > 0) {
+      suggestionsSource = "HISTORY"
+      suggestions = historySuggestions
+    }
+
+    console.log(
+      `[getStudyCenterData] ${Date.now() - t0}ms — ${suggestionsSource}, ${allDisciplines.length} disciplinas`,
+    )
+
+    return {
+      hasActivePlan: planResult.hasActivePlan,
+      planDisciplines: planResult.disciplines,
+      allDisciplines,
+      suggestionsSource,
+      suggestions,
+    }
+  } catch (error: unknown) {
+    console.error("[getStudyCenterData] Exceção:", error)
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: { feature: "study-center-data" },
+    })
+    return {
+      hasActivePlan: false,
+      planDisciplines: [],
+      allDisciplines: [],
+      suggestionsSource: "NONE",
+      suggestions: [],
+    }
+  }
+}
+
+/**
+ * Busca disciplinas do ciclo ativo (matéria atual + próximas).
+ * Função interna — reutiliza lógica de get-study-discipline-suggestions.action.ts
+ * mas SEM criar novo Supabase client nem nova auth.
+ */
+async function fetchCycleDisciplines(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<DisciplineSuggestion[]> {
+  try {
+    const { data: cycle } = await supabase
+      .from("study_cycles")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "ACTIVE")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!cycle) return []
+
+    const { data: items } = await supabase
+      .from("study_cycle_items")
+      .select("*, discipline:disciplines(id, name, area, color_hex)")
+      .eq("cycle_id", cycle.id)
+      .order("order", { ascending: true })
+
+    if (!items || items.length === 0) return []
+
+    const overview = buildCycleOverview(
+      cycle as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycle,
+      items as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleItemWithDetails[],
+      [],
+    )
+
+    const result: DisciplineSuggestion[] = []
+
+    if (overview.currentItem) {
+      result.push({
+        id: overview.currentItem.disciplineId,
+        name: overview.currentItem.disciplineName,
+        area: overview.currentItem.disciplineArea,
+        color_hex: overview.currentItem.disciplineColorHex,
+        from: "CYCLE",
+        metadata: {
+          plannedMinutes: overview.currentItem.plannedMinutes,
+          studiedMinutes: overview.currentItem.studiedMinutesInRound,
+          difficulty: overview.currentItem.difficulty,
+          isCurrentInCycle: true,
+        },
+      })
+    }
+
+    for (const nextItem of overview.items) {
+      if (result.length >= 4) break
+      if (nextItem.itemId === overview.currentItem?.itemId) continue
+      if (result.some((s) => s.id === nextItem.disciplineId)) continue
+      result.push({
+        id: nextItem.disciplineId,
+        name: nextItem.disciplineName,
+        area: nextItem.disciplineArea,
+        color_hex: nextItem.disciplineColorHex,
+        from: "CYCLE",
+        metadata: {
+          plannedMinutes: nextItem.plannedMinutes,
+          difficulty: nextItem.difficulty,
+          isNextInCycle: true,
+        },
+      })
+    }
+
+    return result
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Busca disciplinas dos últimos 30 dias de estudo.
+ * Função interna — reutiliza lógica de get-study-discipline-suggestions.action.ts
+ * mas SEM criar novo Supabase client nem nova auth.
+ */
+async function fetchHistoryDisciplines(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<DisciplineSuggestion[]> {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+    const { data: history } = await supabase
+      .from("study_history")
+      .select("id, discipline_id, started_at, disciplines(id, name, area, color_hex)")
+      .eq("user_id", userId)
+      .gte("started_at", thirtyDaysAgo.toISOString())
+      .order("started_at", { ascending: false })
+      .limit(200)
+
+    if (!history || history.length === 0) return []
+
+    const seen = new Set<string>()
+    const result: DisciplineSuggestion[] = []
+
+    for (const row of history) {
+      const disc = Array.isArray(row.disciplines) ? row.disciplines[0] : row.disciplines
+      if (!disc?.id || !disc?.name) continue
+      if (seen.has(disc.id)) continue
+      seen.add(disc.id)
+
+      result.push({
+        id: disc.id,
+        name: disc.name,
+        area: disc.area ?? null,
+        color_hex: disc.color_hex ?? null,
+        from: "HISTORY",
+        metadata: { lastSessionAt: row.started_at },
+      })
+    }
+
+    return result
+  } catch {
+    return []
   }
 }

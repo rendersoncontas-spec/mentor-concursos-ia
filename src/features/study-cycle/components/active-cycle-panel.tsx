@@ -398,117 +398,147 @@ export function ActiveCyclePanel({
           </span>
         </div>
 
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {items.map((item, index) => {
             const isCompleted = item.status === "CONCLUIDO"
             const isCurrent = item.status === "ATUAL"
             const isSkipped = item.status === "PULADO"
-            const isPending = item.status === "PENDENTE"
+
+            const progressPercent = Math.min(
+              100,
+              Math.round((item.studiedMinutesInRound / Math.max(1, item.plannedMinutes)) * 100)
+            )
 
             return (
               <div
                 key={item.itemId}
                 className={cn(
-                  "flex items-center gap-3 p-3.5 rounded-xl border transition-all",
+                  "rounded-xl border p-3.5 transition-all",
                   isCurrent &&
-                    "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40",
+                    "border-primary/60 bg-primary/5 shadow-xs ring-1 ring-primary/20",
                   isCompleted &&
-                    "border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20 text-foreground",
+                    "border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20",
                   isSkipped &&
-                    "border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 text-foreground",
-                  isPending && "border-border/50 bg-muted/15 opacity-75"
+                    "border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20",
+                  !isCurrent && !isCompleted && !isSkipped && "border-border/50 bg-muted/10"
                 )}
               >
-                {/* ÍCONE DE STATUS */}
-                <div className="shrink-0">
-                  {isCompleted && (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white font-black text-xs shadow-xs" title="Concluída nesta volta">
-                      ✓
-                    </div>
-                  )}
-                  {isCurrent && (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground font-black text-xs animate-pulse shadow-xs" title="Matéria atual">
-                      ▶
-                    </div>
-                  )}
-                  {isSkipped && (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white font-black text-xs shadow-xs" title="Etapa pulada nesta volta (minutos parciais preservados)">
-                      ↷
-                    </div>
-                  )}
-                  {isPending && (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/40 text-muted-foreground font-bold text-xs" title="Pendente">
-                      ○
-                    </div>
-                  )}
-                </div>
-
-                {/* INFORMAÇÕES DA DISCIPLINA */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-muted-foreground">
-                      #{index + 1}
-                    </span>
-                    <h4 className={cn("text-sm font-black truncate", isCurrent && "text-primary")}>
-                      {item.disciplineName}
-                    </h4>
+                {/* LINHA 1: Ícone + Número + Nome + Tempo */}
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0">
+                    {isCompleted && (
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white font-black text-xs shadow-xs">
+                        ✓
+                      </div>
+                    )}
                     {isCurrent && (
-                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
-                        Atual
-                      </span>
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground font-black text-xs animate-pulse shadow-xs">
+                        ▶
+                      </div>
                     )}
                     {isSkipped && (
-                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                        Pulada
-                      </span>
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white font-black text-xs shadow-xs">
+                        ↷
+                      </div>
+                    )}
+                    {!isCompleted && !isCurrent && !isSkipped && (
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/40 text-muted-foreground font-bold text-xs">
+                        ○
+                      </div>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                    {item.disciplineArea || "Geral"} • Dificuldade: {item.difficulty}
-                  </p>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-muted-foreground">
+                        #{index + 1}
+                      </span>
+                      <h4 className={cn(
+                        "text-sm font-black truncate",
+                        isCurrent && "text-primary",
+                        isCompleted && "text-emerald-700 dark:text-emerald-400",
+                        isSkipped && "text-amber-700 dark:text-amber-400"
+                      )}>
+                        {item.disciplineName}
+                      </h4>
+                      {isCurrent && (
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
+                          Atual
+                        </span>
+                      )}
+                      {isSkipped && (
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                          Pulada
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className={cn(
+                      "text-xs font-black",
+                      isCompleted && "text-emerald-600 dark:text-emerald-400",
+                      isCurrent && "text-primary",
+                      isSkipped && "text-amber-600 dark:text-amber-400",
+                      !isCompleted && !isCurrent && !isSkipped && "text-foreground"
+                    )}>
+                      {item.studiedMinutesInRound}/{item.plannedMinutes} min
+                    </span>
+                  </div>
                 </div>
 
-                {/* TEMPO REALIZADO / META */}
-                <div className="text-right shrink-0 space-y-0.5">
-                  <div className="text-xs font-black text-foreground">
-                    {isCompleted ? (
-                      <span className="text-emerald-600 dark:text-emerald-400">
-                        {item.plannedMinutes}/{item.plannedMinutes} min
+                {/* LINHA 2: Área + Dificuldade + Extra/Status */}
+                <div className="flex items-center justify-between mt-1 pl-10">
+                  <p className="text-[11px] text-muted-foreground font-medium">
+                    {item.disciplineArea || "Geral"} • Dificuldade: {item.difficulty}
+                  </p>
+                  <div className="text-right shrink-0">
+                    {item.extraMinutesInRound > 0 && (
+                      <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        +{item.extraMinutesInRound} min extra
                       </span>
-                    ) : isCurrent ? (
-                      <span className="text-primary font-black">
-                        {item.studiedMinutesInRound}/{item.plannedMinutes} min
+                    )}
+                    {isCompleted && item.extraMinutesInRound === 0 && (
+                      <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        Concluída na volta
                       </span>
-                    ) : isSkipped ? (
-                      <span className="text-amber-600 dark:text-amber-400 font-bold">
-                        {item.studiedMinutesInRound}/{item.plannedMinutes} min
+                    )}
+                    {isCurrent && item.remainingMinutesInRound > 0 && (
+                      <span className="text-[11px] font-bold text-primary">
+                        Faltam {item.remainingMinutesInRound} min
                       </span>
-                    ) : (
-                      <span className="text-muted-foreground font-medium">
-                        0/{item.plannedMinutes} min
+                    )}
+                    {isSkipped && !isCompleted && (
+                      <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                        Incompleta nesta volta
                       </span>
                     )}
                   </div>
-                  {isCurrent && item.remainingMinutesInRound > 0 && (
-                    <p className="text-[10px] font-black text-primary">
-                      Faltam {item.remainingMinutesInRound} min
-                    </p>
-                  )}
-                  {item.extraMinutesInRound > 0 && (
-                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                      +{item.extraMinutesInRound} min extra
-                    </p>
-                  )}
-                  {isCompleted && (
-                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                      Concluída na volta
-                    </p>
-                  )}
-                  {isSkipped && (
-                    <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                      Incompleta nesta volta
-                    </p>
-                  )}
+                </div>
+
+                {/* LINHA 3: Barra de Progresso */}
+                <div className="mt-2.5 pl-10">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        isCompleted && "bg-emerald-500",
+                        isCurrent && "bg-primary",
+                        isSkipped && "bg-amber-500",
+                        !isCompleted && !isCurrent && !isSkipped && "bg-muted-foreground/30"
+                      )}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <p className={cn(
+                    "text-[10px] font-bold mt-1 text-right",
+                    isCompleted && "text-emerald-600 dark:text-emerald-400",
+                    isCurrent && "text-primary",
+                    isSkipped && "text-amber-600 dark:text-amber-400",
+                    !isCompleted && !isCurrent && !isSkipped && "text-muted-foreground"
+                  )}>
+                    {progressPercent}%
+                  </p>
                 </div>
               </div>
             )

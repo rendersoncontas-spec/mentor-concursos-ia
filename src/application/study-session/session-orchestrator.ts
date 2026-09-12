@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { SessionCompletionPayload, SessionSummary } from "./study-session.models"
 import { finishStudySession } from "@/application/study-history/study-history.service"
 import { MentorAIService } from "@/application/mentor-ai/mentor-ai.service"
+import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
 
 export class SessionOrchestrator {
   
@@ -38,13 +39,24 @@ export class SessionOrchestrator {
       await this.logReviewsToEngine(supabase, userId, payload)
     }
 
-    // 4. Mentor IA (Calcula o impacto global após as inserções)
+    // 4. Registrar no ciclo se a disciplina estiver no ciclo ativo
+    // Qualquer origem de estudo pode contribuir para o ciclo (não só CYCLE)
+    if (payload.disciplineId && historyResult.duration_minutes && historyResult.duration_minutes > 0) {
+      await registerStudyToCycle({
+        studyHistoryId: payload.sessionId,
+        disciplineId: payload.disciplineId,
+        durationMinutes: historyResult.duration_minutes,
+        studySource: "CYCLE",
+      }).catch((err) => console.error("[SessionOrchestrator] Erro ao registrar no ciclo:", err))
+    }
+
+    // 5. Mentor IA (Calcula o impacto global após as inserções)
     const mentorResponse = await MentorAIService.generateMentorSession(supabase, userId, { 
       logSession: true, 
       useCache: false // Forçamos recalcular IGA 
     })
 
-    // 5. Compila o resumo final
+    // 6. Compila o resumo final
     return {
       durationMinutes: historyResult.duration_minutes || payload.durationMinutes,
       focusVariation: payload.focusFinal - payload.focusInitial,
