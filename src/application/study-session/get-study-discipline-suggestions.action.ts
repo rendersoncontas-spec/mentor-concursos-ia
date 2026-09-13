@@ -32,8 +32,7 @@ export type DisciplineSuggestionsResult = {
 
 /**
  * PRIORIDADE 2 — Busca o ciclo de estudos ATIVO do usuário.
- * Retorna a matéria em foco (cursor atual) e as próximas da fila.
- * NÃO altera/avança o cursor: apenas leitura.
+ * Retorna TODAS as matérias do ciclo, com a atual em primeiro.
  */
 async function fetchActiveCycleDisciplines(
   supabase: SupabaseClient,
@@ -58,47 +57,54 @@ async function fetchActiveCycleDisciplines(
 
   if (!items || items.length === 0) return []
 
+  const { data: sessions } = await supabase
+    .from("study_cycle_sessions")
+    .select("*")
+    .eq("cycle_id", cycle.id)
+
   const typedCycle = cycle as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycle
   const typedItems =
     items as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleItemWithDetails[]
+  const typedSessions =
+    (sessions || []) as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleSession[]
 
   // Usa o serviço oficial que respeita o cursor persistido (current_item_index / current_round)
-  const overview = buildCycleOverview(typedCycle, typedItems, [])
+  const overview = buildCycleOverview(typedCycle, typedItems, typedSessions)
 
+  if (!overview.items || overview.items.length === 0) return []
+
+  const currentItem = overview.currentItem
+  const currentIndex = currentItem
+    ? overview.items.findIndex((it) => it.itemId === currentItem.itemId)
+    : 0
+
+  const orderedItems =
+    currentIndex >= 0
+      ? [
+          ...overview.items.slice(currentIndex),
+          ...overview.items.slice(0, currentIndex),
+        ]
+      : overview.items
+
+  const seen = new Set<string>()
   const suggestions: DisciplineSuggestion[] = []
 
-  // Matéria atualmente EM FOCO no ciclo (cursor persistido)
-  if (overview.currentItem) {
-    suggestions.push({
-      id: overview.currentItem.disciplineId,
-      name: overview.currentItem.disciplineName,
-      area: overview.currentItem.disciplineArea,
-      color_hex: overview.currentItem.disciplineColorHex,
-      from: "CYCLE",
-      metadata: {
-        plannedMinutes: overview.currentItem.plannedMinutes,
-        studiedMinutes: overview.currentItem.studiedMinutesInRound,
-        difficulty: overview.currentItem.difficulty,
-        isCurrentInCycle: true,
-      },
-    })
-  }
+  for (const item of orderedItems) {
+    if (seen.has(item.disciplineId)) continue
+    seen.add(item.disciplineId)
 
-  // Próximas matérias do ciclo
-  for (const nextItem of overview.items) {
-    if (suggestions.length >= 4) break
-    if (nextItem.itemId === overview.currentItem?.itemId) continue
-    if (suggestions.some((s) => s.id === nextItem.disciplineId)) continue
     suggestions.push({
-      id: nextItem.disciplineId,
-      name: nextItem.disciplineName,
-      area: nextItem.disciplineArea,
-      color_hex: nextItem.disciplineColorHex,
+      id: item.disciplineId,
+      name: item.disciplineName,
+      area: item.disciplineArea,
+      color_hex: item.disciplineColorHex,
       from: "CYCLE",
       metadata: {
-        plannedMinutes: nextItem.plannedMinutes,
-        difficulty: nextItem.difficulty,
-        isNextInCycle: true,
+        plannedMinutes: item.plannedMinutes,
+        studiedMinutes: item.studiedMinutesInRound,
+        difficulty: item.difficulty,
+        isCurrentInCycle: item.isCurrent,
+        isNextInCycle: !item.isCurrent,
       },
     })
   }

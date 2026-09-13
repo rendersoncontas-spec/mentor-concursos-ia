@@ -48,7 +48,7 @@ export function SupportModeBanner({
       const res = await endSupportSessionAction()
       if (res.ok) {
         toast.success("Sessão de suporte encerrada. Você retornou para o painel administrativo.")
-        router.push("/admin")
+        await router.push("/admin")
         router.refresh()
       } else {
         toast.error(res.error || "Erro ao encerrar suporte.")

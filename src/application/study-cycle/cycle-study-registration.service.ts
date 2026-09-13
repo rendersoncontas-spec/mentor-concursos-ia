@@ -170,6 +170,11 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     let matchedById = 0
     let matchedByName = 0
 
+    // Track round state as we process studies chronologically
+    let simCurrentRound = 1
+    let simCursorIndex = 0
+    let simItemProgressMin = 0
+
     for (const study of history) {
       const disc = Array.isArray(study.disciplines) ? study.disciplines[0] : study.disciplines
       const disciplineName = disc?.name || ""
@@ -200,36 +205,110 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
       diag.normal += consumed
       diag.extra += extra
 
+      // Determine round for this study by simulating progression
+      let studyRound = simCurrentRound
+      let studyItemIndex = simCursorIndex
+      let studyItemProgress = simItemProgressMin
+
+      // Simulate this study's effect on cursor
+      const studyRemaining = Math.max(0, target - studyItemProgress)
+      if (consumed >= studyRemaining && studyRemaining > 0) {
+        // This study completes the current item
+        const nextIndex = studyItemIndex + 1
+        if (nextIndex >= items.length) {
+          // Completes the round
+          studyRound = simCurrentRound // This study belongs to current round
+          simCurrentRound += 1
+          simCursorIndex = 0
+          simItemProgressMin = 0
+        } else {
+          studyRound = simCurrentRound
+          simCursorIndex = nextIndex
+          simItemProgressMin = 0
+        }
+      } else {
+        // Study doesn't complete current item
+        studyRound = simCurrentRound
+        simItemProgressMin += consumed
+      }
+
       pendingSessions.push({
         cycle_id: cycle.id,
         cycle_item_id: cycleItem.id,
         study_history_id: study.id,
         discipline_id: study.discipline_id,
-        round_number: 1,
+        round_number: studyRound,
         minutes_contributed: consumed,
         extra_minutes: extra,
       })
     }
 
-    // ── 6. Cursor = first incomplete item ─────────────────────────
+    // ── 6. Calcular voltas completas e cursor ──────────────────────
+    // Total planejado por volta
+    const totalPlannedPerRound = items.reduce((sum, it) => sum + (itemTarget.get(it.id) || 0), 0)
+
+    // Minutos válidos por item (capped at target) para esta simulação
+    const validMinutesPerItem = new Map<string, number>()
+    for (const item of items) {
+      const accumulated = itemAccumulated.get(item.id) || 0
+      const target = itemTarget.get(item.id)!
+      validMinutesPerItem.set(item.id, Math.min(accumulated, target))
+    }
+
+    // Calcular quantas voltas completas foram feitas
+    // Simular progressão sequencial: item 0 -> item 1 -> ... -> item N-1 -> volta++
+    let totalValidMinutes = 0
+    for (const item of items) {
+      totalValidMinutes += validMinutesPerItem.get(item.id) || 0
+    }
+
+    let totalRoundsDone = 0
+    if (totalPlannedPerRound > 0) {
+      totalRoundsDone = Math.floor(totalValidMinutes / totalPlannedPerRound)
+    }
+
+    // Minutos restantes na volta atual (após remover voltas completas)
+    let remainingMinutesInCurrentRound = totalValidMinutes - totalRoundsDone * totalPlannedPerRound
+
+    // Encontrar cursor na volta atual
     let cursorIndex = 0
+    let currentItemProgressMin = 0
+
     for (let i = 0; i < items.length; i++) {
-      const accumulated = itemAccumulated.get(items[i].id) || 0
       const target = itemTarget.get(items[i].id)!
-      if (accumulated < target) {
+      const validMinutes = validMinutesPerItem.get(items[i].id) || 0
+
+      if (remainingMinutesInCurrentRound >= target) {
+        // Este item está completo na volta atual
+        remainingMinutesInCurrentRound -= target
+        cursorIndex = i + 1
+      } else {
+        // Este é o item atual (parcial ou zerado)
         cursorIndex = i
+        currentItemProgressMin = Math.max(0, remainingMinutesInCurrentRound)
+        remainingMinutesInCurrentRound = 0
         break
       }
-      cursorIndex = i + 1 // all completed, cursor goes past end
     }
-    if (cursorIndex >= items.length) cursorIndex = items.length - 1
 
-    const currentItemProgressMin = itemAccumulated.get(items[cursorIndex]?.id) || 0
+    // Se todos itens completos na volta atual, cursor volta para 0 (início da próxima)
+    if (cursorIndex >= items.length) {
+      cursorIndex = 0
+      currentItemProgressMin = 0
+      // Nota: totalRoundsDone já foi calculado acima, não incrementamos aqui
+      // pois os minutos completos já foram contados no totalValidMinutes
+    }
+
+    const currentRound = totalRoundsDone + 1
 
     // ── 7. Diagnostic table ──────────────────────────────────────
     log(`Rebuild concluído: ${pendingSessions.length} sessões.`)
     log(`  Match por ID: ${matchedById}, por nome: ${matchedByName}, sem match: ${skippedNoMatch}`)
-    log(`  Cursor: #${cursorIndex + 1} ${items[cursorIndex]?.discipline?.name || "?"}`)
+    log(`  Total planejado/volta: ${totalPlannedPerRound}min`)
+    log(`  Minutos válidos total: ${totalValidMinutes}min`)
+    log(`  Voltas completas: ${totalRoundsDone}`)
+    log(`  Volta atual: ${currentRound}`)
+    log(`  Cursor: #${cursorIndex + 1} ${items[cursorIndex]?.discipline?.name || "?"} (${currentItemProgressMin}min)`)
     log(`  ┌──────────────────────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐`)
     log(`  │ MATÉRIA                      │ ESTUDOS  │ MINUTOS  │ META     │ PROGRESSO│ EXTRA    │`)
     log(`  ├──────────────────────────────┼──────────┼──────────┼──────────┼──────────┼──────────┤`)
@@ -242,7 +321,7 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     }
     log(`  └──────────────────────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘`)
 
-    // ── 6. Persistir: Deletar antigos + Inserir novos ──────────────
+    // ── 8. Persistir: Deletar antigos + Inserir novos ──────────────
     //    Se INSERT falhar (ex: migration V2 não rodada), logamos mas
     //    NÃO perdemos o estado antigo sem antes ter os novos prontos.
 
@@ -295,7 +374,8 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
       .from("study_cycles")
       .update({
         current_item_index: cursorIndex,
-        current_round: 1,
+        current_round: currentRound,
+        total_rounds_done: totalRoundsDone,
         current_item_progress_min: currentItemProgressMin,
         updated_at: new Date().toISOString(),
       })
@@ -310,6 +390,9 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
         .from("study_cycles")
         .update({
           current_item_index: cursorIndex,
+          current_round: currentRound,
+          total_rounds_done: totalRoundsDone,
+          current_item_progress_min: currentItemProgressMin,
           updated_at: new Date().toISOString(),
         })
         .eq("id", cycle.id)
@@ -329,6 +412,7 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     log(`=== REBUILD CONCLUÍDO ===`)
     log(`  Sessões persistidas: ${pendingSessions.length - insertFailed}/${pendingSessions.length}`)
     log(`  Cursor: #${cursorIndex + 1} ${items[cursorIndex]?.discipline?.name || "?"}`)
+    log(`  Volta atual: ${currentRound}, Voltas concluídas: ${totalRoundsDone}`)
     log(`  Estado final: item=${cursorIndex}, progress=${currentItemProgressMin}min`)
 
     revalidatePath("/ciclos")

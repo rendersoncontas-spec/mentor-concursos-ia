@@ -48,22 +48,22 @@ export function CycleCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden transition-all duration-200 hover:shadow-lg border flex flex-col justify-between cursor-pointer",
+        "group relative overflow-hidden transition-all duration-200 hover:shadow-lg border flex flex-col cursor-pointer",
         isActive
           ? "border-primary/50 bg-gradient-to-br from-primary/5 via-card to-card ring-1 ring-primary/30"
           : "border-border/60 hover:border-border/90 bg-card/80"
       )}
       onClick={() => onSelect(cycle.id)}
     >
-      <div className="p-5 space-y-4">
+      <div className="p-3.5 space-y-3">
         {/* CABEÇALHO DO CARD */}
-        <div className="flex items-start justify-between gap-2.5">
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-black text-foreground tracking-tight truncate group-hover:text-primary transition-colors">
+            <h3 className="text-sm font-black text-foreground tracking-tight truncate group-hover:text-primary transition-colors">
               {cycle.name}
             </h3>
             {(cycle.contest_name || cycle.edital_name) && (
-              <p className="text-xs font-semibold text-muted-foreground truncate mt-0.5">
+              <p className="text-[11px] font-semibold text-muted-foreground truncate mt-0.5">
                 {cycle.contest_name}
                 {cycle.edital_name && ` • ${cycle.edital_name}`}
               </p>
@@ -72,7 +72,7 @@ export function CycleCard({
 
           <span
             className={cn(
-              "text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shrink-0 border",
+              "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 border",
               isActive &&
                 "bg-emerald-100 text-emerald-700 border-emerald-500/30 dark:bg-emerald-950/60 dark:text-emerald-400",
               isPaused &&
@@ -84,25 +84,25 @@ export function CycleCard({
         </div>
 
         {/* METADADOS: MATÉRIAS E DURAÇÃO */}
-        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
           <span>{items.length} {items.length === 1 ? "matéria" : "matérias"}</span>
-          <span>|</span>
-          <span>{formatMinutes(totalPlannedMinutesPerRound)} por volta</span>
+          <span className="text-muted-foreground/50">|</span>
+          <span>{formatMinutes(totalPlannedMinutesPerRound)} / volta</span>
         </div>
 
-        {/* VOLTAS */}
-        <div className="grid grid-cols-2 gap-2 text-xs py-2 px-3 bg-muted/40 rounded-xl border border-border/40">
+        {/* VOLTAS - COMPACTO */}
+        <div className="grid grid-cols-2 gap-1.5 text-[11px] py-1.5 px-2.5 bg-muted/40 rounded-lg border border-border/40">
           <div>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Volta atual
+            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
+              Volta
             </span>
             <span className="text-sm font-black text-foreground">
-              {currentRound}ª volta
+              {currentRound}ª
             </span>
           </div>
           <div>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Voltas concluídas
+            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
+              Concluídas
             </span>
             <span className="text-sm font-black text-foreground">
               {totalRoundsDone}
@@ -111,14 +111,14 @@ export function CycleCard({
         </div>
 
         {/* BARRA DE PROGRESSO DA VOLTA */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-bold">
-            <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
-              Progresso da volta
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[11px] font-bold">
+            <span className="text-muted-foreground uppercase tracking-wider text-[9px]">
+              Progresso
             </span>
             <span className="text-primary font-black">{roundProgressPercentage}%</span>
           </div>
-          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all duration-300"
               style={{ width: `${Math.min(100, roundProgressPercentage)}%` }}
@@ -128,7 +128,7 @@ export function CycleCard({
 
         {/* PRÓXIMA MATÉRIA / MATÉRIA ATUAL */}
         {currentItem && (
-          <div className="text-xs text-muted-foreground truncate pt-1">
+          <div className="text-[11px] text-muted-foreground truncate pt-0.5">
             <span className="font-bold text-foreground">Agora: </span>
             <span>{currentItem.disciplineName}</span>
             <span className="text-muted-foreground font-medium"> ({currentItem.studiedMinutesInRound}/{currentItem.plannedMinutes} min)</span>
@@ -138,29 +138,29 @@ export function CycleCard({
 
       {/* RODAPÉ DO CARD: BOTÕES DE AÇÃO */}
       <div
-        className="p-3 border-t bg-muted/20 flex items-center justify-between gap-2"
+        className="p-2.5 border-t bg-muted/20 flex items-center justify-between gap-1.5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {isActive ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onPause(cycle.id)}
-              className="h-8 px-2.5 text-xs font-bold text-muted-foreground hover:text-foreground"
+              className="h-7 px-2 text-[11px] font-bold text-muted-foreground hover:text-foreground"
               title="Pausar ciclo"
             >
-              <Pause className="h-3 w-3 mr-1" />
+              <Pause className="h-2.5 w-2.5 mr-0.5" />
               Pausar
             </Button>
           ) : (
             <Button
               size="sm"
               onClick={() => onActivate(cycle.id)}
-              className="h-8 px-2.5 text-xs font-bold bg-primary text-primary-foreground"
+              className="h-7 px-2 text-[11px] font-bold bg-primary text-primary-foreground"
               title="Ativar como ciclo principal"
             >
-              <Play className="h-3 w-3 mr-1 fill-current" />
+              <Play className="h-2.5 w-2.5 mr-0.5 fill-current" />
               Ativar
             </Button>
           )}
@@ -170,10 +170,10 @@ export function CycleCard({
               variant="ghost"
               size="icon"
               onClick={() => onEdit(overview)}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
               title="Editar ciclo"
             >
-              <Edit3 className="h-3.5 w-3.5" />
+              <Edit3 className="h-3 w-3" />
             </Button>
           )}
 
@@ -181,10 +181,10 @@ export function CycleCard({
             variant="ghost"
             size="icon"
             onClick={() => onDelete(cycle.id)}
-            className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+            className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
             title="Excluir ciclo"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3 w-3" />
           </Button>
         </div>
 
@@ -192,10 +192,10 @@ export function CycleCard({
           variant="ghost"
           size="sm"
           onClick={() => onSelect(cycle.id)}
-          className="h-8 px-2 text-xs font-black text-primary hover:text-primary/90 hover:bg-primary/10 gap-1"
+          className="h-7 px-2 text-[11px] font-black text-primary hover:text-primary/90 hover:bg-primary/10 gap-0.5"
         >
-          {isActive ? "Continuar ciclo" : "Ver detalhes"}
-          <ChevronRight className="h-3.5 w-3.5" />
+          {isActive ? "Continuar" : "Ver"}
+          <ChevronRight className="h-3 w-3" />
         </Button>
       </div>
     </Card>

@@ -138,30 +138,30 @@ export function StudyCyclesView() {
 
   return (
     <div className="flex flex-col min-h-full bg-background">
-      <div className="flex-1 p-4 sm:p-6 md:p-8 space-y-8 max-w-6xl mx-auto w-full pb-28">
-        {/* CABEÇALHO REQUISITADO */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                <Layers className="h-5 w-5" />
+      <div className="flex-1 p-3 sm:p-4 md:p-5 space-y-5 max-w-7xl mx-auto w-full pb-20">
+        {/* CABEÇALHO COMPACTO */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                <Layers className="h-4 w-4" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
                 Ciclos de Estudo
               </h1>
             </div>
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Organize suas matérias em uma sequência contínua de estudos.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
               size="icon"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="h-10 w-10 shrink-0"
+              className="h-9 w-9 shrink-0"
               title="Atualizar ciclos"
             >
               <RefreshCcw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
@@ -169,9 +169,9 @@ export function StudyCyclesView() {
 
             <Button
               onClick={() => setIsCreateModalOpen(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-10 px-4 shadow-sm gap-1.5"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-9 px-3 shadow-sm gap-1.5"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
               Criar ciclo
             </Button>
           </div>
@@ -210,10 +210,10 @@ export function StudyCyclesView() {
             />
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-5">
             {/* 1. DESTAQUE DO CICLO ATIVO */}
             {activeCycle && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <ActiveCyclePanel
                   overview={activeCycle}
                   onRefresh={loadData}
@@ -224,8 +224,8 @@ export function StudyCyclesView() {
             )}
 
             {/* 2. LISTA DE TODOS OS CICLOS */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between border-b pb-2">
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between border-b pb-1.5">
                 <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
                   {activeCycle ? "Todos os Ciclos Cadastrados" : "Meus Ciclos de Estudo"}
                 </h3>
@@ -235,10 +235,10 @@ export function StudyCyclesView() {
               </div>
 
               {cycles.length === 0 ? (
-                <Card className="p-12 text-center space-y-4 border-2 border-dashed">
-                  <div className="text-5xl">🎯</div>
-                  <div className="space-y-1.5 max-w-md mx-auto">
-                    <h3 className="text-lg font-black text-foreground">
+                <Card className="p-8 text-center space-y-3 border-2 border-dashed">
+                  <div className="text-4xl">🎯</div>
+                  <div className="space-y-1 max-w-md mx-auto">
+                    <h3 className="text-base font-black text-foreground">
                       Nenhum ciclo cadastrado ainda
                     </h3>
                     <p className="text-xs text-muted-foreground">
@@ -250,12 +250,12 @@ export function StudyCyclesView() {
                     onClick={() => setIsCreateModalOpen(true)}
                     className="bg-primary text-primary-foreground font-black text-xs gap-1.5 shadow-md"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3.5 w-3.5" />
                     Criar primeiro ciclo
                   </Button>
                 </Card>
               ) : (
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {cycles.map((overview) => (
                     <CycleCard
                       key={overview.cycle.id}

@@ -27,6 +27,7 @@ export default async function DashboardPage() {
 
   const snapshot = await getDashboardData(supabase, effectiveUser.id)
   const layoutResult = await getDashboardLayoutAction()
+  const serverDate = new Date().toISOString()
 
-  return <DashboardLayout snapshot={snapshot} initialLayout={layoutResult.data} />
+  return <DashboardLayout snapshot={snapshot} initialLayout={layoutResult.data} serverDate={serverDate} />
 }

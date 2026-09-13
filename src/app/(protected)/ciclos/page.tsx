@@ -8,5 +8,9 @@ export const metadata: Metadata = {
 }
 
 export default function CiclosPage() {
-  return <StudyCyclesView />
+  return (
+    <div className="min-h-screen bg-background">
+      <StudyCyclesView />
+    </div>
+  )
 }

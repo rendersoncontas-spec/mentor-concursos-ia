@@ -414,7 +414,7 @@ export async function getStudyCenterData(): Promise<StudyCenterData> {
 }
 
 /**
- * Busca disciplinas do ciclo ativo (matéria atual + próximas).
+ * Busca disciplinas do ciclo ativo (todas as matérias, reordenadas com a atual primeiro).
  * Função interna — reutiliza lógica de get-study-discipline-suggestions.action.ts
  * mas SEM criar novo Supabase client nem nova auth.
  */
@@ -442,44 +442,51 @@ async function fetchCycleDisciplines(
 
     if (!items || items.length === 0) return []
 
+    const { data: sessions } = await supabase
+      .from("study_cycle_sessions")
+      .select("*")
+      .eq("cycle_id", cycle.id)
+
     const overview = buildCycleOverview(
       cycle as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycle,
       items as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleItemWithDetails[],
-      [],
+      (sessions || []) as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleSession[],
     )
 
+    if (!overview.items || overview.items.length === 0) return []
+
+    const currentItem = overview.currentItem
+    const currentIndex = currentItem
+      ? overview.items.findIndex((it) => it.itemId === currentItem.itemId)
+      : 0
+
+    const orderedItems =
+      currentIndex >= 0
+        ? [
+            ...overview.items.slice(currentIndex),
+            ...overview.items.slice(0, currentIndex),
+          ]
+        : overview.items
+
+    const seen = new Set<string>()
     const result: DisciplineSuggestion[] = []
 
-    if (overview.currentItem) {
-      result.push({
-        id: overview.currentItem.disciplineId,
-        name: overview.currentItem.disciplineName,
-        area: overview.currentItem.disciplineArea,
-        color_hex: overview.currentItem.disciplineColorHex,
-        from: "CYCLE",
-        metadata: {
-          plannedMinutes: overview.currentItem.plannedMinutes,
-          studiedMinutes: overview.currentItem.studiedMinutesInRound,
-          difficulty: overview.currentItem.difficulty,
-          isCurrentInCycle: true,
-        },
-      })
-    }
+    for (const item of orderedItems) {
+      if (seen.has(item.disciplineId)) continue
+      seen.add(item.disciplineId)
 
-    for (const nextItem of overview.items) {
-      if (result.length >= 4) break
-      if (nextItem.itemId === overview.currentItem?.itemId) continue
-      if (result.some((s) => s.id === nextItem.disciplineId)) continue
       result.push({
-        id: nextItem.disciplineId,
-        name: nextItem.disciplineName,
-        area: nextItem.disciplineArea,
-        color_hex: nextItem.disciplineColorHex,
+        id: item.disciplineId,
+        name: item.disciplineName,
+        area: item.disciplineArea,
+        color_hex: item.disciplineColorHex,
         from: "CYCLE",
         metadata: {
-          plannedMinutes: nextItem.plannedMinutes,
-          difficulty: nextItem.difficulty,
-          isNextInCycle: true,
+          plannedMinutes: item.plannedMinutes,
+          studiedMinutes: item.studiedMinutesInRound,
+          difficulty: item.difficulty,
+          isCurrentInCycle: item.isCurrent,
+          isNextInCycle: !item.isCurrent,
         },
       })
     }

@@ -360,7 +360,12 @@ export async function endSupportSessionAction(): Promise<{ ok: boolean; error: s
       }
     }
 
-    cookieStore.delete(SUPPORT_SESSION_COOKIE_NAME)
+    cookieStore.set(SUPPORT_SESSION_COOKIE_NAME, "", {
+      maxAge: 0,
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+    })
     revalidatePath("/", "layout")
     return { ok: true, error: null }
   } catch (err: unknown) {

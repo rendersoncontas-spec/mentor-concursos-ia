@@ -19,15 +19,17 @@ import { StudyRegisterModal } from "@/features/study-session/components/study-re
 
 import { DashboardCustomizationModal } from "./dashboard-customization-modal"
 import { DashboardDndContext } from "./dashboard-dnd-context"
+import { QuickStartBar } from "./quick-start-bar"
 import { WIDGET_REGISTRY } from "./dashboard-widget-catalog"
 import { SortableWidget } from "./sortable-widget"
 
 export interface DashboardLayoutProps {
   snapshot: DashboardSnapshot
   initialLayout: WidgetConfigItem[]
+  serverDate: string
 }
 
-export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProps) {
+export function DashboardLayout({ snapshot, initialLayout, serverDate }: DashboardLayoutProps) {
   const [layout, setLayout] = useState<WidgetConfigItem[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -41,6 +43,8 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [isExamModalOpen, setIsExamModalOpen] = useState(false)
+  const [quickStartDiscipline, setQuickStartDiscipline] = useState<{ name: string; id: string } | null>(null)
+  const [quickStartTime, setQuickStartTime] = useState<number | null>(null)
 
   useEffect(() => {
     if (initialLayout && initialLayout.length > 0) {
@@ -61,11 +65,12 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
 
   const examName =
     snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Minha Prova"
+  const date = new Date(serverDate)
   const formattedTodayDate = new Intl.DateTimeFormat("pt-BR", {
     weekday: "long",
     day: "numeric",
     month: "long",
-  }).format(new Date())
+  }).format(date)
   const capitalizedDate = formattedTodayDate.charAt(0).toUpperCase() + formattedTodayDate.slice(1)
 
   const handleReorder = async (newLayout: WidgetConfigItem[]) => {
@@ -112,8 +117,8 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
     <div className="flex flex-col min-h-full bg-background/50">
       <div className="flex-1 px-4 sm:px-5 pt-4 pb-20 space-y-3 sm:space-y-3.5 w-full max-w-full">
         {/* 1. Header: Saudação + Frase Motivacional */}
-        {(() => {
-          const msg = getDailyMessage()
+{(() => {
+            const msg = getDailyMessage(date)
           return (
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 min-w-0 pb-1">
               <div className="flex-1 min-w-0 space-y-0.5">
@@ -150,6 +155,24 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
             </div>
           )
         })()}
+
+        {/* 1.5 Quick Start Bar */}
+        <QuickStartBar
+          cycleBlocks={snapshot?.cycleBlocks?.map((b) => ({
+            id: b.id,
+            disciplineName: b.disciplineName,
+            disciplineId: b.disciplineId,
+            durationMinutes: b.durationMinutes,
+            studiedMinutes: b.studiedMinutes ?? 0,
+            color: b.color || "#2563EB",
+            completed: b.status === "CONCLUIDO",
+          })) ?? undefined}
+          onOpenModal={(discName, discId, timeSeconds) => {
+            setQuickStartDiscipline({ name: discName, id: discId })
+            setQuickStartTime(timeSeconds)
+            setIsRegisterModalOpen(true)
+          }}
+        />
 
         {/* 2. Widgets do Dashboard (inclui TempodeEstudo, Desempenho, Constância, etc.) */}
         <DashboardDndContext items={visibleWidgets} onReorder={handleReorder}>
@@ -193,7 +216,13 @@ export function DashboardLayout({ snapshot, initialLayout }: DashboardLayoutProp
         onRestoreDefault={handleRestoreDefault}
       />
 
-      <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
+      <StudyRegisterModal
+        open={isRegisterModalOpen}
+        onOpenChange={setIsRegisterModalOpen}
+        initialDisciplineName={quickStartDiscipline?.name ?? null}
+        initialDisciplineId={quickStartDiscipline?.id ?? null}
+        initialTimeSeconds={quickStartTime}
+      />
       <UserExamModal
         open={isExamModalOpen}
         onOpenChange={setIsExamModalOpen}

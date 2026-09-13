@@ -9,9 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as Sentry from "@sentry/nextjs"
 import {
   Calendar,
-  Check,
   CheckCircle2,
-  ChevronsUpDown,
   Clock,
   FileText,
   Minimize2,
@@ -27,10 +25,6 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { updateStudySessionAction } from "@/application/study-history/study-history.actions"
-import {
-  type DisciplineOption,
-  type DisciplineSuggestion,
-} from "@/application/study-session/get-disciplines.action"
 import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
@@ -42,14 +36,6 @@ import {
   todayKeyInSaoPaulo,
 } from "@/lib/sao-paulo"
 import { Button } from "@/components/ui/button"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   Form,
@@ -61,7 +47,6 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -81,6 +66,7 @@ import { TopicAutocomplete } from "@/features/topic-catalog/components/topic-aut
 import { cn } from "@/lib/utils"
 
 import { FocusSoundControl } from "./focus-sound-control"
+import { DisciplinePopover } from "./discipline-popover"
 import { useGlobalStudy } from "./study-provider"
 
 const sessionSchema = z
@@ -149,6 +135,9 @@ interface StudyRegisterModalProps {
   onOpenChange: (open: boolean) => void
   sessionToEdit?: SavedStudySession | null
   mode?: "create" | "edit"
+  initialDisciplineName?: string | null
+  initialDisciplineId?: string | null
+  initialTimeSeconds?: number | null
 }
 
 function formatClock(seconds: number) {
@@ -206,17 +195,17 @@ export function StudyRegisterModal({
   onOpenChange,
   sessionToEdit,
   mode = "create",
+  initialDisciplineName,
+  initialDisciplineId,
+  initialTimeSeconds,
 }: StudyRegisterModalProps) {
   const router = useRouter()
   const isEditMode = mode === "edit" && !!sessionToEdit
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [disciplinePopoverOpen, setDisciplinePopoverOpen] = useState(false)
   const { data: disciplineData, loading: disciplinesLoading } = useDisciplineData()
   const hasActivePlan = disciplineData?.hasActivePlan ?? null
   const planDisciplines = disciplineData?.planDisciplines ?? []
   const allDisciplines = disciplineData?.allDisciplines ?? []
-  const suggestionsSource = disciplineData?.suggestionsSource ?? "NONE"
-  const suggestions = disciplineData?.suggestions ?? []
 
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema) as Resolver<SessionFormValues>,
@@ -288,11 +277,14 @@ export function StudyRegisterModal({
           : currentTimeInSaoPaulo(),
       })
     } else if (open && !isEditMode) {
+      const hasInitial = !!(initialDisciplineName && initialDisciplineId)
+      const manualMinutes = initialTimeSeconds ? Math.floor(initialTimeSeconds / 60) : 0
+      const manualSecs = initialTimeSeconds ? initialTimeSeconds % 60 : 0
       form.reset({
         studyType: "TEORIA",
         technique: "LIVRE",
-        discipline_name: "",
-        discipline_id: "",
+        discipline_name: initialDisciplineName ?? "",
+        discipline_id: initialDisciplineId ?? "",
         topic_name: "",
         pages_read: 0,
         questions_answered: 0,
@@ -305,15 +297,15 @@ export function StudyRegisterModal({
         audio_speed: "1x",
         audio_url: "",
         notes: "",
-        is_manual_mode: false,
-        manual_hours: 0,
-        manual_minutes_field: 0,
-        manual_seconds: 0,
+        is_manual_mode: hasInitial && !!initialTimeSeconds,
+        manual_hours: hasInitial && initialTimeSeconds ? Math.floor(initialTimeSeconds / 3600) : 0,
+        manual_minutes_field: manualMinutes,
+        manual_seconds: manualSecs,
         study_date: todayKeyInSaoPaulo(),
         study_time: currentTimeInSaoPaulo(),
       })
     }
-  }, [form, open, isEditMode, sessionToEdit])
+  }, [form, open, isEditMode, sessionToEdit, initialDisciplineName, initialDisciplineId, initialTimeSeconds])
 
   const {
     session,
@@ -547,27 +539,6 @@ export function StudyRegisterModal({
     [planDisciplines],
   )
 
-  const suggestionsHeading = useMemo(() => {
-    switch (suggestionsSource) {
-      case "PLAN":
-        return "Sugestões do Planejamento"
-      case "CYCLE":
-        return "Sugestões do Ciclo"
-      case "HISTORY":
-        return "Baseado nas últimas atividades"
-      default:
-        return "Sugestões"
-    }
-  }, [suggestionsSource])
-  const planIds = useMemo(() => new Set(planDisciplines.map((d) => d.id)), [planDisciplines])
-  const otherDisciplines = useMemo(
-    () =>
-      allDisciplines
-        .filter((d) => !planIds.has(d.id))
-        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })),
-    [allDisciplines, planIds],
-  )
-
   const selectedDiscipline = useMemo(() => {
     if (!watchDisciplineId) return null
     return (
@@ -581,12 +552,6 @@ export function StudyRegisterModal({
     if (!watchDisciplineId) return "#2563EB"
     return disciplineColorHex(watchDisciplineId, selectedDiscipline?.color_hex)
   }, [selectedDiscipline, watchDisciplineId])
-
-  const handleSelectDiscipline = (disc: DisciplineOption) => {
-    form.setValue("discipline_name", disc.name, { shouldValidate: true })
-    form.setValue("discipline_id", disc.id)
-    setDisciplinePopoverOpen(false)
-  }
 
   const registerTopicInCatalog = (
     topicName: string | undefined,
@@ -1384,164 +1349,15 @@ export function StudyRegisterModal({
                               <span>Disciplina</span>
                               <span className="text-rose-500">*</span>
                             </FormLabel>
-                            <Popover
-                              open={disciplinePopoverOpen}
-                              onOpenChange={setDisciplinePopoverOpen}
-                              modal={true}
-                            >
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className={cn(
-                                      "w-full justify-between font-normal h-9 text-xs sm:text-sm rounded-xl border-border/70 hover:border-primary/40 relative z-[160]",
-                                      !field.value && "text-muted-foreground",
-                                    )}
-                                  >
-                                    <div className="flex items-center gap-2 truncate">
-                                      {field.value && (
-                                        <span
-                                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                                          style={{ backgroundColor: selectedColor }}
-                                        />
-                                      )}
-                                      <span className="truncate">
-                                        {field.value || "Selecione uma disciplina..."}
-                                      </span>
-                                    </div>
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-[min(380px,calc(100vw-2rem))] p-0 z-[200] rounded-xl shadow-xl border-border/80"
-                                align="start"
-                                sideOffset={4}
-                                onWheel={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                onTouchMove={(e) => e.stopPropagation()}
-                              >
-                                <Command className="w-full max-h-[300px]" shouldFilter={true}>
-                                  <CommandInput
-                                    placeholder="Buscar disciplina..."
-                                    value={field.value}
-                                    onValueChange={(search) => {
-                                      field.onChange(search)
-                                      const found = allDisciplines.find(
-                                        (d) => d.name.toLowerCase() === search.toLowerCase(),
-                                      )
-                                      form.setValue("discipline_id", found ? found.id : "")
-                                    }}
-                                  />
-                                  <CommandList className="max-h-[250px] overflow-y-auto overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
-                                    <CommandEmpty>Nenhuma disciplina encontrada.</CommandEmpty>
-                                    <CommandGroup heading={suggestionsHeading}>
-                                      {suggestions.length > 0 ? (
-                                        suggestions.map((sug) => (
-                                          <CommandItem
-                                            key={`${sug.from}-${sug.id}`}
-                                            value={sug.name}
-                                            onSelect={() =>
-                                              handleSelectDiscipline({
-                                                id: sug.id,
-                                                name: sug.name,
-                                                area: sug.area,
-                                                color_hex: sug.color_hex ?? null,
-                                                fromPlan: sug.from === "PLAN",
-                                              })
-                                            }
-                                            className="cursor-pointer flex items-center justify-between"
-                                          >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                              <Check
-                                                className={cn(
-                                                  "h-4 w-4 shrink-0 text-primary",
-                                                  field.value === sug.name
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              <span
-                                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                                style={{
-                                                  backgroundColor: disciplineColorHex(
-                                                    sug.id,
-                                                    sug.color_hex,
-                                                  ),
-                                                }}
-                                              />
-                                              <span className="truncate font-medium">
-                                                {sug.metadata?.isCurrentInCycle && (
-                                                  <span className="text-primary font-black mr-1">
-                                                    ▶
-                                                  </span>
-                                                )}
-                                                {sug.name}
-                                              </span>
-                                              {sug.metadata?.isCurrentInCycle && (
-                                                <span className="text-[10px] font-black text-primary shrink-0">
-                                                  {sug.metadata.studiedMinutes ?? 0} min /{" "}
-                                                  {sug.metadata.plannedMinutes ?? 0} min
-                                                </span>
-                                              )}
-                                            </div>
-                                            {sug.metadata?.difficulty && (
-                                              <span className="text-[10px] text-muted-foreground ml-auto pl-2 shrink-0">
-                                                {difficultyLabel(sug.metadata.difficulty)}
-                                              </span>
-                                            )}
-                                          </CommandItem>
-                                        ))
-                                      ) : (
-                                        <div className="px-3 py-2 text-xs text-muted-foreground italic">
-                                          Nenhuma sugestão disponível.
-                                        </div>
-                                      )}
-                                    </CommandGroup>
-
-                                    {otherDisciplines.length > 0 && (
-                                      <CommandGroup heading="Todas as Disciplinas">
-                                        {otherDisciplines.map((disc) => (
-                                          <CommandItem
-                                            key={`all-${disc.id}`}
-                                            value={disc.name}
-                                            onSelect={() => handleSelectDiscipline(disc)}
-                                            className="cursor-pointer flex items-center justify-between"
-                                          >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                              <Check
-                                                className={cn(
-                                                  "h-4 w-4 shrink-0 text-primary",
-                                                  field.value === disc.name
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              <span
-                                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                                style={{
-                                                  backgroundColor: disciplineColorHex(
-                                                    disc.id,
-                                                    disc.color_hex,
-                                                  ),
-                                                }}
-                                              />
-                                              <span className="truncate">{disc.name}</span>
-                                            </div>
-                                            {disc.area && (
-                                              <span className="text-[10px] text-muted-foreground ml-auto pl-2 truncate max-w-[120px]">
-                                                {disc.area}
-                                              </span>
-                                            )}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    )}
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
+                            <DisciplinePopover
+                              value={field.value ?? ""}
+                              onSelect={(name, id) => {
+                                field.onChange(name)
+                                form.setValue("discipline_id", id)
+                              }}
+                              placeholder="Selecione uma disciplina..."
+                              className="relative z-[160]"
+                            />
                             <FormMessage />
                           </FormItem>
                         )}

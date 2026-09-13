@@ -438,3 +438,58 @@ test("8. Sem planejamento + sem ciclo + sem histórico: lista vazia", async () =
   assert.equal(res.source, "NONE")
   assert.equal(res.suggestions.length, 0)
 })
+
+test("9. Ciclo com N matérias: TODAS aparecem, atual primeiro, mantendo ordem do ciclo", async () => {
+  const fetchStudyDisciplineSuggestions = await getSuggestionsAction()
+  const dbState: MockDatabaseState = {
+    disciplines: mockDisciplines,
+    study_plans: [],
+    study_plan_items: [],
+    study_cycles: [
+      {
+        id: "cycle-9",
+        user_id: "user-1",
+        name: "Ciclo 9 matérias",
+        status: "ACTIVE",
+        current_item_index: 2, // Cursor aponta para o 3º item
+        current_round: 1,
+        total_rounds_done: 0,
+        current_item_progress_min: 10,
+        created_at: "2026-09-01T00:00:00Z",
+        updated_at: "2026-09-01T00:00:00Z",
+      },
+    ],
+    study_cycle_items: [
+      { id: "ci-1", cycle_id: "cycle-9", discipline_id: "disc-trib", order: 1, priority: "ALTA", difficulty: "MEDIA", planned_minutes: 60 },
+      { id: "ci-2", cycle_id: "cycle-9", discipline_id: "disc-const", order: 2, priority: "ALTA", difficulty: "MEDIA", planned_minutes: 60 },
+      { id: "ci-3", cycle_id: "cycle-9", discipline_id: "disc-cont", order: 3, priority: "ALTA", difficulty: "MEDIA", planned_minutes: 60 },
+      { id: "ci-4", cycle_id: "cycle-9", discipline_id: "disc-port", order: 4, priority: "MEDIA", difficulty: "MEDIA", planned_minutes: 60 },
+      { id: "ci-5", cycle_id: "cycle-9", discipline_id: "disc-adm", order: 5, priority: "MEDIA", difficulty: "MEDIA", planned_minutes: 60 },
+    ],
+    study_history: [],
+  }
+
+  const res = await fetchStudyDisciplineSuggestions(createMockSupabase(dbState), "user-1")
+
+  assert.equal(res.source, "CYCLE")
+  // TODAS as 5 matérias do ciclo devem aparecer (não apenas 4)
+  assert.equal(res.suggestions.length, 5)
+  // A primeira é a matéria atual (item de ordem 3 = Contabilidade Geral)
+  assert.equal(res.suggestions[0]?.name, "Contabilidade Geral")
+  assert.equal(res.suggestions[0]?.metadata?.isCurrentInCycle, true)
+  assert.equal(res.suggestions[0]?.metadata?.studiedMinutes, 10)
+  // Ordem preservada a partir do cursor: 3,4,5,1,2
+  assert.deepEqual(
+    res.suggestions.map((s) => s.name),
+    [
+      "Contabilidade Geral",
+      "Língua Portuguesa",
+      "Direito Administrativo",
+      "Direito Tributário",
+      "Direito Constitucional",
+    ]
+  )
+  // Progresso presente em todas
+  assert.ok(res.suggestions.every((s) => s.metadata?.plannedMinutes === 60))
+  assert.ok(res.suggestions.every((s) => s.metadata?.difficulty === "MEDIA"))
+})
