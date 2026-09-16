@@ -33,8 +33,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { AccountSettingsModal } from "@/features/profile/components/account-settings-modal"
-import { useGlobalStudy } from "@/features/study-session/components/study-provider"
 import { clearUserLocalData } from "@/utils/user-data"
+import { StudyHeaderControl } from "@/components/study/study-header-control"
 
 interface AppHeaderProps {
   userEmail?: string
@@ -54,7 +54,6 @@ export function AppHeader({
   onOpenMenu,
 }: AppHeaderProps) {
   const router = useRouter()
-  const { session, formatTime } = useGlobalStudy()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -128,84 +127,62 @@ export function AppHeader({
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/90 backdrop-blur-sm px-3 sm:px-6 w-full">
-      {/* Esquerda: Menu Hamburger + Logo em Mobile */}
-      <div className="flex items-center gap-2.5 md:hidden">
-        {onOpenMenu && (
-          <button
-            type="button"
-            onClick={onOpenMenu}
-            className="w-10 h-10 -ml-1 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-            aria-label="Abrir menu de navegação"
-            title="Abrir menu"
-          >
-            <Menu className="w-5 h-5 text-foreground" />
-          </button>
-        )}
-        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-          <Image
-            src="/branding/nomeia-icon.png"
-            alt="NomeIA"
-            width={30}
-            height={30}
-            className="w-[30px] h-[30px] rounded-xl object-contain shadow-xs shrink-0"
-          />
-          <span className="font-extrabold text-sm text-foreground flex items-center shrink-0">
-            <span>Nome</span>
-            <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
-              IA
-            </span>
-          </span>
-        </Link>
-      </div>
+     <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border bg-background px-3 sm:px-6">
+       {/* Esquerda: Menu Hamburger + Logo em Mobile */}
+       <div className="flex items-center gap-2.5 md:hidden">
+         {onOpenMenu && (
+           <button
+             type="button"
+             onClick={onOpenMenu}
+            className="h-9 w-9 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-colors flex items-center justify-center cursor-pointer"
+             aria-label="Abrir menu de navegação"
+             title="Abrir menu"
+           >
+             <Menu className="w-5 h-5 text-foreground" />
+           </button>
+         )}
+         <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+           <Image
+             src="/branding/nomeia-icon.png"
+             alt="NomeIA"
+             width={30}
+             height={30}
+              className="w-[30px] h-[30px] rounded-xl object-contain shrink-0"
+           />
+           <span className="font-extrabold text-sm text-foreground flex items-center shrink-0">
+             <span>Nome</span>
+             <span className="text-primary">
+               IA
+             </span>
+           </span>
+         </Link>
+       </div>
 
-      {/* Centro: Indicador de Sessão Ativa */}
-      <div className="flex items-center gap-2">
-        {session?.isActive && (
-          <button
-            type="button"
-            onClick={() => {
-              if (session.source === "PLAN" && session.planItemId) {
-                router.push(`/dashboard/study-session?planId=${session.planItemId}`)
-              } else if (session.disciplineId) {
-                router.push(`/dashboard/study-session?disciplineId=${session.disciplineId}`)
-              } else {
-                router.push("/dashboard/study-session")
-              }
-            }}
-            className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-full text-xs font-bold transition-all shadow-xs cursor-pointer"
-            title="Clique para voltar ao cronômetro"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="font-mono">{formatTime(session.activeSeconds)}</span>
-            <span className="hidden sm:inline text-muted-foreground font-normal">·</span>
-            <span className="hidden sm:inline truncate max-w-[130px] font-medium">{session.disciplineName}</span>
-          </button>
-        )}
-      </div>
+       {/* Central de Estudos — Controle de Sessão no Header Global (lado esquerdo) */}
+       <StudyHeaderControl />
+
+       {/* Spacer empurra ações para a direita no desktop */}
+       <div className="hidden md:block flex-1" />
 
       {/* Direita: Ações Superiores + Avatar do Usuário */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         {/* Botão ? (Ajuda / Suporte) */}
         <button
           onClick={() => toast.info("Central de Ajuda e Suporte do NomeIA")}
-          className="w-9 h-9 rounded-full bg-[#2563EB] text-white flex items-center justify-center hover:bg-[#1D4ED8] transition-colors shadow-xs shrink-0"
+          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
           title="Ajuda e Suporte"
         >
-          <HelpCircle className="h-4.5 w-4.5" />
+          <HelpCircle className="h-[18px] w-[18px]" />
         </button>
 
         {/* Botão Notificações */}
         <button
           onClick={() => toast.info("Nenhuma nova notificação no momento.")}
-          className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative shrink-0 flex items-center justify-center"
+          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative shrink-0 flex items-center justify-center"
           title="Notificações"
         >
-          <Bell className="h-4.5 w-4.5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#2563EB]" />
+          <Bell className="h-[18px] w-[18px]" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
         </button>
 
         {/* Botão de Personalização do Home */}
@@ -213,22 +190,22 @@ export function AppHeader({
           onClick={() => {
             window.dispatchEvent(new CustomEvent("open-dashboard-customization"))
           }}
-          className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
+          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
           title="Personalizar Home"
         >
-          <Settings className="h-4.5 w-4.5" />
+          <Settings className="h-[18px] w-[18px]" />
         </button>
 
         {/* Botão Modo Noturno / Tema */}
         <button
           onClick={toggleDarkMode}
-          className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
+          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
           title="Alternar Tema"
         >
           {mounted && resolvedTheme === "dark" ? (
-            <Sun className="h-4.5 w-4.5 text-amber-400" />
+            <Sun className="h-[18px] w-[18px] text-amber-400 dark:text-amber-300" />
           ) : (
-            <Moon className="h-4.5 w-4.5" />
+            <Moon className="h-[18px] w-[18px]" />
           )}
         </button>
 
@@ -236,7 +213,7 @@ export function AppHeader({
         <div className="relative shrink-0" ref={menuRef}>
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="w-10 h-10 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xs focus:outline-none overflow-hidden"
+            className="h-9 w-9 rounded-xl border border-border bg-card text-foreground flex items-center justify-center hover:bg-muted transition-colors focus:outline-none overflow-hidden"
             title="Menu do Usuário"
             aria-haspopup="menu"
             aria-expanded={isUserMenuOpen}
@@ -256,7 +233,7 @@ export function AppHeader({
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-card p-2 shadow-xl z-50 text-foreground space-y-1 animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-md z-50 text-foreground space-y-1">
               {/* Cumprimento: Olá, {userName}... */}
               <div className="font-bold text-xs text-muted-foreground px-3 py-2 border-b">
                 Olá, <span className="text-foreground font-black">{userName}...</span>

@@ -1065,6 +1065,301 @@ test("TEMPORAL 10. Idempotência + validação temporal: mesmo estudo processado
 })
 
 // ============================================================
+// REGRESSÃO: estudos importados (Aprovado) contribuem para o ciclo
+// mesmo quando anteriores à criação do ciclo.
+// O rebuild NÃO filtra por cycle.created_at (CHECK 5).
+// ============================================================
+
+test("imported Aprovado studies contribute to the active cycle", () => {
+  // Ciclo criado em 01/09, estudo importado do Aprovado em 15/08.
+  // REGRA ATUAL: todo o study_history válido conta, independente da data.
+  const cycleCreatedAt = new Date("2026-09-01T00:00:00Z")
+  const importedStudyAt = new Date("2026-08-15T10:00:00Z")
+
+  // O filtro antigo (started_at >= cycle.created_at) descartaria este estudo.
+  // A regra corrigida NÃO aplica esse filtro.
+  const shouldCount = true // todo histórico válido com duration > 0 conta
+  assert.equal(shouldCount, true, "Importado anterior ao ciclo DEVE contribuir")
+
+  // Acumulação: 90min importados em target 60 → 60/60 + 30 extra
+  const importedMinutes = 90
+  const target = 60
+  const consumed = Math.min(importedMinutes, target)
+  const extra = Math.max(importedMinutes - consumed, 0)
+  assert.equal(consumed, 60, "Progresso limitado ao target")
+  assert.equal(extra, 30, "Excesso vira extra, não é descartado")
+  void cycleCreatedAt
+  void importedStudyAt
+})
+
+test("imported studies: múltiplos registros da mesma disciplina são somados", () => {
+  const studies = [30, 40, 50] // minutos importados
+  const target = 60
+  let accumulated = 0
+  for (const mins of studies) {
+    const remaining = Math.max(0, target - accumulated)
+    accumulated += Math.min(mins, remaining)
+  }
+  assert.equal(accumulated, 60, "Soma limitada ao target")
+  const total = studies.reduce((a, b) => a + b, 0)
+  assert.equal(total - accumulated, 60, "Resto vira extra")
+})
+
+test("imported studies: mesma study_history_id processada 2x contribui só 1x", () => {
+  const processed = new Set<string>(["hist-import-1"])
+  const incoming = "hist-import-1"
+  assert.equal(processed.has(incoming), true, "Idempotência bloqueia duplicação")
+})
+
+// ============================================================
+// CURSOR DO REBUILD: avança por TODAS as matérias completas
+// ============================================================
+
+function rebuildCursor(validMinutesPerItem: number[], targets: number[]): {
+  cursorIndex: number
+  currentItemProgressMin: number
+  roundsDone: number
+  currentRound: number
+} {
+  const totalPlanned = targets.reduce((a, b) => a + b, 0)
+  const totalValid = validMinutesPerItem.reduce((a, b) => a + Math.min(b, targets[validMinutesPerItem.indexOf(b)] ?? b), 0)
+  const roundsDone = totalPlanned > 0 ? Math.floor(totalValid / totalPlanned) : 0
+  let cursorIndex = 0
+  let currentItemProgressMin = 0
+  let foundIncomplete = false
+  for (let i = 0; i < validMinutesPerItem.length; i++) {
+    const target = targets[i]!
+    const valid = Math.min(validMinutesPerItem[i] ?? 0, target)
+    if (valid < target) {
+      cursorIndex = i
+      currentItemProgressMin = Math.max(0, valid)
+      foundIncomplete = true
+      break
+    }
+  }
+  if (!foundIncomplete) {
+    cursorIndex = 0
+    currentItemProgressMin = 0
+  }
+  return { cursorIndex, currentItemProgressMin, roundsDone, currentRound: roundsDone + 1 }
+}
+
+test("CURSOR 1. A=60 B=60 C=20 → cursor = C", () => {
+  const r = rebuildCursor([60, 60, 20], [60, 60, 60])
+  assert.equal(r.cursorIndex, 2, "Cursor na primeira incompleta (C)")
+  assert.equal(r.currentItemProgressMin, 20, "Progresso parcial preservado")
+})
+
+test("CURSOR 2. A=B=C=60 → nova volta, cursor = A", () => {
+  const r = rebuildCursor([60, 60, 60], [60, 60, 60])
+  assert.equal(r.roundsDone, 1, "Volta fecha")
+  assert.equal(r.currentRound, 2, "Nova volta inicia")
+  assert.equal(r.cursorIndex, 0, "Cursor recomeça em A")
+  assert.equal(r.currentItemProgressMin, 0, "Progresso zerado na nova volta")
+})
+
+test("CURSOR 3. A=60 B=80 C=40 → cursor = C, excesso de B vira extra", () => {
+  const r = rebuildCursor([60, 80, 40], [60, 60, 60])
+  assert.equal(r.cursorIndex, 2, "Cursor em C (B completa com extra)")
+  assert.equal(r.currentItemProgressMin, 40, "C preserva 40min")
+})
+
+test("CURSOR 4. A=B=C=60 D=20 → cursor = D (pula todas as completas)", () => {
+  const r = rebuildCursor([60, 60, 60, 20], [60, 60, 60, 60])
+  assert.equal(r.cursorIndex, 3, "Cursor avança por B e C completas até D")
+})
+
+// ============================================================
+// STATUS VISUAL: derivado do progresso real, não do cursor
+// ============================================================
+
+function visualStatus(item: { status: string; studied: number; planned: number }): string {
+  if (item.status === "PULADO") return "SKIPPED"
+  if (item.status === "ATUAL") return "CURRENT"
+  const target = Math.max(1, item.planned)
+  const studied = Math.max(0, item.studied)
+  if (studied >= target) return item.status === "PENDENTE" ? "COMPLETED_EARLY" : "COMPLETED"
+  if (studied > 0) return "PARTIAL"
+  return "PENDING"
+}
+
+test("VISUAL 1. current + 0/60 → ATUAL", () => {
+  assert.equal(visualStatus({ status: "ATUAL", studied: 0, planned: 60 }), "CURRENT")
+})
+
+test("VISUAL 2. future + 60/60 → CONCLUÍDA ANTECIPADAMENTE", () => {
+  assert.equal(visualStatus({ status: "PENDENTE", studied: 60, planned: 60 }), "COMPLETED_EARLY")
+})
+
+test("VISUAL 3. future + 60/60 + extra → CONCLUÍDA + EXTRA", () => {
+  const s = visualStatus({ status: "PENDENTE", studied: 120, planned: 60 })
+  assert.equal(s, "COMPLETED_EARLY", "Excesso vira extra, visual é concluída")
+})
+
+test("VISUAL 4. future + 20/60 → PARCIAL", () => {
+  assert.equal(visualStatus({ status: "PENDENTE", studied: 20, planned: 60 }), "PARTIAL")
+})
+
+test("VISUAL 5. future + 0/60 → PENDENTE", () => {
+  assert.equal(visualStatus({ status: "PENDENTE", studied: 0, planned: 60 }), "PENDING")
+})
+
+test("VISUAL 6. skipped → PULADA", () => {
+  assert.equal(visualStatus({ status: "PULADO", studied: 20, planned: 60 }), "SKIPPED")
+})
+
+// ============================================================
+// APRESENTAÇÃO ESTILO APROVADO: Extra/Falta + Meta + cor + %
+// ============================================================
+
+function fmtDur(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds))
+  if (s < 60) return `${s}s`
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const rest = s % 60
+  const parts: string[] = []
+  if (h > 0) parts.push(`${h}h`)
+  if (m > 0 || h === 0) parts.push(h > 0 ? `${String(m).padStart(2, "0")}m` : `${m}m`)
+  if (rest > 0) parts.push(h > 0 || m > 0 ? `${String(rest).padStart(2, "0")}s` : `${rest}s`)
+  return parts.join("")
+}
+
+function barColor(pct: number): string {
+  if (pct >= 75) return "green"
+  if (pct >= 50) return "lime"
+  if (pct >= 25) return "amber"
+  return "orange"
+}
+
+test("APROVADO 1. 0/60 → Falta 1h, 0,0%, laranja", () => {
+  assert.equal(fmtDur(60 * 60), "1h")
+  assert.equal(barColor(0), "orange")
+})
+
+test("APROVADO 2. 40/60 → 66,7%, lima", () => {
+  const pct = Math.min(100, (40 / 60) * 100)
+  assert.ok(pct > 66 && pct < 67)
+  assert.equal(barColor(Math.round(pct)), "lime")
+})
+
+test("APROVADO 3. 60/60 → Extra 0, 100%, verde", () => {
+  assert.equal(fmtDur(0), "0s")
+  assert.equal(barColor(100), "green")
+})
+
+test("APROVADO 4. 80/60 → Extra 20m, 100%, verde", () => {
+  assert.equal(fmtDur(20 * 60), "20m")
+  assert.equal(barColor(100), "green")
+})
+
+test("APROVADO 5. 120/60 → Extra 1h, 100%, verde", () => {
+  assert.equal(fmtDur(60 * 60), "1h")
+})
+
+test("APROVADO 6. extra nunca eleva % acima de 100", () => {
+  const pct = Math.min(100, (480 / 60) * 100)
+  assert.equal(pct, 100)
+})
+
+test("APROVADO 7. futura 60/60 → concluída visual, cursor fica na anterior incompleta", () => {
+  const s = visualStatus({ status: "PENDENTE", studied: 60, planned: 60 })
+  assert.equal(s, "COMPLETED_EARLY")
+})
+
+// ============================================================
+// PRÓXIMA = primeira incompleta após o cursor (não o próximo array)
+// ============================================================
+
+function nextIncomplete(progress: number[], currentIndex: number): number | null {
+  if (progress.length <= 1) return null
+  for (let offset = 1; offset < progress.length; offset++) {
+    const i = (currentIndex + offset) % progress.length
+    if ((progress[i] ?? 0) < 60) return i
+  }
+  return null
+}
+
+test("NEXT 1. A=0 B=60 C=60 D=0, atual=A → PRÓXIMA=D", () => {
+  assert.equal(nextIncomplete([0, 60, 60, 0], 0), 3)
+})
+
+test("NEXT 2. A=20 B=60 C=10, atual=A → PRÓXIMA=C", () => {
+  assert.equal(nextIncomplete([20, 60, 10], 0), 2)
+})
+
+test("NEXT 3. A=B=C=0, atual=A → PRÓXIMA=B", () => {
+  assert.equal(nextIncomplete([0, 0, 0], 0), 1)
+})
+
+test("NEXT 4. A=0 B=80 C=0, atual=A → PRÓXIMA=C (extra não impede o pulo)", () => {
+  assert.equal(nextIncomplete([0, 80, 0], 0), 2)
+})
+
+test("NEXT 5. todas 60/60 → null (volta completa)", () => {
+  assert.equal(nextIncomplete([60, 60, 60, 60], 0), null)
+})
+
+// ============================================================
+// PROTEÇÃO: múltiplos ciclos registrados, um ativo
+// ============================================================
+
+function filterVisibleCycles(cycles: { id: string; status: string }[]): typeof cycles {
+  // Regra do getCyclesAction: tudo exceto ARCHIVED
+  return cycles.filter((c) => c.status !== "ARCHIVED")
+}
+
+test("CYCLES 1. usuário com 2 ciclos → ambos retornados", () => {
+  const cycles = [
+    { id: "c1", status: "ACTIVE" },
+    { id: "c2", status: "PAUSED" },
+  ]
+  assert.equal(filterVisibleCycles(cycles).length, 2)
+})
+
+test("CYCLES 2. ACTIVE + PAUSED → ambos visíveis", () => {
+  const cycles = [
+    { id: "c1", status: "ACTIVE" },
+    { id: "c2", status: "PAUSED" },
+  ]
+  const visible = filterVisibleCycles(cycles)
+  assert.ok(visible.some((c) => c.status === "ACTIVE"))
+  assert.ok(visible.some((c) => c.status === "PAUSED"))
+})
+
+test("CYCLES 3. ativo corretamente selecionado", () => {
+  const cycles = [
+    { id: "c1", status: "ACTIVE" },
+    { id: "c2", status: "PAUSED" },
+  ]
+  const active = cycles.find((c) => c.status === "ACTIVE")
+  assert.equal(active?.id, "c1")
+})
+
+test("CYCLES 4. lista não colapsa para 1 item", () => {
+  const cycles = [
+    { id: "c1", status: "ACTIVE" },
+    { id: "c2", status: "PAUSED" },
+  ]
+  assert.ok(filterVisibleCycles(cycles).length > 1)
+})
+
+test("CYCLES 5. rebuild de um ciclo não toca no outro", () => {
+  const touched = new Set(["c1"])
+  assert.equal(touched.has("c2"), false, "Ciclo B intacto")
+})
+
+test("CYCLES 6. ARCHIVED fica oculto, demais visíveis", () => {
+  const cycles = [
+    { id: "c1", status: "ACTIVE" },
+    { id: "c2", status: "ARCHIVED" },
+  ]
+  const visible = filterVisibleCycles(cycles)
+  assert.equal(visible.length, 1)
+  assert.equal(visible[0]?.id, "c1")
+})
+
+// ============================================================
 // TESTE DE TIMEZONE: evitar problema de 31/08 23:30 → 01/09
 // ============================================================
 

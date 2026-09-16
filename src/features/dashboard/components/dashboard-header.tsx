@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Target, RefreshCw } from "lucide-react"
+import { Target, RefreshCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { type Greeting } from "@/application/dashboard/greeting.service"
 
@@ -43,7 +43,7 @@ export function DashboardHeader({
 
         <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
           <Link href="/profile">
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCcw className="h-3.5 w-3.5" />
             <span>Alternar Concurso</span>
           </Link>
         </Button>

@@ -8,6 +8,7 @@ import {
   SAME_AREA_PENALTY,
 } from "./study-plan.algorithm"
 import type { AlgorithmDisciplineInput, DayOfWeek } from "@/domain/study-plan/study-plan.types"
+import { getTodayDayOfWeekInSaoPaulo } from "./study-plan.service"
 
 const DISCIPLINES: AlgorithmDisciplineInput[] = [
   { disciplineId: "d1", name: "Português", area: "Humanas", weight: 5, status: "STUDYING" },
@@ -259,4 +260,11 @@ test("todos os minutos são preservados sem perda (soma exata)", () => {
   })
   const totalMinutes = items.reduce((acc, i) => acc + i.durationMinutes, 0)
   assert.equal(totalMinutes, weeklyMinutes)
+})
+
+test("getTodayDayOfWeekInSaoPaulo: borda de meia-noite 23:30 SP vs 00:30 SP dia seguinte", () => {
+  const beforeMidnight = new Date("2026-08-24T02:30:00.000Z")
+  const afterMidnight = new Date("2026-08-24T03:30:00.000Z")
+  assert.equal(getTodayDayOfWeekInSaoPaulo(beforeMidnight), 0)
+  assert.equal(getTodayDayOfWeekInSaoPaulo(afterMidnight), 1)
 })

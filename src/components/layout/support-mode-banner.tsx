@@ -63,7 +63,7 @@ export function SupportModeBanner({
   return (
     <aside
       aria-label="Aviso de modo suporte ativo"
-      className="sticky top-0 z-50 w-full bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 text-white shadow-lg border-b border-amber-500/40 px-4 py-2.5"
+      className="sticky top-0 z-50 w-full bg-amber-700 text-white shadow-sm border-b border-amber-500/40 px-4 py-2.5"
     >
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs font-semibold">
         <div className="flex items-center gap-2.5">

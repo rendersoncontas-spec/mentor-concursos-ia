@@ -77,13 +77,13 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
   return (
     <div
       className={cn(
-        "p-5 space-y-4 flex flex-col justify-between min-h-[300px] h-full w-full",
+        "p-3.5 space-y-2.5 flex flex-col h-full w-full",
         !embedded && "rounded-xl border bg-card shadow-sm",
         className,
       )}
     >
       {/* Card Header */}
-      <div className="flex items-center justify-between border-b pb-3">
+      <div className="flex items-center justify-between border-b pb-1.5">
         <div className="flex items-center gap-2">
           <BellRing className="h-4 w-4 text-primary" />
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
@@ -104,25 +104,25 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
 
       {/* Lista ou Estado Vazio */}
       {reminders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-6 px-2 flex-1 gap-3 w-full">
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs shrink-0">
-            <BellRing className="h-6 w-6 text-[#2563EB]" />
+        <div className="flex flex-col items-center justify-center text-center py-3 px-2 gap-2 w-full">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs shrink-0">
+            <BellRing className="h-4 w-4 text-[#2563EB]" />
           </div>
 
-          <div className="space-y-1 max-w-[280px]">
-            <h4 className="font-bold text-sm text-foreground leading-snug">
-              Você ainda não criou nenhum lembrete
+          <div className="space-y-0.5 max-w-[280px]">
+            <h4 className="font-bold text-xs text-foreground leading-snug">
+              Nenhum lembrete criado
             </h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Use este espaço para anotar datas de inscrições, provas, simulados ou metas.
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Anote inscrições, provas, simulados ou metas.
             </p>
           </div>
 
           <Button
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 h-8 shadow-xs cursor-pointer gap-1.5 mt-1"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-3 h-7 shadow-xs cursor-pointer gap-1"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3 w-3" />
             Criar Lembrete
           </Button>
         </div>

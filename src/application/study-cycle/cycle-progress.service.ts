@@ -184,10 +184,7 @@ export function buildCycleOverview(
   )
 
   const currentItem = computedItems[safeCurrentIndex] || null
-  const nextItem =
-    totalItemsCount > 1
-      ? computedItems[(safeCurrentIndex + 1) % totalItemsCount] || null
-      : null
+  const nextItem = getNextIncompleteCycleItem(computedItems, safeCurrentIndex)
 
   return {
     cycle,
@@ -202,6 +199,25 @@ export function buildCycleOverview(
     currentItem,
     nextItem,
   }
+}
+
+/**
+ * PRÓXIMA = primeira matéria APÓS o cursor atual que ainda não atingiu 100%.
+ * Itens já completos (incluindo com extra) são pulados. Não move o cursor,
+ * não reordena a fila. Retorna null quando a volta está completa.
+ */
+export function getNextIncompleteCycleItem(
+  items: CycleItemProgress[],
+  currentIndex: number
+): CycleItemProgress | null {
+  if (items.length <= 1) return null
+  for (let offset = 1; offset < items.length; offset++) {
+    const candidate = items[(currentIndex + offset) % items.length]
+    if (!candidate) continue
+    const target = Math.max(1, candidate.plannedMinutes)
+    if (candidate.studiedMinutesInRound < target) return candidate
+  }
+  return null
 }
 
 /**

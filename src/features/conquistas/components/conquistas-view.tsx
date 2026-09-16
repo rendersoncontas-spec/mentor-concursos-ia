@@ -642,7 +642,7 @@ export function ConquistasView() {
 
         {/* Banner Geral de Progresso */}
         {!isLoading && !loadError && (
-          <div className="rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/30 p-5 sm:p-6 shadow-sm">
+          <div className="rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               {/* Barra de Progresso Principal */}
               <div className="flex-1 w-full space-y-2.5">

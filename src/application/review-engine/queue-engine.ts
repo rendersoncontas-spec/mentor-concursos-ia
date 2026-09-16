@@ -13,6 +13,7 @@
 
 import type { ReviewCalendarDay, ReviewFilters, ReviewItem, ReviewLoadForecast, ReviewSettings } from "@/domain/reviews/models"
 import { currentRetrievability, isLeech, reviewItemToSnapshot } from "./fsrs-engine"
+import { getDayInSaoPaulo } from "@/lib/sao-paulo"
 
 export interface QueueCard {
   item: ReviewItem
@@ -25,6 +26,15 @@ export interface QueueCard {
 }
 
 const DAY_MS = 1000 * 3600 * 24
+
+/** Soma dias a uma chave "YYYY-MM-DD" (aritmética de calendário, meio-dia UTC evita DST). */
+function addDaysToDayKey(dayKey: string, offset: number): string {
+  const parts = dayKey.split("-").map(Number)
+  const y = parts[0] ?? 1970
+  const m = parts[1] ?? 1
+  const d = parts[2] ?? 1
+  return new Date(Date.UTC(y, m - 1, d + offset, 12, 0, 0)).toISOString().slice(0, 10)
+}
 
 export function elapsedDays(dateIso: string | null, now = new Date()): number {
   if (!dateIso) return 0
@@ -83,9 +93,9 @@ export function smartQueueOrder(items: ReviewItem[], now = new Date()): ReviewIt
     .map((c) => c.item)
 }
 
-/** Aplica os filtros de modo à lista de itens do usuário. */
+/** Aplica os filtros de modo à lista de itens do usuário. Limites de dia em America/Sao_Paulo. */
 export function applyFilters(items: ReviewItem[], filters: ReviewFilters, now = new Date()): ReviewItem[] {
-  const todayStr = now.toISOString().slice(0, 10)
+  const todayStr = getDayInSaoPaulo(now)
 
   let list = items.filter((i) => !i.is_suspended && !i.deleted_at)
   if (filters.disciplineId) list = list.filter((i) => i.discipline_id === filters.disciplineId)
@@ -96,10 +106,14 @@ export function applyFilters(items: ReviewItem[], filters: ReviewFilters, now = 
       // vencidas + de hoje + (lapsos/risco) + novas dentro do limite
       break
     case "OVERDUE":
-      list = list.filter((i) => i.next_review_at && new Date(i.next_review_at) < now)
+      list = list.filter((i) => {
+        if (!i.next_review_at) return false
+        const dayKey = getDayInSaoPaulo(i.next_review_at)
+        return dayKey !== "" && dayKey < todayStr
+      })
       break
     case "TODAY":
-      list = list.filter((i) => i.next_review_at && new Date(i.next_review_at).toISOString().slice(0, 10) === todayStr)
+      list = list.filter((i) => i.next_review_at && getDayInSaoPaulo(i.next_review_at) === todayStr)
       break
     case "NEW":
       list = list.filter((i) => i.review_count === 0)
@@ -148,21 +162,20 @@ export function buildLoadForecast(
   avgSecondsPerCard: number | null,
   now = new Date()
 ): ReviewLoadForecast {
+  const todayStr = getDayInSaoPaulo(now)
   const byDay = new Map<string, number>()
-  const t = (d: Date) => d.toISOString().slice(0, 10)
+  const t = (d: Date) => getDayInSaoPaulo(d)
 
   items.forEach((i) => {
     if (!i.next_review_at) return
-    const d = new Date(i.next_review_at)
-    if (d < now) return
-    const key = t(d)
+    const key = t(new Date(i.next_review_at))
+    if (!key || key < todayStr) return
     byDay.set(key, (byDay.get(key) ?? 0) + 1)
   })
 
   const sec = avgSecondsPerCard ?? 60
   const countAt = (offset: number) => {
-    const d = new Date(now.getTime() + offset * DAY_MS)
-    return byDay.get(t(d)) ?? 0
+    return byDay.get(addDaysToDayKey(todayStr, offset)) ?? 0
   }
 
   const sumRange = (startOffset: number, endOffset: number) => {
@@ -196,22 +209,18 @@ export function buildLoadForecast(
 }
 
 export function buildCalendar(items: ReviewItem[], days = 30, now = new Date()): ReviewCalendarDay[] {
+  const todayStr = getDayInSaoPaulo(now)
+  const maxKey = addDaysToDayKey(todayStr, days)
   const byDay = new Map<string, number>()
-  const t = (d: Date) => d.toISOString().slice(0, 10)
   items.forEach((i) => {
     if (!i.next_review_at) return
-    const d = new Date(i.next_review_at)
-    if (d < now) return
-    const offset = Math.round((d.getTime() - now.getTime()) / DAY_MS)
-    if (offset <= days) {
-      const key = t(d)
-      byDay.set(key, (byDay.get(key) ?? 0) + 1)
-    }
+    const key = getDayInSaoPaulo(i.next_review_at)
+    if (!key || key < todayStr || key > maxKey) return
+    byDay.set(key, (byDay.get(key) ?? 0) + 1)
   })
   const out: ReviewCalendarDay[] = []
   for (let offset = 0; offset <= days; offset++) {
-    const d = new Date(now.getTime() + offset * DAY_MS)
-    const key = t(d)
+    const key = addDaysToDayKey(todayStr, offset)
     out.push({ date: key, count: byDay.get(key) ?? 0 })
   }
   return out

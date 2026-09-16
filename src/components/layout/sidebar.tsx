@@ -160,7 +160,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "relative flex h-screen flex-col shrink-0 border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] transition-[width,transform] duration-300 ease-in-out",
+          "relative flex h-screen flex-col shrink-0 border-r border-border bg-card transition-[width,transform] duration-300 ease-in-out",
           effectiveCollapsed ? "w-[var(--sidebar-width-collapsed)]" : "w-[280px] max-w-[85vw] md:w-[var(--sidebar-width)]",
           // Mobile/tablet: drawer fixo com overlay. Desktop: estático.
           "fixed inset-y-0 left-0 z-50 md:relative",
@@ -168,17 +168,11 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
           className,
         )}
       >
-        {/* Brilho/gradiente sutil de identidade azul */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#2563EB]/[0.07] via-transparent to-transparent dark:from-[#2563EB]/[0.09]"
-        />
-
         {/* Botão fechar mobile */}
         {isOpen && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 rounded-lg p-1.5 text-[hsl(var(--sidebar-foreground))/0.6] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors md:hidden"
+            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-xl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors md:hidden flex items-center justify-center"
             aria-label="Fechar menu"
           >
             <X className="w-5 h-5" />
@@ -194,17 +188,17 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                 onClick={toggleCollapsed}
                 aria-label="Abrir menu"
                 className={cn(
-                  "group relative flex items-center justify-center h-[72px] w-full shrink-0 border-b border-[hsl(var(--sidebar-border))/70] px-0 transition-colors duration-150",
-                  "cursor-pointer hover:bg-[hsl(var(--sidebar-accent))/60] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                  "group relative flex items-center justify-center h-16 w-full shrink-0 border-b border-border px-0 transition-colors duration-150",
+                  "cursor-pointer hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                 )}
               >
-                <div className="flex items-center justify-center shrink-0 transition-transform duration-150 group-hover:scale-105">
+                <div className="flex items-center justify-center shrink-0 transition-colors duration-150">
                   <Image
                     src="/branding/nomeia-icon.png"
                     alt="NomeIA"
                     width={38}
                     height={38}
-                    className="w-[38px] h-[38px] object-contain rounded-xl shadow-xs"
+                    className="w-[38px] h-[38px] object-contain rounded-xl"
                     priority
                   />
                 </div>
@@ -222,28 +216,28 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                 onClick={isDesktop ? toggleCollapsed : onClose}
                 aria-label="Fechar menu"
                 className={cn(
-                  "group relative flex items-center h-[72px] w-full shrink-0 border-b border-[hsl(var(--sidebar-border))/70] px-4 gap-3 transition-colors duration-150 text-left",
-                  "cursor-pointer hover:bg-[hsl(var(--sidebar-accent))/60] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                  "group relative flex items-center h-16 w-full shrink-0 border-b border-border px-4 gap-3 transition-colors duration-150 text-left",
+                  "cursor-pointer hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                 )}
               >
-                <div className="flex items-center justify-center shrink-0 transition-transform duration-150 group-hover:scale-105">
+                <div className="flex items-center justify-center shrink-0 transition-colors duration-150">
                   <Image
                     src="/branding/nomeia-icon.png"
                     alt="NomeIA"
                     width={38}
                     height={38}
-                    className="w-[38px] h-[38px] object-contain rounded-xl shadow-xs"
+                    className="w-[38px] h-[38px] object-contain rounded-xl"
                     priority
                   />
                 </div>
                 <div className="min-w-0 flex-1 leading-tight pr-6 md:pr-0">
-                  <p className="text-[16px] font-extrabold tracking-tight text-[hsl(var(--sidebar-foreground))] flex items-center">
+                  <p className="text-[16px] font-extrabold tracking-tight text-foreground flex items-center">
                     <span>Nome</span>
-                    <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
+                    <span className="text-primary">
                       IA
                     </span>
                   </p>
-                  <p className="text-[10px] sm:text-[10.5px] font-medium text-[hsl(var(--sidebar-foreground))/0.7] leading-snug mt-0.5 whitespace-normal">
+                  <p className="text-[10px] sm:text-[10.5px] font-medium text-muted-foreground leading-snug mt-0.5 whitespace-normal">
                     Sua preparação rumo à nomeação.
                   </p>
                 </div>
@@ -258,16 +252,16 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
         {/* ── Navegação agrupada ─────────────────────────────────────────── */}
         <nav
           aria-label="Menu principal"
-          className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 py-5 space-y-5"
+          className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-6"
         >
           {navGroups.map((group, groupIndex) => (
             <div key={group.label} className="space-y-1">
               {effectiveCollapsed ? (
                 groupIndex > 0 && (
-                  <div aria-hidden className="mx-3 my-2 h-px bg-[hsl(var(--sidebar-border))/70]" />
+                  <div aria-hidden className="mx-3 my-3 h-px bg-border" />
                 )
               ) : (
-                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[hsl(var(--sidebar-foreground))/0.4]">
+                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                   {group.label}
                 </p>
               )}
@@ -285,16 +279,16 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                       "group relative flex items-center gap-3 h-11 rounded-lg px-3 text-[13px] font-medium transition-colors duration-150 outline-none",
                       effectiveCollapsed ? "justify-center px-0" : "",
                       active
-                        ? "bg-[hsl(var(--sidebar-primary))] text-white font-semibold shadow-sm"
-                        : "text-[hsl(var(--sidebar-foreground))/0.75] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]",
-                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-[hsl(var(--sidebar-background))]",
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card",
                     )}
                   >
                     {/* Indicação lateral sutil do item ativo */}
                     <span
                       aria-hidden
                       className={cn(
-                        "absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-white/90 transition-opacity duration-150",
+                        "absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-primary transition-opacity duration-150",
                         active ? "opacity-100" : "opacity-0",
                       )}
                     />
@@ -303,8 +297,8 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                       className={cn(
                         "shrink-0 transition-colors duration-150",
                         active
-                          ? "text-white"
-                          : "text-[hsl(var(--sidebar-foreground))/0.55] group-hover:text-[hsl(var(--sidebar-foreground))]",
+                          ? "text-primary"
+                          : "text-muted-foreground/70 group-hover:text-foreground",
                       )}
                       style={{ width: 18, height: 18 }}
                     />

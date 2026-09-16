@@ -107,7 +107,7 @@ export function Logo({
         <div className="flex flex-col min-w-0 leading-none">
           <span className="font-extrabold tracking-tight text-foreground text-lg sm:text-xl flex items-center">
             <span>Nome</span>
-            <span className="bg-gradient-to-r from-[#2563EB] to-[#38BDF8] bg-clip-text text-transparent">
+            <span className="text-primary">
               IA
             </span>
           </span>

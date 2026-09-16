@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-import { ArrowLeft, Layers, Plus, RefreshCcw } from "lucide-react"
+import { ArrowLeft, Calculator, Layers, Plus, RefreshCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -11,6 +11,7 @@ import {
   getActiveCycleAction,
   getCyclesAction,
   pauseCycleAction,
+  reconcileCycleProgressAction,
 } from "@/application/study-cycle/study-cycle.actions"
 import { getDisciplinesForAutocomplete } from "@/application/study-session/get-disciplines.action"
 import { Button } from "@/components/ui/button"
@@ -37,6 +38,7 @@ export function StudyCyclesView() {
   const [availableDisciplines, setAvailableDisciplines] = useState<DisciplineOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isReconciling, setIsReconciling] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
@@ -80,6 +82,21 @@ export function StudyCyclesView() {
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true)
     loadData()
+  }, [loadData])
+
+  const handleReconcile = useCallback(async () => {
+    setIsReconciling(true)
+    try {
+      const result = await reconcileCycleProgressAction()
+      if (result.success) {
+        toast.success(`Ciclo reconciliado: ${result.processed} sessões processadas.`)
+        loadData()
+      } else {
+        toast.error(result.errors[0] || "Erro ao reconciliar ciclo.")
+      }
+    } finally {
+      setIsReconciling(false)
+    }
   }, [loadData])
 
   const handleActivate = useCallback(
@@ -138,38 +155,48 @@ export function StudyCyclesView() {
 
   return (
     <div className="flex flex-col min-h-full bg-background">
-      <div className="flex-1 p-3 sm:p-4 md:p-5 space-y-5 max-w-7xl mx-auto w-full pb-20">
+      <div className="flex-1 px-3 sm:px-4 md:px-5 py-2.5 md:py-3 space-y-2.5 max-w-[1600px] mx-auto w-full pb-12">
         {/* CABEÇALHO COMPACTO */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
-                <Layers className="h-4 w-4" />
-              </div>
-              <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
-                Ciclos de Estudo
-              </h1>
+        <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+              <Layers className="h-3.5 w-3.5" />
             </div>
-            <p className="text-xs font-medium text-muted-foreground">
-              Organize suas matérias em uma sequência contínua de estudos.
-            </p>
+            <h1 className="text-base sm:text-lg font-black text-foreground tracking-tight whitespace-nowrap">
+              Ciclos de Estudo
+            </h1>
+            <span className="truncate text-[11px] font-medium text-muted-foreground hidden lg:inline">
+              Organize suas matérias em uma sequência contínua
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <Button
               variant="outline"
               size="icon"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="h-9 w-9 shrink-0"
+              className="h-8 w-8 shrink-0"
               title="Atualizar ciclos"
             >
-              <RefreshCcw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              <RefreshCcw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReconcile}
+              disabled={isReconciling}
+              className="h-8 shrink-0 gap-1.5 px-2.5 text-xs font-bold"
+              title="Recalcular progresso do ciclo a partir de todo o histórico"
+            >
+              <Calculator className={cn("h-3.5 w-3.5", isReconciling && "animate-pulse")} />
+              Recalcular
             </Button>
 
             <Button
               onClick={() => setIsCreateModalOpen(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-9 px-3 shadow-sm gap-1.5"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-8 px-2.5 shadow-sm gap-1"
             >
               <Plus className="h-3.5 w-3.5" />
               Criar ciclo
@@ -210,10 +237,10 @@ export function StudyCyclesView() {
             />
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-2.5">
             {/* 1. DESTAQUE DO CICLO ATIVO */}
             {activeCycle && (
-              <div className="space-y-2">
+              <div>
                 <ActiveCyclePanel
                   overview={activeCycle}
                   onRefresh={loadData}
@@ -224,7 +251,7 @@ export function StudyCyclesView() {
             )}
 
             {/* 2. LISTA DE TODOS OS CICLOS */}
-            <div className="space-y-3 pt-1">
+            <div className="space-y-2 pt-0.5">
               <div className="flex items-center justify-between border-b pb-1.5">
                 <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
                   {activeCycle ? "Todos os Ciclos Cadastrados" : "Meus Ciclos de Estudo"}

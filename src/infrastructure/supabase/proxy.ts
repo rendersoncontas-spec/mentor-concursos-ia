@@ -78,13 +78,6 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAdminRoute) {
-    const isAuthorizedEmail = user.email?.toLowerCase() === "rendersonluan@gmail.com"
-    if (!isAuthorizedEmail) {
-      const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = "/dashboard"
-      return NextResponse.redirect(redirectUrl)
-    }
-
     const { data: roleRow } = await supabase
       .from("user_roles")
       .select("role")

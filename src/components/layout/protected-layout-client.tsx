@@ -82,9 +82,8 @@ export function ProtectedLayoutClient({
             {children}
           </main>
         </div>
-
-        <FloatingActionButton />
       </div>
+      <FloatingActionButton />
     </div>
   )
 }

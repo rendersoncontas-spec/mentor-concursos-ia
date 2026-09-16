@@ -1105,7 +1105,7 @@ export function PlanningWizardModal({
                   </p>
                 </div>
 
-                <div className="p-3 rounded-xl border border-[#2563EB]/25 bg-gradient-to-br from-[#2563EB]/5 via-background to-muted/20 space-y-2 shadow-2xs">
+                <div className="p-3 rounded-xl border border-[#2563EB]/25 bg-card space-y-2 shadow-2xs">
                   <label className="text-[10px] font-extrabold uppercase text-[#2563EB] tracking-wider flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
                     Adicionar nova matéria personalizada
@@ -1484,7 +1484,7 @@ export function PlanningWizardModal({
                 </div>
 
                 {/* Resumo */}
-                <div className="rounded-xl border border-[#2563EB]/25 bg-gradient-to-br from-[#2563EB]/8 to-background p-3 space-y-2.5">
+                <div className="rounded-xl border border-[#2563EB]/25 bg-card p-3 space-y-2.5">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#2563EB]">
                     Seu planejamento
                   </span>

@@ -828,14 +828,14 @@ export function StudyRegisterModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="max-w-[1020px] w-[96vw] max-h-[92vh] md:h-[86vh] p-0 flex flex-col overflow-hidden bg-background border-border/80 shadow-2xl rounded-2xl z-[150]"
+        className="max-w-[960px] w-[calc(100vw-32px)] max-h-[82vh] p-0 flex flex-col overflow-hidden bg-background border-border/80 shadow-2xl rounded-2xl z-[150]"
         overlayOnClick={handleMinimize}
       >
         <TooltipProvider delayDuration={200}>
           {/* ═══════════════════════════════════════════════════════════════
               HEADER REFINADO
               ═══════════════════════════════════════════════════════════════ */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-muted/20 shrink-0">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border/60 bg-muted/20 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
                 <Sparkles className="h-4 w-4" />
@@ -925,11 +925,11 @@ export function StudyRegisterModal({
               })}
               className="flex flex-col flex-1 overflow-hidden"
             >
-              <div className="flex flex-col md:flex-row flex-1 overflow-y-auto p-4 sm:p-5 gap-4 lg:gap-5">
+              <div className="flex flex-col md:flex-row flex-1 overflow-y-auto p-3 sm:p-4 gap-3 lg:gap-4">
                 {/* ═══════════════════════════════════════════════════════════════
                     COLUNA ESQUERDA — CENTRAL DE CONTROLE (320px - 340px)
                     ═══════════════════════════════════════════════════════════════ */}
-                <div className="w-full md:w-[320px] lg:w-[340px] shrink-0 flex flex-col gap-3">
+                <div className="w-full md:w-[280px] lg:w-[300px] shrink-0 flex flex-col gap-2.5">
                   {/* Segmented Mode Switcher */}
                   <div className="p-1 rounded-xl bg-muted/60 border border-border/50 grid grid-cols-2 gap-1 shrink-0">
                     <button
@@ -938,7 +938,7 @@ export function StudyRegisterModal({
                       className={cn(
                         "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all select-none",
                         !isManualMode
-                          ? "bg-background text-foreground shadow-sm border border-border/40 font-bold"
+                          ? "bg-background text-foreground border border-border/40 font-bold"
                           : "text-muted-foreground hover:text-foreground hover:bg-background/40",
                       )}
                     >
@@ -951,7 +951,7 @@ export function StudyRegisterModal({
                       className={cn(
                         "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all select-none",
                         isManualMode
-                          ? "bg-background text-foreground shadow-sm border border-border/40 font-bold"
+                          ? "bg-background text-foreground border border-border/40 font-bold"
                           : "text-muted-foreground hover:text-foreground hover:bg-background/40",
                       )}
                     >
@@ -961,7 +961,7 @@ export function StudyRegisterModal({
                   </div>
 
                   {/* Card da Central de Controle */}
-                  <div className="rounded-2xl border border-border/70 bg-card p-4 flex flex-col justify-between flex-1 shadow-sm gap-4">
+                  <div className="rounded-2xl border border-border/70 bg-card p-3 flex flex-col gap-2.5">
                     {/* Topo do Card: Status Pill & Disciplina */}
                     <div className="flex flex-col gap-2.5">
                       <div className="flex items-center justify-between">
@@ -1011,7 +1011,7 @@ export function StudyRegisterModal({
                       {watchDisciplineName && (
                         <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/30 border border-border/40 min-h-[32px]">
                           <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: selectedColor }}
                           />
                           <span className="text-xs font-semibold text-foreground truncate">
@@ -1024,16 +1024,16 @@ export function StudyRegisterModal({
                     {/* Meio do Card: Display do Tempo / Inputs Manuais */}
                     {!isManualMode ? (
                       /* ─── CRONÔMETRO DISPLAY ─── */
-                      <div className="flex flex-col items-center justify-center my-auto py-2 gap-3">
-                        <div className="text-4xl sm:text-5xl font-mono font-black tracking-tight tabular-nums text-foreground select-none">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="text-[52px] leading-none font-mono font-black tracking-tight tabular-nums text-foreground select-none">
                           {formatClock(activeSeconds)}
                         </div>
-                        <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
                           {phase === "PAUSED" ? "Tempo congelado" : "Tempo ativo"}
                         </span>
 
                         {/* Controles do Cronômetro */}
-                        <div className="flex items-center gap-2 w-full pt-1">
+                        <div className="flex items-center gap-1.5 w-full pt-1">
                           {phase === "IDLE" || phase === "PAUSED" ? (
                             <Button
                               size="sm"
@@ -1048,18 +1048,23 @@ export function StudyRegisterModal({
                                     )
                                     return
                                   }
-                                  startSession({
+                                  const startResult = startSession({
                                     disciplineName: discName,
                                     disciplineId: discId,
                                     topicName: form.getValues("topic_name"),
                                     studyType: form.getValues("studyType"),
                                     technique: watchTechnique,
                                   })
+                                  if (!startResult.started) {
+                                    toast.error(
+                                      "Já existe uma sessão ativa. Retome, salve ou encerre antes de iniciar outra.",
+                                    )
+                                  }
                                 } else {
                                   resumeSession()
                                 }
                               }}
-                              className="flex-1 gap-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold h-10 rounded-xl shadow-sm"
+                              className="flex-1 gap-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold h-9 rounded-xl shadow-sm"
                             >
                               <Play className="h-4 w-4 fill-current" />
                               <span>{phase === "PAUSED" ? "Retomar" : "Iniciar"}</span>
@@ -1069,7 +1074,7 @@ export function StudyRegisterModal({
                               size="sm"
                               type="button"
                               onClick={pauseSession}
-                              className="flex-1 gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold h-10 rounded-xl shadow-sm"
+                              className="flex-1 gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold h-9 rounded-xl"
                             >
                               <Pause className="h-4 w-4 fill-current" />
                               <span>Pausar</span>
@@ -1083,7 +1088,7 @@ export function StudyRegisterModal({
                                 size="icon"
                                 type="button"
                                 onClick={resetSession}
-                                className="h-10 w-10 rounded-xl border-border/70 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 hover:border-rose-500/30 shrink-0"
+                                className="h-9 w-9 rounded-xl border-border/70 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 hover:border-rose-500/30 shrink-0"
                                 aria-label="Resetar cronômetro"
                               >
                                 <RotateCcw className="h-4 w-4" />
@@ -1335,10 +1340,10 @@ export function StudyRegisterModal({
                 {/* ═══════════════════════════════════════════════════════════════
                     COLUNA DIREITA — DETALHES DA SESSÃO
                     ═══════════════════════════════════════════════════════════════ */}
-                <div className="flex-1 flex flex-col justify-between gap-3.5 min-w-0">
-                  <div className="flex flex-col gap-3.5">
+                <div className="flex-1 flex flex-col gap-2.5 min-w-0">
+                  <div className="flex flex-col gap-2.5">
                     {/* Linha 1: Disciplina & Tópico */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {/* Disciplina Combobox */}
                       <FormField
                         control={form.control}
@@ -1390,7 +1395,7 @@ export function StudyRegisterModal({
                     </div>
 
                     {/* Linha 2: Tipo de Estudo & Dados Complementares */}
-                    <div className="p-3.5 border border-border/60 rounded-2xl bg-muted/20 flex flex-col gap-2.5">
+                    <div className="p-2.5 border border-border/60 rounded-2xl bg-muted/20 flex flex-col gap-2">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                         <FormField
                           control={form.control}
@@ -1407,26 +1412,26 @@ export function StudyRegisterModal({
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent className="z-[200] max-h-[300px] overflow-y-auto">
-                                  <SelectItem value="AUDIO">🎧 Áudio / Podcast</SelectItem>
-                                  <SelectItem value="AULA_VIVO">📡 Aula ao Vivo</SelectItem>
-                                  <SelectItem value="DISCURSIVA">✒️ Discursiva / Redação</SelectItem>
-                                  <SelectItem value="DOUTRINA">📚 Doutrina</SelectItem>
-                                  <SelectItem value="DUOLINGO">🦉 Duolingo</SelectItem>
-                                  <SelectItem value="ESTUDO_IA">🤖 Estudo com IA</SelectItem>
-                                  <SelectItem value="FLASHCARDS">🎴 Flashcards</SelectItem>
-                                  <SelectItem value="INFORMATIVOS">📰 Informativos (STF/STJ)</SelectItem>
-                                  <SelectItem value="JURISPRUDENCIA">🏛️ Jurisprudência</SelectItem>
-                                  <SelectItem value="LEI_SECA">⚖️ Lei Seca</SelectItem>
-                                  <SelectItem value="LEITURA">📑 Leitura / PDF</SelectItem>
-                                  <SelectItem value="MAPA_MENTAL">🗺️ Mapa Mental</SelectItem>
-                                  <SelectItem value="MONITORIA">👥 Monitoria / Mentoria</SelectItem>
-                                  <SelectItem value="QUESTOES">✍️ Questões</SelectItem>
-                                  <SelectItem value="RESUMO">📝 Resumo</SelectItem>
-                                  <SelectItem value="REVISAO">🔁 Revisão</SelectItem>
-                                  <SelectItem value="SIMULADO">🧪 Simulado</SelectItem>
-                                  <SelectItem value="TEORIA">📖 Teoria</SelectItem>
-                                  <SelectItem value="VIDEOAULA">🎥 Videoaula</SelectItem>
-                                  <SelectItem value="OUTRO">⭐ Outro</SelectItem>
+                                  <SelectItem value="AUDIO">Áudio / Podcast</SelectItem>
+                                  <SelectItem value="AULA_VIVO">Aula ao Vivo</SelectItem>
+                                  <SelectItem value="DISCURSIVA">Discursiva / Redação</SelectItem>
+                                  <SelectItem value="DOUTRINA">Doutrina</SelectItem>
+                                  <SelectItem value="DUOLINGO">Duolingo</SelectItem>
+                                  <SelectItem value="ESTUDO_IA">Estudo com IA</SelectItem>
+                                  <SelectItem value="FLASHCARDS">Flashcards</SelectItem>
+                                  <SelectItem value="INFORMATIVOS">Informativos (STF/STJ)</SelectItem>
+                                  <SelectItem value="JURISPRUDENCIA">Jurisprudência</SelectItem>
+                                  <SelectItem value="LEI_SECA">Lei Seca</SelectItem>
+                                  <SelectItem value="LEITURA">Leitura / PDF</SelectItem>
+                                  <SelectItem value="MAPA_MENTAL">Mapa Mental</SelectItem>
+                                  <SelectItem value="MONITORIA">Monitoria / Mentoria</SelectItem>
+                                  <SelectItem value="QUESTOES">Questões</SelectItem>
+                                  <SelectItem value="RESUMO">Resumo</SelectItem>
+                                  <SelectItem value="REVISAO">Revisão</SelectItem>
+                                  <SelectItem value="SIMULADO">Simulado</SelectItem>
+                                  <SelectItem value="TEORIA">Teoria</SelectItem>
+                                  <SelectItem value="VIDEOAULA">Videoaula</SelectItem>
+                                  <SelectItem value="OUTRO">Outro</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -1456,7 +1461,7 @@ export function StudyRegisterModal({
                           <FormControl>
                             <Textarea
                               placeholder="Anote conceitos-chave, resumos, dúvidas ou links importantes..."
-                              className="min-h-[80px] max-h-[140px] resize-none text-xs sm:text-sm font-sans bg-muted/10 rounded-xl border-border/60 focus-visible:ring-primary/20"
+                              className="min-h-[72px] max-h-[110px] resize-none text-xs sm:text-sm font-sans bg-muted/10 rounded-xl border-border/60 focus-visible:ring-primary/20"
                               {...field}
                             />
                           </FormControl>
@@ -1469,7 +1474,7 @@ export function StudyRegisterModal({
                   {/* ═══════════════════════════════════════════════════════════════
                       RODAPÉ DIREITO: RESUMO DA SESSÃO & BOTÕES
                       ═══════════════════════════════════════════════════════════════ */}
-                  <div className="flex flex-col gap-2.5 pt-2 border-t border-border/50 shrink-0">
+                  <div className="flex flex-col gap-2 pt-1.5 border-t border-border/50 shrink-0">
                     {/* Resumo da Sessão */}
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/30 border border-border/40 text-xs text-muted-foreground flex-wrap">
                       <div className="flex items-center gap-1.5 font-semibold text-foreground">

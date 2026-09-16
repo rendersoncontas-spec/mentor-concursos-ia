@@ -255,9 +255,10 @@ export function StatisticsCenterView() {
   )
 
   // ── Cálculos ──────────────────────────────────────────────────────────────
+  const isCustomRange = range === "custom" && Boolean(customStart && customEnd)
   const buckets = useMemo(
     () =>
-      isAllRange
+      isAllRange || isCustomRange
         ? buildDayBucketsFromKeys(filteredSessions, filteredAttempts, rangeKeys, TIMEZONE)
         : buildDayBuckets(
             filteredSessions,
@@ -266,7 +267,7 @@ export function StatisticsCenterView() {
             now,
             TIMEZONE,
           ),
-    [filteredSessions, filteredAttempts, rangeKeys, now, isAllRange],
+    [filteredSessions, filteredAttempts, rangeKeys, now, isAllRange, isCustomRange],
   )
   const weekStartDay = payload?.weekStartDay ?? 0
   const timeCards = useMemo(

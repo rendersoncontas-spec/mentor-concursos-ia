@@ -20,7 +20,7 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user || user.email?.toLowerCase() !== "rendersonluan@gmail.com") {
+  if (!user) {
     redirect("/dashboard")
   }
 

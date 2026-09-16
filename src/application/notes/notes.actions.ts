@@ -104,6 +104,20 @@ export async function saveUserNoteAction(
     const noteId = noteInput.id || crypto.randomUUID()
     const now = new Date().toISOString()
 
+    // Ownership explícita: não permitir sobrescrever nota de outro usuário
+    // mesmo que o RLS falhe — o id vem do client.
+    if (noteInput.id) {
+      const { data: existing } = await supabase
+        .from("user_notes")
+        .select("id")
+        .eq("id", noteInput.id)
+        .eq("user_id", user.id)
+        .maybeSingle()
+      if (!existing) {
+        return { success: false, error: "Nota não encontrada." }
+      }
+    }
+
     const notePayload = {
       id: noteId,
       user_id: user.id,

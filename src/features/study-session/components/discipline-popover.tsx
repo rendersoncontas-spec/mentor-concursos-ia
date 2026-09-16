@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, Play, Search } from "lucide-react"
 
 import {
   type DisciplineOption,
@@ -134,7 +134,7 @@ export function DisciplinePopover({
             </span>
           ) : (
             <span className="flex items-center gap-2 min-w-0 truncate">
-              <span className="text-muted-foreground/60 shrink-0">🔍</span>
+              <Search className="h-4 w-4 text-muted-foreground/60 shrink-0" />
               <span className="truncate">{placeholder}</span>
             </span>
           )}
@@ -183,11 +183,11 @@ export function DisciplinePopover({
                           backgroundColor: disciplineColorHex(sug.id, sug.color_hex),
                         }}
                       />
-                      <span className="truncate font-medium">
+                      <span className="truncate font-medium flex items-center gap-1 min-w-0">
                         {sug.metadata?.isCurrentInCycle && (
-                          <span className="text-primary font-black mr-1">▶</span>
+                          <Play className="h-3 w-3 fill-current text-primary shrink-0" />
                         )}
-                        {sug.name}
+                        <span className="truncate">{sug.name}</span>
                       </span>
                       {sug.from === "CYCLE" && sug.metadata?.plannedMinutes != null && (
                         <span

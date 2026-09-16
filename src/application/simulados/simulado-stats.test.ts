@@ -14,6 +14,7 @@ import {
   formatDuration,
   netAccuracyOf,
   performanceBandOf,
+  scoringRuleLabel,
   sourceLabel,
   validateRecord,
   wrongsOf,
@@ -330,4 +331,43 @@ test("formatDuration: 2h15m30s", () => {
 test("sourceLabel: OUTRO com custom", () => {
   assert.equal(sourceLabel("OUTRO", "Meu Curso"), "Meu Curso")
   assert.equal(sourceLabel("TEC", null), "TEC Concursos")
+})
+
+// ── M5: CEBRASPE clamp de apresentação + label ────────────────────────────
+test("CEBRASPE: tudo certo = 100% líquido", () => {
+  const net = computeNetScore({ totalCorrect: 100, totalWrong: 0, scoringRule: "CEBRASPE", penaltyPerWrong: 1 })
+  assert.equal(net, 100)
+  assert.equal(netAccuracyOf(net, 100), 100)
+  assert.equal(effectiveAccuracy({ totalQuestions: 100, totalCorrect: 100, totalWrong: 0, scoringRule: "CEBRASPE" }), 100)
+})
+
+test("CEBRASPE: tudo errado — fórmula bruta negativa preservada, apresentação clampada em 0", () => {
+  const net = computeNetScore({ totalCorrect: 0, totalWrong: 100, scoringRule: "CEBRASPE", penaltyPerWrong: 1 })
+  assert.equal(net, -100)
+  assert.equal(netAccuracyOf(net, 100), 0)
+  assert.equal(effectiveAccuracy({ totalQuestions: 100, totalCorrect: 0, totalWrong: 100, scoringRule: "CEBRASPE" }), 0)
+})
+
+test("CEBRASPE: misto 60 certas / 20 erradas = 40 líquidos (40%)", () => {
+  const net = computeNetScore({ totalCorrect: 60, totalWrong: 20, scoringRule: "CEBRASPE", penaltyPerWrong: 1 })
+  assert.equal(net, 40)
+  assert.equal(netAccuracyOf(net, 100), 40)
+})
+
+test("CEBRASPE: zero questões retorna null (sem divisão por zero)", () => {
+  assert.equal(netAccuracyOf(0, 0), null)
+  assert.equal(effectiveAccuracy({ totalQuestions: 0, totalCorrect: 0, totalWrong: 0, scoringRule: "CEBRASPE" }), null)
+})
+
+test("CEBRASPE: score bruto negativo não exibe % negativa", () => {
+  const net = computeNetScore({ totalCorrect: 20, totalWrong: 40, scoringRule: "CEBRASPE", penaltyPerWrong: 1 })
+  assert.equal(net, -20)
+  assert.equal(netAccuracyOf(net, 100), 0)
+})
+
+test("scoringRuleLabel: ramo CEBRASPE", () => {
+  assert.equal(scoringRuleLabel("CEBRASPE"), "CEBRASPE / CESPE")
+  assert.equal(scoringRuleLabel("PERCENTUAL"), "Apenas percentual de acertos")
+  assert.equal(scoringRuleLabel("PENALIZACAO"), "Com penalização")
+  assert.equal(scoringRuleLabel("PERSONALIZADO"), "Personalizada")
 })

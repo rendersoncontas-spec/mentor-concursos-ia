@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 
-import { ChevronLeft, ChevronRight, Edit2, Trash2 } from "lucide-react"
+import { BookOpen, Check, ChevronLeft, ChevronRight, FileText, SquarePen, Timer, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -274,15 +274,19 @@ export function StudyCalendar({
                       ))}
                     </div>
                     <div className="text-[11px] font-extrabold text-foreground flex items-center gap-1 truncate">
-                      <span>📖</span> {daySessions.length} Ativ.
+                      <BookOpen className="h-3 w-3 shrink-0" /> {daySessions.length} Ativ.
                     </div>
                     <div className="text-[11px] font-black text-foreground flex items-center gap-1 truncate">
-                      <span>⏱</span> {formatTime(totalMinutes)}
+                      <Timer className="h-3 w-3 shrink-0" /> {formatTime(totalMinutes)}
                     </div>
                     {totalQuestions > 0 && (
-                      <div className="text-[10px] font-bold text-foreground/80 truncate">
-                        <span>📝</span> {totalQuestions} qst{" "}
-                        {totalCorrect > 0 ? `(${totalCorrect} ✓)` : ""}
+                      <div className="text-[10px] font-bold text-foreground/80 flex items-center gap-1 truncate">
+                        <FileText className="h-3 w-3 shrink-0" /> {totalQuestions} qst{" "}
+                        {totalCorrect > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-emerald-600">
+                            ({totalCorrect} <Check className="h-2.5 w-2.5" />)
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -369,7 +373,7 @@ export function StudyCalendar({
                           onEditSession(session)
                         }}
                       >
-                        <Edit2 className="h-3.5 w-3.5" />
+                        <SquarePen className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"

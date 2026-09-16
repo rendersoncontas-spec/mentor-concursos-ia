@@ -26,6 +26,7 @@ export async function getTopicSuggestionsAction(
         subtopics ( id, name )
       `)
       .eq("discipline_id", disciplineId)
+      .or(`user_id.is.null,user_id.eq.${user.id}`)
       .order("name")
 
     if (error) {

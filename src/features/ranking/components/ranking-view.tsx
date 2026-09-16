@@ -444,7 +444,7 @@ export function RankingView() {
       {/* ── CABEÇALHO & FILTROS ────────────────────────────────────────────── */}
       <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card/60 backdrop-blur-md p-5 rounded-2xl border shadow-sm">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-amber-500/20 to-primary/20 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
+          <div className="w-12 h-12 shrink-0 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
             <Trophy className="h-6 w-6 text-amber-500" />
           </div>
           <div>
@@ -632,7 +632,7 @@ export function RankingView() {
             </span>
           </div>
 
-          <div className="bg-gradient-to-b from-card/80 to-card border rounded-3xl p-4 sm:p-6 shadow-sm">
+          <div className="bg-card border rounded-3xl p-4 sm:p-6 shadow-sm">
             <div className="grid grid-cols-3 gap-2 sm:gap-6 items-end max-w-3xl mx-auto pt-4 pb-2">
               {/* 2º Lugar */}
               <PodiumPedestal
@@ -1288,7 +1288,7 @@ function PodiumPedestal({
             isYou={isYou}
             sizeClass={`${
               isFirst ? "h-16 w-16 sm:h-20 sm:w-20" : "h-12 w-12 sm:h-16 sm:w-16"
-            } text-base font-black border-4 ${getPedestalBorderClass(rank)} shadow-lg`}
+            } text-base font-black border-4 ${getPedestalBorderClass(rank)} shadow-sm`}
             imgSize={isFirst ? 160 : 128}
           />
           {isYou && (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 
-import { ArrowUpDown, Check, ChevronDown, ChevronUp, Edit2, Plus, Trash2, X } from "lucide-react"
+import { ArrowUpDown, Check, ChevronDown, ChevronUp, Plus, SquarePen, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { updateDisciplineAppearanceAction } from "@/application/disciplines/discipline-actions"
@@ -326,7 +326,7 @@ export function EditDisciplineModal({
                       className="p-1 hover:text-[#2563EB]"
                       title="Editar tópico"
                     >
-                      <Edit2 className="h-3.5 w-3.5" />
+                      <SquarePen className="h-3.5 w-3.5" />
                     </button>
 
                     <button

@@ -7,11 +7,11 @@ import {
   AlertTriangle,
   Clock,
   Database,
-  Edit2,
   Filter,
   GraduationCap,
   History as HistoryIcon,
   Loader2,
+  SquarePen,
   Trash2,
   Upload,
 } from "lucide-react"
@@ -1079,7 +1079,7 @@ export function HistoryView() {
                                 className="hover:text-foreground p-1 transition-colors"
                                 title="Editar"
                               >
-                                <Edit2 className="h-4 w-4" />
+                                <SquarePen className="h-4 w-4" />
                               </button>
 
                               <button

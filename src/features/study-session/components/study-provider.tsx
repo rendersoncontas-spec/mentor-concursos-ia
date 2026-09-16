@@ -89,7 +89,10 @@ interface StudyContextType {
     source?: "PLAN" | "FREE" | "CYCLE" | null
     cycleId?: string | null
     cycleItemId?: string | null
-  }) => void
+    force?: boolean
+  }) => { started: boolean; reason?: "active-session-exists" }
+  /** Sessão ativa existente (para guarda anti-sobrescrita silenciosa). */
+  hasActiveSession: boolean
   minimizeSession: () => void
   restoreSession: () => void
   unminimizeSession: () => void
@@ -324,8 +327,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         const state = sessionRef.current
         if (state && state.isActive) {
           const seconds = getActiveElapsedSeconds(state)
-          const icon = state.phase === "STUDYING" ? "⏱" : "⏸"
-          const title = `${icon} ${formatTitleTime(seconds)} — ${state.disciplineName || "Estudo"}`
+          const title = `${formatTitleTime(seconds)} — ${state.disciplineName || "Estudo"}`
           wasTimerTitle = true
           if (document.title !== title) document.title = title
         } else if (wasTimerTitle && document.title !== DEFAULT_TITLE) {
@@ -392,7 +394,17 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       source?: "PLAN" | "FREE" | "CYCLE" | null
       cycleId?: string | null
       cycleItemId?: string | null
-    }) => {
+      force?: boolean
+    }): { started: boolean; reason?: "active-session-exists" } => {
+      // ONE ACTIVE SESSION: nunca sobrescrever silenciosamente.
+      // Callers devem tratar { started: false } pedindo resume/save/discard.
+      const current = sessionRef.current
+      if (current && current.isActive && !data.force) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("study-session-conflict"))
+        }
+        return { started: false, reason: "active-session-exists" }
+      }
       const technique = data.technique || "LIVRE"
       const now = Date.now()
       setSession({
@@ -419,6 +431,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       if (focusSound.selectedSound !== "off") {
         void focusSound.startSound(focusSound.selectedSound)
       }
+      return { started: true }
     },
     [focusSound],
   )
@@ -509,10 +522,10 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         // Prefere a seleção atual do formulário (pode ter sido escolhida após o início)
         discipline_id: (formData?.["discipline_id"] as string) || session.disciplineId,
         discipline_name: (formData?.["discipline_name"] as string) || session.disciplineName,
-        topic_name: session.topicName,
-        studyType: session.studyType,
-        technique: session.technique,
-        notes: session.notes,
+        topic_name: (formData?.["topic_name"] as string) || session.topicName,
+        studyType: (formData?.["studyType"] as string) || session.studyType,
+        technique: (formData?.["technique"] as StudyTechnique) || session.technique,
+        notes: (formData?.["notes"] as string) ?? session.notes,
         // Form data fields
         pages_read: formData?.["pages_read"] || 0,
         questions_answered: formData?.["questions_answered"] || 0,
@@ -592,10 +605,34 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
   }
 
+  // Sync entre abas: quando outra aba salva/encerra a sessão,
+  // recarrega o estado local para não ressuscitar sessão obsoleta.
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY) return
+      try {
+        if (!event.newValue) {
+          setSession(null)
+          return
+        }
+        const parsed = JSON.parse(event.newValue) as StudySessionState
+        if (parsed.isActive && parsed.startTime) {
+          const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
+          setSession({ ...parsed, activeSeconds, pausedSeconds })
+        }
+      } catch {
+        // ignora payload inválido de outra aba
+      }
+    }
+    window.addEventListener("storage", handleStorage)
+    return () => window.removeEventListener("storage", handleStorage)
+  }, [])
+
   return (
     <StudyContext.Provider
       value={{
         session,
+        hasActiveSession: Boolean(session?.isActive),
         startSession,
         minimizeSession,
         restoreSession,
@@ -621,7 +658,6 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-      <FloatingStudyWidget />
       <ResetTimerDialog
         open={resetDialogOpen}
         onOpenChange={setResetDialogOpen}

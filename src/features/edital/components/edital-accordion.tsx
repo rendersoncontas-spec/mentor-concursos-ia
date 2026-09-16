@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 
 import { useRouter } from "next/navigation"
 
-import { Check, ChevronDown, ChevronUp, Edit, ExternalLink, Plus } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, ExternalLink, Plus, SquarePen } from "lucide-react"
 import { Loader2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -279,7 +279,7 @@ export function EditalAccordion({
         <div className="flex items-center gap-2 sm:gap-2.5 w-full md:w-auto shrink-0">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="flex-1 md:flex-initial bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
+            className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
             <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
@@ -380,7 +380,7 @@ export function EditalAccordion({
                       className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                       title="Editar Disciplina"
                     >
-                      <Edit className="h-3.5 w-3.5" />
+                      <SquarePen className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
@@ -414,22 +414,22 @@ export function EditalAccordion({
                         <tr className="border-b bg-muted/20 text-muted-foreground font-semibold">
                           <th className="px-3 py-3 font-bold text-foreground">Tópicos</th>
                           <th
-                            className="px-2 py-3 text-center text-emerald-600 font-bold"
+                            className="px-2 py-3 text-center text-emerald-600 font-bold text-[11px] uppercase"
                             title="Acertos"
                           >
-                            ✔
+                            Acertos
                           </th>
                           <th
-                            className="px-2 py-3 text-center text-rose-500 font-bold"
+                            className="px-2 py-3 text-center text-rose-500 font-bold text-[11px] uppercase"
                             title="Erros"
                           >
-                            ✖
+                            Erros
                           </th>
                           <th
-                            className="px-2 py-3 text-center text-blue-600 font-bold"
+                            className="px-2 py-3 text-center text-blue-600 font-bold text-[11px] uppercase"
                             title="Total de questões"
                           >
-                            📝
+                            Questões
                           </th>
                           <th
                             className="px-2 py-3 text-center font-bold text-foreground"
@@ -437,11 +437,11 @@ export function EditalAccordion({
                           >
                             %
                           </th>
-                          <th className="px-3 py-3 text-center" title="Data do último estudo">
-                            📅
+                          <th className="px-3 py-3 text-center text-[11px] uppercase" title="Data do último estudo">
+                            Último estudo
                           </th>
-                          <th className="px-2 py-3 text-center" title="Quantidade de vezes estudou">
-                            🧮
+                          <th className="px-2 py-3 text-center text-[11px] uppercase" title="Quantidade de vezes estudou">
+                            Sessões
                           </th>
                           <th className="px-3 py-3 text-center">Link</th>
                         </tr>

@@ -43,7 +43,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="space-y-4">
             <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-white leading-[1.15]">
               Sua preparação rumo à{" "}
-              <span className="bg-gradient-to-r from-blue-400 via-sky-300 to-blue-200 bg-clip-text text-transparent">
+              <span className="text-primary">
                 nomeação
               </span>
               .
@@ -72,7 +72,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* Depoimento / Prova Social */}
-          <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-md shadow-2xl space-y-3">
+          <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-md shadow-sm space-y-3">
             <div className="flex items-center gap-1 text-amber-400">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className="w-4 h-4 fill-amber-400" />
@@ -83,7 +83,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               edital e ser aprovado no meu concurso dos sonhos!&quot;
             </p>
             <div className="flex items-center gap-3 pt-1">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center text-white font-bold text-xs shadow-md">
+              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs shadow-md">
                 NM
               </div>
               <div>

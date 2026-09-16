@@ -376,6 +376,7 @@ export function sourceLabel(source: SimuladoRecordInput["source"], custom?: stri
 
 /** Rótulo da regra de pontuação. */
 export function scoringRuleLabel(rule: SimuladoScoringRule): string {
+  if (rule === "CEBRASPE") return "CEBRASPE / CESPE"
   if (rule === "PENALIZACAO") return "Com penalização"
   if (rule === "PERSONALIZADO") return "Personalizada"
   return "Apenas percentual de acertos"
@@ -403,10 +404,11 @@ export function computeNetScore(input: NetScoreInput): number {
   return input.totalCorrect
 }
 
-/** Percentual líquido de aproveitamento. */
+/** Percentual líquido de aproveitamento (piso 0 na apresentação; fórmula bruta preservada). */
 export function netAccuracyOf(netScore: number, totalQuestions: number): number | null {
   if (totalQuestions <= 0) return null
-  return Math.round((netScore / totalQuestions) * 1000) / 10
+  const raw = Math.round((netScore / totalQuestions) * 1000) / 10
+  return Math.max(0, raw)
 }
 
 /** Percentual efetivo considerando regra de pontuação. */

@@ -28,25 +28,21 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
     zIndex: isDragging ? 50 : "auto",
   }
 
-  let colSpanClass = "col-span-1"
-  if (colSpan === 2) {
-    colSpanClass = "col-span-1 md:col-span-2"
-  } else if (colSpan === 3) {
-    colSpanClass = "col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4"
-  }
-  
+  // Em colunas independentes cada card ocupa 100% da coluna
+  // com altura natural — sem linhas compartilhadas.
+  // colSpan largo apenas garante largura mínima confortável.
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col h-full",
+        "group relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col h-auto w-full min-w-0",
         isDragging && "shadow-xl opacity-80 ring-2 ring-[#2563EB] z-50",
-        colSpanClass
+        colSpan >= 2 && "w-full",
       )}
     >
       {/* Drag handle */}
-      <div 
+      <div
         {...attributes}
         {...listeners}
         className="absolute top-2.5 right-2.5 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/70 cursor-grab active:cursor-grabbing z-20 transition-all opacity-30 group-hover:opacity-100 focus-within:opacity-100"
@@ -54,8 +50,8 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
       >
         <GripVertical className="w-3.5 h-3.5" />
       </div>
-      
-      <div className="flex-1 w-full h-full min-w-0">
+
+      <div className="w-full min-w-0">
         {children}
       </div>
     </div>

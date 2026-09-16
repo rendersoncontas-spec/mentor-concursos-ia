@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { PlayCircle, CheckCircle, XCircle, RefreshCw } from "lucide-react"
+import { Play, CheckCircle2, XCircle, RefreshCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import type { HomologationResult } from "@/application/testing/homologation.service"
@@ -57,7 +57,7 @@ export function HomologationPanel() {
           </CardHeader>
           <CardContent>
             <Button onClick={runFlow1} disabled={isRunning} className="w-full gap-2">
-              <PlayCircle className="w-4 h-4" /> Executar Fluxo de Teste
+              <Play className="w-4 h-4" /> Executar Fluxo de Teste
             </Button>
           </CardContent>
         </Card>
@@ -69,7 +69,7 @@ export function HomologationPanel() {
           </CardHeader>
           <CardContent>
             <Button onClick={runMentorTest} disabled={isRunning} variant="secondary" className="w-full gap-2 border">
-              <PlayCircle className="w-4 h-4" /> Testar Motor IA
+              <Play className="w-4 h-4" /> Testar Motor IA
             </Button>
           </CardContent>
         </Card>
@@ -79,7 +79,7 @@ export function HomologationPanel() {
         <CardHeader>
           <CardTitle className="text-xl flex items-center gap-2">
             Terminal de Validação
-            {isRunning && <RefreshCw className="w-5 h-5 animate-spin text-primary ml-auto" />}
+            {isRunning && <RefreshCcw className="w-5 h-5 animate-spin text-primary ml-auto" />}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -89,9 +89,9 @@ export function HomologationPanel() {
             )}
             {logs.map((log, i) => (
               <div key={i} className="flex gap-3 items-start border-b border-gray-800 pb-2">
-                {log.status === "SUCCESS" && <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />}
+                {log.status === "SUCCESS" && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />}
                 {log.status === "FAILED" && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
-                {log.status === "PENDING" && <RefreshCw className="w-5 h-5 text-blue-400 shrink-0 animate-spin" />}
+                {log.status === "PENDING" && <RefreshCcw className="w-5 h-5 text-blue-400 shrink-0 animate-spin" />}
                 
                 <div className="space-y-1 w-full">
                   <div className="flex gap-2">

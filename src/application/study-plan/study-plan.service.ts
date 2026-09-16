@@ -14,6 +14,7 @@ import {
 } from "@/domain/study-plan/study-plan.types"
 import { calculateWeeklyDistribution, calculateCycleDistribution, calcDisciplineSummary } from "@/application/study-plan/study-plan.algorithm"
 import { generateAdaptiveDecisions, type AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
+import { getDayInSaoPaulo } from "@/lib/sao-paulo"
 
 /**
  * Gera e persiste um novo cronograma para o usuário.
@@ -395,13 +396,28 @@ export async function getActiveStudyPlan(
 }
 
 /**
- * Busca itens do plano ativo para o dia atual (hoje).
+ * Dia da semana atual (0-6) no fuso America/Sao_Paulo.
+ * Extraído como função pura para permitir teste de borda de meia-noite.
+ */
+export function getTodayDayOfWeekInSaoPaulo(now: Date = new Date()): DayOfWeek {
+  const spKey = getDayInSaoPaulo(now)
+  if (!spKey) return now.getDay() as DayOfWeek
+  const parts = spKey.split("-").map(Number)
+  const y = parts[0] ?? now.getFullYear()
+  const m = parts[1] ?? now.getMonth() + 1
+  const d = parts[2] ?? now.getDate()
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).getUTCDay() as DayOfWeek
+}
+
+/**
+ * Busca itens do plano ativo para o dia atual (hoje, em America/Sao_Paulo).
  */
 export async function getTodayStudyItems(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  now: Date = new Date()
 ): Promise<StudyPlanItemWithDetails[]> {
-  const todayDow = new Date().getDay() as DayOfWeek
+  const todayDow = getTodayDayOfWeekInSaoPaulo(now)
 
   const { data: plans } = await supabase
     .from("study_plans")
@@ -699,12 +715,18 @@ export async function getCycleOverviewData(
   }
 
   const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
+  // Progresso = minutos REAIS estudados (study_history) sobre o total planejado.
+  // Status nunca é CONCLUIDO aqui por desenho (ver comentário acima), então
+  // derivar de completedBlocks resultaria sempre em 0%.
+  const studiedAllTime = blocks.reduce((acc, b) => acc + (b.studiedMinutes || 0), 0)
+  const completedMinutes = totalCycleMinutes > 0
+    ? Math.min(studiedAllTime, totalCycleMinutes)
+    : 0
   const completedBlocks = blocks.filter(b => b.status === "CONCLUIDO")
-  const completedMinutes = completedBlocks.reduce((acc, b) => acc + b.durationMinutes, 0)
 
 
   const progressPercentage = totalCycleMinutes > 0
-    ? Math.round((completedMinutes / totalCycleMinutes) * 100)
+    ? Math.min(100, Math.round((completedMinutes / totalCycleMinutes) * 100))
     : 0
 
   return {

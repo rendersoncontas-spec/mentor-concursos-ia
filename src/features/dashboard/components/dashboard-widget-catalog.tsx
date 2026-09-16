@@ -13,14 +13,13 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  ChevronRight as ChevronRightIcon,
   Clock,
-  Edit2,
   FileText,
   Flame,
   HelpCircle,
   RotateCcw,
   Sparkles,
+  SquarePen,
   Target,
   Trophy,
   X,
@@ -75,8 +74,8 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
   if (colSpan === 1) {
     return (
       <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+        <div className="flex items-center justify-between border-b pb-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO DE ESTUDO
           </span>
           <span className="text-[10px] sm:text-[11px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
@@ -113,8 +112,8 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
     return (
       <div className="p-5 flex flex-col justify-between h-full space-y-3">
         <div className="flex items-center justify-between border-b pb-2">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-[#2563EB]" /> TEMPO DE ESTUDO SEMANAL
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO DE ESTUDO SEMANAL
           </span>
           <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
             {pct === null ? "—" : `${pct}% Concluído`}
@@ -151,9 +150,9 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
   // Large (colSpan === 3)
   return (
     <div className="p-6 flex flex-col justify-between h-full space-y-4">
-      <div className="flex items-center justify-between border-b pb-3">
-        <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
-          <Clock className="w-4 h-4 text-[#2563EB]" /> PAINEL GERAL DE TEMPO DE ESTUDO
+      <div className="flex items-center justify-between border-b pb-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> PAINEL GERAL DE TEMPO DE ESTUDO
         </span>
         <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-3 py-1 rounded-full font-mono">
           Meta Semanal: {targetMins === null ? "Não definida" : formatMin(targetMins)}
@@ -186,7 +185,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
 
       <div className="mt-4 pt-4 border-t">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
             DISTRIBUIÇÃO DIÁRIA
           </span>
           <div className="flex gap-2">
@@ -290,8 +289,8 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
   if (colSpan === 1) {
     return (
       <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+        <div className="flex items-center justify-between border-b pb-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> DESEMPENHO
           </span>
           <span className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
@@ -333,8 +332,8 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
     return (
       <div className="p-5 flex flex-col justify-between h-full space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-            <Target className="w-4 h-4 text-emerald-600" /> DESEMPENHO GERAL
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Target className="w-3.5 h-3.5 text-emerald-600" /> DESEMPENHO GERAL
           </span>
           <div className="flex items-center gap-2">
             <PerformancePeriodSelector
@@ -375,9 +374,9 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
 
   return (
     <div className="p-6 flex flex-col justify-between h-full space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-        <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
-          <Target className="w-4 h-4 text-emerald-600" /> DESEMPENHO & TAXA DE ACERTO
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Target className="w-3.5 h-3.5 text-emerald-600" /> DESEMPENHO & TAXA DE ACERTO
         </span>
         <div className="flex items-center gap-2">
           <PerformancePeriodSelector
@@ -412,7 +411,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
 
       {disciplineRanking.length > 0 && (
         <div className="mt-4 space-y-2">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
             MELHORES DESEMPENHOS POR MATÉRIA
           </span>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -459,8 +458,8 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
         className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2 cursor-pointer hover:bg-muted/10 transition-colors"
         onClick={() => router.push("/edital")}
       >
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+        <div className="flex items-center justify-between border-b pb-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-[#2563EB]" /> PROGRESSO NO EDITAL
           </span>
           <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
@@ -489,8 +488,8 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
       onClick={() => router.push("/edital")}
     >
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <FileText className="w-4 h-4 text-[#2563EB]" /> PROGRESSO NO EDITAL
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5 text-[#2563EB]" /> PROGRESSO NO EDITAL
         </span>
         <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
           {progress}% Concluído
@@ -527,8 +526,8 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
   if (colSpan === 1) {
     return (
       <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+        <div className="flex items-center justify-between border-b pb-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <Flame className="w-3.5 h-3.5 text-orange-500" /> CONSTÂNCIA
           </span>
           <span className="text-[10px] sm:text-[11px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full font-mono">
@@ -547,7 +546,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
           </div>
         </div>
         <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-border/50">
-          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
             Registro diário
           </span>
           <div className="flex items-center gap-1">
@@ -560,7 +559,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
                 <div
                   key={idx}
                   className={`w-2.5 h-2.5 rounded-xs transition-all ${
-                    studied ? "bg-emerald-500" : "bg-muted-foreground/20"
+                    studied ? "bg-gradient-to-r from-[#2563EB] to-emerald-500" : "bg-muted-foreground/20"
                   }`}
                   title={
                     day?.date ? `${day.date}: ${studied ? `${day.minutes} min` : "Sem estudo"}` : ""
@@ -577,8 +576,8 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-3">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Flame className="w-4 h-4 text-orange-500" /> CONSTÂNCIA E SEQUÊNCIA ATIVA
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Flame className="w-3.5 h-3.5 text-orange-500" /> CONSTÂNCIA E SEQUÊNCIA ATIVA
         </span>
         <span className="text-xs font-black text-orange-500 bg-orange-500/10 px-2.5 py-0.5 rounded-full font-mono">
           🔥 {streak} dias consecutivos
@@ -596,7 +595,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
 
       {heatmap.length > 0 && (
         <div className="pt-2 border-t">
-          <div className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider mb-2">
+          <div className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-2">
             REGISTRO DIÁRIO
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -608,7 +607,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
                   <div
                     key={idx}
                     className={`w-4 h-4 rounded-md transition-all ${
-                      studied ? "bg-emerald-500" : "bg-rose-500/80"
+                      studied ? "bg-gradient-to-r from-[#2563EB] to-emerald-500" : "bg-rose-500/80"
                     }`}
                     title={`${day.date}: ${studied ? `${day.minutes} min` : "Sem estudo"}`}
                   />
@@ -687,8 +686,8 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
         onClick={() => router.push("/estatisticas")}
       >
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+        <div className="flex items-center justify-between border-b pb-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <HelpCircle className="w-3.5 h-3.5 text-[#2563EB]" /> QUESTÕES
           </span>
           {realPct !== null ? (
@@ -783,8 +782,8 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
       onClick={() => router.push("/estatisticas")}
     >
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <HelpCircle className="w-4 h-4 text-[#2563EB]" /> META DE QUESTÕES SEMANAL
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <HelpCircle className="w-3.5 h-3.5 text-[#2563EB]" /> META DE QUESTÕES SEMANAL
         </span>
         {realPct !== null ? (
           <span
@@ -901,8 +900,8 @@ export function WidgetRevisoes({ snapshot, colSpan }: DashboardWidgetProps) {
         className="p-4 flex flex-col justify-between h-full space-y-2 cursor-pointer hover:bg-muted/10 transition-colors"
         onClick={() => router.push("/dashboard/reviews")}
       >
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+        <div className="flex items-center justify-between border-b pb-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <RotateCcw className="w-3.5 h-3.5 text-purple-500" /> REVISÕES
           </span>
           <span className="text-[10px] font-black text-purple-600 bg-purple-500/10 px-2 py-0.5 rounded-full font-mono">
@@ -925,12 +924,16 @@ export function WidgetRevisoes({ snapshot, colSpan }: DashboardWidgetProps) {
       onClick={() => router.push("/dashboard/reviews")}
     >
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <RotateCcw className="w-4 h-4 text-purple-500" /> CENTRAL DE REVISÕES
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <RotateCcw className="w-3.5 h-3.5 text-purple-500" /> CENTRAL DE REVISÕES
         </span>
         <Button
           size="sm"
           variant="outline"
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push("/dashboard/reviews")
+          }}
           className="h-7 text-xs font-bold text-purple-600 border-purple-500/30"
         >
           Ver Todas
@@ -961,8 +964,8 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-4">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Trophy className="w-4 w-4 text-amber-500" /> METAS DE ESTUDO SEMANAL
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Trophy className="w-3.5 h-3.5 text-amber-500" /> METAS DE ESTUDO SEMANAL
         </span>
         {onOpenGoalsModal && (
           <button
@@ -970,7 +973,7 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
             onClick={onOpenGoalsModal}
             className="text-muted-foreground hover:text-foreground"
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <SquarePen className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
@@ -1024,22 +1027,60 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 9. WIDGET: Desempenho por Matéria
+// 9. WIDGET: Desempenho por Matéria (PLANO + CICLO + 30D, sem duplicar)
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetProps) {
   const router = useRouter()
   const rows = snapshot?.rawDisciplines || []
+  const contexts = snapshot?.subjectContexts || []
+
+  const contextById = React.useMemo(() => {
+    const map = new Map<string, (typeof contexts)[number]>()
+    for (const c of contexts) map.set(c.discipline_id, c)
+    return map
+  }, [contexts])
+
+  const ordered = React.useMemo(() => {
+    const score = (id: string | undefined, hasHistory: boolean, lastStudiedAt: string | null) => {
+      const ctx = id ? contextById.get(id) : undefined
+      const planned = ctx?.planned ? 1 : 0
+      const inCycle = ctx?.inCycle ? 1 : 0
+      const current = ctx?.isCurrentInCycle ? 1 : 0
+      const recent = ctx?.recent30d ? 1 : 0
+      const recency = lastStudiedAt ? new Date(lastStudiedAt).getTime() : 0
+      // Prioridade: atual do ciclo > ciclo > planejada > 30d > histórico total
+      return (
+        current * 1e15 +
+        inCycle * 1e13 +
+        planned * 1e11 +
+        recent * 1e9 +
+        (hasHistory ? 1e6 : 0) +
+        recency / 1e9
+      )
+    }
+    return [...rows]
+      .map((disc) => {
+        const ctx = disc.discipline_id ? contextById.get(disc.discipline_id) : undefined
+        const hasHistory =
+          disc.correctCount > 0 || disc.wrongCount > 0 || disc.tempoFormatted !== "-"
+        return { disc, ctx, s: score(disc.discipline_id, hasHistory, ctx?.lastStudiedAt ?? null) }
+      })
+      .sort((a, b) => b.s - a.s)
+  }, [rows, contextById])
+
+  const limit = colSpan === 3 ? 8 : 4
+  const visible = ordered.slice(0, limit)
 
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-4">
-      <div className="flex items-center justify-between border-b pb-3">
-        <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-[#2563EB]" /> DESEMPENHO POR MATÉRIA
+      <div className="flex items-center justify-between border-b pb-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <BarChart3 className="w-3.5 h-3.5 text-[#2563EB]" /> DESEMPENHO POR MATÉRIA
         </span>
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/disciplines")}
+          onClick={() => router.push("/estatisticas")}
           className="text-xs font-bold text-[#2563EB]"
         >
           Ver Todas <ChevronRight className="w-3.5 h-3.5 ml-1" />
@@ -1052,26 +1093,40 @@ export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetPr
             <tr className="border-b text-muted-foreground font-extrabold text-[10px] uppercase">
               <th className="pb-2 px-2">Disciplina</th>
               <th className="pb-2 px-2 text-center">Tempo</th>
-              <th className="pb-2 px-2 text-center text-emerald-600">✔</th>
-              <th className="pb-2 px-2 text-center text-rose-500">✖</th>
+              <th className="pb-2 px-2 text-center text-emerald-600">Acertos</th>
+              <th className="pb-2 px-2 text-center text-rose-500">Erros</th>
               <th className="pb-2 px-2 text-center">%</th>
             </tr>
           </thead>
           <tbody className="divide-y font-semibold">
-            {rows.length === 0 ? (
+            {ordered.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
                   className="py-6 text-center text-muted-foreground font-medium text-xs"
                 >
-                  Nenhuma sessão de estudo registrada ainda.
+                  Nenhuma matéria disponível ainda.
                 </td>
               </tr>
             ) : (
-              rows.slice(0, colSpan === 3 ? 8 : 4).map((disc, idx: number) => (
+              visible.map(({ disc, ctx }, idx: number) => (
                 <tr key={disc.id || idx} className="hover:bg-muted/30 transition-colors">
                   <td className="py-2 px-2 font-bold text-foreground truncate max-w-[150px]">
-                    {disc.name}
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      {ctx?.isCurrentInCycle && (
+                        <span className="shrink-0 rounded-full bg-primary px-1.5 py-px text-[9px] font-black uppercase text-primary-foreground">
+                          Atual
+                        </span>
+                      )}
+                      <span className="truncate">{disc.name}</span>
+                      {(ctx?.planned || ctx?.inCycle || ctx?.recent30d) && (
+                        <span className="shrink-0 text-[9px] font-bold text-muted-foreground">
+                          {[ctx?.planned ? "PLANO" : null, ctx?.inCycle ? "CICLO" : null, ctx?.recent30d ? "30D" : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className="py-2 px-2 text-center font-mono text-muted-foreground">
                     {disc.tempoFormatted}
@@ -1111,8 +1166,8 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-3">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Award className="w-4 h-4 text-yellow-500" /> RANKING DAS MATÉRIAS
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Award className="w-3.5 h-3.5 text-yellow-500" /> RANKING DAS MATÉRIAS
         </span>
       </div>
 
@@ -1157,8 +1212,8 @@ export function WidgetUltimasAtividades({ snapshot, colSpan }: DashboardWidgetPr
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-3">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Activity className="w-4 h-4 text-[#2563EB]" /> ÚLTIMAS ATIVIDADES
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Activity className="w-3.5 h-3.5 text-[#2563EB]" /> ÚLTIMAS ATIVIDADES
         </span>
         <button
           type="button"
@@ -1217,8 +1272,8 @@ export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-3">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Award className="w-4 h-4 text-purple-500" /> CONQUISTAS & MARCOS
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Award className="w-3.5 h-3.5 text-purple-500" /> CONQUISTAS & MARCOS
         </span>
         <span className="text-xs font-black text-purple-600 bg-purple-500/10 px-2 py-0.5 rounded-full font-mono">
           {badges.filter((b) => b.unlocked).length} / {badges.length}
@@ -1265,17 +1320,17 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
   const daysUntil = targetDate ? getDaysUntil(targetDate) : null
 
   return (
-    <div className="p-5 flex flex-col justify-between h-full space-y-3">
+    <div className="p-3 flex flex-col space-y-1.5">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-          <Calendar className="w-4 h-4 text-[#2563EB]" /> DATA DA PROVA
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-[#2563EB]" /> DATA DA PROVA
         </span>
       </div>
-      <div className="my-auto space-y-2">
+      <div className="space-y-1">
         {targetDate ? (
           <>
-            <div className="text-sm font-black text-foreground">{examName}</div>
-            <div className="text-sm font-bold text-[#2563EB]">
+            <div className="text-sm font-black text-foreground leading-snug">{examName}</div>
+            <div className="text-sm font-bold text-[#2563EB] leading-tight">
               {new Date(targetDate + "T00:00:00").toLocaleDateString("pt-BR")}
               {daysUntil !== null && (
                 <span className="block text-xs text-muted-foreground font-medium">
@@ -1283,7 +1338,7 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
                 </span>
               )}
             </div>
-            <div className="pt-2 text-xs text-muted-foreground grid gap-1">
+            <div className="pt-1 text-xs text-muted-foreground grid gap-0.5 leading-snug">
               <div className="flex items-center gap-1">
                 <span className="font-bold">📍</span> {local}
               </div>
@@ -1293,7 +1348,7 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
             </div>
           </>
         ) : (
-          <div className="text-xs text-muted-foreground font-medium text-center">
+          <div className="text-xs text-muted-foreground font-medium text-center py-2">
             Nenhuma prova cadastrada.
           </div>
         )}
@@ -1318,7 +1373,7 @@ export function WidgetMensagemDia(_props: DashboardWidgetProps) {
   return (
     <div className="p-4 flex flex-col justify-between h-full space-y-2">
       <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[10px] font-extrabold uppercase text-[#2563EB] tracking-wider flex items-center gap-1.5">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" /> MENSAGEM DO DIA
         </span>
         <span className="text-[10px] text-muted-foreground font-medium">{msg.category}</span>
@@ -1459,43 +1514,43 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
   const weekDays = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
 
   return (
-    <div className="p-3 sm:p-4 flex flex-col h-full bg-card">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+    <div className="p-2.5 sm:p-3 flex flex-col h-auto bg-card">
+      {/* Cabeçalho compacto */}
+      <div className="flex items-center justify-center gap-1 mb-0.5">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => changeMonth(-1)}
-            className="p-1.5 hover:bg-muted rounded-md cursor-pointer transition-colors"
+            className="p-1 hover:bg-muted rounded-md cursor-pointer transition-colors"
             aria-label="Mês anterior"
           >
-            <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
           </button>
-          <div className="text-center min-w-[140px]">
-            <h3 className="text-base sm:text-lg font-bold text-foreground uppercase tracking-wide">
+          <div className="text-center min-w-[120px]">
+            <h3 className="text-sm sm:text-base font-bold text-foreground uppercase tracking-wide leading-tight">
               {monthName} {year}
             </h3>
           </div>
           <button
             onClick={() => changeMonth(1)}
-            className="p-1.5 hover:bg-muted rounded-md cursor-pointer transition-colors"
+            className="p-1 hover:bg-muted rounded-md cursor-pointer transition-colors"
             aria-label="Próximo mês"
           >
-            <ChevronRightIcon className="w-5 h-5 text-muted-foreground" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
       </div>
 
-      {/* Stats do mês */}
+      {/* Stats do mês — linha única compacta */}
       {monthlyStats && monthlyStats.totalMinutes > 0 && (
-        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 text-xs sm:text-sm text-muted-foreground flex-wrap">
+        <div className="flex items-center justify-center gap-1.5 mb-1 text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap">
           <span>
-            Total: <strong className="text-foreground font-mono">{formatHM(monthlyStats.totalMinutes)}</strong>
+            Total <strong className="text-foreground font-mono">{formatHM(monthlyStats.totalMinutes)}</strong>
           </span>
-          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/40">•</span>
           <span>
-            Média: <strong className="text-foreground font-mono">{formatHM(monthlyStats.averageMinutes)}</strong>/dia
+            Média <strong className="text-foreground font-mono">{formatHM(monthlyStats.averageMinutes)}</strong>/dia
           </span>
-          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/40">•</span>
           <span>
             <strong className="text-foreground font-mono">{monthlyStats.daysStudied}</strong> dias
           </span>
@@ -1503,10 +1558,10 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
       )}
 
       {/* Grid do calendário */}
-      <div className="grid grid-cols-7 gap-[3px] sm:gap-1 text-center">
+      <div className="grid grid-cols-7 gap-[2px] sm:gap-1 text-center">
         {/* Cabeçalho dos dias da semana */}
         {weekDays.map((d, i) => (
-          <div key={i} className="text-xs sm:text-sm font-bold text-muted-foreground pb-1.5">
+          <div key={i} className="text-[10px] sm:text-xs font-bold text-muted-foreground pb-0.5">
             {d}
           </div>
         ))}
@@ -1533,10 +1588,11 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
               key={i}
               onClick={() => handleDayClick(day)}
               aria-label={`${day} de ${monthName} de ${year}${mins > 0 ? `, ${formatFullTime(mins)} estudados` : ""}`}
-              className={`relative rounded-lg font-medium flex flex-col items-center justify-center
-                p-1 sm:p-1.5 min-h-[52px] sm:min-h-[60px]
+              className={`relative rounded-md font-medium flex flex-col items-center justify-center
+                ${mins > 0 ? "p-1 sm:p-1.5 min-h-[62px] sm:min-h-[68px]" : isToday ? "p-0.5 sm:p-1 min-h-[40px] sm:min-h-[44px]" : "p-0.5 sm:p-1 min-h-[36px] sm:min-h-[40px]"}
                 cursor-pointer transition-all duration-150
                 hover:brightness-110 hover:scale-[1.02]
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
                 ${intensityClass} ${
                 isToday
                   ? "ring-2 ring-primary shadow-sm"
@@ -1546,52 +1602,53 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
               }`}
               title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatFullTime(mins)} estudados` : " — Clique para registrar estudo"}`}
             >
-              {/* Dia */}
-              <span
-                className={`text-sm sm:text-base leading-none font-extrabold ${
-                  isToday
-                    ? "text-primary font-black"
-                    : mins > 0
-                      ? "text-slate-900 dark:text-white"
-                      : "text-foreground/60"
-                }`}
-              >
-                {day}
-              </span>
-
-              {/* Label HOJE */}
-              {isToday && (
-                <span className="text-[9px] sm:text-[10px] leading-none font-black uppercase tracking-wider text-primary mt-0.5">
-                  Hoje
-                </span>
-              )}
-
-              {/* Tempo estudado */}
-              {mins > 0 && (
-                <span className="text-xs sm:text-sm leading-none font-black mt-1 text-emerald-950 dark:text-emerald-50 drop-shadow-xs">
-                  {formatCompactTimeShort(mins)}
-                </span>
-              )}
-
-              {/* Percentual da meta */}
-              {goalPct !== null && (
+{/* Dia */}
                 <span
-                  className={`text-[10px] sm:text-xs leading-none font-black mt-0.5 ${
-                    goalPct >= 100
-                      ? "text-emerald-900 dark:text-emerald-200"
-                      : "text-emerald-800/80 dark:text-emerald-300/80"
+                  className={`text-[11px] sm:text-sm leading-none font-extrabold ${
+                    isToday
+                      ? "text-primary font-black"
+                      : mins > 0
+                        ? "text-slate-900 dark:text-white"
+                        : "text-foreground/60"
                   }`}
                 >
-                  {goalPct}%
+                  {day}
                 </span>
-              )}
+
+               {/* Label HOJE */}
+               {isToday && (
+                 <span className="text-[9px] sm:text-[10px] leading-none font-black uppercase tracking-wider text-primary mt-1">
+                   Hoje
+                 </span>
+               )}
+
+               {/* Tempo estudado */}
+               {mins > 0 && (
+                 <span className="text-[10px] sm:text-xs leading-none font-black mt-1 text-emerald-950 dark:text-emerald-50 drop-shadow-xs">
+                   {formatCompactTimeShort(mins)}
+                 </span>
+               )}
+
+{/* Percentual da meta */}
+                {goalPct !== null && (
+                  <span
+                    className={[
+                      "text-[9px] sm:text-[10px] leading-none font-black mt-0.5",
+                      goalPct >= 100
+                        ? "text-emerald-900 dark:text-emerald-200"
+                        : "text-emerald-800/80 dark:text-emerald-300/80"
+                    ].join(" ")}
+                  >
+                    {goalPct}%
+                  </span>
+                )}
             </button>
           )
         })}
       </div>
 
       {/* Legenda do heatmap */}
-      <div className="flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-border/50">
+      <div className="flex items-center justify-center gap-1 mt-1 pt-1 border-t border-border/50">
         <span className="text-[10px] sm:text-xs text-muted-foreground font-semibold mr-1">Menos</span>
         {[
           "bg-emerald-500/15 dark:bg-emerald-600/30 border border-emerald-500/25",

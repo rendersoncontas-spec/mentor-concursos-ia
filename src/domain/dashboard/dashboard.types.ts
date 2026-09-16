@@ -100,6 +100,18 @@ export interface DashboardRawDiscipline {
   accuracyPercentage: number
 }
 
+/** Contexto consolidado PLANO + CICLO + 30D para o widget Desempenho por Matéria. */
+export interface DashboardSubjectContext {
+  discipline_id: string
+  name: string
+  planned: boolean
+  inCycle: boolean
+  cycleOrder: number | null
+  isCurrentInCycle: boolean
+  recent30d: boolean
+  lastStudiedAt: string | null
+}
+
 export type PerformancePeriod = "HOJE" | "SEMANA" | "MES" | "ANO" | "TOTAL"
 
 export interface PeriodPerformanceData {
@@ -128,6 +140,7 @@ export interface DashboardSnapshot {
   todayPlanItems: StudyPlanItemWithDetails[]
   cycleBlocks?: CycleBlock[] | null
   rawDisciplines: DashboardRawDiscipline[]
+  subjectContexts?: DashboardSubjectContext[]
   reviews: PendingReviewsSummary
   recentActivities: RecentActivityItem[]
   analytics: DashboardAnalytics

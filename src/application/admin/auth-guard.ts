@@ -43,10 +43,7 @@ export async function getEffectiveSessionUser(
 
   if (!user) return null
 
-  const rawRole = await getUserRole(supabase, user.id)
-  const isAuthorizedEmail = user.email?.toLowerCase() === "rendersonluan@gmail.com"
-  const userRole: UserRole =
-    isAuthorizedEmail && (rawRole === "admin" || rawRole === "moderator") ? rawRole : "user"
+  const userRole = await getUserRole(supabase, user.id)
 
   let supportSession: ActiveSupportSession | null = null
   if (userRole === "admin" || userRole === "moderator") {

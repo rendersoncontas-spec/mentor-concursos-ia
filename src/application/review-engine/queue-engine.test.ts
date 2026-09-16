@@ -157,8 +157,37 @@ test("buildCalendar: 30 dias com contagem vinda do banco", () => {
   ]
   const cal = buildCalendar(cards, 30, NOW)
   assert.equal(cal.length, 31)
-  assert.equal(cal.find((d) => d.date === NOW.toISOString().slice(0, 10))!.count, 2)
+  assert.equal(cal.find((d) => d.date === "2026-08-11")!.count, 2)
   assert.equal(cal[2]?.count ?? -1, 1)
+})
+
+test("applyFilters: modo TODAY usa dia em America/Sao_Paulo (borda de meia-noite)", () => {
+  const now = new Date("2026-08-24T02:30:00.000Z")
+  const sameSpDay = item({ id: "sp-hoje", next_review_at: "2026-08-24T01:00:00.000Z", review_count: 1, review_stage: "REVIEW" })
+  const nextSpDay = item({ id: "sp-amanha", next_review_at: "2026-08-24T04:00:00.000Z", review_count: 1, review_stage: "REVIEW" })
+  const r = applyFilters([sameSpDay, nextSpDay], { mode: "TODAY" }, now).map((i) => i.id)
+  assert.deepEqual(r, ["sp-hoje"])
+})
+
+test("applyFilters: modo OVERDUE usa dia em America/Sao_Paulo (borda de meia-noite)", () => {
+  const now = new Date("2026-08-24T02:30:00.000Z")
+  const earlierTodaySp = item({ id: "hoje", next_review_at: "2026-08-24T01:00:00.000Z", review_count: 1, review_stage: "REVIEW" })
+  const yesterdaySp = item({ id: "ontem", next_review_at: "2026-08-23T00:00:00.000Z", review_count: 1, review_stage: "REVIEW" })
+  const r = applyFilters([earlierTodaySp, yesterdaySp], { mode: "OVERDUE" }, now).map((i) => i.id)
+  assert.deepEqual(r, ["ontem"])
+})
+
+test("buildCalendar: agrupa por dia em America/Sao_Paulo (borda de meia-noite)", () => {
+  const now = new Date("2026-08-24T02:30:00.000Z")
+  const cards = [
+    item({ id: "a", next_review_at: "2026-08-24T01:00:00.000Z", review_count: 1 }),
+    item({ id: "b", next_review_at: "2026-08-24T04:00:00.000Z", review_count: 1 }),
+  ]
+  const cal = buildCalendar(cards, 30, now)
+  assert.equal(cal[0]?.date, "2026-08-23")
+  assert.equal(cal[0]?.count, 1)
+  assert.equal(cal[1]?.date, "2026-08-24")
+  assert.equal(cal[1]?.count, 1)
 })
 
 // ─── Análises e recomendações (dados reais) ──────────────────────────────────

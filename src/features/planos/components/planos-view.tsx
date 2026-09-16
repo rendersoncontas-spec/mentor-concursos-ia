@@ -252,7 +252,7 @@ export function PlanosView() {
         <div className="flex items-center gap-3">
           <Button
             onClick={() => router.push("/planejamento")}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-6 h-11 rounded-2xl shadow-lg shadow-[#2563EB]/20 flex items-center gap-2 group"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-6 h-11 rounded-2xl shadow-sm flex items-center gap-2 group"
           >
             <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform" />
             CRIAR NOVO PLANO
@@ -334,7 +334,7 @@ export function PlanosView() {
                 </span>
               </div>
 
-              <div className="group relative bg-slate-900 dark:bg-white text-slate-100 dark:text-slate-900 rounded-[2rem] overflow-hidden shadow-2xl transition-all">
+              <div className="group relative bg-slate-900 dark:bg-white text-slate-100 dark:text-slate-900 rounded-[2rem] overflow-hidden shadow-sm transition-all">
                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
                   <ShieldCheck className="h-32 w-32" />
                 </div>
@@ -398,7 +398,7 @@ export function PlanosView() {
                     <div className="flex flex-wrap items-center gap-3 pt-4">
                       <Button
                         onClick={() => router.push("/study-plan")}
-                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-8 h-12 rounded-2xl shadow-lg shadow-[#2563EB]/40 flex items-center gap-2"
+                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-8 h-12 rounded-2xl shadow-sm flex items-center gap-2"
                       >
                         CONTINUAR ESTUDANDO
                         <ChevronRight className="h-4 w-4" />
@@ -497,7 +497,7 @@ export function PlanosView() {
               </div>
               <Button
                 onClick={() => router.push("/planejamento")}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-10 h-14 rounded-3xl shadow-xl shadow-[#2563EB]/30 flex items-center gap-2"
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-10 h-14 rounded-3xl shadow-sm flex items-center gap-2"
               >
                 CRIAR MEU PRIMEIRO PLANO
               </Button>
@@ -536,7 +536,7 @@ export function PlanosView() {
                   <div
                     key={plan.id}
                     onClick={() => setSelectedPlan(plan)}
-                    className="group bg-card border rounded-3xl p-6 shadow-xs hover:shadow-xl hover:border-[#2563EB]/40 transition-all cursor-pointer relative"
+                    className="group bg-card border rounded-3xl p-6 shadow-xs hover:shadow-sm hover:border-[#2563EB]/40 transition-all cursor-pointer relative"
                   >
                     <div className="absolute top-6 right-6 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button

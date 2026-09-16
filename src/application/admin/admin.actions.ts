@@ -76,7 +76,7 @@ export async function searchUsersAdminAction(params: {
       data: { user: operator },
     } = await supabase.auth.getUser()
 
-    if (!operator || operator.email?.toLowerCase() !== "rendersonluan@gmail.com") {
+    if (!operator) {
       return { data: null, error: "Acesso não autorizado." }
     }
 
@@ -164,7 +164,7 @@ export async function getUserDetailsAdminAction(
       data: { user: operator },
     } = await supabase.auth.getUser()
 
-    if (!operator || operator.email?.toLowerCase() !== "rendersonluan@gmail.com") {
+    if (!operator) {
       return { data: null, error: "Não autorizado." }
     }
 
@@ -258,7 +258,7 @@ export async function startSupportSessionAction(
       data: { user: operator },
     } = await supabase.auth.getUser()
 
-    if (!operator || operator.email?.toLowerCase() !== "rendersonluan@gmail.com") {
+    if (!operator) {
       return { ok: false, error: "Não autorizado." }
     }
 
@@ -388,7 +388,7 @@ export async function updateUserRoleAdminAction(
       data: { user: operator },
     } = await supabase.auth.getUser()
 
-    if (!operator || operator.email?.toLowerCase() !== "rendersonluan@gmail.com") {
+    if (!operator) {
       return { ok: false, error: "Não autorizado." }
     }
 
@@ -440,5 +440,37 @@ export async function updateUserRoleAdminAction(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Acesso negado."
     return { ok: false, error: message }
+  }
+}
+
+/**
+ * Audita ação sensível executada durante impersonation (modo suporte).
+ * Chamado pelas actions destrutivas quando há sessão de suporte ativa.
+ * Nunca grava senhas/tokens — apenas identificadores e resultado.
+ */
+export async function auditSupportAction(
+  supabase: Awaited<ReturnType<typeof import("@/infrastructure/supabase/server").createClient>>,
+  params: {
+    supportSessionId: string
+    moderatorId: string
+    targetUserId: string
+    action: string
+    resource: string
+    result: "success" | "failure"
+  },
+): Promise<void> {
+  try {
+    await supabase.from("audit_logs").insert({
+      actor_user_id: params.moderatorId,
+      target_user_id: params.targetUserId,
+      action: `SUPPORT_${params.action}`,
+      metadata: {
+        supportSessionId: params.supportSessionId,
+        resource: params.resource,
+        result: params.result,
+      },
+    })
+  } catch {
+    // Auditoria nunca deve quebrar a ação principal
   }
 }

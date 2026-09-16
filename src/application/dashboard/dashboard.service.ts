@@ -242,6 +242,75 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     )
     const weeklyStudyDays = uniqueDaysThisWeek.size
 
+    // ── CONTEXTO PLANO + CICLO + 30D (consolidação em memória, sem novas queries) ──
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+    const thirtyDaysAgoMs = now.getTime() - THIRTY_DAYS_MS
+
+    const plannedById = new Map<string, { name: string }>()
+    for (const item of todayPlanItems || []) {
+      const discId = (item as { discipline_id?: string }).discipline_id
+      const discName = (item as { discipline?: { name?: string } }).discipline?.name
+      if (discId && !plannedById.has(discId)) {
+        plannedById.set(discId, { name: discName || "Desconhecida" })
+      }
+    }
+
+    const cycleBlocks = cycleOverview?.blocks || []
+    const cycleById = new Map<string, { name: string; order: number; isCurrent: boolean }>()
+    cycleBlocks.forEach((block, index) => {
+      const discId = (block as { disciplineId?: string }).disciplineId
+      const discName = (block as { disciplineName?: string }).disciplineName
+      if (discId && !cycleById.has(discId)) {
+        cycleById.set(discId, {
+          name: discName || "Desconhecida",
+          order: index,
+          isCurrent: index === (cycleOverview?.currentBlockIndex ?? -1),
+        })
+      }
+    })
+
+    const recentById = new Map<string, string>()
+    for (const h of rawHistory || []) {
+      const discId = (h as { discipline_id?: string | null }).discipline_id
+      const startedAt = (h as { started_at?: string }).started_at
+      if (!discId || !startedAt) continue
+      const ms = new Date(startedAt).getTime()
+      if (isNaN(ms) || ms < thirtyDaysAgoMs) continue
+      const prev = recentById.get(discId)
+      if (!prev || startedAt > prev) recentById.set(discId, startedAt)
+    }
+
+    const knownDisciplines = new Map<string, string>()
+    for (const ud of disciplines || []) {
+      const discId = (ud as { discipline?: { id?: string; name?: string } }).discipline?.id
+      const discName = (ud as { discipline?: { id?: string; name?: string } }).discipline?.name
+      if (discId && discName && !knownDisciplines.has(discId)) {
+        knownDisciplines.set(discId, discName)
+      }
+    }
+    for (const [id, v] of plannedById) {
+      if (!knownDisciplines.has(id)) knownDisciplines.set(id, v.name)
+    }
+    for (const [id, v] of cycleById) {
+      if (!knownDisciplines.has(id)) knownDisciplines.set(id, v.name)
+    }
+
+    const subjectContexts = Array.from(knownDisciplines.entries()).map(([discipline_id, name]) => {
+      const planned = plannedById.has(discipline_id)
+      const cycleInfo = cycleById.get(discipline_id)
+      const recentAt = recentById.get(discipline_id) ?? null
+      return {
+        discipline_id,
+        name,
+        planned,
+        inCycle: !!cycleInfo,
+        cycleOrder: cycleInfo ? cycleInfo.order : null,
+        isCurrentInCycle: cycleInfo ? cycleInfo.isCurrent : false,
+        recent30d: recentAt !== null,
+        lastStudiedAt: recentAt,
+      }
+    })
+
     return {
       user: profile,
       activeTarget,
@@ -267,6 +336,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       disciplinesStats,
       todayPlanItems,
       cycleBlocks: cycleOverview?.blocks || [],
+      subjectContexts,
       rawDisciplines: (disciplines || []).map((ud) => {
         const discId = ud.discipline?.id
         const discAttempts = attempts.filter((a) => a.discipline_id === discId)

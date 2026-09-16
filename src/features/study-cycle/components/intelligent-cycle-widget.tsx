@@ -12,7 +12,6 @@ import {
   Pause,
   Play,
   RefreshCcw,
-  SkipForward,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -143,7 +142,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
 
   const handleStartStudy = useCallback(() => {
     if (!overview?.currentItem || !overview.cycle) return
-    startSession({
+    const result = startSession({
       disciplineName: overview.currentItem.disciplineName,
       disciplineId: overview.currentItem.disciplineId,
       studyType: "TEORIA",
@@ -152,6 +151,10 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
       cycleId: overview.cycle.id,
       cycleItemId: overview.currentItem.itemId,
     })
+    if (!result.started) {
+      toast.error("Já existe uma sessão ativa. Retome, salve ou encerre antes de iniciar outra.")
+      return
+    }
     toast.success(`Estudo do ciclo iniciado: ${overview.currentItem.disciplineName}`)
   }, [overview, startSession])
 
@@ -226,21 +229,21 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   }
 
   const content = (
-    <div className="p-4 space-y-3">
+    <div className="p-2.5 space-y-2">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-            <Layers className="h-4 w-4" />
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+            <Layers className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground truncate">
+            <p className="text-sm font-black text-foreground truncate leading-tight">
               Ciclo {cycle.name}
             </p>
-            <p className="text-xs font-black text-foreground truncate">
+            <p className="text-[11px] font-bold text-muted-foreground truncate leading-tight">
               {currentRound}ª volta · {items.length} {items.length === 1 ? "matéria" : "matérias"} · {roundProgressPercentage}%
               {isPaused && (
-                <span className="ml-1.5 text-amber-600 dark:text-amber-400 text-[10px]">
+                <span className="ml-1.5 text-amber-600 dark:text-amber-400">
                   PAUSADO
                 </span>
               )}
@@ -253,10 +256,10 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
-            <MoreVertical className="h-4 w-4" />
+            <MoreVertical className="h-3.5 w-3.5" />
           </Button>
           {isMenuOpen && (
             <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-card border border-border rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
@@ -298,130 +301,112 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
         </div>
       </div>
 
-      {/* MAIN CONTENT: EM FOCO | PRÓXIMA */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-        {/* EM FOCO — 3 cols on sm */}
-        <div className={cn(
-          "sm:col-span-3 rounded-xl border p-3 space-y-2",
-          currentItem
-            ? "bg-primary/5 border-primary/30"
-            : "bg-muted/40 border-border/40"
-        )}>
-          <p className="text-[9px] font-black uppercase tracking-wider text-primary">
-            Em Foco
-          </p>
-          {currentItem ? (
+      {/* CURRENT SUBJECT — FULL WIDTH */}
+      <div className={cn(
+        "rounded-lg border px-2.5 py-2 space-y-1",
+        currentItem
+          ? "bg-primary/5 border-primary/30"
+          : "bg-muted/40 border-border/40"
+      )}>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="text-[10px] font-black uppercase tracking-wider text-primary leading-none">
+            Agora
+          </span>
+          {currentItem && (
             <>
-              <p className="text-sm font-black text-foreground leading-tight" title={currentItem.disciplineName}>
+              <span className="text-[11px] font-bold text-muted-foreground">
+                Etapa {(cycle.current_item_index || 0) + 1}/{items.length}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                {currentItem.difficulty}
+              </span>
+              <span className="ml-auto text-[11px] font-black text-foreground whitespace-nowrap">
+                Meta {currentItem.plannedMinutes} min
+              </span>
+            </>
+          )}
+        </div>
+        {currentItem ? (
+          <>
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="truncate text-base font-black text-foreground leading-tight" title={currentItem.disciplineName}>
                 {currentItem.disciplineName}
               </p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-base font-black text-foreground">
-                  {currentItem.studiedMinutesInRound}
-                </span>
-                <span className="text-[11px] font-bold text-muted-foreground">
-                  / {currentItem.plannedMinutes} min
-                </span>
+              <span className="text-[11px] font-black text-foreground whitespace-nowrap shrink-0">
+                {currentItem.studiedMinutesInRound}/{currentItem.plannedMinutes} min
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.min(100, Math.round((currentItem.studiedMinutesInRound / Math.max(1, currentItem.plannedMinutes)) * 100))}%`,
+                  }}
+                />
               </div>
-              {/* Progress bar */}
-              <div className="space-y-1">
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full transition-all duration-300"
-                    style={{
-                      width: `${Math.min(100, Math.round((currentItem.studiedMinutesInRound / currentItem.plannedMinutes) * 100))}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-primary">
-                    {Math.min(100, Math.round((currentItem.studiedMinutesInRound / currentItem.plannedMinutes) * 100))}%
-                  </span>
-                  {currentItem.remainingMinutesInRound > 0 && (
-                    <span className="text-[10px] font-bold text-muted-foreground">
-                      Faltam {currentItem.remainingMinutesInRound} min
-                    </span>
-                  )}
-                  {currentItem.isCompletedInRound && (
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                      Concluída
-                    </span>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground font-medium">Nenhuma matéria em foco</p>
-          )}
-        </div>
+              <span className="text-[10px] font-black text-primary shrink-0 whitespace-nowrap">
+                {Math.min(100, Math.round((currentItem.studiedMinutesInRound / Math.max(1, currentItem.plannedMinutes)) * 100))}%
+                {" · "}
+                {currentItem.remainingMinutesInRound > 0
+                  ? `Faltam ${currentItem.remainingMinutesInRound} min`
+                  : "Meta atingida!"}
+              </span>
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground font-medium">Nenhuma matéria em foco</p>
+        )}
+      </div>
 
-        {/* PRÓXIMA — 2 cols on sm */}
-        <div className="sm:col-span-2 rounded-xl bg-muted/40 border border-border/40 p-3 space-y-2">
-          <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">
-            Próxima
-          </p>
-          {nextItem ? (
-            <>
-              <p className="text-sm font-black text-foreground leading-tight truncate" title={nextItem.disciplineName}>
-                {nextItem.disciplineName}
-              </p>
-              <p className="text-[11px] font-bold text-muted-foreground">
-                Meta: {nextItem.plannedMinutes} min
-              </p>
+      {/* NEXT — COMPACT ROW */}
+      <div className="flex items-center gap-2 rounded-lg bg-muted/40 border border-border/40 px-2.5 py-1.5">
+        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">
+          Próxima
+        </span>
+        {nextItem ? (
+          <p className="truncate text-xs font-bold text-foreground leading-tight">
+            {nextItem.disciplineName}
+            <span className="font-semibold text-muted-foreground">
+              {" "}· Meta {nextItem.plannedMinutes} min
               {nextItem.studiedMinutesInRound > 0 && (
-                <>
-                  <p className="text-[11px] font-bold text-muted-foreground">
-                    {nextItem.studiedMinutesInRound} / {nextItem.plannedMinutes} min
-                  </p>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-muted-foreground/40 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(100, Math.round((nextItem.studiedMinutesInRound / nextItem.plannedMinutes) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                </>
+                <span className="text-primary"> · {nextItem.studiedMinutesInRound}/{nextItem.plannedMinutes}</span>
               )}
-            </>
-          ) : isLastStep && lastSubject ? (
-            <>
-              <p className="text-sm font-black text-foreground leading-tight truncate">
-                {lastSubject.disciplineName}
-              </p>
-              <p className="text-[10px] font-bold text-primary">
-                Última etapa da volta
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground font-medium">Sem próxima</p>
-          )}
-        </div>
+            </span>
+          </p>
+        ) : isLastStep && lastSubject ? (
+          <p className="truncate text-xs font-bold text-foreground leading-tight">
+            {lastSubject.disciplineName}
+            <span className="text-primary"> · Última etapa da volta</span>
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground font-medium">Sem próxima</p>
+        )}
       </div>
 
-      {/* ROUND PROGRESS BAR */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-            Progresso da volta
-          </span>
-          <span className="text-xs font-black text-primary">{roundProgressPercentage}%</span>
+      {/* ROUND PROGRESS + START */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">
+              Progresso da volta
+            </span>
+            <span className="text-[10px] font-black text-primary shrink-0">
+              {roundProgressPercentage}%
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(roundProgressPercentage, 100)}%` }}
+            />
+          </div>
         </div>
-        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(roundProgressPercentage, 100)}%` }}
-          />
-        </div>
-      </div>
-
-      {/* BUTTONS */}
-      <div className="space-y-1.5">
         <Button
           onClick={buttonAction}
           disabled={isDeleting}
           className={cn(
-            "w-full font-black text-xs h-9 shadow-xs",
+            "h-8 w-[132px] shrink-0 font-black text-xs whitespace-nowrap shadow-xs px-2",
             isPaused
               ? "bg-emerald-600 hover:bg-emerald-700 text-white"
               : "bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -430,20 +415,6 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
           {buttonIcon}
           {buttonLabel}
         </Button>
-
-        {/* SKIP STEP — secondary */}
-        {currentItem && !isPaused && currentItem.studiedMinutesInRound > 0 && !currentItem.isCompletedInRound && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSkipStep}
-            disabled={isSkipping}
-            className="w-full h-7 text-[11px] font-bold text-muted-foreground hover:text-foreground gap-1.5"
-          >
-            <SkipForward className="h-3 w-3" />
-            Pular etapa atual
-          </Button>
-        )}
       </div>
     </div>
   )

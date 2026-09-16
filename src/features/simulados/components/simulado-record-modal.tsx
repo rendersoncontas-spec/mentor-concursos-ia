@@ -675,7 +675,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                                 </span>
                               )}
                               <span className="text-[10px] font-black text-muted-foreground ml-auto shrink-0 hidden sm:block">
-                                {subAcc === null ? "—" : `${subAcc}% · ${subWrong}✖`}
+                                {subAcc === null ? "—" : `${subAcc}% · ${subWrong} erros`}
                               </span>
                             </div>
                             <Input
@@ -728,7 +728,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
             )}
 
             {/* CARD RESULTADO ATUAL — atualiza em tempo real */}
-            <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-card to-primary/5 p-4">
+            <div className="rounded-xl border-2 border-primary/30 bg-card p-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block">

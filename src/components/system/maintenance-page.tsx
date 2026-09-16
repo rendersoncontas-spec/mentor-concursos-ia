@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import { RefreshCw, Wrench } from "lucide-react"
+import { RefreshCcw, Wrench } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/ui/logo"
@@ -44,7 +44,7 @@ export function MaintenancePage() {
           disabled={isRefreshing}
           className="gap-2 w-full sm:w-auto"
         >
-          <RefreshCw className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} />
+          <RefreshCcw className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} />
           {isRefreshing ? "Atualizando..." : "Atualizar página"}
         </Button>
       </main>

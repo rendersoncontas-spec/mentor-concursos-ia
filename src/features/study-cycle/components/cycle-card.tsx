@@ -48,14 +48,14 @@ export function CycleCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden transition-all duration-200 hover:shadow-lg border flex flex-col cursor-pointer",
+        "group relative overflow-hidden transition-all duration-200 hover:shadow-sm border flex flex-col cursor-pointer",
         isActive
-          ? "border-primary/50 bg-gradient-to-br from-primary/5 via-card to-card ring-1 ring-primary/30"
+          ? "border-primary/50 bg-card ring-1 ring-primary/30"
           : "border-border/60 hover:border-border/90 bg-card/80"
       )}
       onClick={() => onSelect(cycle.id)}
     >
-      <div className="p-3.5 space-y-3">
+      <div className="p-2.5 space-y-2">
         {/* CABEÇALHO DO CARD */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -91,7 +91,7 @@ export function CycleCard({
         </div>
 
         {/* VOLTAS - COMPACTO */}
-        <div className="grid grid-cols-2 gap-1.5 text-[11px] py-1.5 px-2.5 bg-muted/40 rounded-lg border border-border/40">
+        <div className="grid grid-cols-2 gap-1.5 text-[11px] py-1 px-2 bg-muted/40 rounded-lg border border-border/40">
           <div>
             <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
               Volta

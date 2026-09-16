@@ -24,7 +24,8 @@ const REBUILD_COOLDOWN_MS = 5_000
  *
  * Esta é a FONTE DE VERDADE do progresso do ciclo.
  * Limpa o estado atual e reconstrói o progresso baseando-se
- * exclusivamente no study_history real posterior à criação do ciclo.
+ * em TODO o study_history real do usuário (incluindo imports
+ * anteriores à criação do ciclo, ex: Aprovado).
  *
  * Fluxo:
  *   1. Buscar o ciclo ativo e seus itens
@@ -109,14 +110,15 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
 
     log(`${items.length} itens no ciclo: ${items.map(i => `${i.discipline?.name} (${i.planned_minutes}min)`).join(", ")}`)
 
-    // ── 3. Buscar Histórico de Estudos (apenas desde a criação do ciclo) ──
+    // ── 3. Buscar Histórico de Estudos (TODO o histórico válido do usuário) ──
+    // NÃO filtrar por cycle.created_at: imports (ex: Aprovado) anteriores à
+    // criação do ciclo devem contribuir para o progresso (CHECK 5).
     const { data: history, error: histErr } = await supabase
       .from("study_history")
-      .select("id, discipline_id, duration_minutes, started_at, disciplines(name)")
+      .select("id, discipline_id, duration_minutes, started_at, study_source, disciplines(name)")
       .eq("user_id", userId)
       .not("duration_minutes", "is", null)
       .gt("duration_minutes", 0)
-      .gte("started_at", cycle.created_at)
       .order("started_at", { ascending: true })
 
     if (histErr) {
@@ -267,36 +269,35 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
       totalRoundsDone = Math.floor(totalValidMinutes / totalPlannedPerRound)
     }
 
-    // Minutos restantes na volta atual (após remover voltas completas)
-    let remainingMinutesInCurrentRound = totalValidMinutes - totalRoundsDone * totalPlannedPerRound
-
-    // Encontrar cursor na volta atual
+    // Encontrar cursor: PRIMEIRA matéria incompleta na ordem da fila.
+    // Usa o progresso próprio de cada item (effectiveProgress = min(acumulado, meta)),
+    // de modo que o cursor avança por TODAS as matérias já completas.
+    // Excesso vira EXTRA e nunca impede o avanço. Matéria futura 100%
+    // não puxa o cursor para frente enquanto a atual estiver incompleta.
     let cursorIndex = 0
     let currentItemProgressMin = 0
+    let foundIncomplete = false
 
     for (let i = 0; i < items.length; i++) {
       const target = itemTarget.get(items[i].id)!
       const validMinutes = validMinutesPerItem.get(items[i].id) || 0
 
-      if (remainingMinutesInCurrentRound >= target) {
-        // Este item está completo na volta atual
-        remainingMinutesInCurrentRound -= target
-        cursorIndex = i + 1
-      } else {
-        // Este é o item atual (parcial ou zerado)
+      if (validMinutes < target) {
+        // Primeira matéria incompleta: o cursor para aqui
         cursorIndex = i
-        currentItemProgressMin = Math.max(0, remainingMinutesInCurrentRound)
-        remainingMinutesInCurrentRound = 0
+        currentItemProgressMin = Math.max(0, validMinutes)
+        foundIncomplete = true
         break
       }
+      // Item completo: continua avançando para o próximo
     }
 
-    // Se todos itens completos na volta atual, cursor volta para 0 (início da próxima)
-    if (cursorIndex >= items.length) {
+    if (!foundIncomplete) {
+      // Todas as matérias completas → a volta fecha.
+      // totalRoundsDone já contou essa volta via floor(totalValid/totalPlanned),
+      // então o cursor recomeça em #1 com progresso zerado na nova volta.
       cursorIndex = 0
       currentItemProgressMin = 0
-      // Nota: totalRoundsDone já foi calculado acima, não incrementamos aqui
-      // pois os minutos completos já foram contados no totalValidMinutes
     }
 
     const currentRound = totalRoundsDone + 1

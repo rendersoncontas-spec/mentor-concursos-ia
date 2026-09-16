@@ -90,7 +90,7 @@ export function DisciplineDetailView({
         <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="flex-1 sm:flex-initial bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
+            className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
             <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
@@ -226,8 +226,8 @@ export function DisciplineDetailView({
                   <th className="px-4 py-2.5">Data</th>
                   <th className="px-4 py-2.5">Categoria</th>
                   <th className="px-3 py-2.5 text-center">Tempo</th>
-                  <th className="px-3 py-2.5 text-center text-emerald-600">✔</th>
-                  <th className="px-3 py-2.5 text-center text-rose-500">✖</th>
+                  <th className="px-3 py-2.5 text-center text-emerald-600">Acertos</th>
+                  <th className="px-3 py-2.5 text-center text-rose-500">Erros</th>
                   <th className="px-3 py-2.5 text-center">%</th>
                   <th className="px-3 py-2.5 text-center">Material</th>
                   <th className="px-4 py-2.5">Tópico</th>
@@ -236,7 +236,7 @@ export function DisciplineDetailView({
                   <th className="px-3 py-2.5 text-center">Comentário</th>
                 </tr>
               </thead>
-              <tbody className="divide-y font-semibold">
+              <tbody className="divide-y divide-border font-semibold">
                 <tr className="hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3 font-mono text-muted-foreground">06/08/26</td>
                   <td className="px-4 py-3">
@@ -281,16 +281,16 @@ export function DisciplineDetailView({
               <tr className="border-b bg-muted/30 text-muted-foreground font-extrabold text-[11px]">
                 <th className="px-3 py-2.5 w-10 text-center" />
                 <th className="px-4 py-2.5">Tópicos</th>
-                <th className="px-3 py-2.5 text-center text-emerald-600">✔</th>
-                <th className="px-3 py-2.5 text-center text-rose-500">✖</th>
-                <th className="px-3 py-2.5 text-center">📝</th>
+                <th className="px-3 py-2.5 text-center text-emerald-600">Acertos</th>
+                <th className="px-3 py-2.5 text-center text-rose-500">Erros</th>
+                <th className="px-3 py-2.5 text-center">Questões</th>
                 <th className="px-3 py-2.5 text-center">%</th>
-                <th className="px-3 py-2.5 text-center">📅</th>
-                <th className="px-3 py-2.5 text-center">📱</th>
+                <th className="px-3 py-2.5 text-center">Data</th>
+                <th className="px-3 py-2.5 text-center">Sessões</th>
                 <th className="px-4 py-2.5 text-center">Link</th>
               </tr>
             </thead>
-            <tbody className="divide-y font-semibold">
+            <tbody className="divide-y divide-border font-semibold">
               {hasCatalog
                 ? catalogTopics.map((topic, idx) => {
                     const isDone = isTopicDone(topic)

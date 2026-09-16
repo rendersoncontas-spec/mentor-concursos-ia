@@ -13,16 +13,16 @@ export type FocusSoundId =
   | "pink_noise"
   | "white_noise"
 
-export const FOCUS_SOUND_OPTIONS: { id: FocusSoundId; label: string; icon: string }[] = [
-  { id: "off", label: "Desativado", icon: "🔇" },
-  { id: "rain", label: "Chuva Suave 🌧️", icon: "🌧️" },
-  { id: "library", label: "Biblioteca Silenciosa 📚", icon: "📚" },
-  { id: "cafe", label: "Cafeteria Aconchegante ☕", icon: "☕" },
-  { id: "waves", label: "Ondas do Mar 🌊", icon: "🌊" },
-  { id: "fireplace", label: "Lareira / Fogueira 🔥", icon: "🔥" },
-  { id: "brown_noise", label: "Brown Noise (Foco Profundo)", icon: "🎧" },
-  { id: "pink_noise", label: "Pink Noise (Aveludado)", icon: "🌸" },
-  { id: "white_noise", label: "White Noise Suave", icon: "⚪" },
+export const FOCUS_SOUND_OPTIONS: { id: FocusSoundId; label: string }[] = [
+  { id: "off", label: "Desativado" },
+  { id: "rain", label: "Chuva Suave" },
+  { id: "library", label: "Biblioteca Silenciosa" },
+  { id: "cafe", label: "Cafeteria Aconchegante" },
+  { id: "waves", label: "Ondas do Mar" },
+  { id: "fireplace", label: "Lareira / Fogueira" },
+  { id: "brown_noise", label: "Brown Noise (Foco Profundo)" },
+  { id: "pink_noise", label: "Pink Noise (Aveludado)" },
+  { id: "white_noise", label: "White Noise Suave" },
 ]
 
 export const FOCUS_SOUND_LABELS: Record<FocusSoundId, string> = {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { useRouter, useSearchParams } from "next/navigation"
 
-import { Edit, Folder, Plus, ShieldCheck, Target, Trash2, Trophy } from "lucide-react"
+import { Folder, Plus, ShieldCheck, SquarePen, Target, Trash2, Trophy } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -411,7 +411,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
       </div>
 
       {/* BARRA DE PROGRESSO DA PREPARAÇÃO */}
-      <div className="bg-slate-900 dark:bg-slate-100 text-slate-100 dark:text-slate-900 rounded-2xl p-6 shadow-xl space-y-3">
+      <div className="bg-slate-900 dark:bg-slate-100 text-slate-100 dark:text-slate-900 rounded-2xl p-6 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-black uppercase tracking-widest opacity-80">
             Progresso da Preparação
@@ -663,7 +663,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="Editar disciplina"
                     >
-                      <Edit className="h-3.5 w-3.5" />
+                      <SquarePen className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={(e) => {

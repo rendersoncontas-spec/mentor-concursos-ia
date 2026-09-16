@@ -17,6 +17,7 @@ import {
   addDaysToKey,
   aggregateBuckets,
   buildDayBuckets,
+  buildDayBucketsFromKeys,
   buildHeatmap,
   classifyDiscipline,
   computeAttentionScore,
@@ -1678,4 +1679,24 @@ test("computeTimeOfDayAnalysis: todas as sessões com foco null geram bestByFocu
   const result = computeTimeOfDayAnalysis(sessions, [], TZ)
   assert.equal(result.bestByFocus, null)
   assert.equal(result.buckets.find((b) => b.period === "MANHA")?.focusAvg, null)
+})
+
+// M4: Período personalizado usa intervalo custom real (não últimos N dias)
+test("custom range: buildDayBucketsFromKeys usa customStart/customEnd real", () => {
+  const customKeys = keysBetween("2026-07-01", "2026-07-03")
+  assert.deepEqual(customKeys, ["2026-07-01", "2026-07-02", "2026-07-03"])
+  const sessions = [
+    session({ id: "in", startedAt: "2026-07-02T14:00:00Z", durationMinutes: 60 }),
+    session({ id: "out-after", startedAt: "2026-08-11T10:00:00Z", durationMinutes: 60 }),
+    session({ id: "out-before", startedAt: "2026-06-30T10:00:00Z", durationMinutes: 60 }),
+  ]
+  const buckets = buildDayBucketsFromKeys(sessions, [], customKeys, TZ)
+  assert.equal(buckets.length, 3)
+  assert.equal(buckets.find((b) => b.date === "2026-07-02")?.minutes, 60)
+  assert.equal(buckets.find((b) => b.date === "2026-07-02")?.sessions, 1)
+  assert.equal(buckets.find((b) => b.date === "2026-07-01")?.sessions, 0)
+  assert.equal(buckets.find((b) => b.date === "2026-07-03")?.sessions, 0)
+  const stale = buildDayBuckets(sessions, [], 3, NOW, TZ)
+  assert.equal(stale[stale.length - 1]!.date, "2026-08-11")
+  assert.equal(stale.find((b) => b.date === "2026-07-02"), undefined)
 })

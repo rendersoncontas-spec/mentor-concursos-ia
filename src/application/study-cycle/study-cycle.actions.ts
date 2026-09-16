@@ -37,21 +37,11 @@ function mapDifficultyToPriority(difficulty?: CycleItemDifficulty | string): Cyc
 
 /**
  * Busca todos os ciclos do usuário com seus itens e dados computados.
- * Retorna ciclos E eventuais erros da reconciliação (para exibir na UI).
  */
 export async function getCyclesAction(): Promise<{ data: CycleOverview[]; reconcileErrors: string[] }> {
   const reconcileErrors: string[] = []
   try {
     const { supabase, userId } = await getUser()
-
-    // Auto-reconciliação para garantir que todo estudo do histórico elegível esteja no ciclo
-    const reconcileResult = await reconcileCycleProgress().catch((err) => {
-      console.error("[getCyclesAction] Reconcile error:", err)
-      return { success: false, processed: 0, errors: [String(err)] }
-    })
-    if (reconcileResult.errors.length > 0) {
-      reconcileErrors.push(...reconcileResult.errors)
-    }
 
     const { data: cycles, error } = await supabase
       .from("study_cycles")
@@ -66,26 +56,24 @@ export async function getCyclesAction(): Promise<{ data: CycleOverview[]; reconc
 
     const cycleIds = cycles.map((c) => c.id)
 
-    const { data: items } = await supabase
-      .from("study_cycle_items")
-      .select("*, discipline:disciplines(id, name, area, color_hex)")
-      .in("cycle_id", cycleIds)
-      .order("order", { ascending: true })
-
-    const { data: sessions } = await supabase
-      .from("study_cycle_sessions")
-      .select("*")
-      .in("cycle_id", cycleIds)
+    const [itemsResult, sessionsResult] = await Promise.all([
+      supabase
+        .from("study_cycle_items")
+        .select("*, discipline:disciplines(id, name, area, color_hex)")
+        .in("cycle_id", cycleIds)
+        .order("order", { ascending: true }),
+      supabase.from("study_cycle_sessions").select("*").in("cycle_id", cycleIds),
+    ])
 
     const itemsByCycle = new Map<string, StudyCycleItemWithDetails[]>()
-    for (const item of items || []) {
+    for (const item of itemsResult.data || []) {
       const list = itemsByCycle.get(item.cycle_id) || []
       list.push(item as StudyCycleItemWithDetails)
       itemsByCycle.set(item.cycle_id, list)
     }
 
     const sessionsByCycle = new Map<string, StudyCycleSession[]>()
-    for (const s of sessions || []) {
+    for (const s of sessionsResult.data || []) {
       const list = sessionsByCycle.get(s.cycle_id) || []
       list.push(s as StudyCycleSession)
       sessionsByCycle.set(s.cycle_id, list)
@@ -111,9 +99,6 @@ export async function getActiveCycleAction(): Promise<CycleOverview | null> {
   try {
     const { supabase, userId } = await getUser()
 
-    // Auto-reconciliação para garantir que todo estudo do histórico elegível esteja no ciclo
-    await reconcileCycleProgress().catch((err) => console.error("[getActiveCycleAction] Reconcile error:", err))
-
     const { data: cycle, error } = await supabase
       .from("study_cycles")
       .select("*")
@@ -125,21 +110,19 @@ export async function getActiveCycleAction(): Promise<CycleOverview | null> {
 
     if (error || !cycle) return null
 
-    const { data: items } = await supabase
-      .from("study_cycle_items")
-      .select("*, discipline:disciplines(id, name, area, color_hex)")
-      .eq("cycle_id", cycle.id)
-      .order("order", { ascending: true })
-
-    const { data: sessions } = await supabase
-      .from("study_cycle_sessions")
-      .select("*")
-      .eq("cycle_id", cycle.id)
+    const [itemsResult, sessionsResult] = await Promise.all([
+      supabase
+        .from("study_cycle_items")
+        .select("*, discipline:disciplines(id, name, area, color_hex)")
+        .eq("cycle_id", cycle.id)
+        .order("order", { ascending: true }),
+      supabase.from("study_cycle_sessions").select("*").eq("cycle_id", cycle.id),
+    ])
 
     return buildCycleOverview(
       cycle as StudyCycle,
-      (items || []) as StudyCycleItemWithDetails[],
-      (sessions || []) as StudyCycleSession[]
+      (itemsResult.data || []) as StudyCycleItemWithDetails[],
+      (sessionsResult.data || []) as StudyCycleSession[]
     )
   } catch (err) {
     console.error("[getActiveCycleAction] Erro:", err)
@@ -470,6 +453,34 @@ export async function deleteCycleAction(cycleId: string) {
       return { success: false, error: "Erro ao excluir ciclo." }
     }
 
+    // Audita se executado sob impersonation (modo suporte)
+    try {
+      const { cookies } = await import("next/headers")
+      const { SUPPORT_SESSION_COOKIE_NAME } = await import("@/application/admin/auth-guard")
+      const token = (await cookies()).get(SUPPORT_SESSION_COOKIE_NAME)?.value
+      if (token) {
+        const { data: supportSession } = await supabase
+          .from("support_sessions")
+          .select("id, moderator_id, target_user_id")
+          .eq("session_token", token)
+          .eq("status", "ACTIVE")
+          .maybeSingle()
+        if (supportSession) {
+          const { auditSupportAction } = await import("@/application/admin/admin.actions")
+          await auditSupportAction(supabase, {
+            supportSessionId: supportSession.id,
+            moderatorId: supportSession.moderator_id,
+            targetUserId: supportSession.target_user_id,
+            action: "DELETE_CYCLE",
+            resource: cycleId,
+            result: "success",
+          })
+        }
+      }
+    } catch {
+      // Auditoria nunca quebra a ação principal
+    }
+
     revalidatePath("/ciclos")
     revalidatePath("/dashboard")
     return { success: true }
@@ -783,6 +794,7 @@ export async function updateFullCycleAction(input: UpdateCycleInput) {
             planned_minutes: plannedMinutes,
           })
           .eq("id", item.id)
+          .eq("cycle_id", input.id)
       } else {
         await supabase.from("study_cycle_items").insert({
           cycle_id: input.id,
@@ -843,6 +855,7 @@ export async function reconcileCycleProgressAction(): Promise<{
   errors: string[]
 }> {
   try {
+    await getUser()
     const result = await reconcileCycleProgress()
     revalidatePath("/ciclos")
     revalidatePath("/dashboard")
@@ -850,6 +863,69 @@ export async function reconcileCycleProgressAction(): Promise<{
   } catch (err) {
     console.error("[reconcileCycleProgressAction] Erro:", err)
     return { success: false, processed: 0, errors: ["Erro inesperado na reconciliação."] }
+  }
+}
+
+/**
+ * Diagnóstico REAL: lista TODOS os ciclos do usuário com contagem de
+ * itens e sessões — sem filtrar por status. Usado para investigar
+ * regressão de ciclo "desaparecido".
+ */
+export async function diagnoseUserCyclesAction(): Promise<{
+  success: boolean
+  total: number
+  cycles?: {
+    id: string
+    name: string
+    status: string
+    created_at: string
+    updated_at: string
+    items: number
+    sessions: number
+  }[]
+  error?: string
+}> {
+  try {
+    const { supabase, userId } = await getUser()
+
+    const { data: cycles, error } = await supabase
+      .from("study_cycles")
+      .select("id, name, status, created_at, updated_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true })
+
+    if (error) return { success: false, total: 0, error: error.message }
+    if (!cycles || cycles.length === 0) return { success: true, total: 0, cycles: [] }
+
+    const ids = cycles.map((c) => c.id)
+    const [itemsRes, sessionsRes] = await Promise.all([
+      supabase.from("study_cycle_items").select("cycle_id").in("cycle_id", ids),
+      supabase.from("study_cycle_sessions").select("cycle_id").in("cycle_id", ids),
+    ])
+
+    const countBy = (rows: { cycle_id: string }[] | null) => {
+      const map = new Map<string, number>()
+      for (const r of rows || []) map.set(r.cycle_id, (map.get(r.cycle_id) || 0) + 1)
+      return map
+    }
+    const itemsCount = countBy(itemsRes.data as { cycle_id: string }[] | null)
+    const sessionsCount = countBy(sessionsRes.data as { cycle_id: string }[] | null)
+
+    return {
+      success: true,
+      total: cycles.length,
+      cycles: cycles.map((c) => ({
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        items: itemsCount.get(c.id) || 0,
+        sessions: sessionsCount.get(c.id) || 0,
+      })),
+    }
+  } catch (err) {
+    return { success: false, total: 0, error: "Erro ao diagnosticar ciclos." }
   }
 }
 

@@ -111,7 +111,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
 
   const startNewSession = useCallback(() => {
     if (!hasPlanContext) return
-    startSession({
+    const result = startSession({
       disciplineName,
       disciplineId,
       topicName: "",
@@ -121,6 +121,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       planItemId: isPlanLinked ? planItem?.id : null,
       source: isPlanLinked ? "PLAN" : "FREE",
     })
+    if (!result.started) return
     setPhase("ACTIVE")
   }, [
     startSession,

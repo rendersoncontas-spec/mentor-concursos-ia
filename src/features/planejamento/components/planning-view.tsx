@@ -254,7 +254,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
             {/* AI Option */}
             <div
               onClick={openCreateWizard}
-              className="bg-card border-2 border-[#2563EB]/20 hover:border-[#2563EB] rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/10 group"
+              className="bg-card border-2 border-[#2563EB]/20 hover:border-[#2563EB] rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-sm group"
             >
               <div className="w-12 h-12 bg-[#2563EB]/10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Bot className="w-6 h-6 text-[#2563EB]" />

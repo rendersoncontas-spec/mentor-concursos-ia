@@ -138,6 +138,10 @@ async function resolveSubjectDisciplineId(
     return { disciplineId: data.id, created: false, error: null }
   }
 
+  // NOTA ARQUITETURAL (auditoria): `disciplines` é catálogo global compartilhado;
+  // o vínculo pessoal é via `user_disciplines`. O INSERT aberto a autenticados é
+  // intencional aqui: o import precisa materializar matérias novas do Aprovado.
+  // Dedupe em 2 níveis (ilike + nome normalizado) evita poluição por duplicatas.
   if (config.mode === "create" && createIfMissing) {
     const trimmed = subjectName.trim()
     const { data: existing } = await supabase

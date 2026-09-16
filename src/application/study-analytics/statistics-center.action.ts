@@ -18,13 +18,15 @@ import {
 } from "./engine/stats-engine"
 
 // ─── Cache em memória (TTL 5 minutos) ──────────────────────────────────────
+// Invalidação explícita via invalidateStatisticsCenterCache() após mutações,
+// então 5 min de TTL não serve dado obsoleto em fluxo normal.
 
 interface CacheEntry {
   at: number
   payload: StatisticsCenterPayload
 }
 
-const TTL_MS = 0
+const TTL_MS = 5 * 60 * 1000
 const cache = new Map<string, CacheEntry>()
 
 export interface StatisticsCenterPayload {

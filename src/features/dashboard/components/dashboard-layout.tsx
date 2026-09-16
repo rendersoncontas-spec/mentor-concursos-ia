@@ -15,11 +15,9 @@ import { getDailyMessage } from "@/features/dashboard/components/daily-message-b
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { UserExamModal } from "@/features/dashboard/components/user-exam-modal"
 import { WeeklyGoalsModal } from "@/features/dashboard/components/weekly-goals-modal"
-import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
 import { DashboardCustomizationModal } from "./dashboard-customization-modal"
 import { DashboardDndContext } from "./dashboard-dnd-context"
-import { QuickStartBar } from "./quick-start-bar"
 import { WIDGET_REGISTRY } from "./dashboard-widget-catalog"
 import { SortableWidget } from "./sortable-widget"
 
@@ -43,8 +41,6 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [isExamModalOpen, setIsExamModalOpen] = useState(false)
-  const [quickStartDiscipline, setQuickStartDiscipline] = useState<{ name: string; id: string } | null>(null)
-  const [quickStartTime, setQuickStartTime] = useState<number | null>(null)
 
   useEffect(() => {
     if (initialLayout && initialLayout.length > 0) {
@@ -109,8 +105,9 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
   }
 
   // Obter apenas widgets visíveis na grade
+  const hasActivePlan = snapshot?.cycleBlocks && snapshot.cycleBlocks.length > 0
   const visibleWidgets = layout
-    .filter((item) => item.visible && item.widget_id !== "mensagem_dia")
+    .filter((item) => item.visible && item.widget_id !== "mensagem_dia" && !(item.widget_id === "estudos_hoje" && !hasActivePlan))
     .sort((a, b) => a.position_order - b.position_order)
 
   return (
@@ -123,7 +120,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 min-w-0 pb-1">
               <div className="flex-1 min-w-0 space-y-0.5">
                 <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight leading-snug">
-                  Olá, <span className="text-[#2563EB] dark:text-blue-400 font-extrabold">{snapshot?.user?.name || "Estudante"}</span>! 👋
+                  Olá, <span className="text-[#2563EB] dark:text-blue-400 font-extrabold">{snapshot?.user?.name || "Estudante"}</span>!
                 </h1>
                 <p className="text-xs sm:text-[13px] font-medium text-muted-foreground leading-relaxed">
                   Hoje é {capitalizedDate}. Bem-vindo de volta.
@@ -132,7 +129,6 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
                   className="text-xs sm:text-[14px] font-medium italic text-foreground/85 leading-relaxed pt-0.5"
                   style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
                 >
-                  <span className="not-italic text-[#2563EB] dark:text-blue-400 mr-1.5" aria-hidden="true">✨</span>
                   &ldquo;{msg.text}&rdquo;
                   <span className="text-[11px] font-semibold text-muted-foreground/60 not-italic ml-1.5">
                     — {msg.author}
@@ -145,7 +141,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
                     setIsRegisterModalOpen(true)
                     window.dispatchEvent(new CustomEvent("study-center-opened"))
                   }}
-                  className="flex-1 md:flex-initial bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer rounded-xl h-9 sm:h-10 shrink-0 whitespace-nowrap min-w-0"
+                  className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer rounded-xl h-9 sm:h-10 shrink-0 whitespace-nowrap min-w-0"
                 >
                   <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
                   <span>Adicionar Estudo</span>
@@ -155,24 +151,6 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
             </div>
           )
         })()}
-
-        {/* 1.5 Quick Start Bar */}
-        <QuickStartBar
-          cycleBlocks={snapshot?.cycleBlocks?.map((b) => ({
-            id: b.id,
-            disciplineName: b.disciplineName,
-            disciplineId: b.disciplineId,
-            durationMinutes: b.durationMinutes,
-            studiedMinutes: b.studiedMinutes ?? 0,
-            color: b.color || "#2563EB",
-            completed: b.status === "CONCLUIDO",
-          })) ?? undefined}
-          onOpenModal={(discName, discId, timeSeconds) => {
-            setQuickStartDiscipline({ name: discName, id: discId })
-            setQuickStartTime(timeSeconds)
-            setIsRegisterModalOpen(true)
-          }}
-        />
 
         {/* 2. Widgets do Dashboard (inclui TempodeEstudo, Desempenho, Constância, etc.) */}
         <DashboardDndContext items={visibleWidgets} onReorder={handleReorder}>
@@ -214,14 +192,6 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
         layout={layout}
         onSave={handleSaveLayout}
         onRestoreDefault={handleRestoreDefault}
-      />
-
-      <StudyRegisterModal
-        open={isRegisterModalOpen}
-        onOpenChange={setIsRegisterModalOpen}
-        initialDisciplineName={quickStartDiscipline?.name ?? null}
-        initialDisciplineId={quickStartDiscipline?.id ?? null}
-        initialTimeSeconds={quickStartTime}
       />
       <UserExamModal
         open={isExamModalOpen}

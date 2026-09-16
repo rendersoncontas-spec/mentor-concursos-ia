@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   ClipboardList,
   Eye,
@@ -14,6 +15,7 @@ import {
   TrendingUp,
   Trophy,
   Trash2,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -393,7 +395,7 @@ export function SimuladosView() {
             </Button>
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-border">
             {filteredRecords.map((r) => {
               const band = performanceBandOf(r.accuracy)
               const bandMeta = PERFORMANCE_BANDS[band]
@@ -420,9 +422,9 @@ export function SimuladosView() {
                   <div className="flex items-center gap-4 sm:gap-6 shrink-0">
                     <div className="text-right text-xs font-mono">
                       <div className="flex gap-2 justify-end font-bold text-[11px]">
-                        <span className="text-emerald-600">{r.totalCorrect}✔</span>
+                        <span className="text-emerald-600 inline-flex items-center gap-0.5">{r.totalCorrect}<Check className="h-3 w-3" /></span>
                         <span className="text-sky-500">{r.totalBlank}—</span>
-                        <span className="text-rose-500">{r.totalWrong}✖</span>
+                        <span className="text-rose-500 inline-flex items-center gap-0.5">{r.totalWrong}<X className="h-3 w-3" /></span>
                       </div>
                       <span className={cn("block font-black text-sm", accuracyColor(r.accuracy))}>
                         {r.accuracy !== null ? `${Math.round(r.accuracy)}%` : "—"}
@@ -481,7 +483,7 @@ export function SimuladosView() {
               DESEMPENHO POR MATÉRIA
             </h3>
           </div>
-          <div className="divide-y">
+          <div className="divide-y divide-border">
             {subjectAnalysis.map((s) => {
               const bandMeta = PERFORMANCE_BANDS[s.band]
               return (
@@ -671,7 +673,7 @@ function SimuladoDetailModal({ record, onClose }: { record: SimuladoRecord; onCl
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0">
-            ✕
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
@@ -727,7 +729,7 @@ function SimuladoDetailModal({ record, onClose }: { record: SimuladoRecord; onCl
                       <th className="text-right px-3 py-2">%</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-border">
                     {record.subjects.map((s) => {
                       const band = performanceBandOf(s.accuracy)
                       const bandMeta = PERFORMANCE_BANDS[band]

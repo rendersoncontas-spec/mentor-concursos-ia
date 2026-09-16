@@ -38,8 +38,12 @@ export function FocusSoundControl({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
-        <span className="text-base shrink-0" aria-hidden>
-          {isActive ? "🔊" : "🔇"}
+        <span className="shrink-0 text-muted-foreground" aria-hidden>
+          {isActive ? (
+            <Volume2 className="h-4 w-4" />
+          ) : (
+            <VolumeX className="h-4 w-4" />
+          )}
         </span>
         <Select
           value={selectedSound}
