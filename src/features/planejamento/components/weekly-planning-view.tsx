@@ -239,8 +239,8 @@ export function WeeklyPlanningView({
       const current = !prev[evtId]
       toast.success(
         current
-          ? "Estudo concluído! 🟢 Meta diária atualizada."
-          : "Estudo marcado como pendente. 🔴",
+          ? "Estudo concluído! Meta diária atualizada."
+          : "Estudo marcado como pendente.",
       )
       return { ...prev, [evtId]: current }
     })
@@ -340,11 +340,11 @@ export function WeeklyPlanningView({
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
-            🟢 Meta Batida
+            Meta Batida
           </span>
           <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-            🔴 Meta Incompleta / Pendente
+            Meta Incompleta / Pendente
           </span>
         </div>
       </div>
@@ -432,17 +432,17 @@ export function WeeklyPlanningView({
                 if (hasEvts) {
                   if (isAllCompleted) {
                     headerStyle = "bg-emerald-600 text-white font-black"
-                    statusTag = "🟢 Meta Batida"
+                    statusTag = "Meta Batida"
                   } else if (isPastOrToday) {
                     headerStyle = "bg-rose-600 text-white font-black"
-                    statusTag = "🔴 Incompleta"
+                    statusTag = "Incompleta"
                   } else {
                     headerStyle = "bg-[#2563EB] text-white font-black"
-                    statusTag = "📅 Programado"
+                    statusTag = "Programado"
                   }
                 } else if (isDuty) {
                   headerStyle = "bg-rose-500/10 text-rose-500 font-black border-b-rose-500/20"
-                  statusTag = "🚨 Plantão"
+                  statusTag = "Plantão"
                 }
 
                 return (
@@ -516,7 +516,7 @@ export function WeeklyPlanningView({
                                           : "Marcar como concluído"
                                       }
                                     >
-                                      {isDone ? "🟢" : "⭕"}
+                                      {isDone ? "Feito" : "Pendente"}
                                     </button>
                                   </div>
 

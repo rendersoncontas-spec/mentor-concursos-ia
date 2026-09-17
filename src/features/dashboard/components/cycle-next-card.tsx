@@ -36,7 +36,7 @@ export function CycleNextCard({
   return (
     <Card
       className={cn(
-        "relative flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 border-primary/20 bg-card",
+        "relative flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-xs transition-all duration-200 border-primary/20 bg-card",
         className,
       )}
       aria-label="Próxima Matéria do Ciclo de Estudos"

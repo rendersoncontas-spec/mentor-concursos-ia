@@ -30,7 +30,7 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
     priorityContent = <div className="flex items-center gap-1.5 text-muted-foreground"><Clock className="h-3 w-3" aria-hidden="true" /><span>Próx: {formattedNextReview}</span></div>
   }
   if (highPriority > 0) {
-    priorityContent = <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium"><span>⚡ {highPriority} alta prioridade</span></div>
+    priorityContent = <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium"><span>{highPriority} alta prioridade</span></div>
   }
 
   let actionVariant: "outline" | "destructive" | "default" = "default"
@@ -43,7 +43,7 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
   return (
     <Card
       className={cn(
-        "relative flex flex-col justify-between overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md",
+        "relative flex flex-col justify-between overflow-hidden transition-all duration-200 shadow-sm hover:shadow-xs",
         isZero && "border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/10",
         isNormal && "border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/10",
         isWarning && "border-amber-500/20 bg-amber-500/5 dark:bg-amber-950/10",
@@ -84,7 +84,7 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
         {isZero ? (
           <div className="py-2 text-center sm:text-left">
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">
-              🎉 0 revisões
+              0 revisões
             </div>
             <p className="text-xs text-muted-foreground">
               Você está com todas as revisões em dia. Bom trabalho!

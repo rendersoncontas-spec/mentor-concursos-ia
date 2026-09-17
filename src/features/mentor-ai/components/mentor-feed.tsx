@@ -9,11 +9,11 @@ interface MentorFeedProps {
 export function MentorFeed({ response }: MentorFeedProps) {
   const { globalScore, feed } = response
 
-  let trendLabel = "➖ Estável"
+  let trendLabel = "Estável"
   if (globalScore.trend === "UP") {
-    trendLabel = "↑ Melhorando"
+    trendLabel = "Melhorando"
   } else if (globalScore.trend === "DOWN") {
-    trendLabel = "↓ Caindo"
+    trendLabel = "Caindo"
   }
 
   return (
@@ -24,7 +24,7 @@ export function MentorFeed({ response }: MentorFeedProps) {
           <Brain className="h-10 w-10" />
         </div>
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-foreground">
+          <h1 className="text-2xl font-black tracking-tight text-foreground">
             Análise Inteligente Nomeia
           </h1>
           <p className="text-muted-foreground text-lg mt-1 flex items-center gap-2">

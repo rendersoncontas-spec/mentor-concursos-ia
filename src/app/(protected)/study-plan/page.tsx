@@ -49,7 +49,7 @@ export default async function StudyPlanPage() {
       {/* Cabeçalho */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cronograma de Estudos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Cronograma de Estudos</h1>
           <p className="text-muted-foreground mt-1">
             {hasPlan
               ? `Versão ${planWeek.plan.version} · Gerado em ${new Date(planWeek.plan.generated_at).toLocaleDateString("pt-BR")} · ${formatMinutes(planWeek.totalWeeklyMinutes)}/semana`

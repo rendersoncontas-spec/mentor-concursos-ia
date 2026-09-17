@@ -88,7 +88,7 @@ export function RecentActivitiesList({ items, className }: RecentActivitiesListP
   const hasItems = items && items.length > 0
 
   return (
-    <Card className={cn("flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow", className)} aria-label="Lista de Atividades Recentes">
+    <Card className={cn("flex flex-col justify-between shadow-sm hover:shadow-xs transition-shadow", className)} aria-label="Lista de Atividades Recentes">
       <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0 border-b">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <History className="h-4 w-4 text-primary" aria-hidden="true" />

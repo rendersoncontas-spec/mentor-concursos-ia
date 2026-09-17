@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 
 import { useTheme } from "next-themes"
 import Image from "next/image"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import {
@@ -65,7 +64,7 @@ export function AppHeader({
 
   const menuRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+useEffect(() => {
     setMounted(true)
   }, [])
 
@@ -74,14 +73,14 @@ export function AppHeader({
     const saved = localStorage.getItem(avatarKey) || localStorage.getItem("mentor_user_avatar")
 
     if (avatarUrl) {
-      setAvatarImg(avatarUrl)
-      try {
-        localStorage.setItem(avatarKey, avatarUrl)
-        localStorage.setItem("mentor_user_avatar", avatarUrl)
-      } catch {}
-    } else if (saved) {
-      setAvatarImg(saved)
-    }
+       setAvatarImg(avatarUrl)
+       try {
+         localStorage.setItem(avatarKey, avatarUrl)
+         localStorage.setItem("mentor_user_avatar", avatarUrl)
+       } catch {}
+     } else if (saved) {
+       setAvatarImg(saved)
+     }
 
     // Escutar atualizações de outros componentes (ex: modal de perfil)
     const handleAvatarUpdate = () => {
@@ -127,49 +126,31 @@ export function AppHeader({
   }
 
   return (
-     <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border bg-background px-3 sm:px-6">
-       {/* Esquerda: Menu Hamburger + Logo em Mobile */}
-       <div className="flex items-center gap-2.5 md:hidden">
-         {onOpenMenu && (
-           <button
-             type="button"
-             onClick={onOpenMenu}
-            className="h-9 w-9 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-colors flex items-center justify-center cursor-pointer"
-             aria-label="Abrir menu de navegação"
-             title="Abrir menu"
-           >
-             <Menu className="w-5 h-5 text-foreground" />
-           </button>
-         )}
-         <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-           <Image
-             src="/branding/nomeia-icon.png"
-             alt="NomeIA"
-             width={30}
-             height={30}
-              className="w-[30px] h-[30px] rounded-xl object-contain shrink-0"
-           />
-           <span className="font-extrabold text-sm text-foreground flex items-center shrink-0">
-             <span>Nome</span>
-             <span className="text-primary">
-               IA
-             </span>
-           </span>
-         </Link>
+     <header className="sticky top-0 z-40 flex h-14 w-full min-w-0 items-center gap-2 overflow-x-clip border-b border-border bg-background px-2 sm:px-3 md:px-6">
+       {/* Esquerda: Menu Hamburger — identidade fica só no Sidebar */}
+       {onOpenMenu && (
+         <button
+           type="button"
+           onClick={onOpenMenu}
+          className="h-9 w-9 shrink-0 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-colors flex items-center justify-center cursor-pointer md:hidden"
+           aria-label="Abrir menu de navegação"
+           title="Abrir menu"
+         >
+           <Menu className="w-5 h-5 text-foreground" />
+         </button>
+       )}
+
+       {/* Central de Estudos — prioridade máxima no mobile, flexível sem overflow */}
+       <div className="flex min-w-0 flex-1 items-center justify-start md:justify-start">
+         <StudyHeaderControl />
        </div>
-
-       {/* Central de Estudos — Controle de Sessão no Header Global (lado esquerdo) */}
-       <StudyHeaderControl />
-
-       {/* Spacer empurra ações para a direita no desktop */}
-       <div className="hidden md:block flex-1" />
 
       {/* Direita: Ações Superiores + Avatar do Usuário */}
       <div className="flex items-center gap-1 shrink-0">
-        {/* Botão ? (Ajuda / Suporte) */}
+        {/* Botão ? (Ajuda / Suporte) — desktop apenas, disponível no menu em mobile */}
         <button
           onClick={() => toast.info("Central de Ajuda e Suporte do NomeIA")}
-          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
+          className="hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
           title="Ajuda e Suporte"
         >
           <HelpCircle className="h-[18px] w-[18px]" />
@@ -185,21 +166,21 @@ export function AppHeader({
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
         </button>
 
-        {/* Botão de Personalização do Home */}
+        {/* Botão de Personalização do Home — desktop apenas */}
         <button
           onClick={() => {
             window.dispatchEvent(new CustomEvent("open-dashboard-customization"))
           }}
-          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
+          className="hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
           title="Personalizar Home"
         >
           <Settings className="h-[18px] w-[18px]" />
         </button>
 
-        {/* Botão Modo Noturno / Tema */}
+        {/* Botão Modo Noturno / Tema — desktop apenas, disponível no perfil em mobile */}
         <button
           onClick={toggleDarkMode}
-          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center justify-center"
+          className="hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
           title="Alternar Tema"
         >
           {mounted && resolvedTheme === "dark" ? (
@@ -285,6 +266,33 @@ export function AppHeader({
               >
                 <Library className="h-4 w-4 text-muted-foreground" />
                 Editais cadastrados
+              </button>
+
+              {/* Opções mobile: Tema e Ajuda (ocultos do header em telas pequenas) */}
+              <div className="border-t my-1 md:hidden" />
+              <button
+                onClick={() => {
+                  setIsUserMenuOpen(false)
+                  toggleDarkMode()
+                }}
+                className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+              >
+                {mounted && resolvedTheme === "dark" ? (
+                  <Sun className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Moon className="h-4 w-4 text-muted-foreground" />
+                )}
+                Alternar tema
+              </button>
+              <button
+                onClick={() => {
+                  setIsUserMenuOpen(false)
+                  toast.info("Central de Ajuda e Suporte do NomeIA")
+                }}
+                className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+              >
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                Ajuda e suporte
               </button>
 
               <div className="border-t my-1" />

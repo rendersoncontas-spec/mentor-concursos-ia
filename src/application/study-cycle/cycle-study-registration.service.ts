@@ -2,7 +2,7 @@
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
-import { normalizeText } from "@/features/importacao/lib/subject-matcher"
+import { normalizeText, similarity } from "@/features/importacao/lib/subject-matcher"
 import { getDayInSaoPaulo } from "@/lib/sao-paulo"
 import { revalidatePath } from "next/cache"
 
@@ -14,8 +14,8 @@ export interface RegisterStudyToCycleResult {
   error?: string | undefined
 }
 
-let _rebuildInFlight: Promise<{ success: boolean; processed: number; errors: string[] }> | null = null
-let _lastRebuildResult: { success: boolean; processed: number; errors: string[] } | null = null
+let _rebuildInFlight: Promise<RebuildResult> | null = null
+let _lastRebuildResult: RebuildResult | null = null
 let _lastRebuildFinishedAt = 0
 const REBUILD_COOLDOWN_MS = 5_000
 
@@ -35,7 +35,41 @@ const REBUILD_COOLDOWN_MS = 5_000
  *
  * Determinística: executar N vezes → mesmo resultado.
  */
-export async function rebuildActiveCycleProgress(): Promise<{ success: boolean; processed: number; errors: string[] }> {
+export interface RebuildDiagnosticItem {
+  name: string
+  studies: number
+  minutes: number
+  target: number
+  progress: number
+  extra: number
+}
+
+export interface RebuildUnmatchedSample {
+  disciplineId: string | null
+  disciplineName: string
+  minutes: number
+  startedAt: string | null
+  studySource: string | null
+}
+
+export interface RebuildResult {
+  success: boolean
+  processed: number
+  errors: string[]
+  historyRows: number
+  validRows: number
+  matchedById: number
+  matchedByName: number
+  matchedBySimilarity: number
+  skippedNoMatch: number
+  unmatchedSamples: RebuildUnmatchedSample[]
+  items: RebuildDiagnosticItem[]
+}
+
+export async function rebuildActiveCycleProgress(options?: {
+  /** Chamadas de import em chunks sequenciais NÃO usam cooldown: cada chunk traz novos registros. */
+  skipCooldown?: boolean
+}): Promise<RebuildResult> {
   // Deduplicação 1: se já existe uma rebuild em andamento, aguardar a mesma
   if (_rebuildInFlight) {
     try {
@@ -47,7 +81,7 @@ export async function rebuildActiveCycleProgress(): Promise<{ success: boolean; 
 
   // Deduplicação 2: se uma rebuild terminou há menos de 5s, retornar resultado cacheado
   const elapsed = Date.now() - _lastRebuildFinishedAt
-  if (_lastRebuildResult && elapsed < REBUILD_COOLDOWN_MS) {
+  if (!options?.skipCooldown && _lastRebuildResult && elapsed < REBUILD_COOLDOWN_MS) {
     console.log(`[rebuildCycle] Cooldown: última rebuild há ${elapsed}ms, ignorando.`)
     return _lastRebuildResult
   }
@@ -63,14 +97,29 @@ export async function rebuildActiveCycleProgress(): Promise<{ success: boolean; 
   }
 }
 
-async function _doRebuild(): Promise<{ success: boolean; processed: number; errors: string[] }> {
+const EMPTY_DIAG: RebuildResult = {
+  success: true,
+  processed: 0,
+  errors: [],
+  historyRows: 0,
+  validRows: 0,
+  matchedById: 0,
+  matchedByName: 0,
+  matchedBySimilarity: 0,
+  skippedNoMatch: 0,
+  unmatchedSamples: [],
+  items: [],
+}
+
+async function _doRebuild(): Promise<RebuildResult> {
   const errors: string[] = []
   const log = (msg: string) => console.log(`[rebuildCycle] ${msg}`)
 
   try {
     const supabase = await createClient()
     const userId = await getEffectiveUserId(supabase)
-    if (!userId) return { success: false, processed: 0, errors: ["Não autenticado"] }
+    if (!userId)
+      return { ...EMPTY_DIAG, success: false, errors: ["Não autenticado"] }
 
     // ── 1. Buscar Ciclo Ativo ──────────────────────────────────────
     const { data: cycle, error: cycleErr } = await supabase
@@ -82,11 +131,11 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
 
     if (cycleErr) {
       errors.push(`Erro ao buscar ciclo ativo: ${cycleErr.message}`)
-      return { success: false, processed: 0, errors }
+      return { ...EMPTY_DIAG, success: false, errors }
     }
     if (!cycle) {
       log("Nenhum ciclo ativo encontrado. Nada a fazer.")
-      return { success: true, processed: 0, errors: [] }
+      return { ...EMPTY_DIAG }
     }
 
     const cycleDayKey = getDayInSaoPaulo(cycle.created_at)
@@ -101,11 +150,11 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
 
     if (itemsErr) {
       errors.push(`Erro ao buscar itens do ciclo: ${itemsErr.message}`)
-      return { success: false, processed: 0, errors }
+      return { ...EMPTY_DIAG, success: false, errors }
     }
     if (!items || items.length === 0) {
       log("Ciclo sem itens. Nada a processar.")
-      return { success: true, processed: 0, errors: [] }
+      return { ...EMPTY_DIAG }
     }
 
     log(`${items.length} itens no ciclo: ${items.map(i => `${i.discipline?.name} (${i.planned_minutes}min)`).join(", ")}`)
@@ -113,31 +162,84 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     // ── 3. Buscar Histórico de Estudos (TODO o histórico válido do usuário) ──
     // NÃO filtrar por cycle.created_at: imports (ex: Aprovado) anteriores à
     // criação do ciclo devem contribuir para o progresso (CHECK 5).
-    const { data: history, error: histErr } = await supabase
-      .from("study_history")
-      .select("id, discipline_id, duration_minutes, started_at, study_source, disciplines(name)")
-      .eq("user_id", userId)
-      .not("duration_minutes", "is", null)
-      .gt("duration_minutes", 0)
-      .order("started_at", { ascending: true })
+    // Usa metadata.imported_seconds como fonte de duração quando disponível
+    // (mesma fonte que o Histórico exibe), com fallback para duration_minutes.
+    // PAGINAÇÃO OBRIGATÓRIA: o PostgREST limita a ~1000 linhas por request;
+    // sem paginar, históricos grandes perdem os registros MAIS RECENTES.
+    const history: Record<string, unknown>[] = []
+    const PAGE_SIZE = 1000
+    let offset = 0
+    let histErr: { message: string } | null = null
+    for (;;) {
+      const { data: page, error } = await supabase
+        .from("study_history")
+        .select("id, discipline_id, duration_minutes, started_at, study_source, metadata, disciplines(name)")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1)
+      if (error) {
+        histErr = { message: error.message }
+        break
+      }
+      if (!page || page.length === 0) break
+      history.push(...(page as unknown as Record<string, unknown>[]))
+      if (page.length < PAGE_SIZE) break
+      offset += PAGE_SIZE
+    }
 
     if (histErr) {
       errors.push(`Erro ao buscar histórico: ${histErr.message}`)
       log(`FALHA ao buscar histórico: ${histErr.message}`)
-      return { success: false, processed: 0, errors }
+      return { ...EMPTY_DIAG, success: false, errors }
     }
 
     if (!history || history.length === 0) {
       log("Nenhum registro no study_history. Ciclo fica zerado.")
       revalidatePath("/ciclos")
-      return { success: true, processed: 0, errors: [] }
+      return { ...EMPTY_DIAG }
     }
 
-    log(`${history.length} registros no study_history (desde ${cycleDayKey}).`)
+    // Duração efetiva em MINUTOS (com fração): prefere imported_seconds
+    // (preciso, mesma fonte do Histórico) e cai para duration_minutes.
+    // Registros sem duração válida são descartados aqui (não no SQL),
+    // para que imports com segundos fracionários (< 1min) também contem.
+    const withDuration = (history || [])
+      .map((h) => {
+        const meta = (h as { metadata?: Record<string, unknown> | null }).metadata
+        const importedSeconds = Number(meta?.["imported_seconds"] || 0)
+        const minutes =
+          importedSeconds > 0
+            ? importedSeconds / 60
+            : Number((h as { duration_minutes?: number | null }).duration_minutes || 0)
+        return { row: h, minutes }
+      })
+      .filter((e) => e.minutes > 0)
+
+    const validHistory = withDuration.map((e) => ({
+      ...(e.row as Record<string, unknown>),
+      _effectiveMinutes: e.minutes,
+    }))
+
+    log(`${history.length} registros no study_history, ${validHistory.length} com duração válida.`)
 
     // ── 4. Matching maps ──────────────────────────────────────────
+    // Prioridade: discipline_id → nome normalizado exato → similaridade
+    // por tokens (>= 0.8, ex: "Tecnologia da Informação (TI)" vs
+    // "Tecnologia da Informação" quando o import criou discipline_id novo).
     const itemMapById = new Map(items.map(i => [i.discipline_id, i]))
     const itemMapByName = new Map(items.map(i => [normalizeText(i.discipline?.name || ""), i]))
+    const matchBySimilarity = (name: string) => {
+      let best: (typeof items)[number] | null = null
+      let bestScore = 0
+      for (const item of items) {
+        const score = similarity(name, item.discipline?.name || "")
+        if (score > bestScore) {
+          bestScore = score
+          best = item
+        }
+      }
+      return bestScore >= 0.8 ? best : null
+    }
 
     // ── 5. Group studies by discipline ────────────────────────────
     //    For each study: find matching item, accumulate minutes.
@@ -158,6 +260,19 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     // Accumulate minutes per item (in order)
     const itemAccumulated = new Map(items.map(it => [it.id, 0]))
     const itemTarget = new Map(items.map(it => [it.id, Math.max(1, it.planned_minutes)]))
+    // Acumulação TOTAL por item (todas as voltas somadas, capped na meta
+    // para progresso + extra separado). A UI soma as sessões persistidas;
+    // cada estudo é registrado na volta em que ocorreu (simulação abaixo).
+    const roundExtra = new Map<number, Map<string, number>>()
+    const addExtraInRound = (round: number, itemId: string, extra: number) => {
+      if (extra <= 0) return
+      let ext = roundExtra.get(round)
+      if (!ext) {
+        ext = new Map()
+        roundExtra.set(round, ext)
+      }
+      ext.set(itemId, (ext.get(itemId) || 0) + extra)
+    }
 
     // Track per-item: total studies, total minutes, normal, extra
     const diagByItem = new Map(items.map(it => [it.id, {
@@ -171,85 +286,108 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     let skippedNoMatch = 0
     let matchedById = 0
     let matchedByName = 0
+    let matchedBySimilarityCount = 0
+    const unmatchedSamples: RebuildUnmatchedSample[] = []
 
     // Track round state as we process studies chronologically
     let simCurrentRound = 1
     let simCursorIndex = 0
     let simItemProgressMin = 0
 
-    for (const study of history) {
-      const disc = Array.isArray(study.disciplines) ? study.disciplines[0] : study.disciplines
+    for (const study of validHistory as Array<Record<string, unknown> & { _effectiveMinutes: number }>) {
+      const rawDisc = study["disciplines"] as
+        | { name?: string }
+        | { name?: string }[]
+        | null
+        | undefined
+      const disc = Array.isArray(rawDisc) ? rawDisc[0] : rawDisc
       const disciplineName = disc?.name || ""
+      const disciplineId = study["discipline_id"] as string | null
+      const studyMinutes = study._effectiveMinutes
 
-      const matchById = study.discipline_id ? itemMapById.get(study.discipline_id) : null
+      const matchById = disciplineId ? itemMapById.get(disciplineId) : null
       const matchByName = disciplineName ? itemMapByName.get(normalizeText(disciplineName)) : null
-      const cycleItem = matchById || matchByName
+      const matchBySimilarityScore = !matchById && !matchByName && disciplineName
+        ? matchBySimilarity(disciplineName)
+        : null
+      const cycleItem = matchById || matchByName || matchBySimilarityScore
 
       if (!cycleItem) {
         skippedNoMatch++
+        // Amostra prioriza os MAIS RECENTES (unshift): os 4 novos importados
+        // aparecem primeiro em vez dos estudos de 2020.
+        if (unmatchedSamples.length < 15) {
+          unmatchedSamples.unshift({
+            disciplineId,
+            disciplineName: disciplineName || "(sem nome)",
+            minutes: Math.round(studyMinutes * 10) / 10,
+            startedAt: (study["started_at"] as string) || null,
+            studySource: (study["study_source"] as string) || null,
+          })
+          if (unmatchedSamples.length > 15) unmatchedSamples.pop()
+        }
         continue
       }
 
       if (matchById) matchedById++
-      else matchedByName++
+      else if (matchByName) matchedByName++
+      else matchedBySimilarityCount++
 
       const target = itemTarget.get(cycleItem.id)!
       const accumulated = itemAccumulated.get(cycleItem.id) || 0
       const remaining = Math.max(0, target - accumulated)
-      const consumed = Math.min(study.duration_minutes, remaining)
-      const extra = Math.max(study.duration_minutes - consumed, 0)
-
-      itemAccumulated.set(cycleItem.id, accumulated + consumed)
-
-      const diag = diagByItem.get(cycleItem.id)!
-      diag.studyCount++
-      diag.totalMinutes += study.duration_minutes
-      diag.normal += consumed
-      diag.extra += extra
-
-      // Determine round for this study by simulating progression
-      let studyRound = simCurrentRound
-      let studyItemIndex = simCursorIndex
-      let studyItemProgress = simItemProgressMin
-
-      // Simulate this study's effect on cursor
-      const studyRemaining = Math.max(0, target - studyItemProgress)
-      if (consumed >= studyRemaining && studyRemaining > 0) {
-        // This study completes the current item
-        const nextIndex = studyItemIndex + 1
+      const consumed = Math.min(studyMinutes, remaining)
+      const extra = Math.max(studyMinutes - consumed, 0)
+      const studyRound = simCurrentRound
+      const perRoundAlloc: { round: number; consumed: number; extra: number }[] = [
+        { round: simCurrentRound, consumed, extra },
+      ]
+      addExtraInRound(simCurrentRound, cycleItem.id, extra)
+      const totalConsumed = consumed
+      const totalExtra = extra
+      // Se o item completou, avança o cursor simulado.
+      if (accumulated + consumed >= target) {
+        const nextIndex = simCursorIndex + 1
         if (nextIndex >= items.length) {
-          // Completes the round
-          studyRound = simCurrentRound // This study belongs to current round
           simCurrentRound += 1
           simCursorIndex = 0
           simItemProgressMin = 0
         } else {
-          studyRound = simCurrentRound
           simCursorIndex = nextIndex
           simItemProgressMin = 0
         }
       } else {
-        // Study doesn't complete current item
-        studyRound = simCurrentRound
         simItemProgressMin += consumed
       }
 
-      pendingSessions.push({
-        cycle_id: cycle.id,
-        cycle_item_id: cycleItem.id,
-        study_history_id: study.id,
-        discipline_id: study.discipline_id,
-        round_number: studyRound,
-        minutes_contributed: consumed,
-        extra_minutes: extra,
-      })
+      const prevAccumulated = itemAccumulated.get(cycleItem.id) || 0
+      itemAccumulated.set(cycleItem.id, prevAccumulated + totalConsumed)
+
+      const diag = diagByItem.get(cycleItem.id)!
+      diag.studyCount++
+      diag.totalMinutes += studyMinutes
+      diag.normal += totalConsumed
+      diag.extra += totalExtra
+
+      for (const alloc of perRoundAlloc) {
+        pendingSessions.push({
+          cycle_id: cycle.id,
+          cycle_item_id: cycleItem.id,
+          study_history_id: study["id"] as string,
+          discipline_id: disciplineId,
+          round_number: alloc.round,
+          minutes_contributed: Math.round(alloc.consumed),
+          extra_minutes: Math.round(alloc.extra),
+        })
+      }
     }
 
-    // ── 6. Calcular voltas completas e cursor ──────────────────────
-    // Total planejado por volta
+    // ── 6. Estado final a partir do acumulado + cursor simulado ───
+    // O progresso exibido é o ACUMULADO TOTAL por item (capped na meta):
+    // a UI soma as sessões persistidas e o diagnóstico reflete o mesmo.
+    // A simulação acima só define volta/cursor (para onde o ciclo anda).
     const totalPlannedPerRound = items.reduce((sum, it) => sum + (itemTarget.get(it.id) || 0), 0)
 
-    // Minutos válidos por item (capped at target) para esta simulação
     const validMinutesPerItem = new Map<string, number>()
     for (const item of items) {
       const accumulated = itemAccumulated.get(item.id) || 0
@@ -257,8 +395,6 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
       validMinutesPerItem.set(item.id, Math.min(accumulated, target))
     }
 
-    // Calcular quantas voltas completas foram feitas
-    // Simular progressão sequencial: item 0 -> item 1 -> ... -> item N-1 -> volta++
     let totalValidMinutes = 0
     for (const item of items) {
       totalValidMinutes += validMinutesPerItem.get(item.id) || 0
@@ -269,56 +405,58 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
       totalRoundsDone = Math.floor(totalValidMinutes / totalPlannedPerRound)
     }
 
-    // Encontrar cursor: PRIMEIRA matéria incompleta na ordem da fila.
-    // Usa o progresso próprio de cada item (effectiveProgress = min(acumulado, meta)),
-    // de modo que o cursor avança por TODAS as matérias já completas.
-    // Excesso vira EXTRA e nunca impede o avanço. Matéria futura 100%
-    // não puxa o cursor para frente enquanto a atual estiver incompleta.
-    let cursorIndex = 0
+    // Cursor = primeira incompleta na ordem (usa o simulado como base e
+    // valida contra o acumulado, para nunca apontar item já completo).
+    let cursorIndex = Math.min(simCursorIndex, items.length - 1)
     let currentItemProgressMin = 0
     let foundIncomplete = false
-
     for (let i = 0; i < items.length; i++) {
       const target = itemTarget.get(items[i].id)!
       const validMinutes = validMinutesPerItem.get(items[i].id) || 0
-
       if (validMinutes < target) {
-        // Primeira matéria incompleta: o cursor para aqui
         cursorIndex = i
         currentItemProgressMin = Math.max(0, validMinutes)
         foundIncomplete = true
         break
       }
-      // Item completo: continua avançando para o próximo
     }
-
     if (!foundIncomplete) {
-      // Todas as matérias completas → a volta fecha.
-      // totalRoundsDone já contou essa volta via floor(totalValid/totalPlanned),
-      // então o cursor recomeça em #1 com progresso zerado na nova volta.
       cursorIndex = 0
       currentItemProgressMin = 0
     }
 
     const currentRound = totalRoundsDone + 1
 
-    // ── 7. Diagnostic table ──────────────────────────────────────
+    const diagItems: RebuildDiagnosticItem[] = items.map((item) => {
+      const d = diagByItem.get(item.id)!
+      const target = itemTarget.get(item.id)!
+      const valid = validMinutesPerItem.get(item.id) || 0
+      const extraTotal = Math.max(0, (itemAccumulated.get(item.id) || 0) - target)
+      const pct = target > 0 ? Math.min(100, Math.round((valid / target) * 100)) : 0
+      return {
+        name: d.name,
+        studies: d.studyCount,
+        minutes: Math.round(valid * 10) / 10,
+        target,
+        progress: pct,
+        extra: Math.round(extraTotal * 10) / 10,
+      }
+    })
+
+    // ── 7. Diagnostic table (volta corrente — igual à UI) ───────
     log(`Rebuild concluído: ${pendingSessions.length} sessões.`)
-    log(`  Match por ID: ${matchedById}, por nome: ${matchedByName}, sem match: ${skippedNoMatch}`)
+    log(`  Match por ID: ${matchedById}, por nome: ${matchedByName}, por similaridade: ${matchedBySimilarityCount}, sem match: ${skippedNoMatch}`)
     log(`  Total planejado/volta: ${totalPlannedPerRound}min`)
     log(`  Minutos válidos total: ${totalValidMinutes}min`)
     log(`  Voltas completas: ${totalRoundsDone}`)
     log(`  Volta atual: ${currentRound}`)
     log(`  Cursor: #${cursorIndex + 1} ${items[cursorIndex]?.discipline?.name || "?"} (${currentItemProgressMin}min)`)
     log(`  ┌──────────────────────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐`)
-    log(`  │ MATÉRIA                      │ ESTUDOS  │ MINUTOS  │ META     │ PROGRESSO│ EXTRA    │`)
+    log(`  │ MATÉRIA (volta atual)        │ ESTUDOS  │ MINUTOS  │ META     │ PROGRESSO│ EXTRA    │`)
     log(`  ├──────────────────────────────┼──────────┼──────────┼──────────┼──────────┼──────────┤`)
-    for (const item of items) {
-      const d = diagByItem.get(item.id)!
-      const target = itemTarget.get(item.id)!
-      const pct = target > 0 ? Math.min(100, Math.round((d.normal / target) * 100)) : 0
-      const name = (d.name || "").padEnd(28)
-      log(`  │ ${name} │ ${String(d.studyCount).padStart(8)} │ ${String(d.totalMinutes).padStart(8)} │ ${String(target).padStart(8)} │ ${String(pct + "%").padStart(8)} │ ${String(d.extra).padStart(8)} │`)
+    for (const diag of diagItems) {
+      const name = (diag.name || "").padEnd(28)
+      log(`  │ ${name} │ ${String(diag.studies).padStart(8)} │ ${String(diag.minutes).padStart(8)} │ ${String(diag.target).padStart(8)} │ ${String(diag.progress + "%").padStart(8)} │ ${String(diag.extra).padStart(8)} │`)
     }
     log(`  └──────────────────────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘`)
 
@@ -331,11 +469,22 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
       .delete()
       .eq("cycle_id", cycle.id)
 
+    const diagBase = {
+      historyRows: history.length,
+      validRows: validHistory.length,
+      matchedById,
+      matchedByName,
+      matchedBySimilarity: matchedBySimilarityCount,
+      skippedNoMatch,
+      unmatchedSamples,
+      items: diagItems,
+    }
+
     if (delErr) {
       const msg = `Erro ao deletar sessões antigas: ${delErr.message}`
       errors.push(msg)
       log(msg)
-      return { success: false, processed: 0, errors }
+      return { ...diagBase, success: false, processed: 0, errors }
     }
 
     let insertFailed = 0
@@ -403,7 +552,7 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     if (finalErr) {
       errors.push(`Erro ao salvar estado final: ${finalErr.message}`)
       log(`FALHA ao salvar estado final: ${finalErr.message}`)
-      return { success: false, processed: pendingSessions.length, errors }
+      return { ...diagBase, success: false, processed: pendingSessions.length, errors }
     }
 
     if (insertFailed > 0) {
@@ -419,10 +568,10 @@ async function _doRebuild(): Promise<{ success: boolean; processed: number; erro
     revalidatePath("/ciclos")
     revalidatePath("/dashboard")
 
-    return { success: pendingSessions.length > 0 || true, processed: pendingSessions.length, errors }
+    return { ...diagBase, success: pendingSessions.length > 0 || true, processed: pendingSessions.length, errors }
   } catch (err: any) {
     console.error("[rebuildCycle] Erro inesperado:", err)
-    return { success: false, processed: 0, errors: [err.message || "Erro desconhecido"] }
+    return { ...EMPTY_DIAG, success: false, processed: 0, errors: [err.message || "Erro desconhecido"] }
   }
 }
 
@@ -441,9 +590,9 @@ export async function registerStudyToCycle(_input?: any): Promise<RegisterStudyT
 }
 
 export async function registerStudiesToCycleBatch(_studies?: any): Promise<any> {
-  return await rebuildActiveCycleProgress()
+  return await rebuildActiveCycleProgress({ skipCooldown: true })
 }
 
-export async function reconcileCycleProgress(): Promise<{ success: boolean; processed: number; errors: string[] }> {
+export async function reconcileCycleProgress(): Promise<RebuildResult> {
   return await rebuildActiveCycleProgress()
 }

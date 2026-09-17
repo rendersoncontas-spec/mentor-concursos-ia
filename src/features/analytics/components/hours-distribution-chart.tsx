@@ -3,14 +3,14 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 
 const CATEGORY_DATA = [
-  { name: "Teoria", value: 38, color: "#3b9edd", icon: "📖" },
-  { name: "Questões", value: 32, color: "#22c55e", icon: "✏️" },
-  { name: "Revisão", value: 20, color: "#a855f7", icon: "🔁" },
-  { name: "Videoaula", value: 6, color: "#f59e0b", icon: "🎥" },
-  { name: "Simulado", value: 4, color: "#ec4899", icon: "🏆" },
+  { name: "Teoria", value: 38, color: "#3b9edd" },
+  { name: "Questões", value: 32, color: "#22c55e" },
+  { name: "Revisão", value: 20, color: "#a855f7" },
+  { name: "Videoaula", value: 6, color: "#f59e0b" },
+  { name: "Simulado", value: 4, color: "#ec4899" },
 ]
 
-type TooltipData = { name: string; value: number; color: string; icon: string }
+type TooltipData = { name: string; value: number; color: string }
 
 function CustomTooltip({
   active,
@@ -26,7 +26,7 @@ function CustomTooltip({
   return (
     <div className="rounded-lg border bg-card p-3 shadow-lg text-xs">
       <p className="font-semibold">
-        {d.icon} {d.name}
+        {d.name}
       </p>
       <p className="text-muted-foreground mt-1">{d.value}% do tempo total</p>
     </div>
@@ -40,7 +40,7 @@ function CustomLegend() {
         <div key={d.name} className="flex items-center gap-2 text-xs">
           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
           <span className="text-muted-foreground">
-            {d.icon} {d.name}
+            {d.name}
           </span>
           <span className="ml-auto font-bold">{d.value}%</span>
         </div>

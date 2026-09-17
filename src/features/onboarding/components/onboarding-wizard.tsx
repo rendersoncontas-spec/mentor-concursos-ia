@@ -513,7 +513,7 @@ export function OnboardingWizard() {
           {/* STEP 3: BAGAGEM */}
           {currentStep === 2 && (
             <div className="space-y-4 text-center">
-              <div className="p-8 border-2 border-dashed rounded-lg bg-muted/20">
+              <div className="p-8 border border-dashed rounded-lg bg-muted/20">
                 <p className="text-muted-foreground mb-4">
                   Ainda não temos disciplinas cadastradas no banco global. 
                   Você poderá adicionar suas matérias já estudadas posteriormente pelo painel.

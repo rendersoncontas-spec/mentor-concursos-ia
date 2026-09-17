@@ -84,20 +84,20 @@ export function StudyCyclesView() {
     loadData()
   }, [loadData])
 
-  const handleReconcile = useCallback(async () => {
-    setIsReconciling(true)
-    try {
-      const result = await reconcileCycleProgressAction()
-      if (result.success) {
-        toast.success(`Ciclo reconciliado: ${result.processed} sessões processadas.`)
-        loadData()
-      } else {
-        toast.error(result.errors[0] || "Erro ao reconciliar ciclo.")
-      }
-    } finally {
-      setIsReconciling(false)
-    }
-  }, [loadData])
+const handleReconcile = useCallback(async () => {
+     setIsReconciling(true)
+     try {
+       const result = await reconcileCycleProgressAction()
+       if (result.success) {
+         toast.success(`Ciclo reconciliado: ${result.processed} sessões processadas.`)
+         loadData()
+       } else {
+         toast.error(result.errors[0] || "Erro ao reconciliar ciclo.")
+       }
+     } finally {
+       setIsReconciling(false)
+     }
+   }, [loadData])
 
   const handleActivate = useCallback(
     async (id: string) => {
@@ -262,8 +262,8 @@ export function StudyCyclesView() {
               </div>
 
               {cycles.length === 0 ? (
-                <Card className="p-8 text-center space-y-3 border-2 border-dashed">
-                  <div className="text-4xl">🎯</div>
+                <Card className="p-8 text-center space-y-3 border border-dashed">
+                  <div className="flex justify-center"><Layers className="h-10 w-10 text-muted-foreground" /></div>
                   <div className="space-y-1 max-w-md mx-auto">
                     <h3 className="text-base font-black text-foreground">
                       Nenhum ciclo cadastrado ainda
@@ -275,7 +275,7 @@ export function StudyCyclesView() {
                   </div>
                   <Button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-primary text-primary-foreground font-black text-xs gap-1.5 shadow-md"
+                    className="bg-primary text-primary-foreground font-black text-xs gap-1.5 shadow-xs"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Criar primeiro ciclo
@@ -323,7 +323,7 @@ export function StudyCyclesView() {
       {/* DIÁLOGO DE CONFIRMAÇÃO DE EXCLUSÃO */}
       {deleteConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <Card className="max-w-sm w-full p-6 space-y-4 border shadow-2xl">
+          <Card className="max-w-sm w-full p-4 space-y-4 border shadow-xs">
             <h3 className="text-base font-black text-foreground">Excluir ciclo de estudos?</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Esta ação removerá a fila de matérias deste ciclo. O histórico de sessões já estudadas

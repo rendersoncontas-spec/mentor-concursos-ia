@@ -762,7 +762,7 @@ export function DailyPlanningView({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#2563EB]/10 border border-[#2563EB]/20 rounded-xl px-3.5 py-2.5">
           <p className="text-xs font-bold text-[#2563EB] flex items-center gap-1.5">
             <RefreshCw className="w-3.5 h-3.5 shrink-0" />
-            🔄 Cronograma reajustado — {lastEvent.message}
+            Cronograma reajustado — {lastEvent.message}
           </p>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -866,7 +866,7 @@ export function DailyPlanningView({
       <div className="grid grid-cols-5 gap-1.5 sm:gap-2 border-b pb-3 sm:pb-3.5">
         {/* Meta (semanal) */}
         <div className="bg-primary/5 dark:bg-primary/10 border border-primary/15 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-primary/10">
-          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-primary/70 tracking-wider truncate">
+          <span className="text-[10px] font-extrabold uppercase text-primary/70 tracking-wider truncate">
             Meta
           </span>
           <span className="text-[10px] sm:text-xs font-black text-primary font-mono truncate mt-0.5 sm:mt-1">
@@ -878,7 +878,7 @@ export function DailyPlanningView({
 
         {/* Estudado (período) */}
         <div className="bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-emerald-500/15">
-          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider truncate">
+          <span className="text-[10px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider truncate">
             Estudado
           </span>
           <span className="text-[10px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono truncate mt-0.5 sm:mt-1">
@@ -892,13 +892,13 @@ export function DailyPlanningView({
 
         {/* Falta (meta - estudado) */}
         <div className="bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-amber-500/15">
-          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-amber-600 dark:text-amber-400 tracking-wider truncate">
+          <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 tracking-wider truncate">
             Falta
           </span>
           <span className="text-[10px] sm:text-xs font-black text-amber-600 dark:text-amber-400 font-mono truncate mt-0.5 sm:mt-1">
             {periodGoal
               ? periodGoal.remainingMinutes <= 0
-                ? "✅ Meta!"
+                ? "Meta!"
                 : `${Math.floor(periodGoal.remainingMinutes / 60)}h${periodGoal.remainingMinutes % 60 > 0 ? `${periodGoal.remainingMinutes % 60}min` : ""}`
               : loadingGoal
                 ? "..."
@@ -908,7 +908,7 @@ export function DailyPlanningView({
 
         {/* Planejado para hoje */}
         <div className="bg-muted/40 dark:bg-muted/20 border border-border/40 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-muted/60">
-          <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
             Hoje
           </span>
           <span className="text-[10px] sm:text-xs font-black text-foreground font-mono truncate mt-0.5 sm:mt-1">
@@ -938,7 +938,7 @@ export function DailyPlanningView({
           }
         >
           <div className="flex items-center justify-between gap-1">
-            <span className="text-[8px] sm:text-[9px] font-extrabold uppercase text-rose-600 dark:text-rose-400 tracking-wider truncate">
+            <span className="text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400 tracking-wider truncate">
               Pendências
             </span>
             {(replanInfo?.totalPendingMinutes ?? 0) > 0 && (

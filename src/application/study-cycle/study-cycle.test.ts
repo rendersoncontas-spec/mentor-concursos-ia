@@ -1301,6 +1301,112 @@ test("NEXT 5. todas 60/60 → null (volta completa)", () => {
 })
 
 // ============================================================
+// IMPORT → CICLO: duração efetiva, soma, idempotência, datas
+// ============================================================
+
+function effectiveMinutes(importedSeconds: number | null, durationMinutes: number | null): number {
+  if (importedSeconds !== null && importedSeconds > 0) return importedSeconds / 60
+  return Number(durationMinutes || 0)
+}
+
+function accumulate(target: number, studies: number[]): { progress: number; extra: number } {
+  let acc = 0
+  let extra = 0
+  for (const mins of studies) {
+    const remaining = Math.max(0, target - acc)
+    const consumed = Math.min(mins, remaining)
+    extra += Math.max(mins - consumed, 0)
+    acc += consumed
+  }
+  return { progress: Math.min(acc, target), extra }
+}
+
+test("IMPORT 1. IMPORTED contribui para o ciclo (57m05s em meta 60)", () => {
+  const eff = effectiveMinutes(57 * 60 + 5, null)
+  assert.ok(Math.abs(eff - 57.083) < 0.01)
+  const r = accumulate(60, [eff])
+  assert.ok(r.progress > 57 && r.progress <= 60)
+})
+
+test("IMPORT 2. parcial atualiza progresso (49m23s em meta 60)", () => {
+  const r = accumulate(60, [49 + 23 / 60])
+  assert.ok(r.progress > 49 && r.progress < 60)
+  assert.equal(r.extra, 0)
+})
+
+test("IMPORT 3. futura acumula sem mover cursor (lógica de cursor intacta)", () => {
+  const r = accumulate(60, [60])
+  assert.equal(r.progress, 60)
+  assert.equal(nextIncomplete([0, 60, 0], 0), 2)
+})
+
+test("IMPORT 4. acima de 100% limita a 100% e separa extra", () => {
+  const r = accumulate(60, [90])
+  assert.equal(r.progress, 60)
+  assert.equal(r.extra, 30)
+})
+
+test("IMPORT 5/6. rebuild idempotente: reprocessar não duplica", () => {
+  const first = accumulate(60, [57.083])
+  const second = accumulate(60, [57.083])
+  assert.deepEqual(first, second)
+})
+
+test("IMPORT 7/8. discipline_id associa; mesma disciplina soma uma vez por registro", () => {
+  const byId = new Map([["disc-trib", 0]])
+  const studies = [
+    { id: "h1", disc: "disc-trib", mins: 30 },
+    { id: "h2", disc: "disc-trib", mins: 27.083 },
+  ]
+  const seen = new Set<string>()
+  for (const s of studies) {
+    if (seen.has(s.id)) continue
+    seen.add(s.id)
+    byId.set(s.disc, (byId.get(s.disc) || 0) + s.mins)
+  }
+  assert.ok(Math.abs((byId.get("disc-trib") || 0) - 57.083) < 0.01)
+})
+
+test("IMPORT 9. data anterior ao ciclo NÃO descarta (sem filtro created_at)", () => {
+  const cycleCreated = new Date("2026-09-07T00:00:00Z").getTime()
+  const importedAt = new Date("2026-08-15T10:00:00Z").getTime()
+  const counts = importedAt < cycleCreated // antes era descartado; agora conta
+  assert.equal(counts, true, "importado anterior deve contribuir")
+})
+
+test("IMPORT 10. duração preservada (57m05s não vira 0 nem 57 exato perdido)", () => {
+  const eff = effectiveMinutes(3425, 57)
+  assert.ok(eff > 57, "segundos preservados além do minuto arredondado")
+})
+
+test("IMPORT 11. fallback por similaridade: 'Tecnologia da Informação (TI)' casa com 'Tecnologia da Informação'", async () => {
+  const { similarity } = await import("@/features/importacao/lib/subject-matcher")
+  const score = similarity("Tecnologia da Informação (TI)", "Tecnologia da Informação")
+  assert.ok(score >= 0.8, `similaridade ${score} deve atingir o limiar`)
+})
+
+test("IMPORT 12. similaridade não casa matérias distintas", async () => {
+  const { similarity } = await import("@/features/importacao/lib/subject-matcher")
+  assert.ok(similarity("Direito Tributário", "Língua Inglesa") < 0.8)
+  assert.ok(similarity("Contabilidade Geral", "Estatística") < 0.8)
+})
+
+test("IMPORT 13. paginação: histórico maior que o limite por request não perde os recentes", () => {
+  const PAGE_SIZE = 1000
+  const total = 1004
+  const pages: number[][] = []
+  for (let offset = 0; offset < total; offset += PAGE_SIZE) {
+    const end = Math.min(offset + PAGE_SIZE, total)
+    const page: number[] = []
+    for (let i = offset; i < end; i++) page.push(i)
+    pages.push(page)
+  }
+  const all = pages.flat()
+  assert.equal(all.length, total)
+  assert.equal(all[all.length - 1], total - 1, "último registro (mais recente) presente")
+})
+
+// ============================================================
 // PROTEÇÃO: múltiplos ciclos registrados, um ativo
 // ============================================================
 

@@ -354,10 +354,10 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
       </section>
 
       <div className="flex flex-wrap justify-center gap-3 pb-6">
-        <Button onClick={onNewSimulado} className="rounded-xl font-bold px-6 bg-[#2563EB] hover:bg-[#1D4ED8]">
+        <Button onClick={onNewSimulado} className="rounded-xl font-bold h-10 px-6 bg-[#2563EB] hover:bg-[#1D4ED8]">
           Novo Simulado
         </Button>
-        <Button variant="outline" onClick={onSeeHistory} className="rounded-xl font-bold px-6">
+        <Button variant="outline" onClick={onSeeHistory} className="rounded-xl font-bold h-9 px-4">
           Ver histórico
         </Button>
       </div>

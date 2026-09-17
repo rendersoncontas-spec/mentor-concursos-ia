@@ -24,7 +24,7 @@ export default async function QuestionsDashboardPage() {
 
       <main className="flex-1 space-y-6 p-4 md:p-8 pt-6">
         <div className="flex flex-col space-y-4">
-          <h2 className="text-3xl font-bold tracking-tight">Painel de Estudos</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Painel de Estudos</h2>
 
           <nav className="flex space-x-4 border-b pb-2 text-sm overflow-x-auto">
             <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">

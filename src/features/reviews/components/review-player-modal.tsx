@@ -145,8 +145,8 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next || close())}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
+      <DialogContent className="max-w-xl gap-0 p-0">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center justify-between gap-4 pr-6">
             <span>Revisão Espacial</span>
             {session && !session.isFinished && (
@@ -155,15 +155,16 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
           </DialogTitle>
         </DialogHeader>
 
+        <div className="px-6 pb-6 pt-4">
         {starting && (
-          <div className="flex flex-col items-center justify-center py-14 gap-3 text-muted-foreground">
+          <div className="flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
             <span className="text-sm">Montando sua fila de revisão...</span>
           </div>
         )}
 
         {!starting && error && (
-          <div className="flex flex-col items-center justify-center py-14 gap-3 text-center px-6">
+          <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
             <AlertTriangle className="h-8 w-8 text-amber-500" />
             <p className="text-sm font-medium">{error}</p>
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
@@ -173,7 +174,7 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
         )}
 
         {!starting && !error && session?.isFinished && (
-          <div className="flex flex-col items-center justify-center py-14 gap-3 text-center px-6">
+          <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
             <CheckCircle2 className="h-10 w-10 text-green-500" />
             <p className="text-sm font-bold">Revisão concluída!</p>
             <p className="text-xs text-muted-foreground">
@@ -238,7 +239,7 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
         )}
 
         {!starting && !error && !session && (
-          <div className="flex flex-col items-center justify-center py-14 gap-3 text-center px-6">
+          <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
             <AlertTriangle className="h-8 w-8 text-amber-500" />
             <p className="text-sm font-medium">Nenhuma revisão disponível nesta fila.</p>
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
@@ -246,6 +247,7 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
             </Button>
           </div>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   )

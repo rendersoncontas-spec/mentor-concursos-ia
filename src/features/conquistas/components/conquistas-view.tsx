@@ -181,7 +181,7 @@ function getAccuracyMinSample(id: string): number {
 
 function getCardBackgroundClass(unlocked: boolean, progressPct: number): string {
   if (unlocked) {
-    return "bg-card border-border/80 shadow-xs hover:shadow-md hover:border-primary/50"
+    return "bg-card border-border/80 shadow-xs hover:border-primary/50"
   }
   if (progressPct > 0) {
     return "bg-card/90 border-border/60 hover:border-border"
@@ -622,7 +622,7 @@ export function ConquistasView() {
   }, [filteredAchievements, evaluatedAchievements])
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-4 pb-8">
       {/* ═══════════════════════════════════════════════════════════════
           HEADER DA PÁGINA & BANNER DE ESTATÍSTICAS
           ═══════════════════════════════════════════════════════════════ */}
@@ -793,7 +793,7 @@ export function ConquistasView() {
       )}
 
       {!isLoading && loadError && (
-        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-8 text-center space-y-3 max-w-md mx-auto">
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6 text-center space-y-3 max-w-md mx-auto">
           <p className="text-sm text-rose-600 dark:text-rose-400 font-medium">{loadError}</p>
           <button
             type="button"
@@ -806,7 +806,7 @@ export function ConquistasView() {
       )}
 
       {!isLoading && !loadError && categoriesWithItems.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border p-12 text-center space-y-2">
+        <div className="rounded-2xl border border-dashed border-border p-6 text-center space-y-2">
           <Filter className="h-8 w-8 text-muted-foreground/50 mx-auto" />
           <h3 className="text-sm font-bold text-foreground">Nenhuma conquista encontrada</h3>
           <p className="text-xs text-muted-foreground">

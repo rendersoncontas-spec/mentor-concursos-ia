@@ -340,7 +340,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b bg-background px-6 py-4">
           <div className="flex items-center gap-2">
             <FolderOpen className="h-4 w-4 text-[#2563EB]" />
-            <h2 className="text-sm font-black uppercase tracking-wider text-foreground">
+            <h2 className="text-sm font-bold tracking-wider text-foreground">
               Importar histórico de estudos
             </h2>
           </div>
@@ -438,7 +438,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!importOrigin}
-                className="w-full rounded-xl border-2 border-dashed border-[#2563EB]/40 bg-[#2563EB]/5 hover:bg-[#2563EB]/10 hover:border-[#2563EB] transition-colors py-12 flex flex-col items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+                className="w-full rounded-xl border border-dashed border-[#2563EB]/40 bg-[#2563EB]/5 hover:bg-[#2563EB]/10 hover:border-[#2563EB] transition-colors py-12 flex flex-col items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
               >
                 <div className="h-12 w-12 rounded-full bg-[#2563EB]/10 flex items-center justify-center">
                   <Upload className="h-6 w-6 text-[#2563EB]" />
@@ -767,7 +767,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
               </p>
 
               <div className="rounded-xl border bg-[#2563EB]/5 border-[#2563EB]/30 p-4 space-y-2">
-                <h3 className="text-sm font-black text-[#2563EB]">Pronto para importar</h3>
+                <h3 className="text-sm font-bold text-[#2563EB]">Pronto para importar</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Serão adicionados {preview.newCount} novo{preview.newCount !== 1 ? "s" : ""}{" "}
                   registro

@@ -12,6 +12,7 @@ import {
   History,
   Lock,
   Target,
+  Timer,
   TrendingUp,
   Zap,
 } from "lucide-react"
@@ -358,7 +359,7 @@ export function PublicStudyProfileModal({
                             {d.disciplineName}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
-                            <span>⏱️ {d.formattedDuration}</span>
+                            <span className="flex items-center gap-1"><Timer className="h-3 w-3" /> {d.formattedDuration}</span>
                             {d.totalQuestions > 0 && <span>• {d.totalQuestions} questões</span>}
                           </div>
                         </div>

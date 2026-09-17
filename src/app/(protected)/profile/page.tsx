@@ -9,7 +9,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="container py-10 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6">Meu Perfil</h1>
+      <h1 className="text-2xl font-bold mb-6">Meu Perfil</h1>
 
       <div className="border rounded-lg p-6 space-y-4 shadow-sm bg-card">
         <div>

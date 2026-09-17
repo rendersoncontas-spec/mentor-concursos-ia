@@ -411,39 +411,39 @@ export function EditalAccordion({
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead>
-                        <tr className="border-b bg-muted/20 text-muted-foreground font-semibold">
-                          <th className="px-3 py-3 font-bold text-foreground">Tópicos</th>
+                        <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          <th className="py-2.5 px-3 font-bold">Tópicos</th>
                           <th
-                            className="px-2 py-3 text-center text-emerald-600 font-bold text-[11px] uppercase"
+                            className="py-2.5 px-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                             title="Acertos"
                           >
                             Acertos
                           </th>
                           <th
-                            className="px-2 py-3 text-center text-rose-500 font-bold text-[11px] uppercase"
+                            className="py-2.5 px-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                             title="Erros"
                           >
                             Erros
                           </th>
                           <th
-                            className="px-2 py-3 text-center text-blue-600 font-bold text-[11px] uppercase"
+                            className="py-2.5 px-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                             title="Total de questões"
                           >
                             Questões
                           </th>
                           <th
-                            className="px-2 py-3 text-center font-bold text-foreground"
+                            className="py-2.5 px-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                             title="Desempenho"
                           >
                             %
                           </th>
-                          <th className="px-3 py-3 text-center text-[11px] uppercase" title="Data do último estudo">
+                          <th className="py-2.5 px-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground" title="Data do último estudo">
                             Último estudo
                           </th>
-                          <th className="px-2 py-3 text-center text-[11px] uppercase" title="Quantidade de vezes estudou">
+                          <th className="py-2.5 px-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground" title="Quantidade de vezes estudou">
                             Sessões
                           </th>
-                          <th className="px-3 py-3 text-center">Link</th>
+                          <th className="py-2.5 px-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Link</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -453,7 +453,7 @@ export function EditalAccordion({
                           return (
                             <tr key={topic.id} className="hover:bg-muted/20 transition-colors">
                               {/* Checkbox + Tópico */}
-                              <td className="px-3 py-3 font-medium text-muted-foreground leading-relaxed max-w-[450px]">
+                              <td className="py-2.5 px-3 font-medium text-muted-foreground leading-relaxed max-w-[450px]">
                                 <div className="flex items-start gap-2.5 group/topic relative">
                                   <button
                                     onClick={() => toggleCheck(topic.id)}
@@ -490,27 +490,27 @@ export function EditalAccordion({
                               </td>
 
                               {/* Stats */}
-                              <td className="px-2 py-3 text-center font-mono font-bold text-emerald-600">
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-600">
                                 {topic.correct}
                               </td>
-                              <td className="px-2 py-3 text-center font-mono font-bold text-rose-500">
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-500">
                                 {topic.wrong}
                               </td>
-                              <td className="px-2 py-3 text-center font-mono text-blue-600 font-bold">
+                              <td className="py-2.5 px-3 text-center font-mono text-blue-600 font-bold">
                                 {topic.questions}
                               </td>
-                              <td className="px-2 py-3 text-center font-mono font-extrabold text-foreground">
+                              <td className="py-2.5 px-3 text-center font-mono font-extrabold text-foreground">
                                 {topic.accuracy > 0 ? `${topic.accuracy}%` : "0"}
                               </td>
-                              <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                              <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                                 {topic.lastStudy || "-"}
                               </td>
-                              <td className="px-2 py-3 text-center font-mono text-muted-foreground">
+                              <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                                 {topic.studyCount}
                               </td>
 
                               {/* Link do Caderno de Questões */}
-                              <td className="px-3 py-3 text-center">
+                              <td className="py-2.5 px-3 text-center">
                                 {topic.link ? (
                                   <a
                                     href={topic.link}
@@ -605,7 +605,7 @@ export function EditalAccordion({
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t">
                     {/* TOTAL pill */}
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-black uppercase text-muted-foreground tracking-wider">
+                      <span className="text-xs font-bold text-muted-foreground tracking-wider">
                         TOTAL
                       </span>
                       <div className="flex items-center gap-4 px-4 py-1.5 rounded-full border-2 border-[#2563EB] bg-[#2563EB]/5 text-xs font-mono font-bold text-foreground">
@@ -618,7 +618,7 @@ export function EditalAccordion({
 
                     {/* PROGRESSO bar */}
                     <div className="flex items-center gap-3 w-full sm:w-72">
-                      <span className="text-xs font-black uppercase text-muted-foreground tracking-wider shrink-0">
+                      <span className="text-xs font-bold text-muted-foreground tracking-wider shrink-0">
                         PROGRESSO
                       </span>
                       <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">

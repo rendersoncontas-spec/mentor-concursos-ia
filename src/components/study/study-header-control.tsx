@@ -2,17 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react"
 import {
-  Maximize2,
-  Minimize2,
   Pause,
   Play,
   RefreshCcw,
   Save,
-  Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
 import { DisciplinePopover } from "@/features/study-session/components/discipline-popover"
@@ -34,10 +32,8 @@ export function StudyHeaderControl() {
     pauseSession,
     resumeSession,
     resetSession,
-    minimizeSession,
     restoreSession,
     isCentralOpen,
-    setIsCentralOpen,
   } = useGlobalStudy()
   const { data: disciplineData } = useDisciplineData()
 
@@ -108,18 +104,6 @@ export function StudyHeaderControl() {
     window.dispatchEvent(new CustomEvent("open-study-session-modal"))
   }, [hasActiveCentralSession, isCentralMinimized, isCentralOpen, restoreSession])
 
-  const handleMinimizeOrRestore = useCallback(() => {
-    if (isCentralOpen) {
-      minimizeSession()
-      setIsCentralOpen(false)
-      window.dispatchEvent(new CustomEvent("close-study-session-modal"))
-    } else if (hasActiveCentralSession && isCentralMinimized) {
-      restoreSession()
-    } else {
-      window.dispatchEvent(new CustomEvent("open-study-session-modal"))
-    }
-  }, [isCentralOpen, hasActiveCentralSession, isCentralMinimized, minimizeSession, restoreSession, setIsCentralOpen])
-
   const handleSave = useCallback(() => {
     pauseSession()
     if (hasActiveCentralSession && isCentralMinimized) {
@@ -134,20 +118,20 @@ export function StudyHeaderControl() {
 
   if (!mounted) {
     return (
-      <div className="h-9 w-[280px] max-w-[40vw] animate-pulse rounded-xl border border-border/50 bg-muted/50" />
+      <Skeleton className="h-9 w-[200px] md:w-[280px] rounded-xl" />
     )
   }
 
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card px-2.5 py-1.5 h-9 min-w-0 max-w-[420px] transition-all duration-200">
+      <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-border/60 bg-card px-2 sm:px-2.5 py-1.5 h-9 min-w-0 w-auto max-w-[280px] md:max-w-[420px] transition-all duration-200">
         {!hasActiveCentralSession ? (
           <>
-            <div className="flex-1 min-w-0 max-w-[240px]">
+            <div className="flex-1 min-w-0 max-w-[160px] sm:max-w-[200px] md:max-w-[240px]">
               <DisciplinePopover
                 value={selectedName}
                 onSelect={handleSelect}
-                placeholder="Escolha ou busque uma matéria"
+                placeholder="Buscar matéria..."
                 className="h-7 w-full border-0 bg-transparent text-xs font-semibold shadow-none hover:bg-muted/50"
               />
             </div>
@@ -169,21 +153,6 @@ export function StudyHeaderControl() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" align="center">Iniciar estudo</TooltipContent>
-            </Tooltip>
-            <div className="h-5 w-px shrink-0 bg-border/60" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleOpenCentral}
-                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  aria-label="Central Inteligente"
-                >
-                  <Sparkles className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="center">Central Inteligente</TooltipContent>
             </Tooltip>
           </>
         ) : (
@@ -255,29 +224,8 @@ export function StudyHeaderControl() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={handleMinimizeOrRestore}
-                    className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
-                    aria-label={isCentralOpen ? "Minimizar Central" : "Restaurar Central"}
-                  >
-                    {isCentralOpen ? (
-                      <Minimize2 className="h-4 w-4" />
-                    ) : (
-                      <Maximize2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="center">
-                  {isCentralOpen ? "Minimizar Central" : "Restaurar Central"}
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
                     onClick={resetSession}
-                    className="h-7 w-7 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                    className="hidden h-7 w-7 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 sm:inline-flex"
                     aria-label="Reiniciar cronômetro"
                   >
                     <RefreshCcw className="h-4 w-4" />

@@ -981,7 +981,7 @@ export function HistoryView() {
           return (
             <div className="space-y-8">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                <span className="text-xs font-bold tracking-wider text-muted-foreground">
                   LINHA DO TEMPO
                   {activeFilterCount > 0 &&
                     ` (${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""})`}
@@ -993,7 +993,7 @@ export function HistoryView() {
                 <div key={day.day} className="space-y-3">
                   <div className="flex items-end justify-between gap-3 flex-wrap">
                     <div className="flex items-baseline gap-3">
-                      <h2 className="text-lg font-black text-foreground">{day.label}</h2>
+                      <h2 className="text-lg font-bold text-foreground">{day.label}</h2>
                       <span className="text-[11px] font-bold text-muted-foreground">
                         {day.activityCount} atividade{day.activityCount !== 1 ? "s" : ""}
                       </span>

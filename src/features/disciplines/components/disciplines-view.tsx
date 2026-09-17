@@ -342,7 +342,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
               setDisciplineNameInput("")
               setIsModalOpen(true)
             }}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-4 h-9 rounded-xl shadow-md shadow-emerald-500/20 flex items-center gap-2 w-full md:w-auto justify-center"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-4 h-9 rounded-xl shadow-xs flex items-center gap-2 w-full md:w-auto justify-center"
           >
             <Plus className="h-4 w-4" />
             Nova Disciplina
@@ -360,7 +360,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Concurso / Edital Atual
             </span>
-            <h2 className="text-lg font-black text-foreground tracking-tight truncate">
+            <h2 className="text-lg font-bold text-foreground tracking-tight truncate">
               {targetInfo.name}
             </h2>
             <p className="text-xs text-muted-foreground font-medium truncate">
@@ -441,7 +441,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
           </div>
           {nextPriority ? (
             <div className="space-y-3">
-              <h3 className="font-black text-lg text-foreground truncate" title={nextPriority.name}>
+              <h3 className="font-bold text-lg text-foreground truncate" title={nextPriority.name}>
                 {nextPriority.name}
               </h3>
               <div className="space-y-1.5">
@@ -484,7 +484,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
           {bestDiscipline ? (
             <div className="space-y-3">
               <h3
-                className="font-black text-lg text-foreground truncate"
+                className="font-bold text-lg text-foreground truncate"
                 title={bestDiscipline.name}
               >
                 {bestDiscipline.name}
@@ -589,7 +589,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
             <div
               key={disc.id}
               onClick={() => openDiscipline(disc)}
-              className="group rounded-2xl border bg-card p-5 shadow-sm hover:shadow-md hover:border-emerald-500/50 cursor-pointer transition-all relative overflow-hidden"
+              className="group rounded-2xl border bg-card p-5 shadow-sm hover:shadow-xs hover:border-emerald-500/50 cursor-pointer transition-all relative overflow-hidden"
             >
               {/* Top Status Line */}
               <div
@@ -599,7 +599,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
 
               <div className="space-y-4 pt-1">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-black text-base text-foreground truncate" title={disc.name}>
+                  <h3 className="font-bold text-base text-foreground truncate" title={disc.name}>
                     {disc.name}
                   </h3>
                   <StatusBadge status={disc.classification} />

@@ -453,7 +453,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
   return (
     <div
       className={cn(
-        "fixed bottom-24 right-3 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[410px] rounded-3xl border shadow-2xl transition-all duration-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95",
+        "fixed bottom-24 right-3 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[410px] rounded-2xl border shadow-xl transition-all duration-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95",
         currentTheme.bg,
         currentTheme.border,
         currentTheme.text
@@ -626,7 +626,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
                       } catch {}
                     }}
                     className={cn(
-                      "p-3 rounded-2xl border transition-all cursor-pointer select-none space-y-1 hover:shadow-md",
+                      "p-3 rounded-2xl border transition-all cursor-pointer select-none space-y-1 hover:shadow-xs",
                       noteTheme?.bg,
                       noteTheme?.border,
                       noteTheme?.text,

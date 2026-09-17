@@ -422,7 +422,7 @@ export function AccountSettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border shadow-xl">
         <div className="flex flex-col sm:flex-row min-h-[520px] bg-card text-foreground">
           {/* Painel Esquerdo (Sidebar de Configurações) */}
           <div className="w-full sm:w-64 bg-muted/40 p-5 border-r flex flex-col justify-between space-y-6">
@@ -432,7 +432,7 @@ export function AccountSettingsModal({
 
               {/* Avatar + Carregar Foto */}
               <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-full border-2 border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
+                <div className="relative w-14 h-14 rounded-full border border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
                   {avatarImg ? (
                     <Image
                       src={avatarImg}
@@ -913,7 +913,7 @@ export function AccountSettingsModal({
                             onChange={() => setTipoFoto("foto")}
                             className="text-[#2563EB]"
                           />
-                          <div className="w-7 h-7 rounded-full border-2 border-[#2563EB] text-[#2563EB] flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full border border-[#2563EB] text-[#2563EB] flex items-center justify-center">
                             <User className="h-4 w-4" />
                           </div>
                           <span>Usar minha foto de perfil</span>

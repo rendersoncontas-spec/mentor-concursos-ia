@@ -160,7 +160,7 @@ export function StudyCalendar({
         </Button>
 
         <div className="text-center">
-          <h2 className="text-lg sm:text-2xl font-black text-foreground">
+          <h2 className="text-lg sm:text-xl font-black text-foreground">
             {MONTH_NAMES[currentMonth - 1]} de {currentYear}
           </h2>
           {isLoading && (
@@ -301,7 +301,7 @@ export function StudyCalendar({
       <Dialog open={!!selectedDate} onOpenChange={(open) => !open && setSelectedDate(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black">
+            <DialogTitle className="text-xl font-bold">
               Estudos do dia {selectedDate ? selectedDate.split("-").reverse().join("/") : ""}
             </DialogTitle>
           </DialogHeader>
@@ -311,19 +311,19 @@ export function StudyCalendar({
               <div className="text-[10px] font-bold text-muted-foreground uppercase">
                 Tempo Total
               </div>
-              <div className="text-lg font-black">{formatTime(dayTotalMinutes)}</div>
+              <div className="text-lg font-bold">{formatTime(dayTotalMinutes)}</div>
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
               <div className="text-[10px] font-bold text-muted-foreground uppercase">Sessões</div>
-              <div className="text-lg font-black">{selectedDaySessions.length}</div>
+              <div className="text-lg font-bold">{selectedDaySessions.length}</div>
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
               <div className="text-[10px] font-bold text-muted-foreground uppercase">Questões</div>
-              <div className="text-lg font-black">{dayTotalQuestions}</div>
+              <div className="text-lg font-bold">{dayTotalQuestions}</div>
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
               <div className="text-[10px] font-bold text-muted-foreground uppercase">Acertos</div>
-              <div className="text-lg font-black text-emerald-600">{dayTotalCorrect}</div>
+              <div className="text-lg font-bold text-emerald-600">{dayTotalCorrect}</div>
             </div>
           </div>
 

@@ -129,7 +129,7 @@ export function StudyPlanDisciplineSummaryView({
 // --- Card de Estado Vazio ---
 export function StudyPlanEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-16 text-center gap-4">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center gap-4">
       <CalendarDays className="h-14 w-14 text-muted-foreground/30" />
       <div>
         <p className="font-semibold text-foreground">Nenhum cronograma gerado ainda</p>

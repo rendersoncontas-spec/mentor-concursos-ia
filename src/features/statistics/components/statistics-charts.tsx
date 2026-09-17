@@ -3,7 +3,7 @@
 import type { ReactNode } from "react"
 import { useState } from "react"
 
-import { Minus, TrendingDown, TrendingUp } from "lucide-react"
+import { Inbox, Minus, TrendingDown, TrendingUp } from "lucide-react"
 
 import {
   type DailyBucket,
@@ -43,10 +43,21 @@ export function SectionCard({
 
 // ─── Estado vazio honesto ───────────────────────────────────────────────────
 
-export function EmptyState({ message }: { message: string }) {
+export function EmptyState({
+  message,
+  title,
+  action,
+}: {
+  message: string
+  title?: string
+  action?: ReactNode
+}) {
   return (
-    <div className="h-full min-h-24 flex items-center justify-center text-center text-xs text-muted-foreground border rounded-lg bg-muted/10 px-4 py-8">
-      {message}
+    <div className="h-full min-h-24 flex flex-col items-center justify-center text-center border rounded-lg bg-muted/10 px-4 py-8 gap-2">
+      <Inbox className="h-8 w-8 text-muted-foreground" />
+      {title && <p className="text-sm font-bold">{title}</p>}
+      <p className="text-xs text-muted-foreground">{message}</p>
+      {action}
     </div>
   )
 }

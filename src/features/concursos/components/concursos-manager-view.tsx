@@ -69,7 +69,17 @@ export function RenderConcursoIcon({ iconKey, className = "h-5 w-5" }: { iconKey
   if (!iconKey) return <Trophy className={className} />
 
   if (iconKey.startsWith("data:image/") || iconKey.startsWith("http://") || iconKey.startsWith("https://")) {
-    return <Image src={iconKey} alt="Ícone do concurso" fill unoptimized className="object-cover" />
+    // Wrapper com tamanho próprio: o `fill` do Next/Image preenche o ancestral
+    // posicionado mais próximo — sem isso, dentro de popovers a imagem estoura
+    // para o tamanho do container (bug da imagem gigante no seletor).
+    // O tamanho acompanha o className pedido pelo chamador (h-4/h-5/h-7).
+    const sizeClass = className.match(/h-\S+/)?.[0] ?? "h-5"
+    const widthClass = className.match(/w-\S+/)?.[0] ?? "w-5"
+    return (
+      <span className={`relative block ${sizeClass} ${widthClass} shrink-0 overflow-hidden rounded`}>
+        <Image src={iconKey} alt="Ícone do concurso" fill unoptimized className="object-cover" sizes="32px" />
+      </span>
+    )
   }
 
   const found = PRESET_ICONS.find(p => p.id === iconKey)
@@ -217,7 +227,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
           {/* Seção 1: Ícone / Logo do Curso ou Concurso */}
           <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider flex items-center gap-1.5">
                 <ImageIcon className="h-3.5 w-3.5 text-primary" />
                 Ícone ou Imagem do Curso / Concurso
               </label>
@@ -234,7 +244,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Visualização Atual do Ícone */}
             <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 rounded-2xl bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm group">
+              <div className="relative w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm group">
                 <RenderConcursoIcon iconKey={icon} className="h-7 w-7 text-primary" />
               </div>
               <div className="flex-1 space-y-2">
@@ -273,7 +283,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Presets de Ícones */}
             <div className="pt-2 border-t border-border/60">
-              <p className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider mb-2">
+              <p className="text-[10px] font-extrabold text-muted-foreground tracking-wider mb-2">
                 Ícones Pré-definidos
               </p>
               <div className="flex items-center gap-2 flex-wrap">
@@ -304,7 +314,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Nome */}
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">
                 Nome do Concurso / Curso *
               </label>
               <div className="relative">
@@ -326,7 +336,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Cargo */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">Cargo</label>
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Cargo</label>
               <input
                 value={role}
                 onChange={e => setRole(e.target.value)}
@@ -337,7 +347,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Banca */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">Banca</label>
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Banca</label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -351,7 +361,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Data da Prova */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">Data da Prova</label>
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Data da Prova</label>
               <input
                 type="date"
                 value={examDate}
@@ -362,7 +372,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Horário */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">Horário</label>
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Horário</label>
               <input
                 type="time"
                 value={examTime}
@@ -373,7 +383,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Local */}
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">Local da Prova</label>
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Local da Prova</label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -387,7 +397,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Edital PDF */}
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">Link do Edital (PDF)</label>
+              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Link do Edital (PDF)</label>
               <div className="relative">
                 <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -505,7 +515,7 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
     if (concurso.days_remaining > 0) {
       daysStr = `Faltam ${concurso.days_remaining} dias`
     } else if (concurso.days_remaining === 0) {
-      daysStr = "Hoje é o dia! 🎯"
+      daysStr = "Hoje é o dia!"
     } else {
       daysStr = "Prova realizada"
     }
@@ -634,7 +644,7 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center space-y-5">
-      <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center">
+      <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
         <GraduationCap className="h-10 w-10 text-primary/60" />
       </div>
       <div className="space-y-2">
@@ -779,7 +789,7 @@ export function ConcursosManagerView({ initialConcursos }: ConcursosManagerViewP
   const archivedConcursos = concursos.filter(c => c.is_archived)
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-4 pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

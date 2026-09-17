@@ -259,7 +259,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
       [key]: prev[key] === status ? "FOLGA_ESTUDO" : status,
     }))
     toast.success(
-      `Dia ${dayNum} atualizado para ${status === "PLANTAO" ? "Plantão 🚨" : "Estudo 📚"}`,
+      `Dia ${dayNum} atualizado para ${status === "PLANTAO" ? "Plantão" : "Estudo"}`,
     )
   }
 
@@ -311,13 +311,13 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               }}
               className="bg-transparent text-xs font-bold text-foreground focus:outline-none cursor-pointer"
             >
-              <option value="24x72">🚨 Escala 24x72 (Plantão 24h)</option>
-              <option value="12x36">🚨 Escala 12x36 (Plantão 12h)</option>
-              <option value="24x48">🚨 Escala 24x48 (Plantão 24h)</option>
-              <option value="5x1">📅 Escala 5x1</option>
-              <option value="6x1">📅 Escala 6x1</option>
-              <option value="4x2">📅 Escala 4x2</option>
-              <option value="normal">☀️ Padrão (Seg-Sáb)</option>
+              <option value="24x72">Escala 24x72 (Plantão 24h)</option>
+              <option value="12x36">Escala 12x36 (Plantão 12h)</option>
+              <option value="24x48">Escala 24x48 (Plantão 24h)</option>
+              <option value="5x1">Escala 5x1</option>
+              <option value="6x1">Escala 6x1</option>
+              <option value="4x2">Escala 4x2</option>
+              <option value="normal">Padrão (Seg-Sáb)</option>
             </select>
           </div>
 
@@ -441,7 +441,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
             if (onShift && scheduleMode !== "normal") {
               dayBadge = (
                 <span className="text-[9px] font-extrabold text-rose-500 bg-rose-500/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
-                  🚨 Plantão
+                  Plantão
                 </span>
               )
             }
@@ -533,7 +533,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                     onClick={() => toggleDayStatus(selectedDayDetail.dayNum, "PLANTAO")}
                     className="text-xs font-bold rounded-lg h-8"
                   >
-                    🚨 Plantão (24h)
+                    Plantão (24h)
                   </Button>
                   <Button
                     size="sm"
@@ -541,7 +541,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                     onClick={() => toggleDayStatus(selectedDayDetail.dayNum, "FOLGA_ESTUDO")}
                     className="text-xs font-bold rounded-lg h-8"
                   >
-                    📚 Dia de Estudo
+                    Dia de Estudo
                   </Button>
                 </div>
 

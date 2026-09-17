@@ -17,6 +17,7 @@ import {
   FileText,
   Flame,
   HelpCircle,
+  MapPin,
   RotateCcw,
   Sparkles,
   SquarePen,
@@ -498,7 +499,7 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
       <div className="space-y-2 my-auto">
         <div className="flex justify-between text-xs font-bold text-muted-foreground">
           <span>Cobertura do Conteúdo</span>
-          <span className="text-foreground font-mono font-black">
+          <span className="text-foreground font-mono font-bold">
             {completed} / {total} matérias
           </span>
         </div>
@@ -580,7 +581,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
           <Flame className="w-3.5 h-3.5 text-orange-500" /> CONSTÂNCIA E SEQUÊNCIA ATIVA
         </span>
         <span className="text-xs font-black text-orange-500 bg-orange-500/10 px-2.5 py-0.5 rounded-full font-mono">
-          🔥 {streak} dias consecutivos
+          {streak} dias consecutivos
         </span>
       </div>
       <div className="flex items-center justify-between my-auto">
@@ -867,7 +868,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
       <div className="space-y-1.5 pt-1 border-t">
         <div className="flex justify-between text-xs font-bold text-muted-foreground">
           <span>Progresso Semanal</span>
-          <span className="text-foreground font-mono font-black">
+          <span className="text-foreground font-mono font-bold">
             {realPct !== null ? `${realPct}%` : "—"}
           </span>
         </div>
@@ -1329,7 +1330,7 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
       <div className="space-y-1">
         {targetDate ? (
           <>
-            <div className="text-sm font-black text-foreground leading-snug">{examName}</div>
+            <div className="text-sm font-bold text-foreground leading-snug">{examName}</div>
             <div className="text-sm font-bold text-[#2563EB] leading-tight">
               {new Date(targetDate + "T00:00:00").toLocaleDateString("pt-BR")}
               {daysUntil !== null && (
@@ -1340,10 +1341,10 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
             </div>
             <div className="pt-1 text-xs text-muted-foreground grid gap-0.5 leading-snug">
               <div className="flex items-center gap-1">
-                <span className="font-bold">📍</span> {local}
+                <MapPin className="w-3.5 h-3.5 shrink-0" /> {local}
               </div>
               <div className="flex items-center gap-1">
-                <span className="font-bold">🕐</span> {time}
+                <Clock className="w-3.5 h-3.5 shrink-0" /> {time}
               </div>
             </div>
           </>

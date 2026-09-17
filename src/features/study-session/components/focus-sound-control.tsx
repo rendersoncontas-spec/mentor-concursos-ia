@@ -84,7 +84,7 @@ export function FocusSoundControl({
 
       {isActive && showVolume && (
         <div className="flex items-center gap-2 px-1 py-1 rounded-md bg-muted/30 border border-border/40">
-          <span className="text-[9px] font-bold text-muted-foreground uppercase shrink-0">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase shrink-0">
             Vol
           </span>
           <Slider

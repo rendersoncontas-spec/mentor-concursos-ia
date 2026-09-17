@@ -24,7 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               alt="NomeIA"
               width={44}
               height={44}
-              className="w-11 h-11 rounded-xl object-contain shadow-md ring-2 ring-white/10"
+              className="w-11 h-11 rounded-xl object-contain shadow-xs ring-2 ring-white/10"
               priority
             />
             <span className="text-white flex items-center">
@@ -83,7 +83,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               edital e ser aprovado no meu concurso dos sonhos!&quot;
             </p>
             <div className="flex items-center gap-3 pt-1">
-              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs shadow-md">
+              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs shadow-xs">
                 NM
               </div>
               <div>

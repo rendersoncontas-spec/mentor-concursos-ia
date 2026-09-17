@@ -517,9 +517,15 @@ export async function importHistoryChunkAction(
           }))
 
         if (studiesForCycle.length > 0) {
-          await registerStudiesToCycleBatch(studiesForCycle).catch((err) => {
+          const cycleResult = await registerStudiesToCycleBatch(studiesForCycle).catch((err) => {
             console.error("[importHistoryChunkAction] Erro ao registrar no ciclo:", err)
+            return { success: false, processed: 0, errors: [String(err?.message ?? err)] }
           })
+          if (!cycleResult?.success) {
+            errorDetails.push(
+              `Ciclo não atualizado neste lote: ${(cycleResult?.errors || []).join("; ") || "erro desconhecido"}`,
+            )
+          }
         }
       }
     }
@@ -540,6 +546,8 @@ export async function importHistoryChunkAction(
     }
 
     revalidatePath("/dashboard/history")
+    revalidatePath("/ciclos")
+    revalidatePath("/dashboard")
 
     return {
       success: true,

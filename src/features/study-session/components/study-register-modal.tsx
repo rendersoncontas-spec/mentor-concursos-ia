@@ -1158,7 +1158,7 @@ export function StudyRegisterModal({
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">
+                                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                                         Horas
                                       </span>
                                     </div>
@@ -1184,7 +1184,7 @@ export function StudyRegisterModal({
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">
+                                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                                         Minutos
                                       </span>
                                     </div>
@@ -1210,7 +1210,7 @@ export function StudyRegisterModal({
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">
+                                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                                         Segundos
                                       </span>
                                     </div>
@@ -1281,7 +1281,7 @@ export function StudyRegisterModal({
                       {!isManualMode ? (
                         <>
                           <div>
-                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
                               Ativo
                             </p>
                             <p className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 truncate">
@@ -1289,7 +1289,7 @@ export function StudyRegisterModal({
                             </p>
                           </div>
                           <div>
-                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
                               Pausa
                             </p>
                             <p className="font-mono font-bold text-xs text-amber-600 dark:text-amber-400 truncate">
@@ -1297,7 +1297,7 @@ export function StudyRegisterModal({
                             </p>
                           </div>
                           <div>
-                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
                               Foco
                             </p>
                             <p className="font-mono font-bold text-xs text-primary truncate">
@@ -1308,7 +1308,7 @@ export function StudyRegisterModal({
                       ) : (
                         <>
                           <div>
-                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
                               Duração
                             </p>
                             <p className="font-mono font-bold text-xs text-foreground truncate">
@@ -1316,7 +1316,7 @@ export function StudyRegisterModal({
                             </p>
                           </div>
                           <div>
-                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
                               Data
                             </p>
                             <p className="font-mono font-bold text-xs text-foreground truncate">
@@ -1324,7 +1324,7 @@ export function StudyRegisterModal({
                             </p>
                           </div>
                           <div>
-                            <p className="text-[9px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
                               Foco
                             </p>
                             <p className="font-mono font-bold text-xs text-muted-foreground truncate">

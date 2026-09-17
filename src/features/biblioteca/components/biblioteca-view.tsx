@@ -122,7 +122,7 @@ export function BibliotecaView() {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
+        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
           <Loader2 className="h-8 w-8 animate-spin text-[#2563EB]" />
           <p className="text-xs text-muted-foreground font-medium">Carregando sua biblioteca...</p>
         </div>
@@ -131,7 +131,7 @@ export function BibliotecaView() {
 
     if (loadError) {
       return (
-        <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
+        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
           <h3 className="text-lg font-bold text-foreground">
             Não foi possível carregar a biblioteca
           </h3>
@@ -148,7 +148,7 @@ export function BibliotecaView() {
 
     if (filteredMaterials.length === 0) {
       return (
-        <div className="rounded-xl border bg-card p-12 shadow-sm flex flex-col items-center justify-center text-center space-y-5 my-6">
+        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
           <div className="relative w-24 h-24 flex items-center justify-center">
             <Library className="h-16 w-16 text-[#2563EB]" />
           </div>
@@ -181,7 +181,7 @@ export function BibliotecaView() {
         {filteredMaterials.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border bg-card p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+            className="rounded-xl border bg-card p-5 shadow-sm hover:shadow-xs transition-all flex flex-col justify-between space-y-4"
           >
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -265,7 +265,7 @@ export function BibliotecaView() {
       </div>
 
       {/* Importar dados */}
-      <div className="rounded-xl border-2 border-dashed border-[#2563EB]/30 bg-[#2563EB]/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="rounded-xl border border-dashed border-[#2563EB]/30 bg-[#2563EB]/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h3 className="text-[10px] font-black uppercase tracking-wider text-[#2563EB]">
             Importar dados

@@ -142,7 +142,7 @@ export function LoginForm() {
         />
         <Button
           type="submit"
-          className="w-full h-11 font-semibold text-base gap-2 shadow-md hover:shadow-sm transition-all"
+          className="w-full h-11 font-semibold text-base gap-2 shadow-xs transition-all"
           disabled={isPending}
         >
           {isPending ? (

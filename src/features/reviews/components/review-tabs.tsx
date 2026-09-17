@@ -65,7 +65,7 @@ function ReviewCard({ item, onReview }: { item: TabReviewItem; onReview: () => v
   return (
     <div
       className={cn(
-        "rounded-xl border p-4 transition-all hover:shadow-md group",
+        "rounded-xl border p-4 transition-all hover:shadow-xs group",
         isOverdue && "border-red-200 dark:border-red-900/50 bg-red-500/5",
         isCompleted && "opacity-60 bg-muted/30",
         isIgnored && "opacity-50 bg-muted/20",

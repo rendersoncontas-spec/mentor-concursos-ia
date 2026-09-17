@@ -179,7 +179,7 @@ export function EditalImporter({ targetId }: { targetId: string }) {
     if (!result || !draft) {
       return (
         <div
-          className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-14 text-center transition-colors ${
+          className={`flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-6 py-8 text-center transition-colors ${
             dragOver ? "border-primary bg-primary/5" : "border-border"
           }`}
           onDragOver={(e) => {

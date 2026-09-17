@@ -62,7 +62,7 @@ export function FloatingActionButton() {
         <button
           id="fab-sticky-note"
           onClick={() => setIsNotesOpen((prev) => !prev)}
-          className="w-12 h-12 rounded-full border-2 border-primary bg-card/95 text-primary hover:bg-primary/10 shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 backdrop-blur-sm"
+          className="w-12 h-12 rounded-full border-2 border-primary bg-card/95 text-primary hover:bg-primary/10 shadow-xs flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 backdrop-blur-sm"
           title="Bloco de Notas"
           aria-label="Bloco de Notas"
         >
@@ -73,7 +73,7 @@ export function FloatingActionButton() {
         <button
           id="fab-register-study"
           onClick={handleOpenCentral}
-          className={`w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl hover:shadow-2xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer relative ${
+          className={`w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer relative ${
             session?.isActive ? "ring-4 ring-blue-400/40 ring-offset-2 ring-offset-background" : ""
           }`}
           title={session?.isActive && session?.isMinimized

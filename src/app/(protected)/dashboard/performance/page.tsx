@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
+import { AlertTriangle } from "lucide-react"
+
 import { getAccuracyByDiscipline } from "@/application/question-analytics/accuracy"
 import { getPerformanceRadar } from "@/application/question-analytics/radar"
 import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
@@ -29,7 +31,7 @@ export default async function PerformancePage() {
 
       <main className="flex-1 space-y-6 p-4 md:p-8 pt-6">
         <div className="flex flex-col space-y-4">
-          <h2 className="text-3xl font-bold tracking-tight">Performance e Questões</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Performance e Questões</h2>
 
           <nav className="flex space-x-4 border-b pb-2 text-sm overflow-x-auto">
             <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
@@ -128,7 +130,7 @@ export default async function PerformancePage() {
           {/* Alerta Mock */}
           <div className="border rounded-lg p-4 bg-amber-500/10 border-amber-500/20 col-span-full">
             <h3 className="font-semibold text-amber-700 flex items-center gap-2">
-              ⚠️ Assunto Crítico Detectado
+              <AlertTriangle className="h-4 w-4" /> Assunto Crítico Detectado
             </h3>
             <p className="text-sm mt-2 text-amber-800/80">
               Você errou as últimas 5 questões de &quot;Remédios Constitucionais&quot; mesmo

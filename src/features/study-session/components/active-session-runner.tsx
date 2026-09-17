@@ -303,7 +303,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   if (!hasPlanContext && !(session && session.isActive)) {
     return (
       <div className="max-w-md mx-auto text-center space-y-6">
-        <div className="bg-muted/50 border rounded-2xl p-8 space-y-4">
+        <div className="bg-muted/50 border rounded-2xl p-5 space-y-4">
           <Minimize2 className="w-10 h-10 mx-auto text-muted-foreground" />
           <h2 className="text-xl font-black">Nenhum estudo iniciado</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
@@ -322,7 +322,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     if (phase === "IDLE" && hasPlanContext) {
       // Estado 00:00:00 após um reset — disciplina/bloco/tópico preservados.
       return (
-        <div className="max-w-2xl mx-auto text-center space-y-8">
+        <div className="max-w-2xl mx-auto text-center space-y-4">
           <div className="flex items-center justify-center gap-3">
             <span
               className="w-3 h-3 rounded-full shrink-0"
@@ -502,7 +502,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   if (phase === "EVALUATION") {
     if (isSubmitting) {
       return (
-        <div className="max-w-md mx-auto text-center space-y-6 py-12">
+        <div className="max-w-md mx-auto text-center space-y-6 py-6">
           <RefreshCw className="w-12 h-12 animate-spin text-primary mx-auto" />
           <h2 className="text-2xl font-bold">Salvando Sessão</h2>
           <p className="text-muted-foreground font-medium animate-pulse">
@@ -518,7 +518,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
 
     return (
       <div className="max-w-xl mx-auto space-y-6 animate-in slide-in-from-bottom-8 duration-500">
-        <h2 className="text-3xl font-bold tracking-tight">Avaliação Rápida</h2>
+        <h2 className="text-xl font-bold tracking-tight">Avaliação Rápida</h2>
         <p className="text-muted-foreground">
           Registre sua produção em{" "}
           <span className="font-bold">{formatDurationShort(session.activeSeconds)}</span> de estudo
@@ -637,7 +637,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
         <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 p-6 rounded-full w-24 h-24 mx-auto flex items-center justify-center">
           <CheckCircle className="w-12 h-12" />
         </div>
-        <h2 className="text-3xl font-black tracking-tight text-center">Sessão Concluída!</h2>
+        <h2 className="text-xl font-black tracking-tight text-center">Sessão Concluída!</h2>
 
         <Card>
           <CardContent className="pt-6 space-y-4">

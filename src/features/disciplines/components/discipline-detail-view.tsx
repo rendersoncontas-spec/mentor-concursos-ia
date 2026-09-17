@@ -90,7 +90,7 @@ export function DisciplineDetailView({
         <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
+            className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
             <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
@@ -189,13 +189,13 @@ export function DisciplineDetailView({
           /* Estado Vazio (Sua Foto 2) */
           <div className="flex flex-col items-center justify-center text-center space-y-4 py-8">
             <div className="relative w-28 h-28 flex items-center justify-center">
-              <div className="w-20 h-24 bg-muted/60 border-2 border-muted rounded-lg transform -rotate-6 flex flex-col p-2 space-y-1">
+              <div className="w-20 h-24 bg-muted/60 border border-muted rounded-lg transform -rotate-6 flex flex-col p-2 space-y-1">
                 <div className="w-8 h-2 bg-[#2563EB] rounded-xs mx-auto mb-1" />
                 <div className="w-full h-1.5 bg-muted-foreground/30 rounded-xs" />
                 <div className="w-3/4 h-1.5 bg-muted-foreground/30 rounded-xs" />
               </div>
 
-              <div className="w-20 h-24 bg-card border-2 border-[#2563EB] rounded-lg shadow-md absolute transform rotate-3 flex flex-col p-2 space-y-1">
+              <div className="w-20 h-24 bg-card border border-[#2563EB] rounded-lg shadow-xs absolute transform rotate-3 flex flex-col p-2 space-y-1">
                 <div className="w-8 h-2 bg-[#2563EB] rounded-xs mx-auto mb-1" />
                 <div className="w-full h-1.5 bg-[#2563EB]/40 rounded-xs" />
                 <div className="w-4/5 h-1.5 bg-[#2563EB]/40 rounded-xs" />
@@ -220,41 +220,41 @@ export function DisciplineDetailView({
         ) : (
           /* Estado Populado com Tabela de Registros (Sua Foto 5) */
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
+            <table className="w-full text-[11px] text-left">
               <thead>
-                <tr className="border-b bg-muted/30 text-muted-foreground font-semibold">
-                  <th className="px-4 py-2.5">Data</th>
-                  <th className="px-4 py-2.5">Categoria</th>
-                  <th className="px-3 py-2.5 text-center">Tempo</th>
-                  <th className="px-3 py-2.5 text-center text-emerald-600">Acertos</th>
-                  <th className="px-3 py-2.5 text-center text-rose-500">Erros</th>
-                  <th className="px-3 py-2.5 text-center">%</th>
-                  <th className="px-3 py-2.5 text-center">Material</th>
-                  <th className="px-4 py-2.5">Tópico</th>
-                  <th className="px-3 py-2.5 text-center">Páginas</th>
-                  <th className="px-3 py-2.5 text-center">Vídeos</th>
-                  <th className="px-3 py-2.5 text-center">Comentário</th>
+                <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-2 py-2">Data</th>
+                  <th className="px-2 py-2">Categoria</th>
+                  <th className="px-2 py-2 text-center">Tempo</th>
+                  <th className="px-2 py-2 text-center" title="Acertos">Acertos</th>
+                  <th className="px-2 py-2 text-center" title="Erros">Erros</th>
+                  <th className="px-2 py-2 text-center">%</th>
+                  <th className="px-2 py-2 text-center">Material</th>
+                  <th className="px-2 py-2">Tópico</th>
+                  <th className="px-2 py-2 text-center">Páginas</th>
+                  <th className="px-2 py-2 text-center">Vídeos</th>
+                  <th className="px-2 py-2 text-center">Comentário</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border font-semibold">
                 <tr className="hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3 font-mono text-muted-foreground">06/08/26</td>
-                  <td className="px-4 py-3">
+                  <td className="px-2 py-2 font-mono text-muted-foreground">06/08/26</td>
+                  <td className="px-2 py-2">
                     <span className="px-3 py-0.5 rounded bg-[#f87171] text-white font-extrabold text-[10px] tracking-wider uppercase">
                       REVISÃO
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-center font-mono font-bold">10:00:00</td>
-                  <td className="px-3 py-3 text-center font-mono text-emerald-600">0</td>
-                  <td className="px-3 py-3 text-center font-mono text-rose-500">0</td>
-                  <td className="px-3 py-3 text-center font-mono">0</td>
-                  <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
-                  <td className="px-4 py-3 text-foreground font-bold max-w-[200px] truncate">
+                  <td className="px-2 py-2 text-center font-mono font-bold">10:00:00</td>
+                  <td className="px-2 py-2 text-center font-mono text-emerald-600">0</td>
+                  <td className="px-2 py-2 text-center font-mono text-rose-500">0</td>
+                  <td className="px-2 py-2 text-center font-mono">0</td>
+                  <td className="px-2 py-2 text-center font-mono text-muted-foreground">-</td>
+                  <td className="px-2 py-2 text-foreground font-bold max-w-[200px] truncate">
                     1. Teoria da administração e das organizações.
                   </td>
-                  <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
-                  <td className="px-3 py-3 text-center font-mono text-muted-foreground">-</td>
-                  <td className="px-3 py-3 text-center">
+                  <td className="px-2 py-2 text-center font-mono text-muted-foreground">-</td>
+                  <td className="px-2 py-2 text-center font-mono text-muted-foreground">-</td>
+                  <td className="px-2 py-2 text-center">
                     <button
                       type="button"
                       className="text-muted-foreground/60 hover:text-foreground"
@@ -278,16 +278,16 @@ export function DisciplineDetailView({
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
-              <tr className="border-b bg-muted/30 text-muted-foreground font-extrabold text-[11px]">
-                <th className="px-3 py-2.5 w-10 text-center" />
-                <th className="px-4 py-2.5">Tópicos</th>
-                <th className="px-3 py-2.5 text-center text-emerald-600">Acertos</th>
-                <th className="px-3 py-2.5 text-center text-rose-500">Erros</th>
-                <th className="px-3 py-2.5 text-center">Questões</th>
-                <th className="px-3 py-2.5 text-center">%</th>
-                <th className="px-3 py-2.5 text-center">Data</th>
-                <th className="px-3 py-2.5 text-center">Sessões</th>
-                <th className="px-4 py-2.5 text-center">Link</th>
+              <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <th className="py-2.5 px-3 w-10 text-center" />
+                <th className="py-2.5 px-3">Tópicos</th>
+                <th className="py-2.5 px-3 text-center" title="Acertos">Acertos</th>
+                <th className="py-2.5 px-3 text-center" title="Erros">Erros</th>
+                <th className="py-2.5 px-3 text-center" title="Total de questões">Questões</th>
+                <th className="py-2.5 px-3 text-center">%</th>
+                <th className="py-2.5 px-3 text-center">Data</th>
+                <th className="py-2.5 px-3 text-center">Sessões</th>
+                <th className="py-2.5 px-3 text-center">Link</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border font-semibold">
@@ -301,11 +301,11 @@ export function DisciplineDetailView({
                     return (
                       <Fragment key={topic.id}>
                         <tr
-                          className={`hover:bg-muted/30 transition-colors ${
+                          className={`hover:bg-muted/20 transition-colors ${
                             idx % 2 === 1 ? "bg-muted/10" : "bg-card"
                           }`}
                         >
-                          <td className="px-3 py-3 text-center">
+                          <td className="py-2.5 px-3 text-center">
                             <input
                               type="checkbox"
                               checked={isDone}
@@ -314,29 +314,29 @@ export function DisciplineDetailView({
                             />
                           </td>
                           <td
-                            className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
+                            className={`py-2.5 px-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
                           >
                             {topic.name}
                           </td>
-                          <td className="px-3 py-3 text-center font-mono text-emerald-600">
+                          <td className="py-2.5 px-3 text-center font-mono text-emerald-600">
                             {subsDone}
                           </td>
-                          <td className="px-3 py-3 text-center font-mono text-rose-500">
+                          <td className="py-2.5 px-3 text-center font-mono text-rose-500">
                             {subs.length - subsDone}
                           </td>
-                          <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                          <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                             -
                           </td>
-                          <td className="px-3 py-3 text-center font-mono">
+                          <td className="py-2.5 px-3 text-center font-mono">
                             {subsPercent === null ? "-" : `${subsPercent}%`}
                           </td>
-                          <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                          <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                             -
                           </td>
-                          <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                          <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                             -
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="py-2.5 px-3 text-center">
                             <button
                               type="button"
                               onClick={() => toast.info("Adicionar link de caderno")}
@@ -351,11 +351,11 @@ export function DisciplineDetailView({
                           return (
                             <tr
                               key={sub.id}
-                              className={`hover:bg-muted/30 transition-colors ${
+                              className={`hover:bg-muted/20 transition-colors ${
                                 idx % 2 === 1 ? "bg-muted/10" : "bg-card"
                               }`}
                             >
-                              <td className="px-3 py-2.5 text-center">
+                              <td className="py-2.5 px-3 text-center">
                                 <input
                                   type="checkbox"
                                   checked={subDone}
@@ -364,18 +364,18 @@ export function DisciplineDetailView({
                                 />
                               </td>
                               <td
-                                className={`px-4 py-2.5 pl-9 text-muted-foreground ${subDone ? "text-emerald-700" : ""}`}
+                                className={`py-2.5 px-3 pl-9 text-muted-foreground ${subDone ? "text-emerald-700" : ""}`}
                               >
                                 <span className="mr-1.5 text-muted-foreground/50">└</span>
                                 {sub.name}
                               </td>
-                              <td className="px-3 py-2.5 text-center" />
-                              <td className="px-3 py-2.5 text-center" />
-                              <td className="px-3 py-2.5 text-center" />
-                              <td className="px-3 py-2.5 text-center" />
-                              <td className="px-3 py-2.5 text-center" />
-                              <td className="px-3 py-2.5 text-center" />
-                              <td className="px-4 py-2.5" />
+                              <td className="py-2.5 px-3 text-center" />
+                              <td className="py-2.5 px-3 text-center" />
+                              <td className="py-2.5 px-3 text-center" />
+                              <td className="py-2.5 px-3 text-center" />
+                              <td className="py-2.5 px-3 text-center" />
+                              <td className="py-2.5 px-3 text-center" />
+                              <td className="py-2.5 px-3" />
                             </tr>
                           )
                         })}
@@ -387,11 +387,11 @@ export function DisciplineDetailView({
                     return (
                       <tr
                         key={topic.id}
-                        className={`hover:bg-muted/30 transition-colors ${
+                        className={`hover:bg-muted/20 transition-colors ${
                           idx % 2 === 1 ? "bg-muted/10" : "bg-card"
                         }`}
                       >
-                        <td className="px-3 py-3 text-center">
+                        <td className="py-2.5 px-3 text-center">
                           <input
                             type="checkbox"
                             checked={isDone}
@@ -400,27 +400,27 @@ export function DisciplineDetailView({
                           />
                         </td>
                         <td
-                          className={`px-4 py-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
+                          className={`py-2.5 px-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
                         >
                           {topic.title}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono text-emerald-600">
+                        <td className="py-2.5 px-3 text-center font-mono text-emerald-600">
                           {topic.correct}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono text-rose-500">
+                        <td className="py-2.5 px-3 text-center font-mono text-rose-500">
                           {topic.wrong}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                        <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                           {topic.notebook}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono">{topic.accuracy}</td>
-                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                        <td className="py-2.5 px-3 text-center font-mono">{topic.accuracy}</td>
+                        <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                           {topic.date}
                         </td>
-                        <td className="px-3 py-3 text-center font-mono text-muted-foreground">
+                        <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
                           {topic.questions}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
                             onClick={() => toast.info("Adicionar link de caderno")}

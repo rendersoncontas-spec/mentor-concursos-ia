@@ -632,7 +632,7 @@ export function RankingView() {
             </span>
           </div>
 
-          <div className="bg-card border rounded-3xl p-4 sm:p-6 shadow-sm">
+          <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
             <div className="grid grid-cols-3 gap-2 sm:gap-6 items-end max-w-3xl mx-auto pt-4 pb-2">
               {/* 2º Lugar */}
               <PodiumPedestal
@@ -666,7 +666,7 @@ export function RankingView() {
       {/* ── GRID PRINCIPAL: LISTA GERAL + SIDEBAR ──────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* COLUNA ESQUERDA: LISTA COMPLETA DE PARTICIPANTES (8 cols) */}
-        <section className="lg:col-span-8 rounded-3xl border bg-card shadow-sm overflow-hidden min-w-0">
+        <section className="lg:col-span-8 rounded-2xl border bg-card shadow-sm overflow-hidden min-w-0">
           <div className="px-5 py-4 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
@@ -964,7 +964,7 @@ function SuaPosicaoCard({
   }
 
   return (
-    <div className="relative rounded-3xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
+    <div className="relative rounded-2xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
       <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
 
       <div className="flex items-start justify-between gap-3">
@@ -973,7 +973,7 @@ function SuaPosicaoCard({
             <Trophy className="h-4 w-4" /> Sua Classificação
           </span>
           <div className="flex items-baseline gap-3 pt-1">
-            <span className="text-4xl sm:text-5xl font-black tracking-tight text-primary leading-none tabular-nums">
+            <span className="text-2xl sm:text-3xl font-black tracking-tight text-primary leading-none tabular-nums">
               {rank > 0 ? `#${rank}` : "#--"}
             </span>
             <div>
@@ -1139,7 +1139,7 @@ function ProximoAlvoCard({
   const belowValue = below ? metricNumber(below, metric) : null
 
   return (
-    <div className="relative rounded-3xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
+    <div className="relative rounded-2xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
       <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
       <div>
@@ -1245,7 +1245,7 @@ function PodiumPedestal({
   if (!student) {
     return (
       <div className="flex flex-col items-center justify-end text-center">
-        <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/40 mb-3">
+        <div className="w-12 h-12 rounded-full border border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/40 mb-3">
           <span className="text-xs font-black">{rank}º</span>
         </div>
         <div
@@ -1269,7 +1269,7 @@ function PodiumPedestal({
           onSelect?.(student)
         }
       }}
-      className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-3xl ${getPedestalOrderClass(
+      className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-2xl ${getPedestalOrderClass(
         rank,
       )}`}
     >
@@ -1277,7 +1277,7 @@ function PodiumPedestal({
       <div className="relative mb-2 flex flex-col items-center">
         {isFirst && (
           <Crown
-            className={`h-6 w-6 mb-1 filter drop-shadow-md animate-bounce ${crownColors[1]}`}
+            className={`h-6 w-6 mb-1 filter drop-shadow-xs animate-bounce ${crownColors[1]}`}
           />
         )}
         {!isFirst && <Medal className={`h-5 w-5 mb-1 ${crownColors[rank]}`} />}
@@ -1321,7 +1321,7 @@ function PodiumPedestal({
       <div
         className={`w-full rounded-t-2xl sm:rounded-t-3xl border-t border-x flex flex-col items-center justify-start pt-3 shadow-inner ${pedestalHeights[rank]} ${pedestalGradients[rank]}`}
       >
-        <span className="text-2xl sm:text-4xl font-black tabular-nums tracking-tighter opacity-80">
+        <span className="text-2xl sm:text-3xl font-black tabular-nums tracking-tighter opacity-80">
           {rank}º
         </span>
         <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest opacity-70 mt-0.5">
@@ -1437,7 +1437,7 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
   const done = !!goal && goal.remainingMinutes <= 0 && goal.achievedMinutes > 0
 
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-sm space-y-4">
+    <section className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <Target className="h-4 w-4 text-primary" /> Meta de Estudo
@@ -1478,7 +1478,7 @@ function ConsistencyCard({ personal }: { personal: RankingPersonalContext | null
   const days = streak?.consecutiveDays ?? 0
 
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-sm space-y-4">
+    <section className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
       <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
         <Flame className="h-4 w-4 text-amber-500" /> Fogo da Constância
       </span>
@@ -1503,7 +1503,7 @@ function ConsistencyCard({ personal }: { personal: RankingPersonalContext | null
       <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 border text-xs font-semibold text-muted-foreground">
         <span>Melhor sequência:</span>
         <span className="text-foreground font-black tabular-nums">
-          🔥 {streak?.longestDays ?? 0} dias
+          {streak?.longestDays ?? 0} dias
         </span>
       </div>
     </section>
@@ -1601,7 +1601,7 @@ function WeeklyWinnersCard({
   }
 
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-sm space-y-4">
+    <section className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <Crown className="h-4 w-4 text-amber-500" /> Histórico de Campeões

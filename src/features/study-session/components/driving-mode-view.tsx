@@ -25,7 +25,7 @@ export function DrivingModeView({ phase, formattedTime, onStart, onPause, onStop
 
       <div className="z-10 flex flex-col items-center space-y-12 w-full max-w-md">
         <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold tracking-wider text-slate-300 uppercase flex items-center justify-center gap-3">
+          <h2 className="text-2xl font-bold tracking-wider text-slate-300 flex items-center justify-center gap-3">
             <Car className="w-6 h-6 text-blue-500" />
             Modo Dirigindo
           </h2>
@@ -41,7 +41,7 @@ export function DrivingModeView({ phase, formattedTime, onStart, onPause, onStop
             <button
               type="button"
               onClick={onStart}
-              className="col-span-2 h-32 rounded-3xl bg-blue-600 hover:bg-blue-500 flex flex-col items-center justify-center gap-3 transition-colors active:scale-95"
+              className="col-span-2 h-32 rounded-2xl bg-blue-600 hover:bg-blue-500 flex flex-col items-center justify-center gap-3 transition-colors active:scale-95"
             >
               <Play className="w-12 h-12 fill-white" />
               <span className="font-bold text-xl uppercase tracking-wider">Iniciar</span>
@@ -50,7 +50,7 @@ export function DrivingModeView({ phase, formattedTime, onStart, onPause, onStop
             <button
               type="button"
               onClick={onPause}
-              className="col-span-2 h-32 rounded-3xl bg-amber-500 hover:bg-amber-400 flex flex-col items-center justify-center gap-3 transition-colors active:scale-95 text-amber-950"
+              className="col-span-2 h-32 rounded-2xl bg-amber-500 hover:bg-amber-400 flex flex-col items-center justify-center gap-3 transition-colors active:scale-95 text-amber-950"
             >
               <Pause className="w-12 h-12 fill-current" />
               <span className="font-bold text-xl uppercase tracking-wider">Pausar</span>

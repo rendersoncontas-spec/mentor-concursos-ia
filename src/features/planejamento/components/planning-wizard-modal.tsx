@@ -1020,7 +1020,7 @@ export function PlanningWizardModal({
                         <div className="rounded-lg border border-amber-300/40 bg-amber-500/5 p-2.5 space-y-2">
                           <div className="grid grid-cols-2 gap-2.5">
                             <div className="space-y-1">
-                              <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                              <label className="text-[10px] font-extrabold text-muted-foreground">
                                 Trabalha (dias)
                               </label>
                               <Input
@@ -1038,7 +1038,7 @@ export function PlanningWizardModal({
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                              <label className="text-[10px] font-extrabold text-muted-foreground">
                                 Folga (dias)
                               </label>
                               <Input
@@ -1106,7 +1106,7 @@ export function PlanningWizardModal({
                 </div>
 
                 <div className="p-3 rounded-xl border border-[#2563EB]/25 bg-card space-y-2 shadow-2xs">
-                  <label className="text-[10px] font-extrabold uppercase text-[#2563EB] tracking-wider flex items-center gap-1.5">
+                  <label className="text-[10px] font-extrabold text-[#2563EB] tracking-wider flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
                     Adicionar nova matéria personalizada
                   </label>
@@ -1376,7 +1376,7 @@ export function PlanningWizardModal({
 
                     <div className="flex items-center gap-2.5">
                       <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="text-[10px] font-extrabold text-muted-foreground">
                           Duração mínima
                         </label>
                         <Select
@@ -1405,7 +1405,7 @@ export function PlanningWizardModal({
                       <span className="text-muted-foreground font-black text-sm mt-6">—</span>
 
                       <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="text-[10px] font-extrabold text-muted-foreground">
                           Duração máxima
                         </label>
                         <Select
@@ -1527,7 +1527,7 @@ export function PlanningWizardModal({
             <Button
               variant="outline"
               onClick={handlePrevStep}
-              className="border-[#2563EB] text-[#2563EB] font-bold text-xs px-6 h-10 sm:h-9 rounded-xl cursor-pointer w-full sm:w-auto"
+              className="border-[#2563EB] text-[#2563EB] font-bold text-xs px-4 h-9 rounded-xl cursor-pointer w-full sm:w-auto"
             >
               Voltar
             </Button>
@@ -1540,7 +1540,7 @@ export function PlanningWizardModal({
           <Button
             onClick={() => void handleNextStep()}
             disabled={!canProceed}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-8 h-10 sm:h-9 rounded-xl shadow-xs cursor-pointer w-full sm:w-auto whitespace-normal"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-10 rounded-xl shadow-xs cursor-pointer w-full sm:w-auto whitespace-normal"
           >
             {currentStep === 4 ? "Salvar planejamento" : "Próximo"}
           </Button>

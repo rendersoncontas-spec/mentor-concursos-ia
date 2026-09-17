@@ -506,7 +506,7 @@ export function StatisticsCenterView() {
 
   if (error && !payload) {
     return (
-      <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+      <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
         <p className="font-semibold text-foreground mb-1">
           Não foi possível carregar suas estatísticas
         </p>
@@ -517,7 +517,7 @@ export function StatisticsCenterView() {
   }
 
   return (
-    <div className="space-y-8 pb-16 print:space-y-4">
+    <div className="space-y-4 pb-8 print:space-y-4">
       {/* ===================== HEADER ===================== */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 print:hidden">
         <div>
@@ -636,7 +636,7 @@ export function StatisticsCenterView() {
       </div>
 
       {!hasAnyData && (
-        <div className="rounded-xl border border-dashed p-8 text-center">
+        <div className="rounded-xl border border-dashed p-6 text-center">
           <p className="text-sm font-semibold text-foreground mb-1">
             Nenhum estudo registrado no período
           </p>
@@ -829,7 +829,7 @@ export function StatisticsCenterView() {
             )}
             {streaks.current >= 3 && (
               <p className="text-[11px] text-emerald-600 font-semibold">
-                🔥 Sequência de {streaks.current} dias!
+                Sequência de {streaks.current} dias!
               </p>
             )}
           </div>
@@ -852,7 +852,7 @@ export function StatisticsCenterView() {
         {heatmap.length > 0 ? (
           <HeatmapCalendar cells={heatmap} now={now} timezone={TIMEZONE} />
         ) : (
-          <EmptyState message="Sem dados no período selecionado." />
+          <EmptyState title="Sem dados" message="Sem dados no período selecionado." />
         )}
       </SectionCard>
 
@@ -869,36 +869,36 @@ export function StatisticsCenterView() {
         subtitle="Agrupados por tema registrado nas sessões — classificação pela mesma regra das disciplinas"
       >
         {topicStats.length === 0 ? (
-          <EmptyState message="Registre tópicos nas sessões (ex.: “Controle de Constitucionalidade”) para ver o desempenho por assunto." />
+          <EmptyState title="Sem tópicos" message="Registre tópicos nas sessões (ex.: “Controle de Constitucionalidade”) para ver o desempenho por assunto." />
         ) : (
           <div className="max-h-96 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-muted-foreground text-[10px] uppercase tracking-wider">
-                  <th className="text-left py-2 pr-2 font-bold">Tópico</th>
-                  <th className="text-left py-2 pr-2 font-bold">Disciplina</th>
-                  <th className="text-right py-2 pr-2 font-bold">Tempo</th>
-                  <th className="text-right py-2 pr-2 font-bold">Questões</th>
-                  <th className="text-right py-2 pr-2 font-bold">Acurácia</th>
-                  <th className="text-right py-2 font-bold">Status</th>
+                <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="py-2.5 px-3 text-left font-bold">Tópico</th>
+                  <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
+                  <th className="py-2.5 px-3 text-right font-bold">Tempo</th>
+                  <th className="py-2.5 px-3 text-right font-bold">Questões</th>
+                  <th className="py-2.5 px-3 text-right font-bold">Acurácia</th>
+                  <th className="py-2.5 px-3 text-right font-bold">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {topicStats.slice(0, 50).map((t) => (
                   <tr
                     key={`${t.disciplineId}-${t.topicName}`}
-                    className="border-t border-border/40"
+                    className="border-t border-border/40 hover:bg-muted/20 transition-colors"
                   >
-                    <td className="py-2 pr-2 font-semibold">{t.topicName}</td>
-                    <td className="py-2 pr-2 text-muted-foreground">{t.disciplineName}</td>
-                    <td className="py-2 pr-2 text-right font-mono">
+                    <td className="py-2.5 px-3 font-semibold">{t.topicName}</td>
+                    <td className="py-2.5 px-3 text-muted-foreground">{t.disciplineName}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">
                       {formatDurationRaw(t.minutes)}
                     </td>
-                    <td className="py-2 pr-2 text-right">{t.questions}</td>
-                    <td className="py-2 pr-2 text-right font-bold">
+                    <td className="py-2.5 px-3 text-right">{t.questions}</td>
+                    <td className="py-2.5 px-3 text-right font-bold">
                       {t.accuracy === null ? "—" : `${Math.round(t.accuracy)}%`}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-2.5 px-3 text-right">
                       <ClassificationChip classification={t.classification} />
                     </td>
                   </tr>
@@ -916,7 +916,7 @@ export function StatisticsCenterView() {
           subtitle="Volume diário e acurácia em linha"
         >
           {questionTrend.length === 0 ? (
-            <EmptyState message="Sem questões registradas no período." />
+            <EmptyState title="Sem questões" message="Sem questões registradas no período." />
           ) : (
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -1005,7 +1005,7 @@ export function StatisticsCenterView() {
       >
         {productivity.score === null ? (
           <div>
-            <EmptyState message="Complete ao menos 3 sessões no período para calcular o índice de produtividade — a fórmula soma tempo ativo (40%), acurácia (30%), foco (20%) e constância (10%)." />
+            <EmptyState title="Produtividade indisponível" message="Complete ao menos 3 sessões no período para calcular o índice de produtividade — a fórmula soma tempo ativo (40%), acurácia (30%), foco (20%) e constância (10%)." />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1041,7 +1041,7 @@ export function StatisticsCenterView() {
       >
         <BestTimeOfDaySection analysis={timeOfDayAnalysis} />
         {insights.length === 0 ? (
-          <EmptyState message="Sem sinais suficientes ainda — registre mais sessões." />
+          <EmptyState title="Sem insights" message="Sem sinais suficientes ainda — registre mais sessões." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {insights.map((ins) => {
@@ -1070,7 +1070,7 @@ export function StatisticsCenterView() {
         action={<ListChecks className="h-4 w-4 text-[#2563EB]" />}
       >
         {priorities.length === 0 ? (
-          <EmptyState message="Sem disciplinas estudadas no período." />
+          <EmptyState title="Sem prioridades" message="Sem disciplinas estudadas no período." />
         ) : (
           <div className="space-y-3">
             {priorities.map((p, i) => (
@@ -1122,7 +1122,7 @@ export function StatisticsCenterView() {
         }
       >
         {!planning.hasPlan ? (
-          <EmptyState message="Quando houver um plano ativo, o gráfico mostra o planejado por dia da semana (pela grade do plano) contra o realizado." />
+          <EmptyState title="Sem plano ativo" message="Quando houver um plano ativo, o gráfico mostra o planejado por dia da semana (pela grade do plano) contra o realizado." />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1220,7 +1220,7 @@ export function StatisticsCenterView() {
         }
       >
         {edital.total === 0 ? (
-          <EmptyState message="Adicione um concurso (edital) para acompanhar a cobertura por disciplina." />
+          <EmptyState title="Sem edital" message="Adicione um concurso (edital) para acompanhar a cobertura por disciplina." />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1232,26 +1232,26 @@ export function StatisticsCenterView() {
             <div className="max-h-72 overflow-y-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-muted-foreground text-[10px] uppercase tracking-wider">
-                    <th className="text-left py-2 pr-2 font-bold">Disciplina</th>
-                    <th className="text-left py-2 pr-2 font-bold">Área</th>
-                    <th className="text-right py-2 pr-2 font-bold">Estudado</th>
-                    <th className="text-right py-2 pr-2 font-bold">Última sessão</th>
-                    <th className="text-right py-2 font-bold">Status</th>
+                  <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
+                    <th className="py-2.5 px-3 text-left font-bold">Área</th>
+                    <th className="py-2.5 px-3 text-right font-bold">Estudado</th>
+                    <th className="py-2.5 px-3 text-right font-bold">Última sessão</th>
+                    <th className="py-2.5 px-3 text-right font-bold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {edital.byDiscipline.map((d) => (
-                    <tr key={d.disciplineId} className="border-t border-border/40">
-                      <td className="py-2 pr-2 font-semibold">{d.name}</td>
-                      <td className="py-2 pr-2 text-muted-foreground">{d.area ?? "—"}</td>
-                      <td className="py-2 pr-2 text-right font-mono">
+                    <tr key={d.disciplineId} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
+                      <td className="py-2.5 px-3 font-semibold">{d.name}</td>
+                      <td className="py-2.5 px-3 text-muted-foreground">{d.area ?? "—"}</td>
+                      <td className="py-2.5 px-3 text-right font-mono">
                         {formatDurationRaw(d.studiedMinutes)}
                       </td>
-                      <td className="py-2 pr-2 text-right">
+                      <td className="py-2.5 px-3 text-right">
                         {daysSinceLastStudyLabel(d.daysSinceLastStudy)}
                       </td>
-                      <td className="py-2 text-right">{statusLabel(d.status)}</td>
+                      <td className="py-2.5 px-3 text-right">{statusLabel(d.status)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1574,7 +1574,7 @@ function EvolutionChart({
       }
     >
       {empty || data.length === 0 ? (
-        <EmptyState message="Sem sessões no período selecionado." />
+        <EmptyState title="Sem sessões" message="Sem sessões no período selecionado." />
       ) : (
         <div className="h-60">
           <ResponsiveContainer width="100%" height="100%">
@@ -1744,7 +1744,7 @@ function DisciplinasSection({
       }
     >
       {empty || sorted.length === 0 ? (
-        <EmptyState message="Sem sessões no período — estude uma disciplina para vê-la aqui." />
+        <EmptyState title="Sem sessões" message="Sem sessões no período — estude uma disciplina para vê-la aqui." />
       ) : (
         <div className="space-y-4">
           {sorted.map((d) => {
@@ -1862,7 +1862,7 @@ function ErrorMap({
   if (empty || (byDiscipline.length === 0 && byTopic.length === 0)) {
     return (
       <div>
-        <EmptyState message="Nenhum erro registrado — sem questões respondidas ou tudo certo por aqui. 🎯" />
+        <EmptyState title="Sem erros" message="Nenhum erro registrado — sem questões respondidas ou tudo certo por aqui." />
       </div>
     )
   }
@@ -1920,7 +1920,7 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
       action={<Brain className="h-4 w-4 text-[#2563EB]" />}
     >
       {revision.totalPending === 0 && revision.completedLast30 === 0 ? (
-        <EmptyState message="Nenhum item de revisão ainda. Quando o motor de repetição espaçada tiver itens, eles aparecem aqui com a taxa de conclusão." />
+        <EmptyState title="Sem revisões" message="Nenhum item de revisão ainda. Quando o motor de repetição espaçada tiver itens, eles aparecem aqui com a taxa de conclusão." />
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -1945,24 +1945,24 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
             <div className="max-h-56 overflow-y-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-muted-foreground text-[10px] uppercase tracking-wider">
-                    <th className="text-left py-2 pr-2 font-bold">Disciplina</th>
-                    <th className="text-right py-2 pr-2 font-bold">Atrasadas</th>
-                    <th className="text-right py-2 pr-2 font-bold">Próximas</th>
-                    <th className="text-right py-2 font-bold">Total</th>
+                  <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
+                    <th className="py-2.5 px-3 text-right font-bold">Atrasadas</th>
+                    <th className="py-2.5 px-3 text-right font-bold">Próximas</th>
+                    <th className="py-2.5 px-3 text-right font-bold">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {revision.byDiscipline.map((d) => (
-                    <tr key={d.disciplineId} className="border-t border-border/40">
-                      <td className="py-2 pr-2 font-semibold">{d.name}</td>
+                    <tr key={d.disciplineId} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
+                      <td className="py-2.5 px-3 font-semibold">{d.name}</td>
                       <td
-                        className={`py-2 pr-2 text-right font-bold ${d.overdue > 0 ? "text-rose-600" : ""}`}
+                        className={`py-2.5 px-3 text-right font-bold ${d.overdue > 0 ? "text-rose-600" : ""}`}
                       >
                         {d.overdue}
                       </td>
-                      <td className="py-2 pr-2 text-right">{d.dueSoon}</td>
-                      <td className="py-2 text-right">{d.total}</td>
+                      <td className="py-2.5 px-3 text-right">{d.dueSoon}</td>
+                      <td className="py-2.5 px-3 text-right">{d.total}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1992,10 +1992,10 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            <th className="text-left py-2 pr-2 font-bold">Comparação</th>
+          <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <th className="py-2.5 px-3 text-left font-bold">Comparação</th>
             {CMP_COLUMNS.map((c) => (
-              <th key={c.key} className="text-right py-2 px-1.5 font-bold min-w-16">
+              <th key={c.key} className="py-2.5 px-3 text-right font-bold min-w-16">
                 {c.label}
               </th>
             ))}
@@ -2003,8 +2003,8 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-t border-border/40">
-              <td className="py-2.5 pr-2">
+            <tr key={r.id} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
+              <td className="py-2.5 px-3">
                 <p className="font-bold">{r.label}</p>
                 <p className="text-[10px] text-muted-foreground">{r.detail}</p>
               </td>
@@ -2108,7 +2108,6 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
           {bf && (
             <div className="rounded-lg border border-border/60 p-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-base">{"🧠"}</span>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   Melhor foco
                 </p>
@@ -2123,7 +2122,6 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
           {ba && (
             <div className="rounded-lg border border-border/60 p-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-base">{"🎯"}</span>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   Melhor acerto
                 </p>
@@ -2146,13 +2144,13 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-muted-foreground text-[10px] uppercase tracking-wider border-b border-border/40">
-                <th className="text-left py-2 px-3 font-bold">Horário</th>
-                <th className="text-left py-2 px-2 font-bold">Período</th>
-                <th className="text-right py-2 px-2 font-bold">Foco</th>
-                <th className="text-right py-2 px-2 font-bold">Acerto</th>
-                <th className="text-right py-2 px-2 font-bold">Tempo</th>
-                <th className="text-right py-2 px-2 font-bold">Sessões</th>
+              <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <th className="py-2.5 px-3 text-left font-bold">Horário</th>
+                <th className="py-2.5 px-3 text-left font-bold">Período</th>
+                <th className="py-2.5 px-3 text-right font-bold">Foco</th>
+                <th className="py-2.5 px-3 text-right font-bold">Acerto</th>
+                <th className="py-2.5 px-3 text-right font-bold">Tempo</th>
+                <th className="py-2.5 px-3 text-right font-bold">Sessões</th>
               </tr>
             </thead>
             <tbody>
@@ -2161,10 +2159,10 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
                 return (
                   <tr
                     key={b.period}
-                    className={`border-b border-border/20 transition-colors ${isBest ? "bg-[#2563EB]/5" : "hover:bg-muted/5"}`}
+                    className={`border-b border-border/20 transition-colors ${isBest ? "bg-[#2563EB]/5" : "hover:bg-muted/20"}`}
                   >
                     <td className="py-2.5 px-3 font-mono font-bold">{b.range}</td>
-                    <td className="py-2.5 px-2">
+                    <td className="py-2.5 px-3">
                       <span className="font-semibold">{b.label}</span>
                       {isBest && (
                         <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-black text-[#2563EB] bg-[#2563EB]/10 px-1.5 py-0.5 rounded-full border border-[#2563EB]/20">
@@ -2172,24 +2170,24 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-2 text-right">
+                    <td className="py-2.5 px-3 text-right">
                       <span
                         className={`font-bold ${b.focusAvg !== null ? "text-foreground" : "text-muted-foreground"}`}
                       >
                         {b.focusAvg !== null ? `${Math.round(b.focusAvg)}%` : "—"}
                       </span>
                     </td>
-                    <td className="py-2.5 px-2 text-right">
+                    <td className="py-2.5 px-3 text-right">
                       <span
                         className={`font-bold ${b.accuracy !== null ? "text-foreground" : "text-muted-foreground"}`}
                       >
                         {b.accuracy !== null ? `${Math.round(b.accuracy)}%` : "—"}
                       </span>
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">
+                    <td className="py-2.5 px-3 text-right font-mono font-bold">
                       {formatDurationRaw(b.totalMinutes)}
                     </td>
-                    <td className="py-2.5 px-2 text-right font-bold">{b.sessions}</td>
+                    <td className="py-2.5 px-3 text-right font-bold">{b.sessions}</td>
                   </tr>
                 )
               })}
@@ -2230,7 +2228,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
 
 function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean }) {
   if (empty || hours.every((h) => h.minutes === 0 && h.questions === 0)) {
-    return <EmptyState message="Sem sessões no período — os períodos do dia aparecem aqui." />
+    return <EmptyState title="Sem sessões" message="Sem sessões no período — os períodos do dia aparecem aqui." />
   }
   const maxMinutes = Math.max(...hours.map((h) => h.minutes), 1)
   return (
@@ -2301,21 +2299,21 @@ function ReportTable({
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            <th className="text-left py-2 pr-2 font-bold">Métrica</th>
-            <th className="text-right py-2 pr-2 font-bold">Atual</th>
-            <th className="text-right py-2 pr-2 font-bold">Anterior</th>
-            <th className="text-right py-2 font-bold">Δ</th>
+          <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <th className="py-2.5 px-3 text-left font-bold">Métrica</th>
+            <th className="py-2.5 px-3 text-right font-bold">Atual</th>
+            <th className="py-2.5 px-3 text-right font-bold">Anterior</th>
+            <th className="py-2.5 px-3 text-right font-bold">Δ</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-t border-border/40">
-              <td className="py-2 pr-2 font-semibold">{r.label}</td>
-              <td className="py-2 pr-2 text-right font-bold">{r.current}</td>
-              <td className="py-2 pr-2 text-right text-muted-foreground">{r.previous}</td>
+            <tr key={r.id} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
+              <td className="py-2.5 px-3 font-semibold">{r.label}</td>
+              <td className="py-2.5 px-3 text-right font-bold">{r.current}</td>
+              <td className="py-2.5 px-3 text-right text-muted-foreground">{r.previous}</td>
               <td
-                className={`py-2 text-right font-black ${r.positive ? "text-emerald-600" : "text-rose-600"}`}
+                className={`py-2.5 px-3 text-right font-black ${r.positive ? "text-emerald-600" : "text-rose-600"}`}
               >
                 {r.deltaLabel}
               </td>

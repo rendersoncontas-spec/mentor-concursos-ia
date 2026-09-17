@@ -124,7 +124,7 @@ export function PedirEditalView() {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
+        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
           <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
           <p className="text-xs text-muted-foreground font-medium">Carregando seus pedidos...</p>
         </div>
@@ -133,7 +133,7 @@ export function PedirEditalView() {
 
     if (loadError) {
       return (
-        <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
+        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
           <h3 className="text-lg font-bold text-foreground">
             Não foi possível carregar os pedidos
           </h3>
@@ -150,7 +150,7 @@ export function PedirEditalView() {
 
     if (filteredRequests.length === 0) {
       return (
-        <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
+        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
           <div className="space-y-1 max-w-md">
             <h3 className="text-lg font-bold text-foreground">Nenhum pedido de edital ainda</h3>
             <p className="text-xs text-muted-foreground font-medium">
@@ -337,7 +337,7 @@ export function PedirEditalView() {
                   ANEXAR EDITAL (OBRIGATÓRIO SE NÃO INFORMAR LINK: 1 ARQUIVO PDF, ATÉ 20MB)
                 </label>
 
-                <label className="border-2 border-dashed border-muted hover:border-[#2563EB] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/20">
+                <label className="border border-dashed border-muted hover:border-[#2563EB] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/20">
                   <Upload className="h-5 w-5 text-muted-foreground mb-1" />
                   <span className="text-xs font-bold text-muted-foreground">
                     {pdfFile ? pdfFile.name : "Inserir seu PDF aqui"}

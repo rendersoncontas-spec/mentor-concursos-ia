@@ -249,7 +249,7 @@ export function PlanningGoalsProgressCard({
               }
             >
               {totalPercentage >= 100
-                ? "🟢 Meta Batida!"
+                ? "Meta Batida!"
                 : `Falta: ${formatHoursMinutesShort(totalMissingMinutes)}`}
             </div>
             <div className="text-muted-foreground">
@@ -296,7 +296,7 @@ export function PlanningGoalsProgressCard({
                     }
                   >
                     {isCompleted
-                      ? "🟢 Meta Batida!"
+                      ? "Meta Batida!"
                       : `Falta: ${formatHoursMinutesShort(d.missingMinutes)}`}
                   </span>
                   <span className="text-muted-foreground">

@@ -72,6 +72,11 @@ const DEFAULT_CONCURSO_DISCIPLINES = [
   "Direito Eleitoral",
   "Língua Inglesa",
   "Língua Espanhola",
+  "Ética",
+  "Física",
+  "Revisão e Questões",
+  "Redação",
+  "CTB",
 ]
 
 interface CreateCycleModalProps {
@@ -679,7 +684,7 @@ export function CreateCycleModal({
                 size="sm"
                 onClick={handleCreate}
                 disabled={isSubmitting || selectedItems.length === 0}
-                className="text-xs font-black bg-primary text-primary-foreground gap-1.5 shadow-md"
+                className="text-xs font-black bg-primary text-primary-foreground gap-1.5 shadow-xs"
               >
                 <Check className="h-4 w-4" />
                 {isSubmitting ? "Criando ciclo..." : "Criar ciclo"}

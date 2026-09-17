@@ -237,7 +237,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                       IA
                     </span>
                   </p>
-                  <p className="text-[10px] sm:text-[10.5px] font-medium text-muted-foreground leading-snug mt-0.5 whitespace-normal">
+                  <p className="hidden md:block text-[10.5px] font-medium text-muted-foreground leading-snug mt-0.5 whitespace-normal">
                     Sua preparação rumo à nomeação.
                   </p>
                 </div>

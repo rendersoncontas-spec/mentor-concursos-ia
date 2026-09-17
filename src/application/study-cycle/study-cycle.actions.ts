@@ -853,6 +853,14 @@ export async function reconcileCycleProgressAction(): Promise<{
   success: boolean
   processed: number
   errors: string[]
+  historyRows?: number
+  validRows?: number
+  matchedById?: number
+  matchedByName?: number
+  matchedBySimilarity?: number
+  skippedNoMatch?: number
+  unmatchedSamples?: { disciplineId: string | null; disciplineName: string; minutes: number; startedAt: string | null; studySource: string | null }[]
+  items?: { name: string; studies: number; minutes: number; target: number; progress: number; extra: number }[]
 }> {
   try {
     await getUser()

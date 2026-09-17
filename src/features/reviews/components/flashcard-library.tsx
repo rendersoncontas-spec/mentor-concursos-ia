@@ -574,7 +574,7 @@ function CreateCardDialog({ open, onOpenChange, options, initial, onSaved, sugge
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {suggestions && (
@@ -753,7 +753,7 @@ function IaGenerateDialog({ open, onOpenChange, options, onSaved }: { open: bool
       onOpenChange(o)
       if (!o) setDrafts(null)
     }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-violet-500" />

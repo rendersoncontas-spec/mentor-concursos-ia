@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { DisciplinePopover } from "@/features/study-session/components/discipline-popover"
 import { useGlobalStudy } from "@/features/study-session/components/study-provider"
 import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
@@ -123,7 +124,7 @@ export function StudyDock() {
 
   if (!mounted) {
     return (
-      <div className="h-16 animate-pulse bg-muted/50 rounded-xl border border-border/50" />
+      <Skeleton className="h-16 w-full rounded-xl" />
     )
   }
 
@@ -243,7 +244,7 @@ export function StudyDock() {
             onClick={handleStart}
             disabled={!selectedName || !selectedId}
             className={cn(
-              "h-9 px-6 text-sm font-black uppercase tracking-wider gap-2 shadow-md transition-all shrink-0",
+              "h-9 px-6 text-sm font-bold tracking-wider gap-2 shadow-xs transition-all shrink-0",
               selectedName && selectedId
                 ? "bg-primary hover:bg-primary/90 text-primary-foreground"
                 : "bg-muted text-muted-foreground",

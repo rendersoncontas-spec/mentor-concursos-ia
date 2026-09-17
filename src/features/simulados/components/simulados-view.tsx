@@ -374,7 +374,7 @@ export function SimuladosView() {
         </div>
 
         {filteredRecords.length === 0 ? (
-          <div className="p-12 flex flex-col items-center justify-center text-center space-y-4">
+          <div className="p-6 flex flex-col items-center justify-center text-center space-y-4">
             <div className="h-14 w-14 rounded-2xl bg-muted/40 border flex items-center justify-center">
               <ClipboardList className="h-7 w-7 text-muted-foreground" />
             </div>

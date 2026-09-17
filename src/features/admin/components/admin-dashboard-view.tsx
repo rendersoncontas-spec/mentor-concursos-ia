@@ -228,12 +228,12 @@ export function AdminDashboardView({
       {/* Lista / Tabela de Usuários */}
       <div className="bg-card rounded-2xl border shadow-xs overflow-hidden">
         {loading && users.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-muted-foreground space-y-3">
+          <div className="flex flex-col items-center justify-center p-6 text-muted-foreground space-y-3">
             <RefreshCw className="w-8 h-8 animate-spin text-[#2563EB]" />
             <p className="text-xs font-medium">Carregando usuários...</p>
           </div>
         ) : users.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-muted-foreground space-y-2 text-center">
+          <div className="flex flex-col items-center justify-center p-6 text-muted-foreground space-y-2 text-center">
             <AlertTriangle className="w-8 h-8 text-amber-500" />
             <p className="text-sm font-bold text-foreground">Nenhum usuário encontrado</p>
             <p className="text-xs">Tente ajustar o termo de pesquisa ou os filtros aplicados.</p>
@@ -363,8 +363,8 @@ export function AdminDashboardView({
                 {targetForSupport?.name} ({targetForSupport?.email})
               </strong>
               <br />
-              <span className="block mt-2 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded-lg">
-                ⚠️ Todas as ações realizadas nesta sessão temporária serão registradas com seu identificador nos logs de auditoria. A sessão expira automaticamente em 30 minutos.
+              <span className="block mt-2 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded-lg flex items-start gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Todas as ações realizadas nesta sessão temporária serão registradas com seu identificador nos logs de auditoria. A sessão expira automaticamente em 30 minutos.
               </span>
             </DialogDescription>
           </DialogHeader>

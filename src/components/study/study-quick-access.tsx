@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DisciplinePopover } from "@/features/study-session/components/discipline-popover"
 import { useGlobalStudy } from "@/features/study-session/components/study-provider"
@@ -84,7 +85,7 @@ export function StudyQuickAccess() {
 
   if (!mounted) {
     return (
-      <div className="h-12 animate-pulse bg-muted/50 rounded-xl border border-border/50 flex items-center px-3 gap-2" />
+      <Skeleton className="h-12 w-full rounded-xl" />
     )
   }
 
@@ -104,7 +105,7 @@ export function StudyQuickAccess() {
           onClick={handleStart}
           disabled={!selectedName || !selectedId}
           className={cn(
-            "h-10 px-5 text-sm font-black uppercase tracking-wider gap-2 shadow-md transition-all shrink-0",
+            "h-10 px-5 text-sm font-bold tracking-wider gap-2 shadow-xs transition-all shrink-0",
             selectedName && selectedId
               ? "bg-primary hover:bg-primary/90 text-primary-foreground"
               : "bg-muted text-muted-foreground",

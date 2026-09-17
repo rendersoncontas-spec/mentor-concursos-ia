@@ -233,7 +233,7 @@ export function ActiveCyclePanel({
   return (
     <div className="space-y-2">
       {/* 1. CARD PRINCIPAL DO CICLO ATIVO - ULTRA COMPACTO */}
-      <Card className="overflow-hidden border-2 border-primary/30 bg-card shadow-sm">
+      <Card className="overflow-hidden border border-primary/30 bg-card shadow-sm">
         {/* CABEÇALHO + MÉTRICAS + PROGRESSO EM ÁREA ÚNICA */}
         <div className="space-y-1.5 px-2.5 py-2 sm:px-3">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -326,7 +326,7 @@ export function ActiveCyclePanel({
           {/* 2. EM FOCO + PRÓXIMA LADO A LADO */}
           {currentItem ? (
             <div className="grid gap-1.5 lg:grid-cols-[minmax(0,1.7fr)_minmax(240px,1fr)]">
-              <div className="rounded-xl border-2 border-primary/50 bg-primary/5 px-3 py-2 space-y-1.5">
+              <div className="rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="px-1.5 py-px text-[10px] font-black uppercase tracking-wider rounded-md bg-primary text-primary-foreground shrink-0">
                     ▶ Em foco
