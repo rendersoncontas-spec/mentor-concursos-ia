@@ -447,10 +447,17 @@ async function fetchCycleDisciplines(
       .select("*")
       .eq("cycle_id", cycle.id)
 
+    const { data: skipRows } = await supabase
+      .from("study_cycle_item_skips")
+      .select("cycle_item_id")
+      .eq("cycle_id", cycle.id)
+      .eq("round_number", cycle.current_round || 1)
+
     const overview = buildCycleOverview(
       cycle as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycle,
       items as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleItemWithDetails[],
       (sessions || []) as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleSession[],
+      new Set((skipRows || []).map((row) => row.cycle_item_id as string)),
     )
 
     if (!overview.items || overview.items.length === 0) return []

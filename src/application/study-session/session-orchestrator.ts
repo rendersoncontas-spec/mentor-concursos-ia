@@ -42,12 +42,15 @@ export class SessionOrchestrator {
     // 4. Registrar no ciclo se a disciplina estiver no ciclo ativo
     // Qualquer origem de estudo pode contribuir para o ciclo (não só CYCLE)
     if (payload.disciplineId && historyResult.duration_minutes && historyResult.duration_minutes > 0) {
-      await registerStudyToCycle({
+      const cycleResult = await registerStudyToCycle({
         studyHistoryId: payload.sessionId,
         disciplineId: payload.disciplineId,
         durationMinutes: historyResult.duration_minutes,
         studySource: "CYCLE",
-      }).catch((err) => console.error("[SessionOrchestrator] Erro ao registrar no ciclo:", err))
+      })
+      if (!cycleResult.success) {
+        throw new Error(`Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`)
+      }
     }
 
     // 5. Mentor IA (Calcula o impacto global após as inserções)

@@ -77,8 +77,17 @@ export async function startStudySessionAction(data: Omit<StudyHistoryInsert, "us
 
     const session = await createStudySession(supabase, effectiveUserId, data as StudyHistoryInsert)
 
+    // Consistência: qualquer INSERT real em study_history passa pelo mecanismo central,
+    // mesmo aqui (sessão recém-iniciada, ainda sem duração). Como a duração é 0/nula
+    // neste ponto, o rebuild é um no-op para o progresso do ciclo, mas nenhuma mutação
+    // fica fora do fluxo único de sincronização.
+    const cycleResult = await registerStudyToCycle()
+
     for (const path of HISTORY_PATHS) revalidatePath(path)
-    return { data: session, error: null }
+    return {
+      data: session,
+      error: cycleResult.success ? null : `Sessão iniciada, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
+    }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
       extra: { feature: "study-session" },
@@ -110,8 +119,15 @@ export async function finishStudySessionAction(
     const session = await finishStudySession(supabase, effectiveUserId, sessionId, feedback)
     await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
 
+    // Qualquer mutação real de study_history deve sincronizar o ciclo ativo
+    // através do mecanismo central único — ver registerStudyToCycle.
+    const cycleResult = await registerStudyToCycle()
+
     for (const path of HISTORY_PATHS) revalidatePath(path)
-    return { data: session, error: null }
+    return {
+      data: session,
+      error: cycleResult.success ? null : `Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
+    }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
       extra: { feature: "study-session" },
@@ -135,8 +151,16 @@ export async function updateStudySessionAction(
 
     const session = await updateStudySession(supabase, effectiveUserId, sessionId, data)
 
+    // A edição pode ter mudado duration_minutes e/ou discipline_id — o ciclo
+    // precisa ser recalculado do zero a partir do study_history atualizado
+    // (nunca por soma/subtração incremental no frontend ou aqui).
+    const cycleResult = await registerStudyToCycle()
+
     for (const path of HISTORY_PATHS) revalidatePath(path)
-    return { data: session, error: null }
+    return {
+      data: session,
+      error: cycleResult.success ? null : `Estudo atualizado, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
+    }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
       extra: { feature: "study-session" },
@@ -157,8 +181,17 @@ export async function deleteStudySessionAction(sessionId: string) {
 
     await deleteStudySession(supabase, effectiveUserId, sessionId)
 
+    // BUG CRÍTICO CORRIGIDO: esta é a action por trás do botão "Excluir" do
+    // Histórico. Antes, ela apagava a linha de study_history e nunca avisava
+    // o ciclo — o progresso/extra/cursor ficavam presos ao estudo que não
+    // existe mais até algum outro evento disparar um rebuild por acidente.
+    // Reconciliar aqui é o que torna a exclusão automaticamente consistente.
+    const cycleResult = await registerStudyToCycle()
+
     for (const path of HISTORY_PATHS) revalidatePath(path)
-    return { error: null }
+    return {
+      error: cycleResult.success ? null : `Sessão excluída, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
+    }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
       extra: { feature: "historico" },
@@ -186,8 +219,14 @@ export async function cancelStudySessionAction(sessionId: string) {
 
     if (error) throw error
 
+    // Mesmo uma sessão cancelada é uma mutação real de study_history: se ela
+    // já tinha algum tempo contabilizado, o ciclo precisa refletir a remoção.
+    const cycleResult = await registerStudyToCycle()
+
     for (const path of HISTORY_PATHS) revalidatePath(path)
-    return { error: null }
+    return {
+      error: cycleResult.success ? null : `Sessão cancelada, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
+    }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
       extra: { feature: "study-session" },
@@ -320,16 +359,11 @@ export async function saveManualStudyTimeAction(
       if (error) throw new Error("Erro ao atualizar registro: " + error.message)
       await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
       
-      // Registrar no ciclo se a disciplina estiver no ciclo ativo
-      await registerStudyToCycle({
-        studyHistoryId: updated.id,
-        disciplineId: updated.discipline_id,
-        durationMinutes: updated.duration_minutes || durationMinutes,
-        studySource: "FREE",
-      }).catch((err) => console.error("[saveManualStudyTimeAction] Erro ao registrar no ciclo:", err))
+// Registrar no ciclo se a disciplina estiver no ciclo ativo
+      const cycleResult = await registerStudyToCycle()
       
       for (const path of HISTORY_PATHS) revalidatePath(path)
-      return { data: updated, error: null }
+      return { data: updated, error: cycleResult.success ? null : `Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}` }
     }
 
     // Create new manual entry
@@ -355,15 +389,10 @@ export async function saveManualStudyTimeAction(
     await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
     
     // Registrar no ciclo se a disciplina estiver no ciclo ativo
-    await registerStudyToCycle({
-      studyHistoryId: created.id,
-      disciplineId: created.discipline_id,
-      durationMinutes: created.duration_minutes || durationMinutes,
-      studySource: "FREE",
-    }).catch((err) => console.error("[saveManualStudyTimeAction] Erro ao registrar no ciclo:", err))
+    const cycleResult = await registerStudyToCycle()
     
     for (const path of HISTORY_PATHS) revalidatePath(path)
-    return { data: created, error: null }
+    return { data: created, error: cycleResult.success ? null : `Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}` }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
       extra: { feature: "calendar-manual-entry" },
@@ -392,8 +421,16 @@ export async function deleteManualStudyTimeAction(dateStr: string) {
       .contains("metadata", { manual_entry: true })
 
     if (error) throw new Error("Erro ao remover registro: " + error.message)
+
+    // A remoção também precisa refletir no ciclo: sem isto, o ciclo ficava
+    // com progresso de um estudo que não existe mais em study_history até
+    // que outro evento qualquer disparasse um rebuild.
+    const cycleResult = await registerStudyToCycle()
+
     for (const path of HISTORY_PATHS) revalidatePath(path)
-    return { error: null }
+    return {
+      error: cycleResult.success ? null : `Registro removido, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
+    }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
       extra: { feature: "calendar-manual-delete" },

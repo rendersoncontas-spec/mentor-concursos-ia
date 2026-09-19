@@ -40,7 +40,8 @@ export interface CycleSkipCalculationResult {
 export function buildCycleOverview(
   cycle: StudyCycle,
   items: StudyCycleItemWithDetails[],
-  sessions: StudyCycleSession[] = []
+  sessions: StudyCycleSession[] = [],
+  skippedItemIds: Set<string> = new Set()
 ): CycleOverview {
   const currentRound = Math.max(1, cycle.current_round || 1)
   const totalRoundsDone = Math.max(0, cycle.total_rounds_done || 0)
@@ -50,7 +51,10 @@ export function buildCycleOverview(
   const safeCurrentIndex =
     totalItemsCount > 0 ? Math.min(Math.max(0, cycle.current_item_index || 0), totalItemsCount - 1) : 0
 
-  const currentItemProgressMin = Math.max(0, cycle.current_item_progress_min || 0)
+  const currentItemProgressSeconds = Math.max(
+    0,
+    cycle.current_item_progress_seconds ?? Math.round((cycle.current_item_progress_min || 0) * 60)
+  )
 
   // Mapear sessões históricas totais e sessões da volta atual por item
   const historicalMinutesByItem = new Map<string, { total: number; extra: number }>()
@@ -62,8 +66,10 @@ export function buildCycleOverview(
   for (const s of sessions) {
     // Histórico geral acumulado
     const hist = historicalMinutesByItem.get(s.cycle_item_id) || { total: 0, extra: 0 }
-    hist.total += (s.minutes_contributed || 0) + (s.extra_minutes || 0)
-    hist.extra += s.extra_minutes || 0
+    const contributed = Math.max(0, s.seconds_contributed ?? Math.round((s.minutes_contributed || 0) * 60)) / 60
+    const extra = Math.max(0, s.extra_seconds ?? Math.round((s.extra_minutes || 0) * 60)) / 60
+    hist.total += contributed + extra
+    hist.extra += extra
     historicalMinutesByItem.set(s.cycle_item_id, hist)
 
     // Dados específicos da volta atual
@@ -73,8 +79,8 @@ export function buildCycleOverview(
         extra: 0,
         isSkip: false,
       }
-      currentRoundEntry.contributed += s.minutes_contributed || 0
-      currentRoundEntry.extra += s.extra_minutes || 0
+      currentRoundEntry.contributed += contributed
+      currentRoundEntry.extra += extra
       if (s.is_skip) {
         currentRoundEntry.isSkip = true
       }
@@ -104,10 +110,12 @@ export function buildCycleOverview(
     const roundEntry = roundDataByItem.get(item.id)
 
     if (isPastInRound) {
-      if (roundEntry?.isSkip) {
-        // Matéria foi pulada nesta volta: mantém os minutos que foram estudados nela
-        studiedInRound = Math.min(roundEntry.contributed, planned)
-        extraInRound = roundEntry.extra || 0
+      if (skippedItemIds.has(item.id) || roundEntry?.isSkip) {
+        // Matéria foi pulada nesta volta: mantém os minutos REAIS que foram
+        // estudados nela (nunca força 100%) — a fonte é o marcador durável
+        // de skip (study_cycle_item_skips), não uma sessão sintética.
+        studiedInRound = Math.min(roundEntry?.contributed || 0, planned)
+        extraInRound = roundEntry?.extra || 0
         remainingInRound = Math.max(0, planned - studiedInRound)
         isCompletedInRound = false
         isSkippedInRound = true
@@ -125,7 +133,7 @@ export function buildCycleOverview(
       }
     } else if (isCurrent) {
       // Para o item atual, preferimos o progresso persistido no ciclo, mas recuperamos das sessões se for maior
-      const combinedCurrent = Math.max(currentItemProgressMin, roundEntry?.contributed || 0)
+      const combinedCurrent = Math.max(currentItemProgressSeconds / 60, roundEntry?.contributed || 0)
       studiedInRound = Math.min(combinedCurrent, planned)
       remainingInRound = Math.max(0, planned - studiedInRound)
       extraInRound = roundEntry?.extra || 0

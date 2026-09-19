@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { CycleOverview } from "@/domain/study-cycle/study-cycle.types"
 import { cn } from "@/lib/utils"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 interface CycleCardProps {
   overview: CycleOverview
@@ -14,14 +15,6 @@ interface CycleCardProps {
   onDelete: (id: string) => void
   onSelect: (id: string) => void
   onEdit?: (overview: CycleOverview) => void
-}
-
-function formatMinutes(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
 }
 
 export function CycleCard({
@@ -87,7 +80,7 @@ export function CycleCard({
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
           <span>{items.length} {items.length === 1 ? "matéria" : "matérias"}</span>
           <span className="text-muted-foreground/50">|</span>
-          <span>{formatMinutes(totalPlannedMinutesPerRound)} / volta</span>
+          <span>{formatDurationMinutes(totalPlannedMinutesPerRound)} / volta</span>
         </div>
 
         {/* VOLTAS - COMPACTO */}
@@ -131,7 +124,7 @@ export function CycleCard({
           <div className="text-[11px] text-muted-foreground truncate pt-0.5">
             <span className="font-bold text-foreground">Agora: </span>
             <span>{currentItem.disciplineName}</span>
-            <span className="text-muted-foreground font-medium"> ({currentItem.studiedMinutesInRound}/{currentItem.plannedMinutes} min)</span>
+            <span className="text-muted-foreground font-medium"> ({Math.round(currentItem.studiedMinutesInRound)}/{currentItem.plannedMinutes} min)</span>
           </div>
         )}
       </div>

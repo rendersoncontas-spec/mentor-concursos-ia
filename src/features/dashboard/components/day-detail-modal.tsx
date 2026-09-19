@@ -8,15 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { getDayDetailAction, type DayDetail } from "@/application/study-history/study-history.actions"
-
-function formatHM(mins: number): string {
-  if (mins <= 0) return "0min"
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h${m}min`
-}
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 function formatDateBR(dateStr: string): string {
   const [y, m, d] = dateStr.split("-")
@@ -70,7 +62,7 @@ export function DayDetailModal({ open, onOpenChange, date }: Props) {
           <div className="p-4 space-y-4">
             {/* Resumo geral */}
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Tempo total" value={formatHM(detail.totalMinutes)} />
+              <StatCard label="Tempo total" value={formatDurationMinutes(detail.totalMinutes)} />
               <StatCard label="Sessões" value={String(detail.sessionCount)} />
               <StatCard label="Questões" value={String(detail.questionsAnswered)} />
               <StatCard
@@ -109,7 +101,7 @@ export function DayDetailModal({ open, onOpenChange, date }: Props) {
                         {d.disciplineName}
                       </span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatHM(d.minutes)}
+                        {formatDurationMinutes(d.minutes)}
                       </span>
                     </div>
                   ))}

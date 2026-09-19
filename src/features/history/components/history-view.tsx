@@ -35,6 +35,7 @@ import {
   readStudySessionSaved,
 } from "@/features/study-session/lib/study-session-events"
 import { formatDayLabel, getDayInSaoPaulo, getTimeInSaoPaulo } from "@/lib/sao-paulo"
+import { formatDuration, formatDurationMinutes } from "@/lib/format-duration"
 
 import { StudyCalendar } from "./study-calendar"
 
@@ -124,35 +125,6 @@ function sessionRealSeconds(s: HistorySession): number {
   const imported = Number(s.metadata?.["imported_seconds"] || 0)
   if (imported > 0) return imported
   return (Number(s.duration_minutes) || 0) * 60
-}
-
-/** Formata duração de UMA sessão: "10m29s", "1h00m", "45s". */
-function formatSessionDuration(totalSeconds: number): string {
-  const total = Math.max(0, Math.round(totalSeconds))
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  if (h === 0 && m === 0) return `${s}s`
-  if (h === 0) return `${m}m${s.toString().padStart(2, "0")}s`
-  if (s === 0) return `${h}h${m.toString().padStart(2, "0")}m`
-  return `${h}h${m.toString().padStart(2, "0")}m${s.toString().padStart(2, "0")}s`
-}
-
-/** Formata o TOTAL do dia: "2h13m44s", "1h10m24s", "34m12s". */
-function formatDayTotalSeconds(totalSeconds: number): string {
-  const total = Math.max(0, Math.round(totalSeconds))
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  if (h === 0 && m === 0) return `${s}s`
-  if (h === 0) return `${m}m${s.toString().padStart(2, "0")}s`
-  return `${h}h${m.toString().padStart(2, "0")}m${s.toString().padStart(2, "0")}s`
-}
-
-function formatHoursMinutes(min: number) {
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return `${h}h${m < 10 ? "0" : ""}${m}min`
 }
 
 function countActiveFilters(f: Filters): number {
@@ -811,7 +783,7 @@ export function HistoryView() {
           </span>
           <div className="text-right">
             <span className="text-2xl font-black text-foreground font-mono">
-              {formatHoursMinutes(totalMinutes)}
+              {formatDurationMinutes(totalMinutes)}
             </span>
           </div>
         </div>
@@ -999,7 +971,7 @@ export function HistoryView() {
                       </span>
                     </div>
                     <span className="text-sm font-mono font-black text-[#2563EB]">
-                      Total: {formatDayTotalSeconds(day.totalSeconds)}
+                      Total: {formatDuration(day.totalSeconds)}
                     </span>
                   </div>
 
@@ -1061,7 +1033,7 @@ export function HistoryView() {
                           <div className="flex items-center gap-4 self-end lg:self-center shrink-0">
                             <span className="text-xs font-mono text-muted-foreground font-bold flex items-center gap-1">
                               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                              {formatSessionDuration(sessionRealSeconds(session))}
+                              {formatDuration(sessionRealSeconds(session))}
                             </span>
 
                             <span className="px-4 py-1 rounded-md bg-[#2563EB] text-white font-extrabold text-[10px] tracking-wider uppercase shadow-xs">

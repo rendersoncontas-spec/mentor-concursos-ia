@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
 import { buildIsoFromSaoPauloDateTime } from "@/lib/sao-paulo"
 
 export async function saveStudySessionAction(data: Record<string, unknown>) {
@@ -211,26 +212,10 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       }
     }
 
-    // 7. Se a sessão foi iniciada a partir de um Ciclo de Estudo, atualizar o progresso do ciclo
-    // REQUISITO ESTREITO: Somente sessões de origem CYCLE avançam o ciclo rotativo
-    const isCycleSource = data["study_source"] === "CYCLE" || (!data["study_source"] && Boolean(data["cycle_id"]))
-    if (data["cycle_id"] && activeMinutesFinal > 0 && isCycleSource) {
-      try {
-        const { registerCycleStudyProgressAction } = await import(
-          "@/application/study-cycle/study-cycle.actions"
-        )
-        await registerCycleStudyProgressAction({
-          cycleId: String(data["cycle_id"]),
-          cycleItemId: data["cycle_item_id"] ? String(data["cycle_item_id"]) : null,
-          studyHistoryId: historyData.id,
-          durationMinutes: activeMinutesFinal,
-          disciplineId: String(disciplineId),
-          studySource: "CYCLE",
-        })
-      } catch (cycleErr) {
-        console.error("[STUDY_SAVE] Erro ao registrar progresso no ciclo:", cycleErr)
-      }
-    }
+    // 7. Atualizar o progresso do ciclo para qualquer sessão de estudo válida
+    // Qualquer estudo real registrado no study_history deve contribuir para o ciclo correspondente
+    // quando: usuário é o mesmo, disciplina corresponde a matéria do ciclo, duração é válida
+    const cycleResult = activeMinutesFinal > 0 ? await registerStudyToCycle() : null
 
     // Revalidar páginas que dependem de dados de sessão
     revalidatePath("/dashboard")
@@ -240,7 +225,12 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     revalidatePath("/home")
     revalidatePath("/ciclos")
 
-    return { success: true, historyId: historyData.id, session: historyData }
+    return {
+      success: true,
+      historyId: historyData.id,
+      session: historyData,
+      cycleSyncError: cycleResult && !cycleResult.success ? cycleResult.error || "O estudo foi salvo, mas o ciclo precisa ser reconciliado." : null,
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro inesperado ao salvar."
     console.error("[saveStudySession] Erro inesperado:", err)

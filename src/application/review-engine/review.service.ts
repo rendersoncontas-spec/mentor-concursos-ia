@@ -4,6 +4,9 @@
 // ============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { revalidatePath } from "next/cache"
+
+import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
 import { FLASHCARD_TYPE_LABEL, FSRS_D0 } from "@/domain/reviews/models"
 import type {
   ReviewCardFront,
@@ -601,11 +604,14 @@ export async function answerReviewCard(
   }
 }
 
-/** Conclui a sessão: STATUS COMPLETED + study_history + cache review_statistics. */
-export async function finalizeSession(supabase: Supabase, userId: string, sessionId: string, answeredIds: string[]) {
+/** Conclui a sessão: STATUS COMPLETED + study_history + cache review_statistics.
+ * Retorna cycleSyncError != null quando o estudo foi salvo no Histórico mas o
+ * ciclo não pôde ser reconciliado — o chamador deve avisar o usuário em vez
+ * de tratar isso como sucesso total silencioso. */
+export async function finalizeSession(supabase: Supabase, userId: string, sessionId: string, answeredIds: string[]): Promise<{ cycleSyncError: string | null }> {
   const now = new Date()
   const { data: sessionRow } = await supabase.from("review_sessions").select("*").eq("id", sessionId).eq("user_id", userId).maybeSingle()
-  if (!sessionRow || sessionRow["status"] !== "ACTIVE") return
+  if (!sessionRow || sessionRow["status"] !== "ACTIVE") return { cycleSyncError: null }
 
   await supabase
     .from("review_sessions")
@@ -613,6 +619,7 @@ export async function finalizeSession(supabase: Supabase, userId: string, sessio
     .eq("id", sessionId)
     .eq("user_id", userId)
 
+  let cycleSyncError: string | null = null
   if (answeredIds.length > 0) {
     const { data: items } = await supabase.from("review_items").select("discipline_id").in("id", answeredIds)
     const disciplineCount = new Map<string, number>()
@@ -622,7 +629,7 @@ export async function finalizeSession(supabase: Supabase, userId: string, sessio
     if (mainDiscipline) {
       const totalSeconds = Math.round((now.getTime() - new Date(String(sessionRow["started_at"])).getTime()) / 1000)
       const durationMinutes = Math.max(1, Math.round(totalSeconds / 60))
-      await supabase.from("study_history").insert({
+      const { error: historyError } = await supabase.from("study_history").insert({
         user_id: userId,
         discipline_id: mainDiscipline,
         study_source: "REVIEW",
@@ -637,15 +644,35 @@ export async function finalizeSession(supabase: Supabase, userId: string, sessio
         finished_at: now.toISOString(),
         notes: `Sessão de revisão (${String(sessionRow["mode"] ?? "ALL")}) — ${answeredIds.length} cartão(ões)`,
         metadata: {
+          duration_seconds: totalSeconds,
           flashcards_reviewed: answeredIds.length,
           review_session_id: sessionId,
           review_mode: String(sessionRow["mode"] ?? "ALL"),
         },
       })
+
+      // Qualquer estudo real (independente da origem) deve contribuir para o
+      // ciclo ativo através do mecanismo central único — revisões (REVIEW)
+      // não são exceção. Sem esta chamada o estudo ficava correto no
+      // Histórico mas o ciclo só era atualizado por acidente, na próxima vez
+      // que algum outro evento disparasse um rebuild.
+      if (!historyError) {
+        const cycleResult = await registerStudyToCycle()
+        revalidatePath("/ciclos")
+        revalidatePath("/dashboard")
+        revalidatePath("/dashboard/history")
+        if (!cycleResult.success) {
+          cycleSyncError = cycleResult.error || "Estudo salvo, mas o ciclo não foi atualizado."
+          console.error("[ReviewEngine] Sessão salva, mas o ciclo não foi atualizado:", cycleResult.error)
+        }
+      } else {
+        console.error("[ReviewEngine] Erro ao salvar study_history da revisão:", historyError)
+      }
     }
   }
 
   await refreshStatisticsCache(supabase, userId)
+  return { cycleSyncError }
 }
 
 /** Descarta a sessão ativa (não grava study_history). */

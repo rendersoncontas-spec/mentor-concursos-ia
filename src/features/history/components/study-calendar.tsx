@@ -10,6 +10,7 @@ import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
 import { originDisplayName } from "@/features/importacao/lib/origin"
 import { getDayInSaoPaulo } from "@/lib/sao-paulo"
+import { formatDuration, formatDurationMinutes } from "@/lib/format-duration"
 
 type HistorySession = StudyHistory & {
   disciplines?: { id?: string; name?: string; color_hex?: string | null } | null
@@ -25,30 +26,11 @@ interface StudyCalendarProps {
   isLoading?: boolean
 }
 
-function formatTime(min: number) {
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  if (h === 0) return `${m}m`
-  return `${h}h${m < 10 ? "0" : ""}${m}m`
-}
-
 /** Duração real da sessão em SEGUNDOS (unidade real do banco). */
 function sessionRealSeconds(s: HistorySession): number {
   const imported = Number(s.metadata?.["imported_seconds"] || 0)
   if (imported > 0) return imported
   return (Number(s.duration_minutes) || 0) * 60
-}
-
-/** Formata duração de UMA sessão: "10m29s", "1h00m", "45s". */
-function formatSessionDuration(totalSeconds: number): string {
-  const total = Math.max(0, Math.round(totalSeconds))
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  if (h === 0 && m === 0) return `${s}s`
-  if (h === 0) return `${m}m${s.toString().padStart(2, "0")}s`
-  if (s === 0) return `${h}h${m.toString().padStart(2, "0")}m`
-  return `${h}h${m.toString().padStart(2, "0")}m${s.toString().padStart(2, "0")}s`
 }
 
 function getIntensityClass(minutes: number) {
@@ -252,7 +234,7 @@ export function StudyCalendar({
                   ${isToday ? "ring-2 ring-inset ring-[#2563EB] z-10" : ""}
                   ${!hasData ? "cursor-default opacity-85" : "cursor-pointer"}
                 `}
-                aria-label={`${day} de ${MONTH_NAMES[currentMonth - 1]} de ${currentYear}. ${hasData ? `${formatTime(totalMinutes)} estudados em ${daySessions.length} sessões.` : "Nenhum estudo."}`}
+                aria-label={`${day} de ${MONTH_NAMES[currentMonth - 1]} de ${currentYear}. ${hasData ? `${formatDurationMinutes(totalMinutes)} estudados em ${daySessions.length} sessões.` : "Nenhum estudo."}`}
               >
                 <div className="flex items-center justify-between w-full mb-1.5">
                   <span
@@ -277,7 +259,7 @@ export function StudyCalendar({
                       <BookOpen className="h-3 w-3 shrink-0" /> {daySessions.length} Ativ.
                     </div>
                     <div className="text-[11px] font-black text-foreground flex items-center gap-1 truncate">
-                      <Timer className="h-3 w-3 shrink-0" /> {formatTime(totalMinutes)}
+                      <Timer className="h-3 w-3 shrink-0" /> {formatDurationMinutes(totalMinutes)}
                     </div>
                     {totalQuestions > 0 && (
                       <div className="text-[10px] font-bold text-foreground/80 flex items-center gap-1 truncate">
@@ -311,7 +293,7 @@ export function StudyCalendar({
               <div className="text-[10px] font-bold text-muted-foreground uppercase">
                 Tempo Total
               </div>
-              <div className="text-lg font-bold">{formatTime(dayTotalMinutes)}</div>
+              <div className="text-lg font-bold">{formatDurationMinutes(dayTotalMinutes)}</div>
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
               <div className="text-[10px] font-bold text-muted-foreground uppercase">Sessões</div>
@@ -361,7 +343,7 @@ export function StudyCalendar({
 
                   <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
                     <span className="text-xs font-mono font-bold">
-                      {formatSessionDuration(sessionRealSeconds(session))}
+                      {formatDuration(sessionRealSeconds(session))}
                     </span>
                     <div className="flex items-center gap-1">
                       <Button

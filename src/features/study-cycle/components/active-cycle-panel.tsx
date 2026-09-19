@@ -23,39 +23,13 @@ import { Card } from "@/components/ui/card"
 import type { CycleOverview } from "@/domain/study-cycle/study-cycle.types"
 import { useGlobalStudy } from "@/features/study-session/components/study-provider"
 import { cn } from "@/lib/utils"
+import { formatDuration, formatDurationMinutes } from "@/lib/format-duration"
 
 interface ActiveCyclePanelProps {
   overview: CycleOverview
   onRefresh: () => void
   onSelectAnotherCycle?: (() => void) | undefined
   onEditCycle?: (() => void) | undefined
-}
-
-function formatMinutes(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
-}
-
-/** Duração legível compacta a partir de segundos: 1h30m25s, 1h01m, 45s. */
-export function formatCycleDuration(totalSeconds: number): string {
-  const s = Math.max(0, Math.round(totalSeconds))
-  if (s < 60) return `${s}s`
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const rest = s % 60
-  const parts: string[] = []
-  if (h > 0) parts.push(`${h}h`)
-  if (m > 0 || h === 0) parts.push(h > 0 ? `${String(m).padStart(2, "0")}m` : `${m}m`)
-  if (rest > 0) parts.push(h > 0 || m > 0 ? `${String(rest).padStart(2, "0")}s` : `${rest}s`)
-  return parts.join("")
-}
-
-/** Duração legível a partir de minutos (fonte: minutos inteiros do ciclo). */
-export function formatCycleMinutes(totalMinutes: number): string {
-  return formatCycleDuration(Math.max(0, Math.round(totalMinutes)) * 60)
 }
 
 /** Cor progressiva da barra por percentual (0–100). */
@@ -292,10 +266,10 @@ export function ActiveCyclePanel({
                 label: "Concluídas",
                 value: totalRoundsDone,
               },
-              { label: "Tempo/volta", value: formatMinutes(totalPlannedMinutesPerRound) },
+              { label: "Tempo/volta", value: formatDurationMinutes(totalPlannedMinutesPerRound) },
               {
                 label: "Restam",
-                value: formatMinutes(remainingRoundMinutes),
+                value: formatDurationMinutes(remainingRoundMinutes),
               },
               {
                 label: "Progresso",
@@ -313,13 +287,13 @@ export function ActiveCyclePanel({
               />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-x-2 text-[10px] text-muted-foreground font-medium leading-tight">
-              <span>{formatMinutes(totalStudiedMinutesInRound)} cumpridos</span>
+              <span>{formatDurationMinutes(totalStudiedMinutesInRound)} cumpridos</span>
               {totalExtraMinutesInRound > 0 && (
                 <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                  +{formatMinutes(totalExtraMinutesInRound)} extra
+                  +{formatDurationMinutes(totalExtraMinutesInRound)} extra
                 </span>
               )}
-              <span>Faltam {formatMinutes(remainingRoundMinutes)}</span>
+              <span>Faltam {formatDurationMinutes(remainingRoundMinutes)}</span>
             </div>
           </div>
 
@@ -336,7 +310,7 @@ export function ActiveCyclePanel({
                   </span>
                   <DifficultyBadge difficulty={currentItem.difficulty} />
                   <span className="ml-auto text-[11px] font-black text-foreground shrink-0">
-                    Meta {formatMinutes(currentItem.plannedMinutes)}
+                    Meta {formatDurationMinutes(currentItem.plannedMinutes)}
                   </span>
                 </div>
 
@@ -353,7 +327,7 @@ export function ActiveCyclePanel({
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-tight">
                   <span className="font-black text-foreground whitespace-nowrap">
-                    {currentItem.studiedMinutesInRound}/{currentItem.plannedMinutes} min
+                    {Math.round(currentItem.studiedMinutesInRound)}/{currentItem.plannedMinutes} min
                   </span>
                   <div className="h-1.5 min-w-[120px] flex-1 bg-muted rounded-full overflow-hidden">
                     <div
@@ -370,7 +344,7 @@ export function ActiveCyclePanel({
                   </div>
                   <span className="font-black text-primary whitespace-nowrap">
                     {currentItem.remainingMinutesInRound > 0
-                      ? `Faltam ${currentItem.remainingMinutesInRound} min`
+                      ? `Faltam ${Math.round(currentItem.remainingMinutesInRound)} min`
                       : "Meta atingida!"}
                   </span>
                 </div>
@@ -385,7 +359,7 @@ export function ActiveCyclePanel({
                     {isCurrentItemStudying
                       ? "Estudo em andamento..."
                       : currentItem.studiedMinutesInRound > 0
-                      ? `Continuar (${currentItem.remainingMinutesInRound} min)`
+                      ? `Continuar (${Math.round(currentItem.remainingMinutesInRound)} min)`
                       : "Iniciar estudo"}
                   </Button>
 
@@ -410,7 +384,7 @@ export function ActiveCyclePanel({
                   </span>
                   {nextItem && (
                     <span className="text-[11px] font-black text-foreground whitespace-nowrap">
-                      Meta {formatMinutes(nextItem.plannedMinutes)}
+                      Meta {formatDurationMinutes(nextItem.plannedMinutes)}
                     </span>
                   )}
                 </div>
@@ -424,7 +398,7 @@ export function ActiveCyclePanel({
                     </p>
                     <div className="flex items-center gap-2 text-[11px] font-black leading-tight">
                       <span className="text-foreground whitespace-nowrap">
-                        {nextItem.studiedMinutesInRound}/{nextItem.plannedMinutes} min
+                        {Math.round(nextItem.studiedMinutesInRound)}/{nextItem.plannedMinutes} min
                       </span>
                       <span className="ml-auto text-primary whitespace-nowrap">
                         {Math.min(
@@ -474,7 +448,7 @@ export function ActiveCyclePanel({
             </h3>
           </div>
           <span className="text-[11px] font-bold text-muted-foreground">
-            {formatMinutes(totalPlannedMinutesPerRound)} / volta
+            {formatDurationMinutes(totalPlannedMinutesPerRound)} / volta
           </span>
         </div>
 
@@ -493,10 +467,10 @@ export function ActiveCyclePanel({
             const extra = Math.max(0, item.extraMinutesInRound)
             const progressPercent = Math.min(100, Math.round((studied / target) * 100))
             const progressLabel = formatCyclePercent(studied, target)
-            const metaLabel = formatCycleMinutes(target)
+            const metaLabel = formatDurationMinutes(target)
             const statusLine = isDone
-              ? `Extra: ${formatCycleDuration(extra * 60)} - Meta definida: ${metaLabel}`
-              : `Falta: ${formatCycleDuration(remaining * 60)} - Meta definida: ${metaLabel}`
+              ? `Extra: ${formatDuration(extra * 60)} - Meta definida: ${metaLabel}`
+              : `Falta: ${formatDuration(remaining * 60)} - Meta definida: ${metaLabel}`
             const barColor = isDone
               ? "bg-emerald-500"
               : isSkipped

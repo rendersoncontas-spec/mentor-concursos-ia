@@ -499,34 +499,14 @@ export async function importHistoryChunkAction(
       insertedHistoryIds = (inserted || []).map((r) => r.id)
     }
 
-    // Registrar estudos importados no ciclo se a disciplina estiver no ciclo ativo
+    // Um rebuild ao fim de cada chunk considera inclusive imports menores que um minuto.
+    // A duração canônica vem de metadata.imported_seconds, não de duration_minutes.
     if (insertedHistoryIds.length > 0) {
-      const { data: insertedRows } = await supabase
-        .from("study_history")
-        .select("id, discipline_id, duration_minutes, study_source")
-        .in("id", insertedHistoryIds)
-
-      if (insertedRows && insertedRows.length > 0) {
-        const studiesForCycle = insertedRows
-          .filter((r) => r.duration_minutes && r.duration_minutes > 0)
-          .map((r) => ({
-            studyHistoryId: r.id,
-            disciplineId: r.discipline_id,
-            durationMinutes: r.duration_minutes!,
-            studySource: r.study_source || "IMPORTED",
-          }))
-
-        if (studiesForCycle.length > 0) {
-          const cycleResult = await registerStudiesToCycleBatch(studiesForCycle).catch((err) => {
-            console.error("[importHistoryChunkAction] Erro ao registrar no ciclo:", err)
-            return { success: false, processed: 0, errors: [String(err?.message ?? err)] }
-          })
-          if (!cycleResult?.success) {
-            errorDetails.push(
-              `Ciclo não atualizado neste lote: ${(cycleResult?.errors || []).join("; ") || "erro desconhecido"}`,
-            )
-          }
-        }
+      const cycleResult = await registerStudiesToCycleBatch()
+      if (!cycleResult.success) {
+        errorDetails.push(
+          `Ciclo não atualizado neste lote: ${cycleResult.errors.join("; ") || "erro desconhecido"}`,
+        )
       }
     }
 
@@ -628,6 +608,7 @@ const IMPORT_REVALIDATE_PATHS = [
   "/estatisticas",
   "/ranking",
   "/planejamento",
+  "/ciclos",
 ]
 
 /**
@@ -685,6 +666,23 @@ export async function deleteImportBatchAction(
       .eq("user_id", user.id)
     if (batchError) return { success: false, error: batchError.message }
 
+    // BUG CRÍTICO CORRIGIDO: excluir um lote de importação apaga linhas reais de
+    // study_history e, sem isto, o progresso/extra do ciclo continuava contando
+    // estudos que não existem mais — o usuário precisava clicar em "Recalcular"
+    // manualmente. Reconciliar aqui torna a exclusão de importações automaticamente
+    // consistente, do mesmo jeito que a exclusão manual no Histórico.
+    if ((count ?? 0) > 0) {
+      const cycleResult = await registerStudiesToCycleBatch()
+      if (!cycleResult.success) {
+        for (const path of IMPORT_REVALIDATE_PATHS) revalidatePath(path)
+        return {
+          success: false,
+          deleted: count ?? 0,
+          error: `Importação excluída, mas o ciclo não foi atualizado: ${cycleResult.errors.join("; ") || "erro desconhecido"}`,
+        }
+      }
+    }
+
     for (const path of IMPORT_REVALIDATE_PATHS) revalidatePath(path)
     return { success: true, deleted: count ?? 0 }
   } catch (err) {
@@ -734,6 +732,21 @@ export async function deleteAllImportedAction(): Promise<{
       .delete()
       .eq("user_id", user.id)
     if (batchError) return { success: false, error: batchError.message }
+
+    // Mesmo raciocínio de deleteImportBatchAction: apagar todas as sessões
+    // importadas exige reconciliar o ciclo automaticamente, sem depender de
+    // "Recalcular".
+    if ((count ?? 0) > 0) {
+      const cycleResult = await registerStudiesToCycleBatch()
+      if (!cycleResult.success) {
+        for (const path of IMPORT_REVALIDATE_PATHS) revalidatePath(path)
+        return {
+          success: false,
+          deleted: count ?? 0,
+          error: `Dados importados excluídos, mas o ciclo não foi atualizado: ${cycleResult.errors.join("; ") || "erro desconhecido"}`,
+        }
+      }
+    }
 
     for (const path of IMPORT_REVALIDATE_PATHS) revalidatePath(path)
     return { success: true, deleted: count ?? 0 }

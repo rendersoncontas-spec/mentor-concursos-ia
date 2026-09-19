@@ -129,7 +129,9 @@ export async function discardReviewSessionAction(sessionId: string): Promise<{ d
 }
 
 /** Finaliza manualmente (fim da fila / sair no meio é tratado pela própria sessão). */
-export async function finalizeReviewSessionAction(sessionId: string): Promise<{ data: boolean; error: string | null }> {
+export async function finalizeReviewSessionAction(
+  sessionId: string,
+): Promise<{ data: boolean; error: string | null; cycleSyncError?: string | null }> {
   try {
     const supabase = await createClient()
     const { user } = await requireUser(supabase)
@@ -137,9 +139,9 @@ export async function finalizeReviewSessionAction(sessionId: string): Promise<{ 
     const { data: sessionRow } = await supabase.from("review_sessions").select("*").eq("id", sessionId).eq("user_id", user.id).maybeSingle()
     if (!sessionRow) return { data: false, error: "Sessão não encontrada." }
     const answeredIds = sessionRow["answered_ids"] as string[] | null ?? []
-    await finalizeSession(supabase, user.id, sessionId, answeredIds)
+    const { cycleSyncError } = await finalizeSession(supabase, user.id, sessionId, answeredIds)
     revalidatePath("/dashboard/reviews")
-    return { data: true, error: null }
+    return { data: true, error: null, cycleSyncError }
   } catch (err: unknown) {
     return { data: false, error: errorMessage(err) }
   }

@@ -36,6 +36,7 @@ const formatMinutesDigitalLocal = (m: number) => {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`
 }
 import { cn } from "@/lib/utils"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 interface EditItem {
   id?: string | undefined
@@ -59,14 +60,6 @@ const DIFFICULTY_OPTIONS: { value: CycleItemDifficulty; label: string; color: st
   { value: "MEDIA", label: "Média", color: "text-amber-600 dark:text-amber-400" },
   { value: "DIFICIL", label: "Difícil", color: "text-rose-600 dark:text-rose-400" },
 ]
-
-function formatMinutes(m: number): string {
-  const h = Math.floor(m / 60)
-  const min = m % 60
-  if (h === 0) return `${min}min`
-  if (min === 0) return `${h}h`
-  return `${h}h ${min}min`
-}
 
 export function EditCycleModal({
   open,
@@ -380,7 +373,7 @@ export function EditCycleModal({
                 Fila de Matérias ({items.length})
               </span>
               <span className="text-xs font-bold text-primary">
-                Total: {formatMinutes(totalMinutes)} por volta
+                Total: {formatDurationMinutes(totalMinutes)} por volta
               </span>
             </div>
 

@@ -5,20 +5,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
 import { cn } from "@/lib/utils"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 export interface CycleNextCardProps {
   item?: StudyPlanItemWithDetails | null
   activeSessionId?: string | null
   onStartSession?: (item: StudyPlanItemWithDetails) => void
   className?: string
-}
-
-function formatMinutes(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m} min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
 }
 
 export function CycleNextCard({
@@ -85,7 +78,7 @@ export function CycleNextCard({
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Clock className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                 <span>Recomendado: </span>
-                <strong className="text-foreground">{formatMinutes(item?.duration_minutes || 60)}</strong>
+                <strong className="text-foreground">{formatDurationMinutes(item?.duration_minutes || 60)}</strong>
               </div>
 
               <div className="text-right text-muted-foreground">

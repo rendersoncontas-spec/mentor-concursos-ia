@@ -5,18 +5,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { type RecentActivityItem } from "@/domain/dashboard/dashboard.types"
 import { cn } from "@/lib/utils"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 export interface RecentActivitiesListProps {
   items: RecentActivityItem[]
   className?: string
-}
-
-function formatMinutes(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
 }
 
 function formatTimeAgo(isoDate: string): string {
@@ -73,7 +66,7 @@ export function RecentActivityCard({ item }: { item: RecentActivityItem }) {
 
       <div className="flex items-center gap-2 shrink-0">
         <div className="text-right">
-          <span className="font-bold text-foreground block">{formatMinutes(item.duration_minutes)}</span>
+          <span className="font-bold text-foreground block">{formatDurationMinutes(item.duration_minutes)}</span>
           <span className="text-[10px] text-muted-foreground">{formatTimeAgo(item.started_at)}</span>
         </div>
         {item.completed && (

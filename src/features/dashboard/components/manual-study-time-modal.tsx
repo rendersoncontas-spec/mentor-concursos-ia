@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatDayLabel } from "@/lib/sao-paulo"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 interface ManualStudyTimeModalProps {
   open: boolean
@@ -189,7 +190,7 @@ export function ManualStudyTimeModal({
               </div>
               {totalMinutes > 0 && (
                 <p className="text-[11px] text-muted-foreground text-center">
-                  Total: {Math.floor(totalMinutes / 60)}h{totalMinutes % 60 > 0 ? `${totalMinutes % 60}min` : "00min"}
+                  Total: {formatDurationMinutes(totalMinutes)}
                 </p>
               )}
             </div>

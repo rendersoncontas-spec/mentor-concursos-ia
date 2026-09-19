@@ -69,6 +69,7 @@ export interface StudyCycle {
   current_round: number
   total_rounds_done: number
   current_item_progress_min: number
+  current_item_progress_seconds?: number | null
   created_at: string
   updated_at: string
 }
@@ -96,6 +97,8 @@ export interface StudyCycleSession {
   round_number: number
   minutes_contributed: number
   extra_minutes: number
+  seconds_contributed?: number | null
+  extra_seconds?: number | null
   discipline_id?: string | null
   is_skip?: boolean
   created_at: string

@@ -39,6 +39,7 @@ const formatMinutesDigitalLocal = (m: number) => {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`
 }
 import { cn } from "@/lib/utils"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 const DEFAULT_CONCURSO_DISCIPLINES = [
   "Língua Portuguesa",
@@ -101,14 +102,6 @@ const DIFFICULTY_OPTIONS: { value: CycleItemDifficulty; label: string; color: st
   { value: "MEDIA", label: "Média", color: "text-amber-600 dark:text-amber-400" },
   { value: "DIFICIL", label: "Difícil", color: "text-rose-600 dark:text-rose-400" },
 ]
-
-function formatMinutes(m: number): string {
-  const h = Math.floor(m / 60)
-  const min = m % 60
-  if (h === 0) return `${min}min`
-  if (min === 0) return `${h}h`
-  return `${h}h ${min}min`
-}
 
 export function CreateCycleModal({
   open,
@@ -491,7 +484,7 @@ export function CreateCycleModal({
                     Ciclo: {cycleName}
                   </span>
                   <span className="text-xs font-black text-primary">
-                    Tempo por volta: {formatMinutes(totalMinutesPerRound)}
+                    Tempo por volta: {formatDurationMinutes(totalMinutesPerRound)}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">

@@ -62,14 +62,21 @@ async function fetchActiveCycleDisciplines(
     .select("*")
     .eq("cycle_id", cycle.id)
 
+  const { data: skipRows } = await supabase
+    .from("study_cycle_item_skips")
+    .select("cycle_item_id")
+    .eq("cycle_id", cycle.id)
+    .eq("round_number", cycle.current_round || 1)
+
   const typedCycle = cycle as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycle
   const typedItems =
     items as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleItemWithDetails[]
   const typedSessions =
     (sessions || []) as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleSession[]
+  const skippedItemIds = new Set((skipRows || []).map((row) => row.cycle_item_id as string))
 
   // Usa o serviço oficial que respeita o cursor persistido (current_item_index / current_round)
-  const overview = buildCycleOverview(typedCycle, typedItems, typedSessions)
+  const overview = buildCycleOverview(typedCycle, typedItems, typedSessions, skippedItemIds)
 
   if (!overview.items || overview.items.length === 0) return []
 

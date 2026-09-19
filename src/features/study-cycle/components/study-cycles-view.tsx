@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-import { ArrowLeft, Calculator, Layers, Plus, RefreshCcw } from "lucide-react"
+import { ArrowLeft, Layers, Plus, RefreshCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -11,7 +11,6 @@ import {
   getActiveCycleAction,
   getCyclesAction,
   pauseCycleAction,
-  reconcileCycleProgressAction,
 } from "@/application/study-cycle/study-cycle.actions"
 import { getDisciplinesForAutocomplete } from "@/application/study-session/get-disciplines.action"
 import { Button } from "@/components/ui/button"
@@ -38,7 +37,6 @@ export function StudyCyclesView() {
   const [availableDisciplines, setAvailableDisciplines] = useState<DisciplineOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [isReconciling, setIsReconciling] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
@@ -83,21 +81,6 @@ export function StudyCyclesView() {
     setIsRefreshing(true)
     loadData()
   }, [loadData])
-
-const handleReconcile = useCallback(async () => {
-     setIsReconciling(true)
-     try {
-       const result = await reconcileCycleProgressAction()
-       if (result.success) {
-         toast.success(`Ciclo reconciliado: ${result.processed} sessões processadas.`)
-         loadData()
-       } else {
-         toast.error(result.errors[0] || "Erro ao reconciliar ciclo.")
-       }
-     } finally {
-       setIsReconciling(false)
-     }
-   }, [loadData])
 
   const handleActivate = useCallback(
     async (id: string) => {
@@ -180,18 +163,6 @@ const handleReconcile = useCallback(async () => {
               title="Atualizar ciclos"
             >
               <RefreshCcw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReconcile}
-              disabled={isReconciling}
-              className="h-8 shrink-0 gap-1.5 px-2.5 text-xs font-bold"
-              title="Recalcular progresso do ciclo a partir de todo o histórico"
-            >
-              <Calculator className={cn("h-3.5 w-3.5", isReconciling && "animate-pulse")} />
-              Recalcular
             </Button>
 
             <Button

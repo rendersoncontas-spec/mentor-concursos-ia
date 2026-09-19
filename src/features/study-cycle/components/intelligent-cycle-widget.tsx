@@ -29,14 +29,6 @@ import { useGlobalStudy } from "@/features/study-session/components/study-provid
 import { useCachedServerAction } from "@/hooks/use-cached-server-action"
 import { cn } from "@/lib/utils"
 
-function formatMinutes(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
-}
-
 function getLastSubjectOfRound(items: CycleItemProgress[]): CycleItemProgress | null {
   if (!items || items.length === 0) return null
   return items[items.length - 1] ?? null
@@ -333,7 +325,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
                 {currentItem.disciplineName}
               </p>
               <span className="text-[11px] font-black text-foreground whitespace-nowrap shrink-0">
-                {currentItem.studiedMinutesInRound}/{currentItem.plannedMinutes} min
+                {Math.round(currentItem.studiedMinutesInRound)}/{currentItem.plannedMinutes} min
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -349,7 +341,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
                 {Math.min(100, Math.round((currentItem.studiedMinutesInRound / Math.max(1, currentItem.plannedMinutes)) * 100))}%
                 {" · "}
                 {currentItem.remainingMinutesInRound > 0
-                  ? `Faltam ${currentItem.remainingMinutesInRound} min`
+                  ? `Faltam ${Math.round(currentItem.remainingMinutesInRound)} min`
                   : "Meta atingida!"}
               </span>
             </div>
@@ -370,7 +362,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
             <span className="font-semibold text-muted-foreground">
               {" "}· Meta {nextItem.plannedMinutes} min
               {nextItem.studiedMinutesInRound > 0 && (
-                <span className="text-primary"> · {nextItem.studiedMinutesInRound}/{nextItem.plannedMinutes}</span>
+                <span className="text-primary"> · {Math.round(nextItem.studiedMinutesInRound)}/{nextItem.plannedMinutes}</span>
               )}
             </span>
           </p>

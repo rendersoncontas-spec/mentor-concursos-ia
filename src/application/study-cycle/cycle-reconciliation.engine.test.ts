@@ -1,0 +1,340 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+
+import { reconcileCycleFromStudies } from "./cycle-reconciliation.engine"
+
+const items = [
+  { id: "a", disciplineId: "discipline-a", disciplineName: "A", targetSeconds: 3600 },
+  { id: "b", disciplineId: "discipline-b", disciplineName: "B", targetSeconds: 3600 },
+]
+
+test("cycle reconciliation counts every eligible source identically", () => {
+  const result = reconcileCycleFromStudies(items, [
+    { id: "free", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1800 },
+    { id: "imported", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+    { id: "cycle", cycleItemId: "a", disciplineId: "discipline-a", seconds: 600 },
+  ])
+
+  assert.equal(result.state.currentItemIndex, 1)
+  assert.equal(result.sessions.reduce((sum, session) => sum + session.seconds_contributed, 0), 3600)
+})
+
+test("cycle reconciliation is idempotent and preserves imported seconds", () => {
+  const studies = [{ id: "imported", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3425 }]
+  const once = reconcileCycleFromStudies(items, studies)
+  const again = reconcileCycleFromStudies(items, studies)
+
+  assert.deepEqual(again, once)
+  assert.equal(once.sessions[0]?.seconds_contributed, 3425)
+  assert.equal(once.state.currentItemProgressSeconds, 3425)
+})
+
+test("future completion does not move the cursor past the first incomplete item", () => {
+  const result = reconcileCycleFromStudies(items, [
+    { id: "future", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 },
+  ])
+
+  assert.equal(result.state.currentItemIndex, 0)
+})
+
+test("a completed round starts cleanly and never reuses old history", () => {
+  const result = reconcileCycleFromStudies(items, [
+    { id: "a-1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+    { id: "b-1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 },
+    { id: "a-2", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+  ])
+
+  assert.equal(result.state.totalRoundsDone, 1)
+  assert.equal(result.state.currentRound, 2)
+  assert.equal(result.state.currentItemIndex, 0)
+  assert.equal(result.state.currentItemProgressSeconds, 1200)
+  assert.equal(result.sessions[2]?.round_number, 2)
+})
+
+test("extra never becomes progress for the next round", () => {
+  const result = reconcileCycleFromStudies(items, [
+    { id: "a", cycleItemId: "a", disciplineId: "discipline-a", seconds: 5000 },
+  ])
+
+  assert.equal(result.sessions[0]?.seconds_contributed, 3600)
+  assert.equal(result.sessions[0]?.extra_seconds, 1400)
+  assert.equal(result.state.currentItemIndex, 1)
+  assert.equal(result.state.currentItemProgressSeconds, 0)
+  assert.equal(result.state.currentRound, 1)
+})
+
+test("a skipped item stops blocking the cursor without being marked 100%", () => {
+  const result = reconcileCycleFromStudies(
+    items,
+    [{ id: "a-1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 }],
+    [{ cycleItemId: "a", roundNumber: 1 }],
+  )
+
+  // Cursor moved past the skipped item even though it only has 1200/3600s of real progress.
+  assert.equal(result.state.currentItemIndex, 1)
+  // The skip never fabricates progress: the real studied seconds are unchanged.
+  assert.equal(result.sessions[0]?.seconds_contributed, 1200)
+  assert.equal(result.sessions[0]?.extra_seconds, 0)
+})
+
+test("skipping every item completes the round even with zero studies", () => {
+  const result = reconcileCycleFromStudies(items, [], [
+    { cycleItemId: "a", roundNumber: 1 },
+    { cycleItemId: "b", roundNumber: 1 },
+  ])
+
+  assert.equal(result.state.totalRoundsDone, 1)
+  assert.equal(result.state.currentRound, 2)
+  assert.equal(result.state.currentItemIndex, 0)
+})
+
+test("a skip only applies to the round it was recorded for", () => {
+  const result = reconcileCycleFromStudies(
+    items,
+    [
+      { id: "b-1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 },
+      // Completes round 1 (a skipped, b fully studied) and starts round 2.
+    ],
+    [{ cycleItemId: "a", roundNumber: 1 }],
+  )
+
+  assert.equal(result.state.currentRound, 2)
+  // In round 2 there is no skip recorded for "a", so it blocks the cursor again.
+  assert.equal(result.state.currentItemIndex, 0)
+})
+
+test("reconciliation with skips stays idempotent", () => {
+  const studies = [{ id: "a-1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 }]
+  const skips = [{ cycleItemId: "a", roundNumber: 1 }]
+  const once = reconcileCycleFromStudies(items, studies, skips)
+  const again = reconcileCycleFromStudies(items, studies, skips)
+  assert.deepEqual(again, once)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BUG CRÍTICO + AUTOMAÇÃO DEFINITIVA DO CICLO — cenários da Parte 15.
+//
+// O motor é puro e stateless: ele nunca sabe "o que mudou" entre uma chamada e
+// outra, apenas recebe a lista atual de estudos e recalcula tudo do zero. Por
+// isso, simular um DELETE/UPDATE/mudança de disciplina é simplesmente chamar
+// reconcileCycleFromStudies de novo com a lista já refletindo a mutação — que é
+// exatamente o que rebuildForUser faz contra o study_history real. Nenhum teste
+// abaixo faz soma/subtração incremental: cada "depois" é um recálculo completo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("DELETE: remover um estudo reduz o progresso do item e some da lista de sessões", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+    { id: "s2", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+  ])
+  assert.equal(before.state.currentItemProgressSeconds, 2400)
+  assert.equal(before.sessions.length, 2)
+
+  // "s2" foi excluído do Histórico — a nova lista simplesmente não o contém mais.
+  const after = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+  ])
+  assert.equal(after.state.currentItemProgressSeconds, 1200)
+  assert.equal(after.sessions.length, 1)
+  assert.equal(after.sessions.some((s) => s.study_history_id === "s2"), false)
+})
+
+test("DELETE: excluir o único estudo que completou um item torna-o incompleto de novo (cursor volta)", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+  ])
+  // "a" está satisfeito (100%), cursor já avançou para "b".
+  assert.equal(before.state.currentItemIndex, 1)
+
+  const after = reconcileCycleFromStudies(items, [])
+  // Sem "a1", "a" nunca foi estudado: o cursor deve voltar para ele, nunca
+  // preservar o 100% antigo.
+  assert.equal(after.state.currentItemIndex, 0)
+  assert.equal(after.state.currentItemProgressSeconds, 0)
+})
+
+test("DELETE: excluir um estudo que só gerava 'extra' reduz o extra sem desfazer a conclusão real", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+    { id: "a2", cycleItemId: "a", disciplineId: "discipline-a", seconds: 600 }, // puro extra
+  ])
+  const extraBefore = before.sessions.reduce((sum, s) => sum + s.extra_seconds, 0)
+  assert.equal(extraBefore, 600)
+  assert.equal(before.state.currentItemIndex, 1) // "a" completo, cursor em "b"
+
+  const after = reconcileCycleFromStudies(items, [
+    { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+  ])
+  const extraAfter = after.sessions.reduce((sum, s) => sum + s.extra_seconds, 0)
+  assert.equal(extraAfter, 0)
+  // A conclusão real de "a" não foi destruída por excluir só o estudo extra.
+  assert.equal(after.state.currentItemIndex, 1)
+  assert.equal(after.sessions.length, 1)
+})
+
+test("UPDATE (duração menor, ex.: 60min -> 30min): reduz a contribuição do item, sem duplicar", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+  ])
+  assert.equal(before.state.currentItemIndex, 1) // completo com 60min
+
+  // Mesma linha (mesmo id), duração editada para 30min — não é uma nova linha.
+  const after = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1800 },
+  ])
+  assert.equal(after.state.currentItemIndex, 0) // volta a ser incompleto
+  assert.equal(after.state.currentItemProgressSeconds, 1800)
+  assert.equal(after.sessions.length, 1)
+  assert.equal(after.sessions[0]?.study_history_id, "s1")
+})
+
+test("UPDATE (duração maior, ex.: 30min -> 60min): aumenta a contribuição do item, sem duplicar", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1800 },
+  ])
+  assert.equal(before.state.currentItemIndex, 0)
+
+  const after = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+  ])
+  assert.equal(after.state.currentItemIndex, 1)
+  assert.equal(after.sessions.length, 1)
+})
+
+test("UPDATE (troca de disciplina): tempo migra de um item para outro sem duplicar nem sobrar", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+  ])
+  const sumFor = (result: ReturnType<typeof reconcileCycleFromStudies>, itemId: string) =>
+    result.sessions
+      .filter((s) => s.cycle_item_id === itemId)
+      .reduce((sum, s) => sum + s.seconds_contributed, 0)
+
+  assert.equal(sumFor(before, "a"), 1200)
+  assert.equal(sumFor(before, "b"), 0)
+
+  // O mesmo estudo (s1) foi editado para apontar para a disciplina/item "b".
+  const after = reconcileCycleFromStudies(items, [
+    { id: "s1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 1200 },
+  ])
+  assert.equal(sumFor(after, "a"), 0)
+  assert.equal(sumFor(after, "b"), 1200)
+  assert.equal(after.sessions.length, 1) // continua sendo uma única linha, não duas
+})
+
+test("INSERT: um novo estudo aumenta o progresso do ciclo", () => {
+  const before = reconcileCycleFromStudies(items, [])
+  assert.equal(before.state.currentItemProgressSeconds, 0)
+
+  const after = reconcileCycleFromStudies(items, [
+    { id: "n1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 900 },
+  ])
+  assert.equal(after.state.currentItemProgressSeconds, 900)
+})
+
+test("Rebuilds repetidos após um DELETE continuam idempotentes", () => {
+  const studiesAfterDelete = [{ id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 }]
+  const once = reconcileCycleFromStudies(items, studiesAfterDelete)
+  const again = reconcileCycleFromStudies(items, studiesAfterDelete)
+  assert.deepEqual(again, once)
+})
+
+test("Um simples refresh (recalcular com a mesma lista) nunca muda o resultado", () => {
+  const studies = [
+    { id: "s1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1800 },
+    { id: "s2", cycleItemId: "b", disciplineId: "discipline-b", seconds: 900 },
+  ]
+  const first = reconcileCycleFromStudies(items, studies)
+  const secondCallSameData = reconcileCycleFromStudies(items, studies)
+  assert.deepEqual(first, secondCallSameData)
+})
+
+test("Múltiplas mutações sequenciais (insert, edit, delete) produzem um estado final determinístico", () => {
+  // O estado final depende só do conteúdo atual de study_history, nunca da
+  // sequência de mutações que levou até ele — por isso simular o "caminho"
+  // (inserir b1, editar a1, excluir b1) e simplesmente construir o resultado
+  // final direto devem bater exatamente.
+  const finalStudies = [{ id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1800 }]
+
+  const viaSimulatedPath = (() => {
+    let list: { id: string; cycleItemId: string; disciplineId: string; seconds: number }[] = [
+      { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+    ]
+    list = [...list, { id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 600 }] // insert
+    list = list.map((s) => (s.id === "a1" ? { ...s, seconds: 1800 } : s)) // edit
+    list = list.filter((s) => s.id !== "b1") // delete
+    return list
+  })()
+
+  assert.deepEqual(viaSimulatedPath, finalStudies)
+  assert.deepEqual(
+    reconcileCycleFromStudies(items, viaSimulatedPath),
+    reconcileCycleFromStudies(items, finalStudies),
+  )
+})
+
+test("DELETE de estudo de uma rodada anterior já concluída pode desfazer a conclusão daquela rodada", () => {
+  // Rodada 1 é concluída por a1 (completa "a") + b1 (completa "b"); depois
+  // disso, a2 já é progresso da rodada 2.
+  const before = reconcileCycleFromStudies(items, [
+    { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+    { id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 },
+    { id: "a2", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+  ])
+  assert.equal(before.state.totalRoundsDone, 1)
+  assert.equal(before.state.currentRound, 2)
+  assert.equal(before.state.currentItemProgressSeconds, 1200)
+
+  // Exclui a1 (o estudo que efetivamente fechou "a" na rodada 1).
+  const after = reconcileCycleFromStudies(items, [
+    { id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 },
+    { id: "a2", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1200 },
+  ])
+  // A rodada 1 nunca foi realmente concluída sem a1 — o rebuild não pode
+  // fingir que ela foi. total_rounds_done e current_round recuam, e a2
+  // (que antes "pertencia" à rodada 2) passa a contar como progresso real da
+  // rodada 1, porque tudo é recontado do zero, cronologicamente.
+  assert.equal(after.state.totalRoundsDone, 0)
+  assert.equal(after.state.currentRound, 1)
+  assert.equal(after.state.currentItemProgressSeconds, 1200)
+  assert.equal(after.sessions.some((s) => s.study_history_id === "a1"), false)
+  assert.equal(after.sessions.length, 2)
+})
+
+test("DELETE de um contribuinte redundante (extra) de rodada anterior NÃO desfaz a conclusão da rodada", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+    { id: "a1b", cycleItemId: "a", disciplineId: "discipline-a", seconds: 600 }, // extra dentro da rodada 1
+    { id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 },
+  ])
+  assert.equal(before.state.totalRoundsDone, 1)
+  assert.equal(before.state.currentRound, 2)
+
+  // Exclui só o estudo "extra" (a1b) — "a" continua legitimamente completo
+  // por a1 sozinho, então a rodada 1 continua concluída.
+  const after = reconcileCycleFromStudies(items, [
+    { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600 },
+    { id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 },
+  ])
+  assert.equal(after.state.totalRoundsDone, 1)
+  assert.equal(after.state.currentRound, 2)
+  const extraAfter = after.sessions.reduce((sum, s) => sum + s.extra_seconds, 0)
+  assert.equal(extraAfter, 0)
+})
+
+test("Skips duráveis continuam válidos após um DELETE em study_history (nunca são derivados dele)", () => {
+  const skips = [{ cycleItemId: "a", roundNumber: 1 }]
+  const before = reconcileCycleFromStudies(
+    items,
+    [{ id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600 }],
+    skips,
+  )
+  // "a" satisfeito por skip, "b" satisfeito por estudo real -> rodada 1 completa.
+  assert.equal(before.state.totalRoundsDone, 1)
+
+  // Excluindo b1 (o único estudo real), a rodada 1 deixa de estar completa —
+  // mas o skip de "a" continua ali, intocado, pronto para a próxima tentativa.
+  const after = reconcileCycleFromStudies(items, [], skips)
+  assert.equal(after.state.totalRoundsDone, 0)
+  assert.equal(after.state.currentItemIndex, 1) // "a" ainda satisfeito pelo skip; cursor vai para "b"
+})

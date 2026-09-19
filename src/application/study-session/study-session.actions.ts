@@ -20,8 +20,12 @@ export async function finalizeSmartSessionAction(payload: SessionCompletionPaylo
     // O Orquestrador cuida de tudo
     const summary = await SessionOrchestrator.finalizeSession(supabase, effectiveUserId, payload)
     
-    // Atualiza todas as métricas da dashboard
+    // Atualiza todas as métricas da dashboard e do ciclo (o orquestrador já
+    // chamou o registro central do ciclo — aqui só invalidamos as telas que
+    // dependem desses dados, para não deixar cache desatualizado).
     revalidatePath("/dashboard")
+    revalidatePath("/dashboard/history")
+    revalidatePath("/ciclos")
     
     return { data: summary, error: null }
   } catch (error: unknown) {

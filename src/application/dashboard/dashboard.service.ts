@@ -8,6 +8,7 @@ import { getRecentActivities } from "@/application/study-history/study-history.s
 import { getStartOfWeek } from "@/application/study-analytics/utils"
 import { getDayInSaoPaulo } from "@/lib/sao-paulo"
 import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 export async function getDashboardData(supabase: SupabaseClient, userId: string): Promise<DashboardSnapshot> {
   try {
@@ -355,9 +356,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         const accuracyPercentage = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0
         const totalMinutes = discHistory.reduce((acc: number, h) => acc + (h.duration_minutes || 0), 0)
         
-        const h = Math.floor(totalMinutes / 60)
-        const m = totalMinutes % 60
-        const tempoFormatted = totalMinutes > 0 ? `${h}h${m.toString().padStart(2, "0")}min` : "-"
+        const tempoFormatted = totalMinutes > 0 ? formatDurationMinutes(totalMinutes) : "-"
 
         return {
           id: ud.id,

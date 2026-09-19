@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { formatDurationMinutes } from "@/lib/format-duration"
 
 import {
   type RecentHistoryEntry,
@@ -64,12 +65,6 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
   const weeklyHours = snapshot?.user?.weekly_study_hours
   const targetMins = weeklyHours ? weeklyHours * 60 : null
 
-  const formatMin = (mins: number) => {
-    const h = Math.floor(mins / 60)
-    const m = mins % 60
-    return `${h}h ${m.toString().padStart(2, "0")}min`
-  }
-
   const pct = targetMins ? Math.min(100, Math.round((weeklyMins / targetMins) * 100)) : null
 
   if (colSpan === 1) {
@@ -87,7 +82,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
           <div>
             <span className="text-[10px] sm:text-[11px] text-muted-foreground font-bold uppercase block mb-0.5">Hoje</span>
             <span className="text-sm sm:text-base font-black text-foreground font-mono leading-tight">
-              {formatMin(dailyMins)}
+              {formatDurationMinutes(dailyMins)}
             </span>
           </div>
           <div className="text-right">
@@ -95,7 +90,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
               Semana
             </span>
             <span className="text-sm sm:text-base font-black text-[#2563EB] font-mono leading-tight">
-              {formatMin(weeklyMins)}
+              {formatDurationMinutes(weeklyMins)}
             </span>
           </div>
         </div>
@@ -126,7 +121,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
               Hoje
             </span>
             <span className="text-base font-black text-foreground font-mono">
-              {formatMin(dailyMins)}
+              {formatDurationMinutes(dailyMins)}
             </span>
           </div>
           <div className="bg-[#2563EB]/10 p-2.5 rounded-xl border border-[#2563EB]/20">
@@ -134,7 +129,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
               Esta Semana
             </span>
             <span className="text-base font-black text-[#2563EB] font-mono">
-              {formatMin(weeklyMins)}
+              {formatDurationMinutes(weeklyMins)}
             </span>
           </div>
         </div>
@@ -156,7 +151,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
           <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> PAINEL GERAL DE TEMPO DE ESTUDO
         </span>
         <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-3 py-1 rounded-full font-mono">
-          Meta Semanal: {targetMins === null ? "Não definida" : formatMin(targetMins)}
+          Meta Semanal: {targetMins === null ? "Não definida" : formatDurationMinutes(targetMins)}
         </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -165,7 +160,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             Hoje
           </span>
           <span className="text-xl font-black text-foreground font-mono">
-            {formatMin(dailyMins)}
+            {formatDurationMinutes(dailyMins)}
           </span>
         </div>
         <div className="bg-[#2563EB]/10 p-3.5 rounded-xl border border-[#2563EB]/20">
@@ -173,7 +168,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             Esta Semana
           </span>
           <span className="text-xl font-black text-[#2563EB] font-mono">
-            {formatMin(weeklyMins)}
+            {formatDurationMinutes(weeklyMins)}
           </span>
         </div>
         <div className="bg-emerald-500/10 p-3.5 rounded-xl border border-emerald-500/20">
@@ -1406,32 +1401,6 @@ function getIntensityClass(mins: number): string {
   return "bg-emerald-500/90 dark:bg-emerald-500 border border-emerald-700/60 dark:border-emerald-200/80"
 }
 
-function formatCompactTimeShort(mins: number): string {
-  if (mins <= 0) return ""
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h${m < 10 ? "0" : ""}${m}`
-}
-
-function formatFullTime(mins: number): string {
-  if (mins <= 0) return ""
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  if (h === 0) return `${m} min`
-  if (m === 0) return `${h}h`
-  return `${h}h${m}min`
-}
-
-function formatHM(mins: number): string {
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h${m}min`
-}
-
 const MONTH_NAMES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
   "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
@@ -1545,11 +1514,11 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
       {monthlyStats && monthlyStats.totalMinutes > 0 && (
         <div className="flex items-center justify-center gap-1.5 mb-1 text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap">
           <span>
-            Total <strong className="text-foreground font-mono">{formatHM(monthlyStats.totalMinutes)}</strong>
+            Total <strong className="text-foreground font-mono">{formatDurationMinutes(monthlyStats.totalMinutes)}</strong>
           </span>
           <span className="text-muted-foreground/40">•</span>
           <span>
-            Média <strong className="text-foreground font-mono">{formatHM(monthlyStats.averageMinutes)}</strong>/dia
+            Média <strong className="text-foreground font-mono">{formatDurationMinutes(monthlyStats.averageMinutes)}</strong>/dia
           </span>
           <span className="text-muted-foreground/40">•</span>
           <span>
@@ -1588,7 +1557,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
             <button
               key={i}
               onClick={() => handleDayClick(day)}
-              aria-label={`${day} de ${monthName} de ${year}${mins > 0 ? `, ${formatFullTime(mins)} estudados` : ""}`}
+              aria-label={`${day} de ${monthName} de ${year}${mins > 0 ? `, ${formatDurationMinutes(mins)} estudados` : ""}`}
               className={`relative rounded-md font-medium flex flex-col items-center justify-center
                 ${mins > 0 ? "p-1 sm:p-1.5 min-h-[62px] sm:min-h-[68px]" : isToday ? "p-0.5 sm:p-1 min-h-[40px] sm:min-h-[44px]" : "p-0.5 sm:p-1 min-h-[36px] sm:min-h-[40px]"}
                 cursor-pointer transition-all duration-150
@@ -1601,7 +1570,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
                     ? "hover:ring-1 hover:ring-emerald-500/50"
                     : "hover:bg-muted/60"
               }`}
-              title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatFullTime(mins)} estudados` : " — Clique para registrar estudo"}`}
+              title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatDurationMinutes(mins)} estudados` : " — Clique para registrar estudo"}`}
             >
 {/* Dia */}
                 <span
@@ -1626,7 +1595,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
                {/* Tempo estudado */}
                {mins > 0 && (
                  <span className="text-[10px] sm:text-xs leading-none font-black mt-1 text-emerald-950 dark:text-emerald-50 drop-shadow-xs">
-                   {formatCompactTimeShort(mins)}
+                   {(mins > 0 ? formatDurationMinutes(mins) : "")}
                  </span>
                )}
 
