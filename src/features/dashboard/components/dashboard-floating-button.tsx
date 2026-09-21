@@ -14,7 +14,7 @@ export function DashboardFloatingButton({ onClick }: DashboardFloatingButtonProp
       <Button
         onClick={onClick}
         size="icon"
-        className="w-14 h-14 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs transition-transform hover:scale-110 active:scale-95"
+        className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-white shadow-xs transition-transform hover:scale-110 active:scale-95"
         title="Personalizar Home"
       >
         <Settings2 className="w-6 h-6" />

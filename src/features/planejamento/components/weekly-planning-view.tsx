@@ -38,7 +38,7 @@ import { type StudyCycleBlock } from "./planning-view"
 function getEventCardClass(isDone: boolean, isPastOrToday: boolean): string {
   if (isDone) return "bg-emerald-500/10 border-emerald-500/50 hover:border-emerald-600"
   if (isPastOrToday) return "bg-rose-500/10 border-rose-500/40 hover:border-rose-600"
-  return "bg-muted/30 border-muted hover:border-[#2563EB]"
+  return "bg-muted/30 border-muted hover:border-primary"
 }
 
 export interface WeeklyStudyEvent {
@@ -396,7 +396,7 @@ export function WeeklyPlanningView({
               <button type="button" className="p-1 hover:bg-muted rounded-md text-muted-foreground">
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <h2 className="text-lg font-black text-[#2563EB]">
+              <h2 className="text-lg font-black text-primary">
                 {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
               </h2>
               <button type="button" className="p-1 hover:bg-muted rounded-md text-muted-foreground">
@@ -437,7 +437,7 @@ export function WeeklyPlanningView({
                     headerStyle = "bg-rose-600 text-white font-black"
                     statusTag = "Incompleta"
                   } else {
-                    headerStyle = "bg-[#2563EB] text-white font-black"
+                    headerStyle = "bg-primary text-white font-black"
                     statusTag = "Programado"
                   }
                 } else if (isDuty) {
@@ -551,7 +551,7 @@ export function WeeklyPlanningView({
           <div className="rounded-2xl border bg-card p-4 shadow-xs space-y-3 text-center">
             <div className="flex items-center justify-between text-xs font-extrabold text-foreground border-b pb-2">
               <span className="text-muted-foreground uppercase text-[10px]">AGO.</span>
-              <div className="flex items-center gap-1 font-mono text-[11px] text-[#2563EB]">
+              <div className="flex items-center gap-1 font-mono text-[11px] text-primary">
                 <ChevronLeft className="h-3.5 w-3.5 cursor-pointer" />
                 <span>02/08 ~ 08/08</span>
                 <ChevronRight className="h-3.5 w-3.5 cursor-pointer" />
@@ -580,15 +580,15 @@ export function WeeklyPlanningView({
               <span>1</span>
 
               {/* Semana Ativa Destacada */}
-              <span className="bg-[#dbeafe] text-[#2563EB] font-bold rounded-md py-0.5">2</span>
-              <span className="bg-[#dbeafe] text-[#2563EB] font-bold rounded-md py-0.5">3</span>
-              <span className="bg-[#dbeafe] text-[#2563EB] font-bold rounded-md py-0.5">4</span>
-              <span className="bg-[#dbeafe] text-[#2563EB] font-bold rounded-md py-0.5">5</span>
-              <span className="bg-[#2563EB] text-white font-bold rounded-md py-0.5 shadow-xs">
+              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">2</span>
+              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">3</span>
+              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">4</span>
+              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">5</span>
+              <span className="bg-primary text-white font-bold rounded-md py-0.5 shadow-xs">
                 6
               </span>
-              <span className="bg-[#dbeafe] text-[#2563EB] font-bold rounded-md py-0.5">7</span>
-              <span className="bg-[#dbeafe] text-[#2563EB] font-bold rounded-md py-0.5">8</span>
+              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">7</span>
+              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">8</span>
 
               <span>9</span>
               <span>10</span>
@@ -630,7 +630,7 @@ export function WeeklyPlanningView({
                   onChange={(e) =>
                     setActiveAgendas({ ...activeAgendas, revisoes: e.target.checked })
                   }
-                  className="rounded text-[#2563EB] focus:ring-[#2563EB]"
+                  className="rounded text-primary focus:ring-primary"
                 />
                 <span>REVISÕES</span>
               </label>
@@ -642,7 +642,7 @@ export function WeeklyPlanningView({
                   onChange={(e) =>
                     setActiveAgendas({ ...activeAgendas, historico: e.target.checked })
                   }
-                  className="rounded text-[#2563EB] focus:ring-[#2563EB]"
+                  className="rounded text-primary focus:ring-primary"
                 />
                 <span>HISTÓRICO</span>
               </label>
@@ -654,7 +654,7 @@ export function WeeklyPlanningView({
                   onChange={(e) =>
                     setActiveAgendas({ ...activeAgendas, planejamento: e.target.checked })
                   }
-                  className="rounded text-[#2563EB] focus:ring-[#2563EB]"
+                  className="rounded text-primary focus:ring-primary"
                 />
                 <span>PLANEJAMENTO</span>
               </label>
@@ -692,7 +692,7 @@ export function WeeklyPlanningView({
                   placeholder="Disciplina"
                   value={formDiscipline}
                   onChange={(e) => setFormDiscipline(e.target.value)}
-                  className="border-0 border-b border-[#2563EB] rounded-none shadow-none px-0 text-sm font-bold placeholder:text-muted-foreground/60 focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold placeholder:text-muted-foreground/60 focus-visible:ring-0"
                 />
               </div>
 
@@ -704,7 +704,7 @@ export function WeeklyPlanningView({
                   placeholder="00:00"
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
-                  className="border-0 border-b border-[#2563EB] rounded-none shadow-none px-0 text-sm font-bold font-mono focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold font-mono focus-visible:ring-0"
                 />
               </div>
 
@@ -715,7 +715,7 @@ export function WeeklyPlanningView({
                   type="text"
                   value={formDate}
                   onChange={(e) => setFormDate(e.target.value)}
-                  className="border-0 border-b border-[#2563EB] rounded-none shadow-none px-0 text-sm font-bold font-mono focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold font-mono focus-visible:ring-0"
                 />
               </div>
 
@@ -724,7 +724,7 @@ export function WeeklyPlanningView({
                 <select
                   value={formRepeat}
                   onChange={(e) => setFormRepeat(e.target.value)}
-                  className="w-full border-0 border-b border-[#2563EB] bg-transparent text-xs font-bold text-foreground py-1 focus:outline-none cursor-pointer"
+                  className="w-full border-0 border-b border-primary bg-transparent text-xs font-bold text-foreground py-1 focus:outline-none cursor-pointer"
                 >
                   <option value="Não se repete">Não se repete</option>
                   <option value="Todos os dias">Todos os dias</option>
@@ -740,7 +740,7 @@ export function WeeklyPlanningView({
                   placeholder="Tópico"
                   value={formTopic}
                   onChange={(e) => setFormTopic(e.target.value)}
-                  className="border-0 border-b border-[#2563EB] rounded-none shadow-none px-0 text-sm font-bold focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold focus-visible:ring-0"
                 />
               </div>
             </div>
@@ -750,7 +750,7 @@ export function WeeklyPlanningView({
               <Button
                 type="button"
                 onClick={handleSaveEvent}
-                className="w-full bg-[#dbeafe] hover:bg-[#2563EB] text-[#2563EB] hover:text-white font-bold text-xs py-5 rounded-xl transition-all shadow-xs"
+                className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-white font-bold text-xs py-5 rounded-xl transition-all shadow-xs"
               >
                 Salvar
               </Button>

@@ -125,7 +125,7 @@ export function PedirEditalView() {
     if (isLoading) {
       return (
         <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
-          <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
           <p className="text-xs text-muted-foreground font-medium">Carregando seus pedidos...</p>
         </div>
       )
@@ -140,7 +140,7 @@ export function PedirEditalView() {
           <p className="text-xs text-muted-foreground font-medium">{loadError}</p>
           <Button
             onClick={loadRequests}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs mt-2"
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-xs mt-2"
           >
             Tentar novamente
           </Button>
@@ -160,7 +160,7 @@ export function PedirEditalView() {
 
           <Button
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs mt-2"
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-xs mt-2"
           >
             Pedir agora
           </Button>
@@ -234,7 +234,7 @@ export function PedirEditalView() {
 
         <Button
           onClick={() => setIsModalOpen(true)}
-          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-xs"
         >
           Novo pedido
         </Button>
@@ -247,7 +247,7 @@ export function PedirEditalView() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full h-9 bg-transparent border-b border-[#2563EB] text-xs font-bold text-foreground focus:outline-none cursor-pointer py-1"
+          className="w-full h-9 bg-transparent border-b border-primary text-xs font-bold text-foreground focus:outline-none cursor-pointer py-1"
         >
           <option value="Todos">Todos</option>
           <option value="Pendente">Pendente</option>
@@ -279,7 +279,7 @@ export function PedirEditalView() {
                   placeholder="Ex: Polícia Federal 2026"
                   value={editalName}
                   onChange={(e) => setEditalName(e.target.value)}
-                  className="w-full bg-transparent border-b border-[#2563EB] text-xs font-semibold text-foreground py-1.5 focus:outline-none placeholder:text-muted-foreground/50"
+                  className="w-full bg-transparent border-b border-primary text-xs font-semibold text-foreground py-1.5 focus:outline-none placeholder:text-muted-foreground/50"
                   required
                   autoFocus
                 />
@@ -296,7 +296,7 @@ export function PedirEditalView() {
                     placeholder="Ex: Delegado"
                     value={cargo}
                     onChange={(e) => setCargo(e.target.value)}
-                    className="w-full bg-transparent border-b border-[#2563EB] text-xs font-semibold text-foreground py-1.5 focus:outline-none placeholder:text-muted-foreground/50"
+                    className="w-full bg-transparent border-b border-primary text-xs font-semibold text-foreground py-1.5 focus:outline-none placeholder:text-muted-foreground/50"
                   />
                 </div>
 
@@ -309,7 +309,7 @@ export function PedirEditalView() {
                     placeholder="https://..."
                     value={linkUrl}
                     onChange={(e) => setLinkUrl(e.target.value)}
-                    className="w-full bg-transparent border-b border-[#2563EB] text-xs font-semibold text-foreground py-1.5 focus:outline-none placeholder:text-muted-foreground/50"
+                    className="w-full bg-transparent border-b border-primary text-xs font-semibold text-foreground py-1.5 focus:outline-none placeholder:text-muted-foreground/50"
                   />
                 </div>
               </div>
@@ -324,7 +324,7 @@ export function PedirEditalView() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value.substring(0, 100))}
                   maxLength={100}
-                  className="w-full bg-transparent border-b border-[#2563EB] text-xs font-semibold text-foreground py-1.5 focus:outline-none resize-none h-16 placeholder:text-muted-foreground/50"
+                  className="w-full bg-transparent border-b border-primary text-xs font-semibold text-foreground py-1.5 focus:outline-none resize-none h-16 placeholder:text-muted-foreground/50"
                 />
                 <div className="text-right text-[10px] text-muted-foreground font-mono">
                   {description.length}/100
@@ -337,7 +337,7 @@ export function PedirEditalView() {
                   ANEXAR EDITAL (OBRIGATÓRIO SE NÃO INFORMAR LINK: 1 ARQUIVO PDF, ATÉ 20MB)
                 </label>
 
-                <label className="border border-dashed border-muted hover:border-[#2563EB] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/20">
+                <label className="border border-dashed border-muted hover:border-primary rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/20">
                   <Upload className="h-5 w-5 text-muted-foreground mb-1" />
                   <span className="text-xs font-bold text-muted-foreground">
                     {pdfFile ? pdfFile.name : "Inserir seu PDF aqui"}
@@ -371,7 +371,7 @@ export function PedirEditalView() {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-7 h-9 rounded-xl shadow-xs"
+                  className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-7 h-9 rounded-xl shadow-xs"
                 >
                   {isSubmitting ? (
                     <>

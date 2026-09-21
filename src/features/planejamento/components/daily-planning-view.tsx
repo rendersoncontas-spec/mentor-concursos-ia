@@ -324,6 +324,19 @@ export function DailyPlanningView({
     }
   }
 
+  // Reverte a marcação otimista de "bloco fechado" quando closeBlockManuallyAction
+  // falha (ver handleConfirmCloseBlock) — usa a forma funcional para não gravar
+  // no localStorage um valor "stale" capturado antes da atualização otimista.
+  const revertOptimisticClose = (keysToRemove: string[]) => {
+    setClosedBlockKeys((prev) => {
+      const reverted = prev.filter((k) => !keysToRemove.includes(k))
+      try {
+        localStorage.setItem("mentor_closed_block_keys", JSON.stringify(reverted))
+      } catch {}
+      return reverted
+    })
+  }
+
   const handleConfirmCloseBlock = async () => {
     if (!blockToClose) return
     const key1 = blockToClose.id
@@ -342,16 +355,27 @@ export function DailyPlanningView({
 
     setClosingBlock(true)
     try {
-      await closeBlockManuallyAction(
+      const result = await closeBlockManuallyAction(
         blockToClose.id,
         blockToClose.durationMinutes,
         blockToClose.studiedMinutes,
       )
+      if (!result.ok) {
+        // Antes o retorno não era verificado: mesmo com result.ok === false a UI
+        // já tinha marcado o bloco como fechado no localStorage (acima) e mostrava
+        // toast de sucesso — o bloco sumia da lista permanentemente sem nada ter
+        // sido persistido no servidor. Agora desfazemos a marcação otimista e
+        // avisamos o usuário do erro real.
+        revertOptimisticClose(newKeys)
+        toast.error(result.error || "Erro ao concluir o bloco.")
+        return
+      }
       toast.success("Bloco concluído. Os minutos restantes não serão reprogramados.")
       setBlockToClose(null)
       window.dispatchEvent(new CustomEvent(STUDY_SESSION_SAVED_EVENT))
       await loadReplanInfo()
     } catch {
+      revertOptimisticClose(newKeys)
       toast.error("Erro ao concluir o bloco.")
     } finally {
       setClosingBlock(false)
@@ -667,7 +691,7 @@ export function DailyPlanningView({
           <Button
             onClick={onReplan}
             size="sm"
-            className="font-bold text-xs bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer"
+            className="font-bold text-xs bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer"
           >
             Gerar Planejamento com IA
           </Button>
@@ -687,7 +711,7 @@ export function DailyPlanningView({
       {/* Linha 1: Controles de Data e Navegação */}
       <div className="flex items-start justify-between gap-3 border-b pb-2.5">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <CalendarIcon className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
@@ -707,7 +731,7 @@ export function DailyPlanningView({
                 : "Nenhum planejamento ativo para esta data"}
             </p>
             {hasAdjustments && (
-              <p className="text-[11px] font-bold text-[#2563EB] mt-0.5 flex items-center gap-1">
+              <p className="text-[11px] font-bold text-primary mt-0.5 flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" /> Ajustado devido às pendências de ontem
               </p>
             )}
@@ -729,7 +753,7 @@ export function DailyPlanningView({
               variant="outline"
               size="sm"
               onClick={handleGoToday}
-              className="h-10 px-3 rounded-lg text-xs font-bold text-[#2563EB] border-[#2563EB]/30 hidden sm:flex"
+              className="h-10 px-3 rounded-lg text-xs font-bold text-primary border-primary/30 hidden sm:flex"
             >
               Ir para Hoje
             </Button>
@@ -759,8 +783,8 @@ export function DailyPlanningView({
 
       {/* Aviso de reajuste automático */}
       {showBanner && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#2563EB]/10 border border-[#2563EB]/20 rounded-xl px-3.5 py-2.5">
-          <p className="text-xs font-bold text-[#2563EB] flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-primary/10 border border-primary/20 rounded-xl px-3.5 py-2.5">
+          <p className="text-xs font-bold text-primary flex items-center gap-1.5">
             <RefreshCw className="w-3.5 h-3.5 shrink-0" />
             Cronograma reajustado — {lastEvent.message}
           </p>
@@ -769,7 +793,7 @@ export function DailyPlanningView({
               variant="ghost"
               size="sm"
               onClick={() => setShowPendencies((v) => !v)}
-              className="h-7 px-2.5 text-[11px] font-bold text-[#2563EB] rounded-lg cursor-pointer"
+              className="h-7 px-2.5 text-[11px] font-bold text-primary rounded-lg cursor-pointer"
             >
               {showPendencies ? "Ocultar alterações" : "Ver alterações"}
             </Button>
@@ -828,7 +852,7 @@ export function DailyPlanningView({
                     size="sm"
                     onClick={() => setPendingToPull(p)}
                     disabled={pullingPending}
-                    className="h-7 px-2.5 text-[11px] font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-lg cursor-pointer shadow-xs"
+                    className="h-7 px-2.5 text-[11px] font-bold bg-primary text-white hover:bg-primary/90 rounded-lg cursor-pointer shadow-xs"
                   >
                     Puxar para hoje
                   </Button>
@@ -843,7 +867,7 @@ export function DailyPlanningView({
                 type="checkbox"
                 checked={replanInfo?.enabled ?? true}
                 onChange={(e) => void handleToggleAuto(e.target.checked)}
-                className="w-3.5 h-3.5 accent-[#2563EB] cursor-pointer"
+                className="w-3.5 h-3.5 accent-primary cursor-pointer"
               />
               Reajustar automaticamente meu cronograma
             </label>
@@ -852,7 +876,7 @@ export function DailyPlanningView({
                 size="sm"
                 onClick={() => void handleManualReplan()}
                 disabled={busy || replanInfo?.replanPaused}
-                className="h-8 px-3 text-[11px] font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-lg cursor-pointer"
+                className="h-8 px-3 text-[11px] font-bold bg-primary text-white hover:bg-primary/90 rounded-lg cursor-pointer"
               >
                 <RefreshCw className={`w-3 h-3 mr-1 ${busy ? "animate-spin" : ""}`} />
                 {replanInfo?.replanPaused ? "Pausado" : "Recalcular cronograma"}
@@ -863,7 +887,7 @@ export function DailyPlanningView({
       )}
 
       {/* Linha 2: Pílulas de Métricas — Meta, Estudado, Falta, Planejado, Pendências */}
-      <div className="grid grid-cols-5 gap-1.5 sm:gap-2 border-b pb-3 sm:pb-3.5">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2 border-b pb-3 sm:pb-3.5">
         {/* Meta (semanal) */}
         <div className="bg-primary/5 dark:bg-primary/10 border border-primary/15 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-primary/10">
           <span className="text-[10px] font-extrabold uppercase text-primary/70 tracking-wider truncate">
@@ -957,7 +981,7 @@ export function DailyPlanningView({
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
             Cronograma do Dia
           </h3>
-          <span className="text-xs font-bold text-[#2563EB]">
+          <span className="text-xs font-bold text-primary">
             {scheduledTasks.length} matéria{scheduledTasks.length !== 1 ? "s" : ""} programada
             {scheduledTasks.length !== 1 ? "s" : ""}
           </span>
@@ -1024,7 +1048,7 @@ export function DailyPlanningView({
                               </span>
                             )}
                             {status === "PENDENCIA" && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#2563EB]/10 text-[#2563EB]">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
                                 Pendência
                               </span>
                             )}
@@ -1165,7 +1189,7 @@ export function DailyPlanningView({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-black text-foreground">
-              <Sparkles className="w-5 h-5 text-[#2563EB]" />
+              <Sparkles className="w-5 h-5 text-primary" />
               Puxar pendência para hoje?
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground pt-1.5 leading-relaxed">
@@ -1190,7 +1214,7 @@ export function DailyPlanningView({
               size="sm"
               onClick={() => void handleConfirmPullPending()}
               disabled={pullingPending}
-              className="text-xs font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer"
+              className="text-xs font-bold bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer"
             >
               {pullingPending ? (
                 <>

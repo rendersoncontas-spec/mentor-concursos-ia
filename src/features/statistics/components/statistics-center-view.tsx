@@ -1,12 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from "react"
 
 import {
   AlertTriangle,
   BarChart3,
+  BookOpen,
   Brain,
   CheckCircle2,
+  Clock,
   Download,
   Info,
   ListChecks,
@@ -522,7 +524,7 @@ export function StatisticsCenterView() {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-[#2563EB]" />
+            <BarChart3 className="h-6 w-6 text-primary" />
             Estatísticas
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -560,7 +562,7 @@ export function StatisticsCenterView() {
                 onClick={() => setRange(r.id)}
                 className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   range === r.id
-                    ? "bg-background text-foreground shadow-sm"
+                    ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -871,8 +873,8 @@ export function StatisticsCenterView() {
         {topicStats.length === 0 ? (
           <EmptyState title="Sem tópicos" message="Registre tópicos nas sessões (ex.: “Controle de Constitucionalidade”) para ver o desempenho por assunto." />
         ) : (
-          <div className="max-h-96 overflow-y-auto">
-            <table className="w-full text-xs">
+          <div className="max-h-96 overflow-auto">
+            <table className="w-full text-xs min-w-[520px]">
               <thead>
                 <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   <th className="py-2.5 px-3 text-left font-bold">Tópico</th>
@@ -960,7 +962,7 @@ export function StatisticsCenterView() {
                     yAxisId="q"
                     dataKey="questions"
                     name="Questões"
-                    fill="#2563EB"
+                    fill="hsl(var(--primary))"
                     radius={[3, 3, 0, 0]}
                     barSize={Math.max(2, Math.min(10, 360 / questionTrend.length))}
                   />
@@ -997,7 +999,7 @@ export function StatisticsCenterView() {
         subtitle="Índice 0-100 com fórmula documentada abaixo"
         action={
           productivity.score !== null ? (
-            <span className="text-3xl font-black text-[#2563EB] font-mono">
+            <span className="text-3xl font-black text-primary font-mono">
               {productivity.score}
             </span>
           ) : null
@@ -1037,7 +1039,7 @@ export function StatisticsCenterView() {
       <SectionCard
         title="Análise inteligente"
         subtitle="Insights gerados por regras determinísticas sobre os seus dados (sem IA de terceiros)"
-        action={<Sparkles className="h-4 w-4 text-[#2563EB]" />}
+        action={<Sparkles className="h-4 w-4 text-primary" />}
       >
         <BestTimeOfDaySection analysis={timeOfDayAnalysis} />
         {insights.length === 0 ? (
@@ -1067,7 +1069,7 @@ export function StatisticsCenterView() {
       <SectionCard
         title="Prioridades de estudo"
         subtitle="Score de atenção 0-100: desempenho 30% · erros 15% · abandono 20% · revisão atrasada 15% · cobertura 10% · tendência 10%"
-        action={<ListChecks className="h-4 w-4 text-[#2563EB]" />}
+        action={<ListChecks className="h-4 w-4 text-primary" />}
       >
         {priorities.length === 0 ? (
           <EmptyState title="Sem prioridades" message="Sem disciplinas estudadas no período." />
@@ -1078,13 +1080,13 @@ export function StatisticsCenterView() {
                 key={p.disciplineId}
                 className="flex items-start gap-3 rounded-lg border bg-card p-3"
               >
-                <span className="w-6 h-6 rounded-full bg-[#2563EB]/10 text-[#2563EB] text-xs font-black flex items-center justify-center shrink-0">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-black flex items-center justify-center shrink-0">
                   {i + 1}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-xs font-bold">{p.name}</p>
-                    <span className="text-xs font-black font-mono text-[#2563EB]">
+                    <span className="text-xs font-black font-mono text-primary">
                       {p.score}
                       <span className="text-muted-foreground font-semibold">/100</span>
                     </span>
@@ -1186,7 +1188,7 @@ export function StatisticsCenterView() {
                   <Bar
                     dataKey="actualMinutes"
                     name="Realizado"
-                    fill="#2563EB"
+                    fill="hsl(var(--primary))"
                     radius={[3, 3, 0, 0]}
                   />
                   <Line
@@ -1210,7 +1212,7 @@ export function StatisticsCenterView() {
         subtitle="Status das disciplinas do seu concurso e cobertura geral"
         action={
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-black text-[#2563EB] font-mono">
+            <span className="text-2xl font-black text-primary font-mono">
               {edital.percentage}%
             </span>
             <div className="w-28">
@@ -1229,8 +1231,8 @@ export function StatisticsCenterView() {
               <Metric label="Em estudo" value={edital.studying} sub="status EM_ESTUDO" />
               <Metric label="Não iniciadas" value={edital.notStarted} sub="status NOT_STARTED" />
             </div>
-            <div className="max-h-72 overflow-y-auto">
-              <table className="w-full text-xs">
+            <div className="max-h-72 overflow-auto">
+              <table className="w-full text-xs min-w-[480px]">
                 <thead>
                   <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
@@ -1427,19 +1429,27 @@ function typeLabel(t: string): string {
   return map[t] ?? t
 }
 
-function statusLabel(status: string): string {
-  const map: Record<string, string> = {
-    CONCLUIDA: "✅ Concluída",
-    COMPLETED: "✅ Concluída",
-    CONCLUÍDA: "✅ Concluída",
-    EM_ESTUDO: "📘 Em estudo",
-    STUDYING: "📘 Em estudo",
-    EM_REVISAO: "🔁 Em revisão",
-    REVISING: "🔁 Em revisão",
-    NOT_STARTED: "⏳ Não iniciada",
-    NOT_STARTED_: "⏳ Não iniciada",
+function statusLabel(status: string): ReactNode {
+  const map: Record<string, { label: string; icon: ElementType; className: string }> = {
+    CONCLUIDA: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-600 dark:text-emerald-400" },
+    COMPLETED: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-600 dark:text-emerald-400" },
+    CONCLUÍDA: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-600 dark:text-emerald-400" },
+    EM_ESTUDO: { label: "Em estudo", icon: BookOpen, className: "text-primary" },
+    STUDYING: { label: "Em estudo", icon: BookOpen, className: "text-primary" },
+    EM_REVISAO: { label: "Em revisão", icon: RefreshCw, className: "text-amber-600 dark:text-amber-400" },
+    REVISING: { label: "Em revisão", icon: RefreshCw, className: "text-amber-600 dark:text-amber-400" },
+    NOT_STARTED: { label: "Não iniciada", icon: Clock, className: "text-muted-foreground" },
+    NOT_STARTED_: { label: "Não iniciada", icon: Clock, className: "text-muted-foreground" },
   }
-  return map[status] ?? status
+  const entry = map[status]
+  if (!entry) return status
+  const Icon = entry.icon
+  return (
+    <span className={`inline-flex items-center gap-1 justify-end ${entry.className}`}>
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      {entry.label}
+    </span>
+  )
 }
 
 function focusBarCls(pct: number | null): string {
@@ -1468,7 +1478,7 @@ function Donut({ value, size }: { value: number | null; size: number }) {
           cy="18"
           r="15.9"
           fill="none"
-          stroke="#2563EB"
+          stroke="hsl(var(--primary))"
           strokeWidth="3.8"
           strokeLinecap="round"
           strokeDasharray={`${v}, 100`}
@@ -1545,7 +1555,7 @@ function EvolutionChart({
 }) {
   const [metric, setMetric] = useState("minutos")
   const lineBased = metric === "acuracia" || metric === "foco"
-  let color = "#2563EB"
+  let color = "hsl(var(--primary))"
   if (metric === "acuracia") color = "#22c55e"
   else if (metric === "foco") color = "#8b5cf6"
 
@@ -1563,7 +1573,7 @@ function EvolutionChart({
               onClick={() => setMetric(m.id)}
               className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
                 metric === m.id
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -1917,7 +1927,7 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
     <SectionCard
       title="Revisões (memória)"
       subtitle="Fila do motor de repetição espaçada — atrasadas, de hoje e concluídas nos últimos 30 dias"
-      action={<Brain className="h-4 w-4 text-[#2563EB]" />}
+      action={<Brain className="h-4 w-4 text-primary" />}
     >
       {revision.totalPending === 0 && revision.completedLast30 === 0 ? (
         <EmptyState title="Sem revisões" message="Nenhum item de revisão ainda. Quando o motor de repetição espaçada tiver itens, eles aparecem aqui com a taxa de conclusão." />
@@ -1942,8 +1952,8 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
             />
           </div>
           {revision.byDiscipline.length > 0 && (
-            <div className="max-h-56 overflow-y-auto">
-              <table className="w-full text-xs">
+            <div className="max-h-56 overflow-auto">
+              <table className="w-full text-xs min-w-[380px]">
                 <thead>
                   <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
@@ -2035,7 +2045,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
     return (
       <div className="rounded-xl border border-border/60 bg-muted/5 p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="h-4 w-4 text-[#2563EB]" />
+          <Sparkles className="h-4 w-4 text-primary" />
           <p className="text-xs font-bold">Análise de melhor horário</p>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -2053,14 +2063,14 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
   return (
     <div className="space-y-4 mb-4">
       {/* === DESTAQUE: MELHOR HORÁRIO === */}
-      <div className="rounded-xl border border-[#2563EB]/40 bg-[#2563EB]/5 p-4">
+      <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Sparkles className="h-4 w-4 text-[#2563EB]" />
+          <Sparkles className="h-4 w-4 text-primary" />
           <p className="text-xs font-bold text-foreground">Melhor horário para você</p>
         </div>
 
         <div className="flex flex-wrap items-baseline gap-2 mb-3">
-          <p className="text-lg font-black text-[#2563EB] uppercase tracking-tight">{ob.label}</p>
+          <p className="text-lg font-black text-primary uppercase tracking-tight">{ob.label}</p>
           <span className="text-sm font-mono text-muted-foreground">{ob.range}</span>
         </div>
 
@@ -2104,31 +2114,27 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
 
       {/* === MELHOR FOCO & MELHOR ACERTO === */}
       {(bf || ba) && bf?.period !== ba?.period && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
           {bf && (
-            <div className="rounded-lg border border-border/60 p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Melhor foco
-                </p>
-              </div>
-              <p className="text-sm font-bold text-foreground">{bf.label}</p>
+            <div className="pt-3 sm:pt-0 sm:pr-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Melhor foco
+              </p>
+              <p className="text-sm font-bold text-foreground mt-0.5">{bf.label}</p>
               <p className="text-xs font-mono text-muted-foreground">{bf.range}</p>
-              <p className="text-lg font-black text-[#2563EB] mt-1">
+              <p className="text-lg font-black text-primary mt-1">
                 {bf.focusAvg !== null ? `${Math.round(bf.focusAvg)}%` : "—"}
               </p>
             </div>
           )}
           {ba && (
-            <div className="rounded-lg border border-border/60 p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Melhor acerto
-                </p>
-              </div>
-              <p className="text-sm font-bold text-foreground">{ba.label}</p>
+            <div className="pt-3 sm:pt-0 sm:pl-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Melhor acerto
+              </p>
+              <p className="text-sm font-bold text-foreground mt-0.5">{ba.label}</p>
               <p className="text-xs font-mono text-muted-foreground">{ba.range}</p>
-              <p className="text-lg font-black text-[#2563EB] mt-1">
+              <p className="text-lg font-black text-primary mt-1">
                 {ba.accuracy !== null ? `${Math.round(ba.accuracy)}%` : "—"}
               </p>
             </div>
@@ -2159,13 +2165,13 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
                 return (
                   <tr
                     key={b.period}
-                    className={`border-b border-border/20 transition-colors ${isBest ? "bg-[#2563EB]/5" : "hover:bg-muted/20"}`}
+                    className={`border-b border-border/20 transition-colors ${isBest ? "bg-primary/5" : "hover:bg-muted/20"}`}
                   >
                     <td className="py-2.5 px-3 font-mono font-bold">{b.range}</td>
                     <td className="py-2.5 px-3">
                       <span className="font-semibold">{b.label}</span>
                       {isBest && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-black text-[#2563EB] bg-[#2563EB]/10 px-1.5 py-0.5 rounded-full border border-[#2563EB]/20">
+                        <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full border border-primary/20">
                           <Sparkles className="h-2.5 w-2.5" /> MELHOR
                         </span>
                       )}
@@ -2202,7 +2208,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
             return (
               <div
                 key={b.period}
-                className={`text-[10px] ${isBest ? "text-[#2563EB] font-semibold" : "text-muted-foreground"}`}
+                className={`text-[10px] ${isBest ? "text-primary font-semibold" : "text-muted-foreground"}`}
               >
                 <span className="font-mono">{b.range}</span>
                 {" — "}
@@ -2247,7 +2253,7 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
           <div className="flex items-center gap-2 mt-2">
             <div className="flex-1 h-2 bg-muted/40 rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#2563EB] rounded-full"
+                className="h-full bg-primary rounded-full"
                 style={{ width: `${(h.minutes / maxMinutes) * 100}%` }}
               />
             </div>

@@ -346,7 +346,7 @@ useEffect(() => {
               <Button
                 type="submit"
                 size="sm"
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
               >
                 Enviar Pedido
               </Button>

@@ -579,7 +579,7 @@ export function PlanningWizardModal({
 
   const presetColors: Record<SessionStyle, string> = {
     curtas: "border-sky-300 bg-sky-500/10 text-sky-700",
-    equilibradas: "border-[#2563EB]/40 bg-[#2563EB]/8 text-[#2563EB]",
+    equilibradas: "border-primary/40 bg-primary/8 text-primary",
     longas: "border-violet-300 bg-violet-500/10 text-violet-700",
     personalizado: "border-amber-300 bg-amber-500/10 text-amber-700",
   }
@@ -614,7 +614,7 @@ export function PlanningWizardModal({
           <div className="hidden sm:flex items-center justify-between relative max-w-xl mx-auto mt-4">
             <div className="absolute top-3.5 left-8 right-8 h-0.5 bg-muted">
               <div
-                className="h-full bg-[#2563EB] rounded-full transition-all duration-300"
+                className="h-full bg-primary rounded-full transition-all duration-300"
                 style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
               />
             </div>
@@ -628,9 +628,9 @@ export function PlanningWizardModal({
                     className={cn(
                       "w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-extrabold transition-all",
                       done || active
-                        ? "bg-[#2563EB] border-[#2563EB] text-white"
+                        ? "bg-primary border-primary text-white"
                         : "bg-card border-muted text-muted-foreground",
-                      active && "ring-4 ring-[#2563EB]/15 scale-105",
+                      active && "ring-4 ring-primary/15 scale-105",
                     )}
                   >
                     {done ? <Check className="w-3.5 h-3.5" /> : `0${step}`}
@@ -638,7 +638,7 @@ export function PlanningWizardModal({
                   <span
                     className={cn(
                       "text-[10px] font-extrabold uppercase tracking-wide",
-                      active ? "text-[#2563EB]" : "text-muted-foreground",
+                      active ? "text-primary" : "text-muted-foreground",
                     )}
                   >
                     {label}
@@ -655,7 +655,7 @@ export function PlanningWizardModal({
             </span>
             <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#2563EB] rounded-full transition-all duration-300"
+                className="h-full bg-primary rounded-full transition-all duration-300"
                 style={{ width: `${(currentStep / 4) * 100}%` }}
               />
             </div>
@@ -702,15 +702,15 @@ export function PlanningWizardModal({
                             className={cn(
                               "rounded-xl border-2 p-3 cursor-pointer transition-all flex items-center gap-2.5 text-left",
                               planningMode === opt.key
-                                ? "border-[#2563EB] bg-[#dbeafe]/20 shadow-md"
-                                : "border-muted bg-card hover:border-[#2563EB]/50",
+                                ? "border-primary bg-primary/20 shadow-md"
+                                : "border-muted bg-card hover:border-primary/50",
                             )}
                           >
                             <div
                               className={cn(
                                 "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                                 planningMode === opt.key
-                                  ? "text-[#2563EB] bg-[#2563EB]/10"
+                                  ? "text-primary bg-primary/10"
                                   : "text-muted-foreground bg-muted",
                               )}
                             >
@@ -756,7 +756,7 @@ export function PlanningWizardModal({
                           <Minus className="w-3.5 h-3.5" />
                         </Button>
                         <div className="text-center min-w-[80px] shrink-0">
-                          <div className="text-2xl font-black font-mono text-[#2563EB] tabular-nums leading-none">
+                          <div className="text-2xl font-black font-mono text-primary tabular-nums leading-none">
                             {weeklyHoursNum}
                             <span className="text-base text-muted-foreground">h</span>
                           </div>
@@ -856,7 +856,7 @@ export function PlanningWizardModal({
                         <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
                           Disponível
                         </div>
-                        <div className="text-base font-black tabular-nums text-[#2563EB]">
+                        <div className="text-base font-black tabular-nums text-primary">
                           {capacityHours}h
                         </div>
                       </div>
@@ -912,7 +912,7 @@ export function PlanningWizardModal({
                         className={cn(
                           "px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer",
                           dayConfigMode === "semana"
-                            ? "bg-[#2563EB] text-white shadow-xs"
+                            ? "bg-primary text-white shadow-xs"
                             : "text-muted-foreground hover:text-foreground",
                         )}
                       >
@@ -924,7 +924,7 @@ export function PlanningWizardModal({
                         className={cn(
                           "px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer",
                           dayConfigMode === "escala"
-                            ? "bg-[#2563EB] text-white shadow-xs"
+                            ? "bg-primary text-white shadow-xs"
                             : "text-muted-foreground hover:text-foreground",
                         )}
                       >
@@ -946,8 +946,8 @@ export function PlanningWizardModal({
                             className={cn(
                               "px-3.5 py-2 rounded-lg border-2 text-xs font-extrabold transition-all cursor-pointer",
                               isSelected
-                                ? "border-[#2563EB] bg-[#2563EB] text-white shadow-xs"
-                                : "border-muted bg-card text-muted-foreground hover:border-[#2563EB]/60",
+                                ? "border-primary bg-primary text-white shadow-xs"
+                                : "border-muted bg-card text-muted-foreground hover:border-primary/60",
                             )}
                           >
                             {day}
@@ -969,12 +969,12 @@ export function PlanningWizardModal({
                               className={cn(
                                 "relative rounded-lg border-2 p-2.5 text-left transition-all cursor-pointer",
                                 selected
-                                  ? "border-[#2563EB] bg-[#2563EB]/10"
-                                  : "border-muted bg-card hover:border-[#2563EB]/40",
+                                  ? "border-primary bg-primary/10"
+                                  : "border-muted bg-card hover:border-primary/40",
                               )}
                             >
                               {selected && (
-                                <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#2563EB] text-white flex items-center justify-center">
+                                <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-primary text-white flex items-center justify-center">
                                   <Check className="w-2.5 h-2.5" />
                                 </span>
                               )}
@@ -1105,8 +1105,8 @@ export function PlanningWizardModal({
                   </p>
                 </div>
 
-                <div className="p-3 rounded-xl border border-[#2563EB]/25 bg-card space-y-2 shadow-2xs">
-                  <label className="text-[10px] font-extrabold text-[#2563EB] tracking-wider flex items-center gap-1.5">
+                <div className="p-3 rounded-xl border border-primary/25 bg-card space-y-2 shadow-2xs">
+                  <label className="text-[10px] font-extrabold text-primary tracking-wider flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
                     Adicionar nova matéria personalizada
                   </label>
@@ -1154,7 +1154,7 @@ export function PlanningWizardModal({
                       <Button
                         type="button"
                         size="sm"
-                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shrink-0 px-4 h-9 gap-1 rounded-xl shadow-xs cursor-pointer"
+                        className="bg-primary hover:bg-primary/90 text-white font-bold text-xs shrink-0 px-4 h-9 gap-1 rounded-xl shadow-xs cursor-pointer"
                         onClick={() => {
                           if (searchTerm.trim()) {
                             handleAddCustomDiscipline(searchTerm)
@@ -1194,17 +1194,17 @@ export function PlanningWizardModal({
                                 }}
                                 className={`w-full px-3 text-left text-xs font-bold transition-colors flex items-center justify-between py-2 cursor-pointer ${
                                   isAlreadySelected
-                                    ? "bg-[#2563EB]/10 text-[#2563EB]"
+                                    ? "bg-primary/10 text-primary"
                                     : "hover:bg-muted/80 text-foreground"
                                 }`}
                               >
                                 <span className="truncate">{item}</span>
                                 {isAlreadySelected ? (
-                                  <span className="text-[10px] font-extrabold uppercase text-[#2563EB] bg-[#2563EB]/15 px-2 py-0.5 rounded-full">
+                                  <span className="text-[10px] font-extrabold uppercase text-primary bg-primary/15 px-2 py-0.5 rounded-full">
                                     Já Adicionada
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] font-extrabold text-[#2563EB]">
+                                  <span className="text-[10px] font-extrabold text-primary">
                                     + Selecionar
                                   </span>
                                 )}
@@ -1229,8 +1229,8 @@ export function PlanningWizardModal({
                           aria-pressed={isSelected}
                           className={`p-2.5 rounded-lg border text-xs font-bold transition-all text-center ${
                             isSelected
-                              ? "border-[#2563EB] bg-[#dbeafe]/30 text-[#2563EB] shadow-xs"
-                              : "border-muted bg-card text-muted-foreground hover:border-[#2563EB]"
+                              ? "border-primary bg-primary/30 text-primary shadow-xs"
+                              : "border-muted bg-card text-muted-foreground hover:border-primary"
                           }`}
                         >
                           {disc}
@@ -1260,7 +1260,7 @@ export function PlanningWizardModal({
                           <h4 className="font-extrabold text-xs text-foreground truncate">
                             {disc}
                           </h4>
-                          <span className="shrink-0 text-[10px] font-black font-mono text-[#2563EB] bg-[#2563EB]/10 px-1.5 py-0.5 rounded-md">
+                          <span className="shrink-0 text-[10px] font-black font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-md">
                             {pct}%
                           </span>
                         </div>
@@ -1284,7 +1284,7 @@ export function PlanningWizardModal({
                                   [disc]: parseFloat(e.target.value),
                                 })
                               }
-                              className="w-full accent-[#2563EB]"
+                              className="w-full accent-primary"
                             />
                           </div>
 
@@ -1307,7 +1307,7 @@ export function PlanningWizardModal({
                                   [disc]: parseFloat(e.target.value),
                                 })
                               }
-                              className="w-full accent-[#2563EB]"
+                              className="w-full accent-primary"
                             />
                           </div>
                         </div>
@@ -1351,7 +1351,7 @@ export function PlanningWizardModal({
                             "rounded-lg border-2 p-2.5 text-center transition-all cursor-pointer",
                             selected
                               ? presetColors[preset.id]
-                              : "border-muted bg-card text-muted-foreground hover:border-[#2563EB]/50",
+                              : "border-muted bg-card text-muted-foreground hover:border-primary/50",
                           )}
                         >
                           <div className="text-xs font-extrabold">{preset.label}</div>
@@ -1371,7 +1371,7 @@ export function PlanningWizardModal({
                       <label className="text-xs font-extrabold text-foreground block">
                         Duração de cada sessão
                       </label>
-                      <Clock className="w-4 h-4 text-[#2563EB]" />
+                      <Clock className="w-4 h-4 text-primary" />
                     </div>
 
                     <div className="flex items-center gap-2.5">
@@ -1452,7 +1452,7 @@ export function PlanningWizardModal({
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                         O Nomeia distribuirá aproximadamente
                       </span>
-                      <Sparkles className="w-4 h-4 text-[#2563EB]" />
+                      <Sparkles className="w-4 h-4 text-primary" />
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {preview.map((p) => (
@@ -1460,7 +1460,7 @@ export function PlanningWizardModal({
                           key={p.label}
                           className={cn(
                             "rounded-lg px-2.5 py-1.5 text-center",
-                            p.available ? "bg-[#2563EB]/8" : "bg-muted/40",
+                            p.available ? "bg-primary/8" : "bg-muted/40",
                           )}
                         >
                           <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
@@ -1469,7 +1469,7 @@ export function PlanningWizardModal({
                           <div
                             className={cn(
                               "text-sm font-black font-mono tabular-nums",
-                              p.available ? "text-[#2563EB]" : "text-muted-foreground/50",
+                              p.available ? "text-primary" : "text-muted-foreground/50",
                             )}
                           >
                             {p.hours > 0 ? `${p.hours}h` : "—"}
@@ -1484,8 +1484,8 @@ export function PlanningWizardModal({
                 </div>
 
                 {/* Resumo */}
-                <div className="rounded-xl border border-[#2563EB]/25 bg-card p-3 space-y-2.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#2563EB]">
+                <div className="rounded-xl border border-primary/25 bg-card p-3 space-y-2.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
                     Seu planejamento
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1.5 text-xs">
@@ -1512,7 +1512,7 @@ export function PlanningWizardModal({
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-600 border-t border-[#2563EB]/15 pt-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-600 border-t border-primary/15 pt-2">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Configuração válida
                   </div>
                 </div>
@@ -1527,7 +1527,7 @@ export function PlanningWizardModal({
             <Button
               variant="outline"
               onClick={handlePrevStep}
-              className="border-[#2563EB] text-[#2563EB] font-bold text-xs px-4 h-9 rounded-xl cursor-pointer w-full sm:w-auto"
+              className="border-primary text-primary font-bold text-xs px-4 h-9 rounded-xl cursor-pointer w-full sm:w-auto"
             >
               Voltar
             </Button>
@@ -1540,7 +1540,7 @@ export function PlanningWizardModal({
           <Button
             onClick={() => void handleNextStep()}
             disabled={!canProceed}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-10 rounded-xl shadow-xs cursor-pointer w-full sm:w-auto whitespace-normal"
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 h-10 rounded-xl shadow-xs cursor-pointer w-full sm:w-auto whitespace-normal"
           >
             {currentStep === 4 ? "Salvar planejamento" : "Próximo"}
           </Button>

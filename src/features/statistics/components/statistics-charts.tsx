@@ -28,7 +28,7 @@ export function SectionCard({
   className?: string
 }) {
   return (
-    <div className={`rounded-xl border bg-card p-5 shadow-sm space-y-4 ${className}`}>
+    <div className={`rounded-xl border bg-card p-5 shadow-xs space-y-4 ${className}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h3 className="font-semibold text-sm">{title}</h3>
@@ -126,7 +126,7 @@ export function DeltaBadge({
 
 export function ProgressBar({
   pct,
-  barClass = "bg-[#2563EB]",
+  barClass = "bg-primary",
   height = "h-2",
 }: {
   pct: number
@@ -156,12 +156,17 @@ export function Metric({
   sub?: ReactNode
   accent?: boolean
 }) {
+  // Sem borda/card próprios: várias Metric já vivem dentro de um SectionCard
+  // (que fornece a contenção real). Um "card dentro de card" repetido em
+  // grades de 4-6 itens era exatamente a grade de cards iguais que a Fase 9
+  // pede para evitar — aqui a informação respira em uma superfície aberta,
+  // separada só por espaçamento e hierarquia tipográfica.
   return (
-    <div className="rounded-lg border bg-card p-3 min-w-0">
+    <div className="min-w-0 py-1">
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
-      <p className={`mt-1 font-black text-xl ${accent ? "text-[#2563EB]" : "text-foreground"}`}>
+      <p className={`mt-1 font-black text-xl ${accent ? "text-primary" : "text-foreground"}`}>
         {value}
       </p>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
@@ -173,10 +178,10 @@ export function Metric({
 
 const HEAT_LEVELS: Record<number, string> = {
   0: "bg-muted/30",
-  1: "bg-[#2563EB]/25",
-  2: "bg-[#2563EB]/45",
-  3: "bg-[#2563EB]/70",
-  4: "bg-[#2563EB]",
+  1: "bg-emerald-500/25",
+  2: "bg-emerald-500/45",
+  3: "bg-emerald-500/70",
+  4: "bg-emerald-500",
 }
 
 const MONTH_NAMES = [

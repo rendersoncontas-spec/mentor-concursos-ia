@@ -239,6 +239,16 @@ export function EditalAccordion({
     if (res.success) {
       setData((prev) => prev.filter((d) => d.id !== discId))
       toast.success("Matéria removida!")
+      // DECISAO DE PRODUTO (Fase 12 -> Fase 13, opcao A): Edital e Ciclo
+      // continuam desacoplados de proposito - remover do Edital nunca apaga
+      // nada do Ciclo. Este aviso é só informativo (nunca bloqueia a
+      // remoção, que já aconteceu acima).
+      if (res.activeCyclesWithDiscipline && res.activeCyclesWithDiscipline > 0) {
+        const count = res.activeCyclesWithDiscipline
+        toast.warning(
+          `Esta disciplina também está presente em ${count} ciclo${count > 1 ? "s" : ""} ativo${count > 1 ? "s" : ""}. Removê-la do Edital não a removerá dos seus Ciclos.`,
+        )
+      }
       router.refresh()
     } else {
       toast.error(res.error || "Erro ao remover matéria")
@@ -279,7 +289,7 @@ export function EditalAccordion({
         <div className="flex items-center gap-2 sm:gap-2.5 w-full md:w-auto shrink-0">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
+            className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
             <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
@@ -309,7 +319,7 @@ export function EditalAccordion({
         {/* Barra de Progresso em Verde-Água */}
         <div className="w-full h-3 rounded-full bg-muted/60 overflow-hidden">
           <div
-            className="h-full bg-[#2563EB] transition-all duration-300 rounded-full"
+            className="h-full bg-primary transition-all duration-300 rounded-full"
             style={{ width: `${overallProgressPercentage}%` }}
           />
         </div>
@@ -333,7 +343,7 @@ export function EditalAccordion({
           return (
             <div
               key={disc.id}
-              className="rounded-xl border bg-card shadow-sm overflow-hidden transition-all"
+              className="rounded-xl border bg-card shadow-xs overflow-hidden transition-all"
             >
               {/* Cabeçalho da Disciplina */}
               <div
@@ -349,11 +359,11 @@ export function EditalAccordion({
                 {/* Direita: Pílula de Métricas + Barra de Progresso da Matéria + Lápis Editar + Setinha */}
                 <div className="flex items-center gap-4">
                   {/* Pílula de Métricas das Questões (Verde/Red/Gray/%) */}
-                  <div className="hidden sm:flex items-center gap-4 px-4 py-1.5 rounded-full border border-[#2563EB]/40 bg-[#dbeafe]/30 font-mono text-xs font-bold shadow-2xs">
+                  <div className="hidden sm:flex items-center gap-3 font-mono text-xs font-bold">
                     <span className="text-emerald-600 font-extrabold">{totalCorrect}</span>
                     <span className="text-rose-500 font-extrabold">{totalWrong}</span>
                     <span className="text-muted-foreground font-bold">{totalQuestions}</span>
-                    <span className="text-foreground font-black">{avgAccuracy}</span>
+                    <span className="text-primary font-black">{avgAccuracy}</span>
                   </div>
 
                   {/* Barra de Progresso da Matéria (ex: 3% + Barra Verde-Água) */}
@@ -363,7 +373,7 @@ export function EditalAccordion({
                     </span>
                     <div className="w-24 h-2.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full bg-[#2563EB] rounded-full transition-all duration-300"
+                        className="h-full bg-primary rounded-full transition-all duration-300"
                         style={{ width: `${progressPercentage}%` }}
                       />
                     </div>
@@ -459,8 +469,8 @@ export function EditalAccordion({
                                     onClick={() => toggleCheck(topic.id)}
                                     className={`w-4 h-4 rounded-full border shrink-0 mt-0.5 flex items-center justify-center transition-all ${
                                       isChecked
-                                        ? "bg-[#2563EB] border-[#2563EB] text-white"
-                                        : "border-muted-foreground/40 hover:border-[#2563EB] bg-background"
+                                        ? "bg-primary border-primary text-white"
+                                        : "border-muted-foreground/40 hover:border-primary bg-background"
                                     }`}
                                   >
                                     {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
@@ -496,7 +506,7 @@ export function EditalAccordion({
                               <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-500">
                                 {topic.wrong}
                               </td>
-                              <td className="py-2.5 px-3 text-center font-mono text-blue-600 font-bold">
+                              <td className="py-2.5 px-3 text-center font-mono text-primary font-bold">
                                 {topic.questions}
                               </td>
                               <td className="py-2.5 px-3 text-center font-mono font-extrabold text-foreground">
@@ -516,7 +526,7 @@ export function EditalAccordion({
                                     href={topic.link}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-xs font-bold text-[#2563EB] hover:underline flex items-center justify-center gap-1"
+                                    className="text-xs font-bold text-primary hover:underline flex items-center justify-center gap-1"
                                   >
                                     <span>Abrir</span>
                                     <ExternalLink className="h-3 w-3" />
@@ -527,7 +537,7 @@ export function EditalAccordion({
                                       setLinkModalTopic(topic)
                                       setInputUrl("")
                                     }}
-                                    className="text-xs font-semibold text-muted-foreground hover:text-[#2563EB] transition-colors"
+                                    className="text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
                                   >
                                     Adicionar
                                   </button>
@@ -558,7 +568,7 @@ export function EditalAccordion({
                                 />
                                 <Button
                                   size="sm"
-                                  className="h-8 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs px-3"
+                                  className="h-8 bg-primary hover:bg-primary/90 text-white text-xs px-3"
                                   onClick={() => handleAddTopic(disc.id)}
                                   disabled={isSaving}
                                 >
@@ -589,7 +599,7 @@ export function EditalAccordion({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-[#2563EB] hover:text-[#1D4ED8] hover:bg-[#2563EB]/10 text-xs font-semibold gap-1.5"
+                        className="text-primary hover:text-primary/90 hover:bg-primary/10 text-xs font-semibold gap-1.5"
                         onClick={() => {
                           setAddingTopicDiscId(disc.id)
                           setNewTopicName("")
@@ -608,11 +618,11 @@ export function EditalAccordion({
                       <span className="text-xs font-bold text-muted-foreground tracking-wider">
                         TOTAL
                       </span>
-                      <div className="flex items-center gap-4 px-4 py-1.5 rounded-full border-2 border-[#2563EB] bg-[#2563EB]/5 text-xs font-mono font-bold text-foreground">
+                      <div className="flex items-center gap-3 text-xs font-mono font-bold">
                         <span className="text-emerald-600">{totalCorrect}</span>
                         <span className="text-rose-500">{totalWrong}</span>
-                        <span className="text-blue-600">{totalQuestions}</span>
-                        <span className="text-foreground">{avgAccuracy}%</span>
+                        <span className="text-muted-foreground">{totalQuestions}</span>
+                        <span className="text-primary">{avgAccuracy}%</span>
                       </div>
                     </div>
 
@@ -623,7 +633,7 @@ export function EditalAccordion({
                       </span>
                       <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
                         <div
-                          className="h-full bg-[#2563EB] rounded-full transition-all duration-500"
+                          className="h-full bg-primary rounded-full transition-all duration-500"
                           style={{ width: `${progressPercentage}%` }}
                         />
                       </div>
@@ -639,7 +649,7 @@ export function EditalAccordion({
       {/* Adicionar Disciplina Section */}
       <div className="pt-2">
         {isAddingDiscipline ? (
-          <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-col gap-2 relative">
+          <div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-2 relative">
             <div className="flex items-center gap-3">
               <input
                 type="text"
@@ -647,14 +657,14 @@ export function EditalAccordion({
                 value={newDisciplineName}
                 onChange={(e) => setNewDisciplineName(e.target.value)}
                 placeholder="Nome da matéria (ex: Direito Penal)..."
-                className="flex-1 bg-background border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30"
+                className="flex-1 bg-background border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleAddDiscipline()
                   if (e.key === "Escape") setIsAddingDiscipline(false)
                 }}
               />
               <Button
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold"
+                className="bg-primary hover:bg-primary/90 text-white font-bold"
                 onClick={handleAddDiscipline}
                 disabled={isSaving}
               >
@@ -702,7 +712,7 @@ export function EditalAccordion({
       <Dialog open={!!linkModalTopic} onOpenChange={() => setLinkModalTopic(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2 text-[#2563EB]">
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-primary">
               <ExternalLink className="h-4 w-4" />
               Adicionar Link do Caderno de Questões
             </DialogTitle>
@@ -730,7 +740,7 @@ export function EditalAccordion({
             </Button>
             <Button
               onClick={handleSaveLink}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold"
+              className="bg-primary hover:bg-primary/90 text-white font-semibold"
             >
               Salvar Link
             </Button>

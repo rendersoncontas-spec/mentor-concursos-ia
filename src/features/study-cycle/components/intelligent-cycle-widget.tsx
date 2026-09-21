@@ -25,7 +25,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { CycleOverview, CycleItemProgress } from "@/domain/study-cycle/study-cycle.types"
-import { useGlobalStudy } from "@/features/study-session/components/study-provider"
+import { useStudyActions } from "@/features/study-session/components/study-provider"
 import { useCachedServerAction } from "@/hooks/use-cached-server-action"
 import { cn } from "@/lib/utils"
 
@@ -47,7 +47,7 @@ interface IntelligentCycleWidgetProps {
 
 export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: IntelligentCycleWidgetProps) {
   const router = useRouter()
-  const { startSession, session } = useGlobalStudy()
+  const { startSession, resumeSession, sessionSummary } = useStudyActions()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isPausing, setIsPausing] = useState(false)
   const [isSkipping, setIsSkipping] = useState(false)
@@ -133,7 +133,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   }, [overview, refresh])
 
   const handleStartStudy = useCallback(() => {
-    if (!overview?.currentItem || !overview.cycle) return
+    if (!overview?.currentItem || !overview.cycle) return false
     const result = startSession({
       disciplineName: overview.currentItem.disciplineName,
       disciplineId: overview.currentItem.disciplineId,
@@ -145,14 +145,45 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
     })
     if (!result.started) {
       toast.error("Já existe uma sessão ativa. Retome, salve ou encerre antes de iniciar outra.")
-      return
+      return false
     }
     toast.success(`Estudo do ciclo iniciado: ${overview.currentItem.disciplineName}`)
+    return true
   }, [overview, startSession])
 
   const handleNavigate = useCallback(() => {
     router.push("/ciclos")
   }, [router])
+
+  // "Continuar ciclo" (botão padrão do widget quando já há progresso na etapa
+  // atual, ou quando a sessão do ciclo já está ativa): NUNCA deve navegar
+  // para /ciclos — só deve dar play no cronômetro, reutilizando o MESMO
+  // startSession/resumeSession de sempre (mesmo source=CYCLE/cycleId/
+  // cycleItemId/disciplineId — handleStartStudy acima, sem lógica paralela).
+  // Não abre a Central de Estudos (pedido explícito): o usuário só quer ver
+  // o cronômetro rodando, igual ao fluxo já validado de "Iniciar ciclo".
+  const handleContinueCycle = useCallback(() => {
+    if (!overview?.currentItem || !overview.cycle) return
+
+    // Já existe uma sessão ativa PARA ESTE CICLO — nunca criar uma segunda.
+    const isThisCycleActive =
+      Boolean(sessionSummary?.isActive) && sessionSummary?.cycleId === overview.cycle.id
+
+    if (isThisCycleActive) {
+      // Só dá play se estiver pausada; se já está tocando, não faz nada.
+      if (sessionSummary?.phase === "PAUSED") {
+        resumeSession()
+      }
+      return
+    }
+
+    // Nenhuma sessão ativa para este ciclo: inicia (ou, se houver progresso
+    // parcial, retoma a partir do tempo restante — handleStartStudy já usa
+    // remainingMinutesInRound). Se já existir uma sessão ativa de OUTRO
+    // ciclo/disciplina, handleStartStudy recusa e avisa via toast (evita
+    // duplicidade) — comportamento existente, intocado.
+    handleStartStudy()
+  }, [overview, sessionSummary, handleStartStudy, resumeSession])
 
   // Loading state
   if (isLoading) {
@@ -193,14 +224,14 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
 
   const { cycle, items, currentItem, nextItem, currentRound, totalRoundsDone, roundProgressPercentage } = overview
   const isPaused = cycle.status === "PAUSED"
-  const isCurrentStudying = Boolean(session?.isActive) && session?.cycleId === cycle.id
+  const isCurrentStudying = Boolean(sessionSummary?.isActive) && sessionSummary?.cycleId === cycle.id
   const isLastStep = isLastSubjectOfRound(currentItem, items)
   const lastSubject = getLastSubjectOfRound(items)
 
   // Determine button label
   let buttonLabel = "Continuar ciclo"
   let buttonIcon = <Play className="h-3.5 w-3.5 mr-1.5 fill-current" />
-  let buttonAction = handleNavigate
+  let buttonAction = handleContinueCycle
 
   if (isPaused) {
     buttonLabel = "Retomar ciclo"
@@ -217,7 +248,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   } else if (isCurrentStudying) {
     buttonLabel = "Estudo em andamento..."
     buttonIcon = <RefreshCcw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-    buttonAction = handleNavigate
+    buttonAction = handleContinueCycle
   }
 
   const content = (

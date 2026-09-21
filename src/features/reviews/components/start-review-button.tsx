@@ -12,7 +12,7 @@ export function StartReviewButton({ disabled }: { disabled: boolean }) {
   return (
     <>
       <button
-        className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+        className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-semibold text-sm shadow-sm hover:shadow-md hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
         disabled={disabled}
         onClick={() => setOpen(true)}
       >

@@ -13,6 +13,7 @@ import {
   validatePlanningForm,
 } from "@/features/planejamento/lib/planning-form"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
 export type GeneratePlanResult =
@@ -33,12 +34,9 @@ export async function generateStudyPlanAction(
   try {
     const supabase = await createClient()
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (userError || !user) {
+    if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }
     }
 
@@ -46,7 +44,7 @@ export async function generateStudyPlanAction(
     const { data: rawTarget } = await supabase
       .from("user_targets")
       .select("id, exam_id")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("is_active", true)
       .limit(1)
       .single()
@@ -96,26 +94,37 @@ export async function generateStudyPlanAction(
           experience_level: config.nivel || "iniciante",
           weekly_study_hours: targetWeeklyHours,
         })
-        .eq("id", user.id)
+        .eq("id", effectiveUserId)
 
       // 2. Apagar disciplinas antigas caso esteja gerando do Wizard e tenha enviado as novas
       if (config.importanceMap && config.knowledgeMap) {
         await supabase
           .from("user_disciplines")
           .delete()
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .eq("target_id", rawTarget.id)
 
         const discNames = Object.keys(config.importanceMap)
         const toInsert = []
 
-        for (const name of discNames) {
-          let { data: d } = await supabase
+        // Evita N+1: busca todas as disciplinas já existentes com esses nomes
+        // numa única query, em vez de uma consulta sequencial por nome.
+        const existingByName = new Map<string, { id: string }>()
+        if (discNames.length > 0) {
+          const { data: existingDisciplines } = await supabase
             .from("disciplines")
-            .select("id")
-            .eq("name", name)
-            .maybeSingle()
+            .select("id, name")
+            .in("name", discNames)
+          for (const disc of existingDisciplines ?? []) {
+            existingByName.set(disc.name, { id: disc.id })
+          }
+        }
+
+        for (const name of discNames) {
+          let d: { id: string } | null = existingByName.get(name) ?? null
           if (!d) {
+            // Disciplina nova: mantém a criação sequencial, pois a cor
+            // atribuída depende do estado das cores já usadas até aqui.
             const color = await pickNextDisciplineColor(supabase)
             const res = await supabase
               .from("disciplines")
@@ -127,7 +136,7 @@ export async function generateStudyPlanAction(
           if (d) {
             // Em uma versão mais complexa, salvaríamos o peso/dificuldade no user_disciplines ou num config
             toInsert.push({
-              user_id: user.id,
+              user_id: effectiveUserId,
               target_id: rawTarget.id,
               discipline_id: d.id,
               status: "STUDYING",
@@ -143,7 +152,7 @@ export async function generateStudyPlanAction(
         const { data: userDiscs } = await supabase
           .from("user_disciplines")
           .select("id")
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .eq("target_id", rawTarget.id)
           .limit(1)
         if (!userDiscs || userDiscs.length === 0) {
@@ -152,7 +161,7 @@ export async function generateStudyPlanAction(
       }
     }
 
-    const plan = await generateStudyPlan(supabase, user.id, reason, rawTarget.id, targetWeeklyHours)
+    const plan = await generateStudyPlan(supabase, effectiveUserId, reason, rawTarget.id, targetWeeklyHours)
 
     if (!plan) {
       return {
@@ -177,13 +186,11 @@ export async function generateStudyPlanAction(
 export async function deactivateStudyPlanAction(): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) return { success: false, error: "Usuário não autenticado." }
+    if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
-    const ok = await deactivateUserStudyPlan(supabase, user.id)
+    const ok = await deactivateUserStudyPlan(supabase, effectiveUserId)
     if (ok) {
       revalidatePath("/planejamento")
       revalidatePath("/dashboard")

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 
 import { Download, ExternalLink, Library, Loader2, Search, Trash2 } from "lucide-react"
 import { Import } from "lucide-react"
+import dynamic from "next/dynamic"
 import { toast } from "sonner"
 
 import {
@@ -22,7 +23,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { ImportHistoryModal } from "@/features/importacao/components/import-history-modal"
+
+// Carregado sob demanda (Fase 6, auditoria de bundle): ImportHistoryModal
+// importa estaticamente a biblioteca xlsx (pesada) via excel-reader.ts. Como
+// antes era um import estático no topo do arquivo, o JS do xlsx era baixado
+// sempre que a página Biblioteca carregava, mesmo que o usuário nunca abrisse
+// o modal de importação. Com next/dynamic, esse JS só é buscado quando o
+// modal é de fato aberto (isImportOpen vira true).
+const ImportHistoryModal = dynamic(
+  () =>
+    import("@/features/importacao/components/import-history-modal").then(
+      (mod) => mod.ImportHistoryModal,
+    ),
+  { ssr: false },
+)
 
 export function BibliotecaView() {
   const [materials, setMaterials] = useState<LibraryMaterialItem[]>([])
@@ -122,8 +136,8 @@ export function BibliotecaView() {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
-          <Loader2 className="h-8 w-8 animate-spin text-[#2563EB]" />
+        <div className="rounded-xl border bg-card p-6 shadow-xs flex flex-col items-center justify-center text-center space-y-3 my-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-xs text-muted-foreground font-medium">Carregando sua biblioteca...</p>
         </div>
       )
@@ -131,14 +145,14 @@ export function BibliotecaView() {
 
     if (loadError) {
       return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
+        <div className="rounded-xl border bg-card p-6 shadow-xs flex flex-col items-center justify-center text-center space-y-3 my-4">
           <h3 className="text-lg font-bold text-foreground">
             Não foi possível carregar a biblioteca
           </h3>
           <p className="text-xs text-muted-foreground font-medium">{loadError}</p>
           <Button
             onClick={loadMaterials}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-sm hover:shadow-md transition-all"
           >
             Tentar novamente
           </Button>
@@ -148,9 +162,9 @@ export function BibliotecaView() {
 
     if (filteredMaterials.length === 0) {
       return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
+        <div className="rounded-xl border bg-card p-6 shadow-xs flex flex-col items-center justify-center text-center space-y-3 my-4">
           <div className="relative w-24 h-24 flex items-center justify-center">
-            <Library className="h-16 w-16 text-[#2563EB]" />
+            <Library className="h-16 w-16 text-primary" />
           </div>
 
           <div className="space-y-1.5 max-w-md">
@@ -167,7 +181,7 @@ export function BibliotecaView() {
           {!normalizedSearch && (
             <Button
               onClick={() => setIsModalOpen(true)}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs"
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-sm hover:shadow-md transition-all"
             >
               Adicionar Material
             </Button>
@@ -181,13 +195,13 @@ export function BibliotecaView() {
         {filteredMaterials.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border bg-card p-5 shadow-sm hover:shadow-xs transition-all flex flex-col justify-between space-y-4"
+            className="rounded-xl border bg-card p-5 hover:shadow-xs transition-all flex flex-col justify-between space-y-4"
           >
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Badge
                   variant="secondary"
-                  className="text-[10px] font-bold bg-[#2563EB]/10 text-[#2563EB]"
+                  className="text-[10px] font-bold bg-primary/10 text-primary"
                 >
                   {item.type}
                 </Badge>
@@ -206,7 +220,7 @@ export function BibliotecaView() {
                   href={item.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs font-bold text-[#2563EB] hover:underline flex items-center gap-1.5"
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1.5"
                 >
                   <span>Acessar Material</span>
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -224,7 +238,7 @@ export function BibliotecaView() {
                     download={item.type === "PDF" || item.type === "Resumo"}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-1 text-muted-foreground hover:text-[#2563EB] transition-colors"
+                    className="p-1 text-muted-foreground hover:text-primary transition-colors"
                     title="Baixar"
                   >
                     <Download className="h-4 w-4" />
@@ -258,16 +272,16 @@ export function BibliotecaView() {
 
         <Button
           onClick={() => setIsModalOpen(true)}
-          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-sm hover:shadow-md transition-all"
         >
           Adicionar Material
         </Button>
       </div>
 
       {/* Importar dados */}
-      <div className="rounded-xl border border-dashed border-[#2563EB]/30 bg-[#2563EB]/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h3 className="text-[10px] font-black uppercase tracking-wider text-[#2563EB]">
+          <h3 className="text-[10px] font-black uppercase tracking-wider text-primary">
             Importar dados
           </h3>
           <p className="text-sm font-extrabold text-foreground">
@@ -279,7 +293,7 @@ export function BibliotecaView() {
         </div>
         <Button
           onClick={() => setIsImportOpen(true)}
-          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs gap-2 shrink-0"
+          className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-sm hover:shadow-md transition-all gap-2 shrink-0"
         >
           <Import className="h-4 w-4" />
           Importar histórico
@@ -297,29 +311,29 @@ export function BibliotecaView() {
         />
       </div>
 
-      {/* Top Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
+      {/* Resumo da biblioteca: uma única superfície com divisórias (não 3 cards repetidos) */}
+      <div className="rounded-xl border bg-card shadow-xs grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+        <div className="p-5 space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            MATERIAIS CADASTRADOS
+            Materiais cadastrados
           </span>
-          <span className="text-3xl font-black text-foreground block pt-1">{materials.length}</span>
+          <span className="text-3xl font-black text-primary block pt-1">{materials.length}</span>
         </div>
 
-        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
+        <div className="p-5 space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            PDFs & RESUMOS
+            PDFs & Resumos
           </span>
-          <span className="text-3xl font-black text-[#2563EB] block pt-1">
+          <span className="text-3xl font-black text-foreground block pt-1">
             {materials.filter((m) => m.type === "PDF" || m.type === "Resumo").length}
           </span>
         </div>
 
-        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
+        <div className="p-5 space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            LINKS & CADERNOS
+            Links & Cadernos
           </span>
-          <span className="text-3xl font-black text-sky-500 block pt-1">
+          <span className="text-3xl font-black text-foreground block pt-1">
             {materials.filter((m) => m.type === "Link" || m.type === "Vídeo").length}
           </span>
         </div>
@@ -333,7 +347,7 @@ export function BibliotecaView() {
         {" "}
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-[#2563EB]">
+            <DialogTitle className="text-base font-bold text-primary">
               Adicionar Material de Estudo
             </DialogTitle>
           </DialogHeader>
@@ -393,7 +407,7 @@ export function BibliotecaView() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold"
+                className="bg-primary hover:bg-primary/90 text-white font-semibold"
               >
                 {isSubmitting ? (
                   <>

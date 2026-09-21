@@ -449,7 +449,7 @@ export async function updateUserRoleAdminAction(
  * Nunca grava senhas/tokens — apenas identificadores e resultado.
  */
 export async function auditSupportAction(
-  supabase: Awaited<ReturnType<typeof import("@/infrastructure/supabase/server").createClient>>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   params: {
     supportSessionId: string
     moderatorId: string

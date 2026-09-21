@@ -7,6 +7,11 @@ import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { buildCycleOverview } from "@/application/study-cycle/cycle-progress.service"
 import { fetchActivePlanDisciplines } from "@/application/study-session/get-disciplines.action"
 import { createClient } from "@/infrastructure/supabase/server"
+import type {
+  StudyCycle,
+  StudyCycleItemWithDetails,
+  StudyCycleSession,
+} from "@/domain/study-cycle/study-cycle.types"
 
 export type DisciplineSuggestion = {
   id: string
@@ -68,11 +73,9 @@ async function fetchActiveCycleDisciplines(
     .eq("cycle_id", cycle.id)
     .eq("round_number", cycle.current_round || 1)
 
-  const typedCycle = cycle as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycle
-  const typedItems =
-    items as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleItemWithDetails[]
-  const typedSessions =
-    (sessions || []) as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleSession[]
+  const typedCycle = cycle as unknown as StudyCycle
+  const typedItems = items as unknown as StudyCycleItemWithDetails[]
+  const typedSessions = (sessions || []) as unknown as StudyCycleSession[]
   const skippedItemIds = new Set((skipRows || []).map((row) => row.cycle_item_id as string))
 
   // Usa o serviço oficial que respeita o cursor persistido (current_item_index / current_round)

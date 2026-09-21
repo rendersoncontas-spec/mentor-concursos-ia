@@ -106,7 +106,7 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
       {reminders.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-3 px-2 gap-2 w-full">
           <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs shrink-0">
-            <BellRing className="h-4 w-4 text-[#2563EB]" />
+            <BellRing className="h-4 w-4 text-primary" />
           </div>
 
           <div className="space-y-0.5 max-w-[280px]">
@@ -120,7 +120,7 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
 
           <Button
             onClick={() => setIsModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-3 h-7 shadow-xs cursor-pointer gap-1"
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-3 h-7 shadow-xs cursor-pointer gap-1"
           >
             <Plus className="h-3 w-3" />
             Criar Lembrete
@@ -207,7 +207,7 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
               </Button>
               <Button
                 type="submit"
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold"
+                className="bg-primary hover:bg-primary/90 text-white font-bold"
               >
                 Salvar Lembrete
               </Button>

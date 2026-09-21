@@ -7,6 +7,7 @@ import { readWorkbook } from "./excel-reader"
 import { parseFileSheets } from "./normalize"
 import { detectField } from "./column-detector"
 import { parseStartAt, parseDurationSeconds, parseCount, formatDuration } from "./value-parsers"
+import { getDayInSaoPaulo } from "@/lib/sao-paulo"
 import { detectStudyType, studyTypeToSource } from "./study-map"
 import { similarity, suggestDisciplines, AUTO_MATCH_THRESHOLD } from "./subject-matcher"
 
@@ -278,3 +279,69 @@ test("overrides manuais de colunas corrigem mapeamento", () => {
   assert.equal(overridden.columns[2]!.field, "topic")
   assert.equal(overridden.records[0]!.topicName, "xyz-123")
 })
+
+/**
+ * Fase 5 da auditoria de estabilização (timezone — "Aprovado"/Excel import):
+ * as planilhas de origem trazem data e hora no horário local do aluno (São
+ * Paulo), sem fuso explícito. parseStartAt (via parseDmy/parseIso/
+ * parseExcelSerial em value-parsers.ts) construía o instante com accessors
+ * de Date no fuso LOCAL DO RUNTIME (UTC em produção) em vez de -03:00,
+ * deslocando TODO registro importado com horário em ~3h — e, para horários
+ * entre 00h-02h59 em SP, até para o dia de calendário errado quando lido de
+ * volta pelos helpers de fuso de São Paulo usados no resto do projeto
+ * (getDayInSaoPaulo, usado por Histórico, Estatísticas, Ciclo etc.). Os
+ * testes abaixo fixam o instante UTC exato esperado (não apenas "é uma
+ * data válida"), incluindo o caso de borda perto da virada do dia.
+ */
+test("parseStartAt (DD/MM/YYYY HH:mm): aplica o fuso de São Paulo (-03:00), não o fuso do runtime", () => {
+  const date = parseStartAt("01/07/2026 14:30")
+  assert.ok(date)
+  assert.equal(date!.toISOString(), "2026-07-01T17:30:00.000Z")
+})
+
+test("parseStartAt (DD/MM/YYYY HH:mm): horário perto da meia-noite em SP não desloca para o dia errado", () => {
+  // 22h em São Paulo em 27/08 deve continuar sendo o dia 27 quando lido de
+  // volta pelo helper de fuso de São Paulo — não o dia 28 (que seria o
+  // resultado do bug: interpretar 22:00 como UTC, virando 01h UTC do dia
+  // seguinte, e SEM a conversão de volta para SP, aparentaria ser dia 28).
+  const date = parseStartAt("27/08/2026 22:00")
+  assert.ok(date)
+  assert.equal(date!.toISOString(), "2026-08-28T01:00:00.000Z")
+  assert.equal(getDayInSaoPaulo(date!), "2026-08-27")
+})
+
+test("parseStartAt (ISO sem fuso explícito): também aplica o fuso de São Paulo", () => {
+  const date = parseStartAt("2026-07-01T14:30:00")
+  assert.ok(date)
+  assert.equal(date!.toISOString(), "2026-07-01T17:30:00.000Z")
+})
+
+test("parseStartAt (ISO COM fuso explícito): respeita o fuso informado, sem reinterpretar", () => {
+  const date = parseStartAt("2026-07-01T14:30:00-03:00")
+  assert.ok(date)
+  assert.equal(date!.toISOString(), "2026-07-01T17:30:00.000Z")
+
+  const utcDate = parseStartAt("2026-07-01T14:30:00Z")
+  assert.ok(utcDate)
+  assert.equal(utcDate!.toISOString(), "2026-07-01T14:30:00.000Z")
+})
+
+test("parseStartAt (serial Excel com hora): aplica o fuso de São Paulo na fração do dia", () => {
+  // Serial equivalente a "2026-01-15 14:30:00" no horário de São Paulo.
+  const date = parseStartAt(46037.604166666664)
+  assert.ok(date)
+  assert.equal(date!.toISOString(), "2026-01-15T17:30:00.000Z")
+})
+
+test("parseStartAt (serial Excel perto da meia-noite em SP): não desloca para o dia errado", () => {
+  // Serial equivalente a "2026-08-27 22:00:00" no horário de São Paulo.
+  const date = parseStartAt(46261.916666666664)
+  assert.ok(date)
+  assert.equal(date!.toISOString(), "2026-08-28T01:00:00.000Z")
+  assert.equal(getDayInSaoPaulo(date!), "2026-08-27")
+})
+
+test("parseStartAt: entrada de hora inválida (DD/MM/YYYY) é rejeitada, não silenciosamente aceita", () => {
+  assert.equal(parseStartAt("01/07/2026 25:99"), null)
+})
+

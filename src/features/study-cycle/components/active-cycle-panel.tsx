@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { CycleOverview } from "@/domain/study-cycle/study-cycle.types"
-import { useGlobalStudy } from "@/features/study-session/components/study-provider"
+import { useStudyActions } from "@/features/study-session/components/study-provider"
 import { cn } from "@/lib/utils"
 import { formatDuration, formatDurationMinutes } from "@/lib/format-duration"
 
@@ -126,7 +126,7 @@ export function ActiveCyclePanel({
   onSelectAnotherCycle,
   onEditCycle,
 }: ActiveCyclePanelProps) {
-  const { startSession, session } = useGlobalStudy()
+  const { startSession, sessionSummary } = useStudyActions()
   const [isSkipping, setIsSkipping] = useState(false)
   const [isPausing, setIsPausing] = useState(false)
 
@@ -144,7 +144,7 @@ export function ActiveCyclePanel({
   } = overview
 
   const isCurrentItemStudying =
-    Boolean(session?.isActive) && session?.cycleId === cycle.id
+    Boolean(sessionSummary?.isActive) && sessionSummary?.cycleId === cycle.id
 
   const handleStartStudy = useCallback(() => {
     if (!currentItem) {

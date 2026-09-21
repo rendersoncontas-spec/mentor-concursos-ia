@@ -57,3 +57,43 @@ export function formatDurationMinutes(totalMinutes: number): string {
   const roundedMinutes = Math.max(0, Math.round(totalMinutes))
   return formatDuration(roundedMinutes * 60)
 }
+
+/**
+ * Formata uma duração em SEGUNDOS como relógio digital: "mm:ss", ou
+ * "hh:mm:ss" quando há pelo menos 1 hora completa. Usada no timer ao vivo
+ * da sessão de estudo (StudyDock, StudyHeaderControl) — extraída de duas
+ * implementações locais idênticas para eliminar a duplicação (Fase 4 da
+ * auditoria de estabilização). Comportamento preservado byte a byte em
+ * relação às implementações originais (nenhum clamp/round adicional).
+ *
+ * Exemplos: 5 → "00:05"; 90 → "01:30"; 3600 → "01:00:00"; 3661 → "01:01:01".
+ */
+export function formatTimerClock(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  if (h > 0) {
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  }
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+}
+
+/**
+ * Formata uma duração em MINUTOS como "Xh Ymin" / "Xh" / "Ymin" — extraída
+ * de duas implementações locais idênticas, uma em study-plan/page.tsx e
+ * outra em study-plan-week.tsx (Fase 4 da auditoria de estabilização).
+ * Comportamento preservado byte a byte em relação às implementações
+ * originais. NÃO é a mesma convenção de formatDurationMinutes acima (essa
+ * usa espaço antes de "min" e não faz padding do minuto) — mantida como
+ * função separada de propósito para não alterar a apresentação visual
+ * dessas duas telas.
+ *
+ * Exemplos: 0 → "0min"; 45 → "45min"; 60 → "1h"; 90 → "1h 30min".
+ */
+export function formatPlanMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}min`
+}

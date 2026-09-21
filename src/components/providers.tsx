@@ -5,30 +5,20 @@ import * as React from "react"
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { Toaster } from "sonner"
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { StudyProvider } from "@/features/study-session/components/study-provider"
 
+// @tanstack/react-query foi removido daqui (Fase 6, auditoria de bundle):
+// o QueryClientProvider envolvia toda a árvore de componentes, mas nenhum
+// componente do projeto usa useQuery/useMutation/useQueryClient (confirmado
+// por busca em todo o src) — era JS carregado globalmente sem nenhum
+// consumidor real. Se uma futura feature precisar de React Query, reintroduza
+// aqui deliberadamente.
 export function Providers({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
-  const [queryClient] = React.useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000,
-            retry: 1,
-            refetchOnWindowFocus: false,
-          },
-        },
-      }),
-  )
-
   return (
     <NextThemesProvider {...props}>
-      <QueryClientProvider client={queryClient}>
-        <StudyProvider>
-          {children}
-        </StudyProvider>
-      </QueryClientProvider>
+      <StudyProvider>
+        {children}
+      </StudyProvider>
       <Toaster position="top-center" richColors />
     </NextThemesProvider>
   )

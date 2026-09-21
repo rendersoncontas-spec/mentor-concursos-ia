@@ -7,18 +7,18 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
-function formatMinutes(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
-}
+import { formatPlanMinutes } from "@/lib/format-duration"
+import { getDayInSaoPaulo, dayOfWeekForDateKey } from "@/lib/sao-paulo"
 
 // --- Grade Semanal ---
 export function StudyPlanWeekView({ week }: { week: StudyPlanWeek }) {
-  const today = new Date().getDay()
+  // Fase 5 da auditoria (timezone): este é um Server Component (sem "use
+  // client") — `new Date().getDay()` rodava no fuso do SERVIDOR (UTC em
+  // produção), não no fuso de negócio (America/Sao_Paulo) nem no fuso do
+  // navegador do aluno. Entre 21h e 23h59 em São Paulo, o card destacado
+  // como "hoje" na Grade Semanal podia ficar um dia adiantado. Corrigido
+  // para usar os helpers de fuso de São Paulo já usados no resto do projeto.
+  const today = dayOfWeekForDateKey(getDayInSaoPaulo(new Date()))
 
   return (
     <TooltipProvider>
@@ -40,7 +40,7 @@ export function StudyPlanWeekView({ week }: { week: StudyPlanWeek }) {
                     )}
                   </CardTitle>
                   <span className="text-xs text-muted-foreground">
-                    {formatMinutes(day.totalMinutes)}
+                    {formatPlanMinutes(day.totalMinutes)}
                   </span>
                 </div>
               </CardHeader>
@@ -65,7 +65,7 @@ export function StudyPlanWeekView({ week }: { week: StudyPlanWeek }) {
                       </div>
                       <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {formatMinutes(item.duration_minutes)}
+                        {formatPlanMinutes(item.duration_minutes)}
                       </div>
                     </div>
                     
@@ -114,7 +114,7 @@ export function StudyPlanDisciplineSummaryView({
                 <CalendarDays className="h-3.5 w-3.5" />
                 <span className="text-xs">{s.daysCount}×/sem</span>
                 <span className="font-semibold text-foreground tabular-nums">
-                  {formatMinutes(s.totalWeeklyMinutes)}
+                  {formatPlanMinutes(s.totalWeeklyMinutes)}
                 </span>
               </div>
             </div>

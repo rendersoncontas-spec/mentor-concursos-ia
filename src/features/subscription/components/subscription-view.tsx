@@ -45,7 +45,7 @@ export function SubscriptionView() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-3">
-        <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
         <p className="text-xs text-muted-foreground font-medium">
           Carregando dados da assinatura...
         </p>
@@ -76,7 +76,7 @@ export function SubscriptionView() {
 
         <Button
           onClick={handleManageSubscription}
-          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-xs"
         >
           Gerenciar
         </Button>
@@ -85,7 +85,7 @@ export function SubscriptionView() {
       {/* Card do Plano Ativo */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col md:flex-row">
         {/* Bloco da Esquerda */}
-        <div className="w-full md:w-64 bg-[#2563EB] text-white font-black text-3xl flex items-center justify-center p-8 shrink-0 tracking-tight">
+        <div className="w-full md:w-64 bg-primary text-white font-black text-3xl flex items-center justify-center p-8 shrink-0 tracking-tight">
           {data.plan}
         </div>
 

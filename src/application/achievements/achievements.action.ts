@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { computeStreak, localDateKey } from "@/utils/study-streak"
+import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo, dayOfWeekForDateKey, getHourInSaoPaulo } from "@/lib/sao-paulo"
 
 export interface AchievementsFacts {
   streak: number
@@ -94,9 +95,15 @@ export async function getAchievementsAction(): Promise<{
     let firstAt: string | null = null
     let lastAt: string | null = null
 
+    // Fase 5 da auditoria (timezone): todayDow/weekStart eram calculados com
+    // accessors de Date no fuso local do runtime (UTC em produção), não no
+    // fuso de negócio (America/Sao_Paulo) — o mesmo desvio de ~3h na virada
+    // do dia podia fazer o "domingo" da semana e o dia da semana de hoje
+    // ficarem errados, afetando facts.planDaysDone/adherencePercentage.
     const now = new Date()
-    const todayDow = now.getDay()
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - todayDow)
+    const todayKey = getDayInSaoPaulo(now)
+    const todayDow = dayOfWeekForDateKey(todayKey)
+    const weekStartKey = daysAgoKeyInSaoPaulo(todayDow, todayKey)
     const studiedDow = new Set<number>()
 
     for (const row of historyRes.data ?? []) {
@@ -141,12 +148,12 @@ export async function getAchievementsAction(): Promise<{
           if (!firstAt || date.getTime() < new Date(firstAt).getTime()) firstAt = startedAt
           if (!lastAt || date.getTime() > new Date(lastAt).getTime()) lastAt = startedAt
 
-          const hour = date.getHours()
+          const hour = getHourInSaoPaulo(date)
           if (hour >= 6 && hour < 12) facts.morningSessions += 1
           if (hour >= 12 && hour < 18) facts.afternoonSessions += 1
           if (hour >= 18 && hour <= 22) facts.nightSessions += 1
 
-          if (date >= weekStart && date <= now) studiedDow.add(date.getDay())
+          if (key >= weekStartKey && key <= todayKey) studiedDow.add(dayOfWeekForDateKey(key))
         }
       }
     }

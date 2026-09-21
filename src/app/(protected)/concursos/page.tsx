@@ -3,6 +3,7 @@ import { GraduationCap } from "lucide-react"
 import type { ConcursoData } from "@/application/concursos/concurso.action"
 import { ConcursosManagerView } from "@/features/concursos/components/concursos-manager-view"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getDayInSaoPaulo, daysBetweenSaoPauloDateKeys } from "@/lib/sao-paulo"
 
 export const metadata = {
   title: "Concursos",
@@ -36,12 +37,13 @@ function mapRowToConcurso(row: any): ConcursoData {
   const meta = parseRowMeta(row.main_study_source)
   const exam_date = meta.examDate || (row.exam_date as string | null) || null
 
+  // Fase 5 da auditoria (timezone — contagem regressiva de prova): mesmo
+  // bug já corrigido em concurso.action.ts (duplicado aqui em
+  // mapRowToConcurso). Ver comentário equivalente lá.
   let days_remaining: number | null = null
   if (exam_date) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const target = new Date(exam_date + "T00:00:00")
-    days_remaining = Math.ceil((target.getTime() - today.getTime()) / 86400000)
+    const todayKey = getDayInSaoPaulo(new Date())
+    days_remaining = daysBetweenSaoPauloDateKeys(todayKey, exam_date)
   }
 
   return {

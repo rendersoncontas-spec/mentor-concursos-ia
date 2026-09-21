@@ -207,6 +207,28 @@ export function StudyRegisterModal({
   const planDisciplines = disciplineData?.planDisciplines ?? []
   const allDisciplines = disciplineData?.allDisciplines ?? []
 
+  // Sessão global (StudyProvider). Precisa vir ANTES do efeito de pré-preenchimento
+  // abaixo, pois quando a Central abre para uma sessão já ativa (ex.: ciclo iniciado
+  // via "Iniciar ciclo"), a disciplina/tópico/vínculo já estão aqui e devem ser
+  // reaproveitados em vez de reconstruídos.
+  const {
+    session,
+    startSession,
+    pauseSession,
+    resumeSession,
+    endSession,
+    resetSession,
+    minimizeSession,
+    toggleFloatingTimer,
+    floatingTimerEnabled,
+    finalizeAndSaveSession,
+    focusSound: focusSoundId,
+    focusSoundVolume,
+    focusSoundIsPlaying,
+    selectFocusSound,
+    changeFocusSoundVolume,
+  } = useGlobalStudy()
+
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema) as Resolver<SessionFormValues>,
     defaultValues: {
@@ -277,15 +299,29 @@ export function StudyRegisterModal({
           : currentTimeInSaoPaulo(),
       })
     } else if (open && !isEditMode) {
-      const hasInitial = !!(initialDisciplineName && initialDisciplineId)
+      // Fonte preferencial: sessão ativa (ex.: "Iniciar ciclo" já chamou startSession()
+      // com disciplineId/disciplineName/topicName/source/cycleId/cycleItemId). O nome
+      // isolado (initialDisciplineName) é só fallback visual — a fonte de verdade é o id.
+      // Se não houver sessão ativa (ex.: abrir a Central direto de uma tela de disciplina),
+      // cai para os props initialDisciplineId/initialDisciplineName, como antes.
+      const hasActiveSessionDiscipline = Boolean(session?.isActive && session.disciplineId)
+      const resolvedDisciplineId = hasActiveSessionDiscipline
+        ? (session!.disciplineId as string)
+        : (initialDisciplineId ?? "")
+      const resolvedDisciplineName = hasActiveSessionDiscipline
+        ? session!.disciplineName
+        : (initialDisciplineName ?? "")
+      // Tópico: nunca inventar. Só pré-seleciona se a sessão ativa já tiver um.
+      const resolvedTopicName = (session?.isActive && session.topicName) || ""
+      const hasInitial = !!(resolvedDisciplineName && resolvedDisciplineId)
       const manualMinutes = initialTimeSeconds ? Math.floor(initialTimeSeconds / 60) : 0
       const manualSecs = initialTimeSeconds ? initialTimeSeconds % 60 : 0
       form.reset({
         studyType: "TEORIA",
         technique: "LIVRE",
-        discipline_name: initialDisciplineName ?? "",
-        discipline_id: initialDisciplineId ?? "",
-        topic_name: "",
+        discipline_name: resolvedDisciplineName,
+        discipline_id: resolvedDisciplineId,
+        topic_name: resolvedTopicName,
         pages_read: 0,
         questions_answered: 0,
         questions_correct: 0,
@@ -305,25 +341,19 @@ export function StudyRegisterModal({
         study_time: currentTimeInSaoPaulo(),
       })
     }
-  }, [form, open, isEditMode, sessionToEdit, initialDisciplineName, initialDisciplineId, initialTimeSeconds])
-
-  const {
-    session,
-    startSession,
-    pauseSession,
-    resumeSession,
-    endSession,
-    resetSession,
-    minimizeSession,
-    toggleFloatingTimer,
-    floatingTimerEnabled,
-    finalizeAndSaveSession,
-    focusSound: focusSoundId,
-    focusSoundVolume,
-    focusSoundIsPlaying,
-    selectFocusSound,
-    changeFocusSoundVolume,
-  } = useGlobalStudy()
+  }, [
+    form,
+    open,
+    isEditMode,
+    sessionToEdit,
+    initialDisciplineName,
+    initialDisciplineId,
+    initialTimeSeconds,
+    session?.isActive,
+    session?.disciplineId,
+    session?.disciplineName,
+    session?.topicName,
+  ])
 
   const phase = session?.phase ?? "IDLE"
   const activeSeconds = session?.activeSeconds ?? 0
@@ -996,8 +1026,8 @@ export function StudyRegisterModal({
                             )
                           })()
                         ) : (
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 bg-info/10 text-info border border-info/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-info" />
                             Lançamento Manual
                           </span>
                         )}
@@ -1009,12 +1039,18 @@ export function StudyRegisterModal({
 
                       {/* Disciplina Selecionada Badge */}
                       {watchDisciplineName && (
-                        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/30 border border-border/40 min-h-[32px]">
+                        <div
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl border min-h-[36px]"
+                          style={{
+                            backgroundColor: `${selectedColor}14`,
+                            borderColor: `${selectedColor}40`,
+                          }}
+                        >
                           <span
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: selectedColor }}
                           />
-                          <span className="text-xs font-semibold text-foreground truncate">
+                          <span className="text-sm font-bold text-foreground truncate">
                             {watchDisciplineName}
                           </span>
                         </div>
@@ -1025,7 +1061,7 @@ export function StudyRegisterModal({
                     {!isManualMode ? (
                       /* ─── CRONÔMETRO DISPLAY ─── */
                       <div className="flex flex-col items-center justify-center gap-1.5">
-                        <div className="text-[52px] leading-none font-mono font-black tracking-tight tabular-nums text-foreground select-none">
+                        <div className="text-[58px] sm:text-[64px] leading-none font-mono font-black tracking-tight tabular-nums text-foreground select-none">
                           {formatClock(activeSeconds)}
                         </div>
                         <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
@@ -1064,7 +1100,7 @@ export function StudyRegisterModal({
                                   resumeSession()
                                 }
                               }}
-                              className="flex-1 gap-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold h-9 rounded-xl shadow-sm"
+                              className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-white font-semibold h-9 rounded-xl shadow-sm hover:shadow-md transition-all"
                             >
                               <Play className="h-4 w-4 fill-current" />
                               <span>{phase === "PAUSED" ? "Retomar" : "Iniciar"}</span>
@@ -1512,7 +1548,7 @@ export function StudyRegisterModal({
                       <Button
                         type="submit"
                         disabled={isSubmitting}
-                        className="h-9 px-6 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm shadow-sm flex items-center gap-2"
+                        className="h-9 px-6 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs sm:text-sm shadow-sm hover:shadow-md transition-all flex items-center gap-2"
                       >
                         <CheckCircle2 className="h-4 w-4" />
                         <span>{isSubmitting ? "Salvando..." : "Salvar estudo"}</span>

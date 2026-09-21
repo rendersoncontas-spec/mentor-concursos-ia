@@ -339,7 +339,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
 
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b bg-background px-6 py-4">
           <div className="flex items-center gap-2">
-            <FolderOpen className="h-4 w-4 text-[#2563EB]" />
+            <FolderOpen className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-bold tracking-wider text-foreground">
               Importar histórico de estudos
             </h2>
@@ -414,7 +414,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 {importOrigin && (
                   <p className="text-[11px] text-muted-foreground">
                     Origem registrada:{" "}
-                    <span className="font-bold text-[#2563EB]">
+                    <span className="font-bold text-primary">
                       {originDisplayName(importOrigin.source, importOrigin.sourceName)}
                     </span>
                   </p>
@@ -438,12 +438,12 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!importOrigin}
-                className="w-full rounded-xl border border-dashed border-[#2563EB]/40 bg-[#2563EB]/5 hover:bg-[#2563EB]/10 hover:border-[#2563EB] transition-colors py-12 flex flex-col items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+                className="w-full rounded-xl border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary transition-colors py-12 flex flex-col items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
               >
-                <div className="h-12 w-12 rounded-full bg-[#2563EB]/10 flex items-center justify-center">
-                  <Upload className="h-6 w-6 text-[#2563EB]" />
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Upload className="h-6 w-6 text-primary" />
                 </div>
-                <div className="text-sm font-extrabold text-[#2563EB]">Selecionar arquivo</div>
+                <div className="text-sm font-extrabold text-primary">Selecionar arquivo</div>
                 <div className="text-[11px] text-muted-foreground">.xlsx, .xls ou .csv</div>
               </button>
 
@@ -465,7 +465,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
 
           {step === "parsing" && (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-[#2563EB]" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm font-bold text-foreground">Analisando arquivo...</p>
               <p className="text-xs text-muted-foreground">{fileName}</p>
             </div>
@@ -701,7 +701,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
               <Button
                 onClick={() => void handlePreview()}
                 disabled={previewing || importableRecords.length === 0}
-                className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs h-10"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-bold text-xs h-10"
               >
                 {previewing ? (
                   <>
@@ -766,8 +766,8 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 .
               </p>
 
-              <div className="rounded-xl border bg-[#2563EB]/5 border-[#2563EB]/30 p-4 space-y-2">
-                <h3 className="text-sm font-bold text-[#2563EB]">Pronto para importar</h3>
+              <div className="rounded-xl border bg-primary/5 border-primary/30 p-4 space-y-2">
+                <h3 className="text-sm font-bold text-primary">Pronto para importar</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Serão adicionados {preview.newCount} novo{preview.newCount !== 1 ? "s" : ""}{" "}
                   registro
@@ -795,7 +795,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 <Button
                   onClick={() => void handleImport()}
                   disabled={preview.newCount === 0 || importing}
-                  className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs h-10"
+                  className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold text-xs h-10"
                 >
                   <Download className="h-4 w-4" />
                   {preview.newCount === 0
@@ -809,7 +809,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
           {step === "importing" && (
             <div className="space-y-5 py-6">
               <div className="text-center space-y-2">
-                <Loader2 className="h-8 w-8 animate-spin text-[#2563EB] mx-auto" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                 <p className="text-sm font-extrabold text-foreground">Importando histórico...</p>
                 <p className="text-xs text-muted-foreground font-mono">
                   {progress.done.toLocaleString("pt-BR")} / {progress.total.toLocaleString("pt-BR")}
@@ -827,7 +827,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                   Importação concluída
                 </p>
                 {importOrigin && (
-                  <span className="inline-flex items-center rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-3 py-1 text-[10px] font-bold text-[#2563EB]">
+                  <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-bold text-primary">
                     Importado · {originDisplayName(importOrigin.source, importOrigin.sourceName)}
                   </span>
                 )}
@@ -877,7 +877,7 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                 </Button>
                 <Button
                   onClick={() => handleOpenChange(false)}
-                  className="flex-1 text-xs font-bold bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                  className="flex-1 text-xs font-bold bg-primary hover:bg-primary/90 text-white"
                 >
                   Fechar
                 </Button>
@@ -900,7 +900,7 @@ function SummaryCard({
   tone?: "default" | "blue" | "muted" | "amber"
 }) {
   let toneClass = "text-foreground"
-  if (tone === "blue") toneClass = "text-[#2563EB]"
+  if (tone === "blue") toneClass = "text-primary"
   else if (tone === "amber") toneClass = "text-amber-600"
   else if (tone === "muted") toneClass = "text-muted-foreground"
   return (

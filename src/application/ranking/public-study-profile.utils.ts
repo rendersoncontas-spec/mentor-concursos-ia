@@ -1,3 +1,5 @@
+import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo } from "@/lib/sao-paulo"
+
 export function formatMinutesToHours(minutes: number): string {
   if (minutes <= 0) return "0min"
   if (minutes < 60) return `${minutes}min`
@@ -37,108 +39,94 @@ export function computeBgColor(id: string): string {
   return colors[idx] || "bg-blue-600"
 }
 
-export function getRelativeDateLabel(dateString: string): string {
+// Fase 5 da auditoria (timezone): getRelativeDateLabel e computeStreaksFromDates
+// abaixo comparavam dia/mês/ano com accessors de Date no fuso LOCAL DO
+// RUNTIME (UTC em produção), não no fuso de negócio (America/Sao_Paulo) —
+// o mesmo desvio de ~3h na virada do dia já corrigido em
+// study-analytics/evolution.ts, heatmap.ts, dashboard.service.ts,
+// aggregations.ts (streak) e utils/study-streak.ts (achievements). Como
+// este é o perfil PÚBLICO de estudo (visível a outros usuários no ranking),
+// o rótulo "Hoje"/"Ontem" e o streak exibidos podiam ficar incorretos por
+// até ~3h por dia. Corrigido para usar os mesmos helpers de fuso de São
+// Paulo já usados no resto do projeto. Os parâmetros `todayKey` são
+// opcionais (chave "YYYY-MM-DD" já resolvida em SP) e permitem testar de
+// forma determinística sem depender do relógio real do sistema.
+export function getRelativeDateLabel(
+  dateString: string,
+  todayKey: string = daysAgoKeyInSaoPaulo(0),
+): string {
   try {
-    const d = new Date(dateString)
-    const now = new Date()
+    const dayKey = getDayInSaoPaulo(dateString)
+    if (!dayKey) return "Recente"
 
-    // Compara dia/mês/ano local
-    const isToday =
-      d.getDate() === now.getDate() &&
-      d.getMonth() === now.getMonth() &&
-      d.getFullYear() === now.getFullYear()
+    if (dayKey === todayKey) return "Hoje"
 
-    if (isToday) return "Hoje"
+    const yesterdayKey = daysAgoKeyInSaoPaulo(1, todayKey)
+    if (dayKey === yesterdayKey) return "Ontem"
 
-    const yesterday = new Date(now)
-    yesterday.setDate(yesterday.getDate() - 1)
-    const isYesterday =
-      d.getDate() === yesterday.getDate() &&
-      d.getMonth() === yesterday.getMonth() &&
-      d.getFullYear() === yesterday.getFullYear()
-
-    if (isYesterday) return "Ontem"
-
-    const pad = (n: number) => String(n).padStart(2, "0")
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`
+    const [, m, d] = dayKey.split("-")
+    return `${d}/${m}`
   } catch {
     return "Recente"
   }
 }
 
-export function computeStreaksFromDates(dateStrings: string[]): {
+export function computeStreaksFromDates(
+  dateStrings: string[],
+  todayKey: string = daysAgoKeyInSaoPaulo(0),
+): {
   currentStreak: number
   longestStreak: number
 } {
   if (dateStrings.length === 0) return { currentStreak: 0, longestStreak: 0 }
 
-  // Extrai datas únicas formatadas YYYY-MM-DD em ordem decrescente
+  // Extrai dias únicos (chave "YYYY-MM-DD" no fuso de São Paulo) em ordem
+  // decrescente (mais recente primeiro).
   const uniqueDays = Array.from(
-    new Set(
-      dateStrings.map((ds) => {
-        const d = new Date(ds)
-        const pad = (n: number) => String(n).padStart(2, "0")
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-      }),
-    ),
+    new Set(dateStrings.map((ds) => getDayInSaoPaulo(ds)).filter((key) => key.length > 0)),
   )
     .sort()
     .reverse()
 
   if (uniqueDays.length === 0) return { currentStreak: 0, longestStreak: 0 }
 
-  const todayStr = (() => {
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, "0")
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-  })()
-
-  const yesterdayStr = (() => {
-    const y = new Date()
-    y.setDate(y.getDate() - 1)
-    const pad = (n: number) => String(n).padStart(2, "0")
-    return `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`
-  })()
+  const todayStr = todayKey
+  const yesterdayStr = daysAgoKeyInSaoPaulo(1, todayStr)
 
   // Calcula Sequência Atual
   let currentStreak = 0
   const firstDay = uniqueDays[0]
   if (firstDay === todayStr || firstDay === yesterdayStr) {
-    const expectedDate = new Date(firstDay === todayStr ? todayStr : yesterdayStr)
+    let expectedKey = firstDay
     for (const dayStr of uniqueDays) {
-      const dayDate = new Date(dayStr)
-      const diffDays = Math.round(
-        (expectedDate.getTime() - dayDate.getTime()) / (1000 * 60 * 60 * 24),
-      )
-      if (diffDays === 0) {
+      if (dayStr === expectedKey) {
         currentStreak++
-        expectedDate.setDate(expectedDate.getDate() - 1)
-      } else if (diffDays > 0) {
+        expectedKey = daysAgoKeyInSaoPaulo(1, expectedKey)
+      } else if (dayStr < expectedKey) {
+        // Já passamos do dia esperado sem encontrar correspondência: lacuna.
         break
       }
     }
   }
 
-  // Calcula Maior Sequência
+  // Calcula Maior Sequência (a direção da varredura não importa para o
+  // comprimento máximo de uma sequência de dias consecutivos).
   let longestStreak = 0
   let tempStreak = 0
-  let prevDate: Date | null = null
+  let prevKey: string | null = null
 
-  // Processa do mais antigo para o mais recente
-  const chronological = [...uniqueDays].reverse()
-  for (const dayStr of chronological) {
-    const dayDate = new Date(dayStr)
-    if (!prevDate) {
+  for (const dayStr of uniqueDays) {
+    if (!prevKey) {
       tempStreak = 1
     } else {
-      const diffDays = Math.round((dayDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
-      if (diffDays === 1) {
+      const expectedPrev = daysAgoKeyInSaoPaulo(1, prevKey)
+      if (dayStr === expectedPrev) {
         tempStreak++
-      } else if (diffDays > 1) {
+      } else {
         tempStreak = 1
       }
     }
-    prevDate = dayDate
+    prevKey = dayStr
     if (tempStreak > longestStreak) {
       longestStreak = tempStreak
     }

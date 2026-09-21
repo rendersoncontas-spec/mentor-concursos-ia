@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
+import { getDayInSaoPaulo, daysBetweenSaoPauloDateKeys } from "@/lib/sao-paulo"
 
 export interface ConcursoData {
   id: string
@@ -86,10 +87,15 @@ function mapRow(row: any): ConcursoData {
 
   let days_remaining: number | null = null
   if (exam_date) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const target = new Date(exam_date + "T00:00:00")
-    days_remaining = Math.ceil((target.getTime() - today.getTime()) / 86400000)
+    // Fase 5 da auditoria (timezone — contagem regressiva de prova):
+    // `today.setHours(0,0,0,0)` zera o horário no fuso LOCAL DO RUNTIME
+    // (UTC em produção), não no fuso de negócio (America/Sao_Paulo). Entre
+    // 21h e 23h59 em São Paulo, "hoje" (meia-noite UTC) já apontava para o
+    // dia seguinte ao dia real do aluno, subestimando os "dias restantes"
+    // em 1 durante essa janela. Corrigido para comparar chaves de
+    // calendário ("YYYY-MM-DD") calculadas em São Paulo.
+    const todayKey = getDayInSaoPaulo(new Date())
+    days_remaining = daysBetweenSaoPauloDateKeys(todayKey, exam_date)
   }
 
   return {

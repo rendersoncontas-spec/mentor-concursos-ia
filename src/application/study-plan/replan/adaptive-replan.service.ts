@@ -1144,8 +1144,12 @@ export async function closeBlockManually(
 
     return { ok: true }
   } catch (error) {
+    // Antes retornava { ok: true } mesmo após uma falha real aqui (ex.: erro de
+    // rede na busca/atualização do bloco), o que fazia closeBlockManuallyAction
+    // revalidar as rotas e a UI mostrar "Bloco concluído" mesmo sem persistir
+    // nada — o bloco reaparecia como pendente após um refresh.
     Sentry.captureException(error, { extra: { feature: FEATURE, step: "close_block_manually" } })
-    return { ok: true }
+    return { ok: false, error: error instanceof Error ? error.message : "Erro ao concluir o bloco." }
   }
 }
 

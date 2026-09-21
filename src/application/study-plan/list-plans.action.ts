@@ -1,5 +1,7 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
+
 import { createClient } from "@/infrastructure/supabase/server"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import type { PlanStatus, PlanType } from "@/domain/study-plan/study-plan.types"
@@ -268,6 +270,20 @@ export async function activatePlanAction(planId: string): Promise<{ success: boo
       .eq("user_id", effectiveUserId)
 
     if (error) return { success: false, error: error.message }
+
+    // BUG CORRIGIDO (QA 2026-09): esta mutacao muda qual plano esta ativo,
+    // exatamente como generateStudyPlanAction (que ja revalida estas 4
+    // rotas ao criar um plano) - mas as acoes de ciclo de vida do plano
+    // (ativar/pausar/retomar/excluir) nunca revalidavam nada. /planos ficava
+    // correto so porque a propria tela recarrega via loadPlans() apos cada
+    // acao, mas /dashboard, /planejamento e /study-plan podiam continuar
+    // servindo o plano ativo antigo pelo cache de rota do Next ate expirar
+    // por conta propria.
+    revalidatePath("/planejamento")
+    revalidatePath("/study-plan")
+    revalidatePath("/dashboard")
+    revalidatePath("/planos")
+
     return { success: true }
   } catch (err) {
     return { success: false, error: (err as { message?: string }).message ?? "Erro ao ativar plano" }
@@ -303,6 +319,20 @@ export async function togglePausePlanAction(planId: string, currentStatus: PlanS
       .eq("user_id", effectiveUserId)
 
     if (error) return { success: false, error: error.message }
+
+    // BUG CORRIGIDO (QA 2026-09): esta mutacao muda qual plano esta ativo,
+    // exatamente como generateStudyPlanAction (que ja revalida estas 4
+    // rotas ao criar um plano) - mas as acoes de ciclo de vida do plano
+    // (ativar/pausar/retomar/excluir) nunca revalidavam nada. /planos ficava
+    // correto so porque a propria tela recarrega via loadPlans() apos cada
+    // acao, mas /dashboard, /planejamento e /study-plan podiam continuar
+    // servindo o plano ativo antigo pelo cache de rota do Next ate expirar
+    // por conta propria.
+    revalidatePath("/planejamento")
+    revalidatePath("/study-plan")
+    revalidatePath("/dashboard")
+    revalidatePath("/planos")
+
     return { success: true, newStatus: nextStatus }
   } catch (err) {
     return { success: false, error: (err as { message?: string }).message ?? "Erro ao pausar/retomar plano" }
@@ -395,6 +425,19 @@ export async function deletePlanAction(planId: string): Promise<{ success: boole
     // CASCADE exclui automaticamente os study_plan_items (via FK)
     const { error } = await supabase.from("study_plans").delete().eq("id", planId).eq("user_id", effectiveUserId)
     if (error) return { success: false, error: error.message }
+
+    // BUG CORRIGIDO (QA 2026-09): esta mutacao muda qual plano esta ativo,
+    // exatamente como generateStudyPlanAction (que ja revalida estas 4
+    // rotas ao criar um plano) - mas as acoes de ciclo de vida do plano
+    // (ativar/pausar/retomar/excluir) nunca revalidavam nada. /planos ficava
+    // correto so porque a propria tela recarrega via loadPlans() apos cada
+    // acao, mas /dashboard, /planejamento e /study-plan podiam continuar
+    // servindo o plano ativo antigo pelo cache de rota do Next ate expirar
+    // por conta propria.
+    revalidatePath("/planejamento")
+    revalidatePath("/study-plan")
+    revalidatePath("/dashboard")
+    revalidatePath("/planos")
 
     return { success: true }
   } catch (err) {

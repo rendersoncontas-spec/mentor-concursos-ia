@@ -174,7 +174,7 @@ export function EditDisciplineModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-transparent border-b border-[#2563EB] text-xs font-semibold text-foreground py-1.5 focus:outline-none"
+                className="w-full bg-transparent border-b border-primary text-xs font-semibold text-foreground py-1.5 focus:outline-none"
               />
             </div>
 
@@ -190,7 +190,7 @@ export function EditDisciplineModal({
                 <select
                   value={colorHex ?? ""}
                   onChange={(e) => setColorHex(e.target.value)}
-                  className="w-full h-8 bg-transparent border-b border-[#2563EB] text-xs font-semibold text-foreground focus:outline-none cursor-pointer"
+                  className="w-full h-8 bg-transparent border-b border-primary text-xs font-semibold text-foreground focus:outline-none cursor-pointer"
                 >
                   <option value="">Automática</option>
                   {COLOR_OPTIONS.map((c) => (
@@ -214,7 +214,7 @@ export function EditDisciplineModal({
                 <button
                   type="button"
                   onClick={() => toast.info("Arraste os botões de seta para reordenar os tópicos.")}
-                  className="flex items-center gap-1 text-[#2563EB] hover:underline"
+                  className="flex items-center gap-1 text-primary hover:underline"
                 >
                   <ArrowUpDown className="h-3.5 w-3.5" />
                   <span>ORDENAR TÓPICOS</span>
@@ -223,7 +223,7 @@ export function EditDisciplineModal({
                 <button
                   type="button"
                   onClick={() => setShowAddTopicInput(true)}
-                  className="flex items-center gap-1 text-[#2563EB] hover:underline"
+                  className="flex items-center gap-1 text-primary hover:underline"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>NOVO TÓPICO</span>
@@ -244,7 +244,7 @@ export function EditDisciplineModal({
                 <Button
                   size="sm"
                   onClick={handleAddTopic}
-                  className="h-8 bg-[#2563EB] text-white font-bold text-xs"
+                  className="h-8 bg-primary text-white font-bold text-xs"
                 >
                   Adicionar
                 </Button>
@@ -271,7 +271,7 @@ export function EditDisciplineModal({
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
                     {(t.badgeText || badgeText) && (
-                      <span className="px-2 py-0.5 rounded-md bg-[#2563EB] text-white font-extrabold text-[9px] shrink-0">
+                      <span className="px-2 py-0.5 rounded-md bg-primary text-white font-extrabold text-[9px] shrink-0">
                         {t.badgeText || badgeText}
                       </span>
                     )}
@@ -323,7 +323,7 @@ export function EditDisciplineModal({
                         setEditingTopicId(t.id)
                         setEditingTopicText(t.title)
                       }}
-                      className="p-1 hover:text-[#2563EB]"
+                      className="p-1 hover:text-primary"
                       title="Editar tópico"
                     >
                       <SquarePen className="h-3.5 w-3.5" />
@@ -349,7 +349,7 @@ export function EditDisciplineModal({
               type="button"
               variant="outline"
               onClick={handleRemoveDiscipline}
-              className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs px-6 h-9 rounded-xl"
+              className="border-primary text-primary hover:bg-primary/10 font-bold text-xs px-6 h-9 rounded-xl"
             >
               Remover
             </Button>
@@ -357,7 +357,7 @@ export function EditDisciplineModal({
             <Button
               type="button"
               onClick={handleSave}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-7 h-9 rounded-xl shadow-xs"
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-7 h-9 rounded-xl shadow-xs"
             >
               Salvar
             </Button>

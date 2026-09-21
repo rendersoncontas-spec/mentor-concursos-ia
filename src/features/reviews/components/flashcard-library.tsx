@@ -55,7 +55,7 @@ const STAGE_FILTERS: { value: ReviewItem["review_stage"] | "SUSPENDED" | "ALL"; 
 
 const STAGE_STYLE: Record<string, string> = {
   NEW: "bg-muted/60 border-border text-muted-foreground",
-  LEARNING: "bg-blue-500/10 border-blue-500/40 text-blue-600",
+  LEARNING: "bg-primary/10 border-primary/40 text-primary",
   REVIEW: "bg-amber-500/10 border-amber-500/40 text-amber-600",
   MASTERED: "bg-green-500/10 border-green-500/40 text-green-600",
   LAPSED: "bg-red-500/10 border-red-500/40 text-red-600",

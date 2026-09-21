@@ -165,7 +165,7 @@ export async function getStatisticsCenterAction(): Promise<{
     //    permitir o período "Tudo" nas Estatísticas — o filtro acontecerá no
     //    cliente. Paginamos porque o PostgREST limita ~1000 linhas por
     //    requisição.
-    let sessions: SessionRecord[] = []
+    const sessions: SessionRecord[] = []
     const SESSION_SELECT = `
         id, discipline_id, started_at, finished_at, duration_minutes,
         active_minutes, paused_minutes, planned_minutes,

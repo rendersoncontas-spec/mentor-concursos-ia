@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react"
 import {
   AlertTriangle,
   Check,
-  CheckCircle2,
   ClipboardList,
   Eye,
   Loader2,
@@ -13,7 +12,6 @@ import {
   Timer,
   TrendingDown,
   TrendingUp,
-  Trophy,
   Trash2,
   X,
 } from "lucide-react"
@@ -181,40 +179,33 @@ export function SimuladosView() {
             setEditing(null)
             setModalOpen(true)
           }}
-          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs gap-1.5"
+          className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs gap-1.5"
         >
           <Plus className="h-4 w-4" /> Registrar simulado
         </Button>
       </div>
 
-      {/* MÉTRICAS DO DASHBOARD */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <MetricCard
-          label="Simulados realizados"
-          value={String(stats.totalSimulados)}
-          icon={ClipboardList}
-        />
-        <MetricCard
+      {/* MÉTRICAS DO DASHBOARD: uma única superfície com hierarquia (não 5 cards
+          idênticos, cada um repetindo ícone + título + número) */}
+      <div className="rounded-xl border bg-card shadow-xs grid grid-cols-2 lg:grid-cols-5 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border">
+        <MetricStat label="Simulados realizados" value={String(stats.totalSimulados)} />
+        <MetricStat
           label="Questões respondidas"
           value={stats.totalQuestions.toLocaleString("pt-BR")}
-          icon={ClipboardList}
         />
-        <MetricCard
+        <MetricStat
           label="Média de acertos"
           value={stats.averageAccuracy !== null ? `${Math.round(stats.averageAccuracy)}%` : "—"}
-          icon={CheckCircle2}
           valueClass={accuracyColor(stats.averageAccuracy)}
         />
-        <MetricCard
+        <MetricStat
           label="Melhor desempenho"
           value={stats.bestAccuracy !== null ? `${Math.round(stats.bestAccuracy)}%` : "—"}
-          icon={Trophy}
           valueClass="text-amber-500"
         />
-        <MetricCard
+        <MetricStat
           label="Último simulado"
           value={stats.lastAccuracy !== null ? `${Math.round(stats.lastAccuracy)}%` : "—"}
-          icon={TrendingUp}
           valueClass={accuracyColor(stats.lastAccuracy)}
         />
       </div>
@@ -389,7 +380,7 @@ export function SimuladosView() {
                 setEditing(null)
                 setModalOpen(true)
               }}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-9 rounded-xl"
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 h-9 rounded-xl"
             >
               <Plus className="h-4 w-4" /> Registrar primeiro simulado
             </Button>
@@ -540,26 +531,23 @@ export function SimuladosView() {
   )
 }
 
-function MetricCard({
+function MetricStat({
   label,
   value,
-  icon: Icon,
   valueClass,
 }: {
   label: string
   value: string
-  icon: React.ElementType
   valueClass?: string
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col justify-between min-h-[86px]">
-      <span className="text-[9px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
+    <div className="p-4 min-w-0">
+      <span className="text-[9px] font-extrabold uppercase text-muted-foreground tracking-wider truncate block">
         {label}
       </span>
-      <div className="flex items-end justify-between gap-2">
-        <span className={cn("text-2xl font-black font-mono truncate", valueClass)}>{value}</span>
-        <Icon className="h-4 w-4 text-muted-foreground/40 shrink-0" />
-      </div>
+      <span className={cn("mt-1 text-2xl font-black font-mono truncate block", valueClass)}>
+        {value}
+      </span>
     </div>
   )
 }
@@ -719,7 +707,8 @@ function SimuladoDetailModal({ record, onClose }: { record: SimuladoRecord; onCl
                 Resultado por matéria
               </h4>
               <div className="rounded-xl border overflow-hidden">
-                <table className="w-full text-xs">
+                <div className="overflow-x-auto">
+                <table className="w-full text-xs min-w-[400px]">
                   <thead>
                     <tr className="bg-muted/50 text-[9px] font-extrabold uppercase text-muted-foreground">
                       <th className="text-left px-3 py-2">Matéria</th>
@@ -752,6 +741,7 @@ function SimuladoDetailModal({ record, onClose }: { record: SimuladoRecord; onCl
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}

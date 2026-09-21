@@ -95,7 +95,7 @@ export function AdminUserDetailsView({
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto p-6 sm:p-10 flex flex-col items-center justify-center space-y-3">
-        <RefreshCw className="w-8 h-8 animate-spin text-[#2563EB]" />
+        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
         <p className="text-xs text-muted-foreground font-medium">Carregando diagnóstico do estudante...</p>
       </div>
     )
@@ -156,7 +156,7 @@ export function AdminUserDetailsView({
           <Button
             size="sm"
             onClick={() => setShowSupportModal(true)}
-            className="h-9 px-4 text-xs font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer shadow-xs"
+            className="h-9 px-4 text-xs font-bold bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer shadow-xs"
           >
             <LifeBuoy className="w-4 h-4 mr-1.5" /> Entrar como usuário
           </Button>
@@ -167,7 +167,7 @@ export function AdminUserDetailsView({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground flex items-center gap-1">
-            <Clock className="w-3 h-3 text-[#2563EB]" /> Total Estudado
+            <Clock className="w-3 h-3 text-primary" /> Total Estudado
           </span>
           <div className="text-lg font-black text-foreground font-mono">
             {formatHours(detail.stats.totalMinutes)}
@@ -213,7 +213,7 @@ export function AdminUserDetailsView({
       {/* Detalhes do Plano Ativo */}
       <div className="bg-card rounded-2xl border p-5 shadow-xs space-y-3">
         <h2 className="text-sm font-black text-foreground flex items-center gap-2">
-          <Zap className="w-4 h-4 text-[#2563EB]" /> Planejamento Atual
+          <Zap className="w-4 h-4 text-primary" /> Planejamento Atual
         </h2>
 
         {detail.activePlan ? (
@@ -239,7 +239,7 @@ export function AdminUserDetailsView({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-black text-foreground">
-              <LifeBuoy className="w-5 h-5 text-[#2563EB]" />
+              <LifeBuoy className="w-5 h-5 text-primary" />
               Iniciar Modo de Suporte
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground pt-1.5 leading-relaxed">
@@ -261,7 +261,7 @@ export function AdminUserDetailsView({
               size="sm"
               onClick={() => void handleStartSupport()}
               disabled={startingSupport}
-              className="text-xs font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer"
+              className="text-xs font-bold bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer"
             >
               {startingSupport ? "Conectando..." : "Sim, entrar como usuário"}
             </Button>

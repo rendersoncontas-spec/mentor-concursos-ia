@@ -122,7 +122,7 @@ export function ManageImportsModal({
         </DialogDescription>
 
         <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-6 py-4">
-          <Database className="h-4 w-4 text-[#2563EB]" />
+          <Database className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-black uppercase tracking-wider text-foreground">
             Gerenciar importações
           </h2>
@@ -152,7 +152,7 @@ export function ManageImportsModal({
               )}
               <Button
                 size="sm"
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs gap-2"
+                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs gap-2"
                 onClick={() => {
                   onOpenChange(false)
                   onImportClick?.()

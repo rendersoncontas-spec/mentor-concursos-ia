@@ -7,6 +7,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 
 import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
+import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
+import { HISTORY_PATHS } from "@/application/study-history/study-history.constants"
 import { FLASHCARD_TYPE_LABEL, FSRS_D0 } from "@/domain/reviews/models"
 import type {
   ReviewCardFront,
@@ -165,12 +167,11 @@ export async function getReviewDashboardSummary(supabase: Supabase, userId: stri
   const now = new Date()
   const { items, discNames, topicNames } = bundle
 
-  const [historyRes, sessionsRes, allHistoryRes] = await Promise.all([
+  const [historyRes, sessionsRes] = await Promise.all([
     supabase.from("review_history").select("grade, review_date").eq("user_id", userId).gte("review_date", new Date(now.getTime() - 365 * DAY_MS).toISOString()).order("review_date", { ascending: false }).limit(100000),
     supabase.from("review_sessions").select("id").eq("user_id", userId).eq("status", "ACTIVE").limit(1),
-    supabase.from("review_history").select("grade, review_date").eq("user_id", userId).gte("review_date", new Date(now.getTime() - 365 * DAY_MS).toISOString()).order("review_date", { ascending: false }).limit(100000),
   ])
-  const allHistory = allHistoryRes.data ?? historyRes.data ?? []
+  const allHistory = historyRes.data ?? []
 
   const startOfToday = new Date()
   startOfToday.setUTCHours(0, 0, 0, 0)
@@ -613,11 +614,28 @@ export async function finalizeSession(supabase: Supabase, userId: string, sessio
   const { data: sessionRow } = await supabase.from("review_sessions").select("*").eq("id", sessionId).eq("user_id", userId).maybeSingle()
   if (!sessionRow || sessionRow["status"] !== "ACTIVE") return { cycleSyncError: null }
 
-  await supabase
+  // BUG CORRIGIDO (QA 2026-09, concorrencia): o SELECT acima e o UPDATE abaixo
+  // nao eram atomicos. finalizeSession pode ser chamada duas vezes quase ao
+  // mesmo tempo para a MESMA sessao - pelo auto-finalize ao responder o
+  // ultimo card (answerReviewCard) e/ou pelo botao explicito "finalizar"
+  // (finalizeReviewSessionAction), inclusive de duas abas diferentes. Antes,
+  // as duas chamadas liam status "ACTIVE" (nenhuma tinha commitado o UPDATE
+  // ainda), as duas passavam pela guarda acima, e as duas inseriam uma linha
+  // em study_history para a mesma sessao - duplicando o tempo de estudo da
+  // revisao no Historico/Estatisticas/Ciclo/ranking. A correcao usa o
+  // proprio UPDATE como trava (compare-and-swap): so avanca quem realmente
+  // conseguiu mudar o status de ACTIVE para COMPLETED; a segunda chamada nao
+  // encontra nenhuma linha para atualizar e retorna sem duplicar nada.
+  const { data: claimedSession } = await supabase
     .from("review_sessions")
     .update({ status: "COMPLETED", finished_at: now.toISOString() })
     .eq("id", sessionId)
     .eq("user_id", userId)
+    .eq("status", "ACTIVE")
+    .select("id")
+    .maybeSingle()
+
+  if (!claimedSession) return { cycleSyncError: null }
 
   let cycleSyncError: string | null = null
   if (answeredIds.length > 0) {
@@ -658,9 +676,24 @@ export async function finalizeSession(supabase: Supabase, userId: string, sessio
       // que algum outro evento disparasse um rebuild.
       if (!historyError) {
         const cycleResult = await registerStudyToCycle()
-        revalidatePath("/ciclos")
-        revalidatePath("/dashboard")
-        revalidatePath("/dashboard/history")
+        // BUG CORRIGIDO (QA 2026-09): esta funcao finaliza a sessao de
+        // revisao por DOIS caminhos - o botao explicito "finalizar" (via
+        // finalizeReviewSessionAction) e o auto-finalize ao responder o
+        // ultimo card da fila (via answerReviewCard/answerReviewCardAction).
+        // Antes, aqui dentro so revalidavamos /ciclos, /dashboard e
+        // /dashboard/history via uma lista hardcoded propria - o caminho
+        // explicito compensava isso porque a action tambem fazia
+        // for (const path of HISTORY_PATHS) revalidatePath(path), mas o
+        // auto-finalize (answerReviewCardAction) nunca fazia essa segunda
+        // passada, entao /estatisticas, /dashboard/analytics, /disciplines
+        // e /planejamento podiam ficar com dado obsoleto apos concluir uma
+        // revisao respondendo o ultimo card, sem depender de clicar em
+        // "finalizar". Usar HISTORY_PATHS (fonte unica, ver
+        // study-history.constants.ts) aqui dentro cobre os dois caminhos por
+        // igual, e o cache em memoria de /estatisticas (que revalidatePath
+        // sozinho NAO invalida) tambem precisa da chamada explicita abaixo.
+        for (const path of HISTORY_PATHS) revalidatePath(path)
+        await invalidateStatisticsCenterCache(userId)
         if (!cycleResult.success) {
           cycleSyncError = cycleResult.error || "Estudo salvo, mas o ciclo não foi atualizado."
           console.error("[ReviewEngine] Sessão salva, mas o ciclo não foi atualizado:", cycleResult.error)

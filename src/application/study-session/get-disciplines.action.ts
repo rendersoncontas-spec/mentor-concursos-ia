@@ -5,6 +5,11 @@ import { type SupabaseClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { buildCycleOverview } from "@/application/study-cycle/cycle-progress.service"
+import type {
+  StudyCycle,
+  StudyCycleItemWithDetails,
+  StudyCycleSession,
+} from "@/domain/study-cycle/study-cycle.types"
 
 export type DisciplineOption = {
   id: string
@@ -454,9 +459,9 @@ async function fetchCycleDisciplines(
       .eq("round_number", cycle.current_round || 1)
 
     const overview = buildCycleOverview(
-      cycle as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycle,
-      items as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleItemWithDetails[],
-      (sessions || []) as unknown as import("@/domain/study-cycle/study-cycle.types").StudyCycleSession[],
+      cycle as unknown as StudyCycle,
+      items as unknown as StudyCycleItemWithDetails[],
+      (sessions || []) as unknown as StudyCycleSession[],
       new Set((skipRows || []).map((row) => row.cycle_item_id as string)),
     )
 

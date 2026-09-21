@@ -5,25 +5,38 @@ import { createClient } from "@/infrastructure/supabase/server"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 
 // Separação de configuração e server actions
+// Ordem padrão editorial (Fase 7/8 do redesign visual): reflete a hierarquia de prioridade
+// solicitada — 1) estudo de hoje, 2) progresso, 3) próxima ação, 4) desempenho,
+// 5) planejamento, 6) informações secundárias. Esta função só define os valores
+// PADRÃO usados quando o usuário ainda não tem um layout salvo (ver getDashboardLayoutAction
+// abaixo); a personalização por drag-and-drop do usuário (posição/tamanho/visibilidade
+// salvos em user_dashboard_layouts / profiles.preferences) continua intacta e sempre
+// tem prioridade sobre esta configuração padrão.
 function getDashboardLayoutConfig(): WidgetConfigItem[] {
   return [
-    { widget_id: "calendario", position_order: 1, col_span: 2 as const, visible: true },
-    { widget_id: "ciclo_estudo", position_order: 2, col_span: 3 as const, visible: true },
-    { widget_id: "conquistas", position_order: 3, col_span: 1 as const, visible: true },
-    { widget_id: "constancia", position_order: 4, col_span: 1 as const, visible: true },
-    { widget_id: "data_prova", position_order: 5, col_span: 1 as const, visible: true },
-    { widget_id: "desempenho", position_order: 6, col_span: 2 as const, visible: true },
-    { widget_id: "desempenho_materia", position_order: 7, col_span: 3 as const, visible: true },
-    { widget_id: "estudos_hoje", position_order: 8, col_span: 3 as const, visible: true },
-    { widget_id: "lembretes", position_order: 9, col_span: 1 as const, visible: true },
-    { widget_id: "mensagem_dia", position_order: 10, col_span: 2 as const, visible: true },
-    { widget_id: "metas_estudo", position_order: 11, col_span: 2 as const, visible: true },
-    { widget_id: "progresso_edital", position_order: 12, col_span: 2 as const, visible: true },
-    { widget_id: "questoes", position_order: 13, col_span: 1 as const, visible: true },
-    { widget_id: "ranking", position_order: 14, col_span: 1 as const, visible: true },
-    { widget_id: "revisoes", position_order: 15, col_span: 1 as const, visible: true },
-    { widget_id: "tempo_estudo", position_order: 16, col_span: 2 as const, visible: true },
-    { widget_id: "ultimas_atividades", position_order: 17, col_span: 1 as const, visible: true },
+    // 1) Estudo de hoje
+    { widget_id: "ciclo_estudo", position_order: 1, col_span: 3 as const, visible: true },
+    { widget_id: "estudos_hoje", position_order: 2, col_span: 3 as const, visible: true },
+    // 2) Progresso
+    { widget_id: "progresso_edital", position_order: 3, col_span: 2 as const, visible: true },
+    { widget_id: "tempo_estudo", position_order: 4, col_span: 1 as const, visible: true },
+    { widget_id: "constancia", position_order: 5, col_span: 1 as const, visible: true },
+    // 3) Próxima ação
+    { widget_id: "revisoes", position_order: 6, col_span: 1 as const, visible: true },
+    { widget_id: "metas_estudo", position_order: 7, col_span: 2 as const, visible: true },
+    // 4) Desempenho
+    { widget_id: "desempenho", position_order: 8, col_span: 2 as const, visible: true },
+    { widget_id: "desempenho_materia", position_order: 9, col_span: 3 as const, visible: true },
+    { widget_id: "questoes", position_order: 10, col_span: 1 as const, visible: true },
+    { widget_id: "ranking", position_order: 11, col_span: 1 as const, visible: true },
+    // 5) Planejamento
+    { widget_id: "calendario", position_order: 12, col_span: 2 as const, visible: true },
+    { widget_id: "data_prova", position_order: 13, col_span: 1 as const, visible: true },
+    // 6) Informações secundárias
+    { widget_id: "conquistas", position_order: 14, col_span: 1 as const, visible: true },
+    { widget_id: "ultimas_atividades", position_order: 15, col_span: 1 as const, visible: true },
+    { widget_id: "lembretes", position_order: 16, col_span: 1 as const, visible: true },
+    { widget_id: "mensagem_dia", position_order: 17, col_span: 2 as const, visible: true },
   ]
 }
 

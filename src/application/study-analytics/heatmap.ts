@@ -1,5 +1,5 @@
 import type { AnalyticsContext, HeatmapDay } from "./types"
-import { formatDateToYYYYMMDD, getDaysAgoDate } from "./utils"
+import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 export function getHeatmap(ctx: AnalyticsContext): HeatmapDay[] {
   return ctx.getCache('heatmap', () => {
@@ -9,7 +9,7 @@ export function getHeatmap(ctx: AnalyticsContext): HeatmapDay[] {
     let maxMinutes = 0
 
     ctx.history.forEach(session => {
-      const dateStr = formatDateToYYYYMMDD(new Date(session.started_at))
+      const dateStr = getDayInSaoPaulo(session.started_at)
       const current = map.get(dateStr) || { minutes: 0, sessions: 0 }
       
       const duration = session.duration_minutes || 0
@@ -29,8 +29,7 @@ export function getHeatmap(ctx: AnalyticsContext): HeatmapDay[] {
     // Opcional: O heatmap do Github geralmente começa num Domingo. 
     // Para simplificar, traremos apenas os últimos X dias exatos.
     for (let i = ctx.periodDays - 1; i >= 0; i--) {
-      const d = getDaysAgoDate(i)
-      const dateStr = formatDateToYYYYMMDD(d)
+      const dateStr = daysAgoKeyInSaoPaulo(i)
       
       const data = map.get(dateStr) || { minutes: 0, sessions: 0 }
       

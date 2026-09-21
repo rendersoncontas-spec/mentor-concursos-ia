@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 
 import {
   CalendarDays,
+  Check,
   CheckSquare,
   Clock,
   PlayCircle,
@@ -48,6 +49,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   const [hasPlanning, setHasPlanning] = useState(() =>
     Boolean(initialData && initialData.blocks && initialData.blocks.length > 0),
   )
+  const [isRemovingPlan, setIsRemovingPlan] = useState(false)
   const [planningType, setPlanningType] = useState<
     "ciclo" | "diario" | "semanal" | "mensal" | "metas"
   >("ciclo")
@@ -157,6 +159,16 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   }
 
   const handleRemovePlan = async () => {
+    // Fase 6 (auditoria de Loading/UX): esta ação desativa todo o
+    // planejamento do usuário, mas não tinha confirmação nem proteção contra
+    // duplo clique — diferente de outras ações destrutivas do projeto
+    // (ex.: excluir sessão em history-view.tsx), que já pedem confirmação.
+    if (isRemovingPlan) return
+    const confirmed = window.confirm(
+      "Remover o planejamento atual?\nVocê pode criar um novo planejamento depois, mas o atual será desativado.",
+    )
+    if (!confirmed) return
+    setIsRemovingPlan(true)
     try {
       const res = await deactivateStudyPlanAction()
       if (res.success) {
@@ -169,6 +181,8 @@ export function PlanningView({ initialData }: PlanningViewProps) {
       }
     } catch {
       toast.error("Erro de conexão ao desativar o planejamento.")
+    } finally {
+      setIsRemovingPlan(false)
     }
   }
 
@@ -241,7 +255,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
         <div className="flex flex-col items-center justify-center text-center p-5 sm:p-8 bg-card rounded-2xl border shadow-xs space-y-6 my-2">
           <div className="space-y-2 max-w-lg">
-            <div className="flex items-center justify-center gap-2.5 text-[#2563EB]">
+            <div className="flex items-center justify-center gap-2.5 text-primary">
               <BrainCircuit className="w-7 h-7" />
               <h2 className="text-xl font-black">Criar Planejamento Inteligente</h2>
             </div>
@@ -254,24 +268,24 @@ export function PlanningView({ initialData }: PlanningViewProps) {
             {/* AI Option */}
             <div
               onClick={openCreateWizard}
-              className="bg-card border border-[#2563EB]/20 hover:border-[#2563EB] rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-sm group"
+              className="bg-card border border-primary/20 hover:border-primary rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-xs group"
             >
-              <div className="w-12 h-12 bg-[#2563EB]/10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Bot className="w-6 h-6 text-[#2563EB]" />
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Bot className="w-6 h-6 text-primary" />
               </div>
               <div className="space-y-2 flex-1">
                 <h3 className="text-base font-bold text-foreground flex items-center justify-center gap-1.5">
-                  Nomeia Inteligente <Sparkles className="w-4 h-4 text-[#2563EB]" />
+                  Nomeia Inteligente <Sparkles className="w-4 h-4 text-primary" />
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   O Nomeia monta todo o seu planejamento automaticamente com base no seu perfil,
                   escala de trabalho e carga horária.
                 </p>
-                <div className="inline-flex items-center text-[10px] font-bold text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <div className="inline-flex items-center text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Tempo: ~2 minutos
                 </div>
               </div>
-              <Button className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold h-10 rounded-xl">
+              <Button className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-10 rounded-xl">
                 Começar com IA
               </Button>
             </div>
@@ -335,7 +349,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
           {isManualCreation || blocks.length === 0 ? (
             <Button
               onClick={handleSaveChanges}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-9 rounded-xl shadow-xs"
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 h-9 rounded-xl shadow-xs"
             >
               Salvar Planejamento
             </Button>
@@ -344,14 +358,14 @@ export function PlanningView({ initialData }: PlanningViewProps) {
               <Button
                 variant="outline"
                 onClick={handleResetCycle}
-                className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs px-4 h-9"
+                className="border-primary text-primary hover:bg-primary/10 font-bold text-xs px-4 h-9"
               >
                 Recomeçar Ciclo
               </Button>
 
               <Button
                 onClick={openEditWizard}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-4 h-9 shadow-xs"
+                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 h-9 shadow-xs"
               >
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                 Replanejar
@@ -360,9 +374,10 @@ export function PlanningView({ initialData }: PlanningViewProps) {
               <Button
                 variant="outline"
                 onClick={handleRemovePlan}
+                disabled={isRemovingPlan}
                 className="border-rose-400 text-rose-500 hover:bg-rose-50 font-bold text-xs px-4 h-9"
               >
-                Remover
+                {isRemovingPlan ? "Removendo..." : "Remover"}
               </Button>
             </>
           )}
@@ -467,19 +482,19 @@ export function PlanningView({ initialData }: PlanningViewProps) {
         <div className="space-y-6">
           {/* Top Metrics Cards: Ciclos Completos + Progresso */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div className="rounded-xl border bg-card p-5 shadow-sm flex flex-col justify-between">
+            <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between">
               <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
                 CICLOS COMPLETOS
               </span>
 
               <div className="py-2 flex items-center justify-center">
-                <div className="w-16 h-16 rounded-full border-4 border-[#2563EB] flex items-center justify-center text-xl font-black text-[#2563EB] shadow-sm">
+                <div className="w-16 h-16 rounded-full border-4 border-primary flex items-center justify-center text-xl font-black text-primary">
                   {completedCyclesCount}
                 </div>
               </div>
             </div>
 
-            <div className="sm:col-span-2 rounded-xl border bg-card p-5 shadow-sm flex flex-col justify-between space-y-3">
+            <div className="sm:col-span-2 rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
                   PROGRESSO (RODADA {completedCyclesCount + 1})
@@ -491,7 +506,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
               <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                 <div
-                  className="h-full bg-[#2563EB] rounded-full transition-all duration-700"
+                  className="h-full bg-primary rounded-full transition-all duration-700"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
@@ -500,7 +515,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
           {/* Layout de Duas Colunas: Sequência dos Estudos (Esq) + Donut (Dir) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="lg:col-span-2 rounded-xl border bg-card p-6 shadow-xs flex flex-col justify-between space-y-4">
               <div className="flex items-center justify-between border-b pb-3">
                 <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider">
                   SEQUÊNCIA DOS ESTUDOS
@@ -511,7 +526,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-semibold transition-colors"
                 >
                   {showCompletedOnly ? (
-                    <CheckSquare className="h-4 w-4 text-[#2563EB]" />
+                    <CheckSquare className="h-4 w-4 text-primary" />
                   ) : (
                     <Square className="h-4 w-4" />
                   )}
@@ -528,7 +543,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                       </p>
                       <Button
                         onClick={handleAddDisciplineRow}
-                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs rounded-xl shadow-xs"
+                        className="bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-xl shadow-xs"
                       >
                         Adicionar Matéria
                       </Button>
@@ -560,8 +575,8 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                           onMouseEnter={() => setActiveBlockId(block.id)}
                           className={`rounded-xl border transition-all ${
                             isSelected
-                              ? "bg-card border-[#2563EB] shadow-md ring-2 ring-[#2563EB]/10 scale-[1.01]"
-                              : "bg-card border-border hover:border-[#2563EB]/50"
+                              ? "bg-primary/[0.03] border-primary"
+                              : "bg-card border-border hover:border-primary/50"
                           }`}
                         >
                           <div className="p-4 cursor-pointer space-y-3">
@@ -576,8 +591,8 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                                       Extra: {formatHoursMinutes(Math.abs(remaining))}
                                     </span>
                                   ) : remaining === 0 ? (
-                                    <span className="text-emerald-600">
-                                      ✓ Concluído nesta rodada
+                                    <span className="text-emerald-600 inline-flex items-center gap-1">
+                                      <Check className="h-3.5 w-3.5" /> Concluído nesta rodada
                                     </span>
                                   ) : (
                                     <span className="text-orange-500">
@@ -591,7 +606,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                               </div>
                               <div className="text-right shrink-0">
                                 <span
-                                  className={`text-sm font-black ${isCompleted ? "text-emerald-500" : "text-[#2563EB]"}`}
+                                  className={`text-sm font-black ${isCompleted ? "text-emerald-500" : "text-primary"}`}
                                 >
                                   {Math.min(100, progressPct).toFixed(1)}%
                                 </span>
@@ -600,7 +615,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
                             <div className="w-full bg-muted rounded-full h-3 overflow-hidden relative">
                               <div
-                                className={`h-full rounded-full transition-all duration-700 ${isCompleted ? "bg-emerald-500" : "bg-[#2563EB]"}`}
+                                className={`h-full rounded-full transition-all duration-700 ${isCompleted ? "bg-emerald-500" : "bg-primary"}`}
                                 style={{
                                   width: `${Math.min(progressPct, 100)}%`,
                                   backgroundColor: isCompleted ? undefined : block.color,
@@ -613,17 +628,17 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                             <div className="flex items-center gap-4 px-4 py-2.5 bg-muted/40 border-t text-[11px] font-bold text-muted-foreground">
                               <button
                                 onClick={() => handleStartStudy(block)}
-                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-[#2563EB] transition-colors"
+                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-primary transition-colors"
                               >
-                                <PlayCircle className="h-3.5 w-3.5 text-[#2563EB]" />
+                                <PlayCircle className="h-3.5 w-3.5 text-primary" />
                                 <span>Iniciar Estudo</span>
                               </button>
 
                               <button
                                 onClick={() => setIsRegisterModalOpen(true)}
-                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-[#2563EB] transition-colors"
+                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-primary transition-colors"
                               >
-                                <PlusCircle className="h-3.5 w-3.5 text-[#2563EB]" />
+                                <PlusCircle className="h-3.5 w-3.5 text-primary" />
                                 <span>Adicionar Estudo Manualmente</span>
                               </button>
                             </div>
@@ -639,7 +654,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                 <div className="flex justify-end pt-2">
                   <Button
                     onClick={openEditWizard}
-                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs"
+                    className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs"
                   >
                     Editar Ciclo
                   </Button>
@@ -648,7 +663,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
             </div>
 
             {/* Coluna Direita: CICLO */}
-            <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between items-center text-center space-y-6">
+            <div className="rounded-xl border bg-card p-6 shadow-xs flex flex-col justify-between items-center text-center space-y-6">
               <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider block border-b pb-3 w-full text-left">
                 CICLO
               </span>

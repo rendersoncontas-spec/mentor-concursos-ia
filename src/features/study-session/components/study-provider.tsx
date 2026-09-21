@@ -1,27 +1,19 @@
 "use client"
 
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
-
-import { useRouter } from "next/navigation"
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import * as Sentry from "@sentry/nextjs"
 
-import {
-  ChevronDown,
-  ChevronUp,
-  Maximize2,
-  Pause,
-  Play,
-  RefreshCcw,
-  RotateCcw,
-  Square,
-  Volume2,
-} from "lucide-react"
-
 import { saveStudySessionAction } from "@/application/study-session/study-session.action"
-import { Button } from "@/components/ui/button"
 import type { StudyTechnique } from "@/domain/study-history/study-history.types"
-import { cn } from "@/lib/utils"
 
 import { type FocusSoundId, useFocusSound } from "../hooks/use-focus-sound"
 import { ResetTimerDialog } from "./reset-timer-dialog"
@@ -38,7 +30,6 @@ const TECHNIQUE_DURATIONS: Record<StudyTechnique, number> = {
 } as const
 
 const STORAGE_KEY = "mentor_active_study_session"
-const POSITION_KEY = "mentor-study-floating-timer-position-v2"
 const FLOATING_TIMER_PREF_KEY = "mentor-floating-timer-enabled"
 const DEFAULT_TITLE = "Nomeia — Sua preparação rumo à nomeação"
 
@@ -122,7 +113,66 @@ interface StudyContextType {
   changeFocusSoundVolume: (vol: number) => void
 }
 
-const StudyContext = createContext<StudyContextType | null>(null)
+/**
+ * StudyContextType é mantido como a "view" combinada, devolvida por
+ * useGlobalStudy() para 100% de compatibilidade com o código existente.
+ * Internamente, o estado é dividido em dois contextos (Fase 2 — otimização
+ * de re-renders do StudyContext):
+ *  - StudyLiveContext: só o que muda a cada segundo (session, formatTime).
+ *  - StudyActionsContext: ações e flags estáveis + um resumo memoizado da
+ *    sessão (sessionSummary), que só troca de referência quando algo
+ *    relevante muda de fato (início/pausa/fim/minimizar/restaurar/trocar
+ *    disciplina ou ciclo) — nunca a cada tick do cronômetro.
+ * Componentes que só precisam de ações/flags (ex.: FloatingActionButton,
+ * StudyQuickAccess, os widgets de ciclo) devem usar useStudyActions() em
+ * vez de useGlobalStudy(), para não re-renderizar a cada segundo durante
+ * uma sessão ativa.
+ */
+export interface StudySessionSummary {
+  isActive: boolean
+  isMinimized: boolean
+  phase: TimerPhase
+  disciplineName: string
+  disciplineId: string | undefined
+  source: "PLAN" | "FREE" | "CYCLE" | null
+  planItemId: string | null
+  cycleId?: string | null | undefined
+  cycleItemId?: string | null | undefined
+}
+
+interface StudyLiveContextType {
+  session: StudySessionState | null
+  formatTime: (seconds: number) => string
+}
+
+export interface StudyActionsContextType {
+  hasActiveSession: boolean
+  sessionSummary: StudySessionSummary | null
+  startSession: StudyContextType["startSession"]
+  minimizeSession: () => void
+  restoreSession: () => void
+  unminimizeSession: () => void
+  resetSession: () => void
+  pauseSession: () => void
+  resumeSession: () => void
+  endSession: () => void
+  updateNotes: (notes: string) => void
+  updatePlannedSeconds: (seconds: number) => void
+  floatingTimerEnabled: boolean
+  toggleFloatingTimer: () => void
+  finalizeAndSaveSession: StudyContextType["finalizeAndSaveSession"]
+  isCentralOpen: boolean
+  setIsCentralOpen: (open: boolean) => void
+  focusSound: FocusSoundId
+  focusSoundVolume: number
+  focusSoundIsPlaying: boolean
+  focusSoundActiveLabel: string | null
+  selectFocusSound: (sound: FocusSoundId) => void
+  changeFocusSoundVolume: (vol: number) => void
+}
+
+const StudyLiveContext = createContext<StudyLiveContextType | null>(null)
+const StudyActionsContext = createContext<StudyActionsContextType | null>(null)
 
 function totalPausedMsAt(state: StudySessionState, now: number): number {
   let pausedMs = state.totalPausedMs
@@ -157,48 +207,6 @@ function calculateTimes(state: StudySessionState): {
   return {
     activeSeconds: Math.floor(activeMs / 1000),
     pausedSeconds: Math.floor(pausedMs / 1000),
-  }
-}
-
-// Posição padrão do balão: centralizado horizontalmente no viewport (ou canto no mobile)
-interface Position {
-  x: number
-  y: number
-}
-
-function getDefaultPosition(isMobile: boolean = false): Position {
-  if (typeof window === "undefined") return { x: 16, y: 16 }
-  if (isMobile) {
-    return {
-      x: 16,
-      y: Math.max(16, window.innerHeight - 80),
-    }
-  }
-  const floatingWidth = 250
-  const x = Math.max(16, (window.innerWidth - floatingWidth) / 2)
-  const y = 10
-  return { x, y }
-}
-
-function loadSavedPosition(): Position | null {
-  try {
-    const saved = localStorage.getItem(POSITION_KEY)
-    if (!saved) return null
-    const pos = JSON.parse(saved) as { x: number; y: number }
-    if (typeof pos?.x === "number" && typeof pos?.y === "number") {
-      if (typeof window !== "undefined") {
-        const vw = window.innerWidth
-        const vh = window.innerHeight
-        const maxX = Math.max(8, vw - 60)
-        const maxY = Math.max(8, vh - 40)
-        pos.x = Math.max(8, Math.min(pos.x, maxX))
-        pos.y = Math.max(8, Math.min(pos.y, maxY))
-      }
-      return { x: pos.x, y: pos.y }
-    }
-    return null
-  } catch {
-    return null
   }
 }
 
@@ -315,6 +323,12 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   // ou quando o Next/metadata altera o title durante a navegação.
   // ═══════════════════════════════════════════════════════════════════════
   const sessionRef = useRef<StudySessionState | null>(null)
+  // Trava de reentrancia: garante uma unica gravacao por sessao mesmo que
+  // finalizeAndSaveSession seja chamado duas vezes quase ao mesmo tempo
+  // (duplo clique antes do botao desabilitar re-renderizar, duas abas
+  // chamando a mesma acao, etc). E' a fonte da verdade da sessao; nao deve
+  // depender apenas do `disabled` de cada tela consumidora.
+  const isFinalizingRef = useRef(false)
   useEffect(() => {
     sessionRef.current = session
   }, [session])
@@ -510,82 +524,89 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   const finalizeAndSaveSession = useCallback(
     async (formData?: Record<string, unknown>) => {
       if (!session) return { success: false, error: "Nenhuma sessão ativa" }
-
-      // Capturar snapshot ANTES de qualquer alteração
-      const snapshot = {
-        // Timestamps para cálculo server-side
-        sessionStartTime: session.startTime,
-        sessionTotalPausedMs: session.totalPausedMs,
-        sessionLastPauseStartTime: session.lastPauseStartTime,
-        is_manual_mode: false,
-        // Dados que o saveStudySessionAction espera
-        // Prefere a seleção atual do formulário (pode ter sido escolhida após o início)
-        discipline_id: (formData?.["discipline_id"] as string) || session.disciplineId,
-        discipline_name: (formData?.["discipline_name"] as string) || session.disciplineName,
-        topic_name: (formData?.["topic_name"] as string) || session.topicName,
-        studyType: (formData?.["studyType"] as string) || session.studyType,
-        technique: (formData?.["technique"] as StudyTechnique) || session.technique,
-        notes: (formData?.["notes"] as string) ?? session.notes,
-        // Form data fields
-        pages_read: formData?.["pages_read"] || 0,
-        questions_answered: formData?.["questions_answered"] || 0,
-        questions_correct: formData?.["questions_correct"] || 0,
-        flashcards_reviewed: formData?.["flashcards_reviewed"] || 0,
-        flashcards_correct: formData?.["flashcards_correct"] || 0,
-        audio_name: formData?.["audio_name"] || null,
-        audio_author: formData?.["audio_author"] || null,
-        audio_platform: formData?.["audio_platform"] || null,
-        audio_speed: formData?.["audio_speed"] || null,
-        audio_url: formData?.["audio_url"] || null,
-        // Focus sound
-        focus_sound: focusSound.selectedSound !== "off" ? focusSound.selectedSound : null,
-        focus_sound_volume: focusSound.selectedSound !== "off" ? focusSound.volume : null,
-        // Vínculo com o planejamento (quando a sessão veio do Cronograma)
-        study_plan_item_id: session.planItemId || null,
-        planned_minutes:
-          session.plannedSeconds > 0 ? Math.round(session.plannedSeconds / 60) : null,
-        study_source: session.source || null,
-        // Avaliação (Cronograma)
-        energy_level: (formData?.["energy_level"] as number) ?? null,
-        interrupted: Boolean(formData?.["interrupted"]),
-        reviews_completed: (formData?.["reviews_completed"] as number) || 0,
-        // Tempo calculado
-        activeSeconds: session.activeSeconds,
-        pausedSeconds: session.pausedSeconds,
-        activeMinutes: Math.floor(session.activeSeconds / 60),
-        pausedMinutes: Math.floor(session.pausedSeconds / 60),
-        focusPercentage:
-          session.activeSeconds + session.pausedSeconds > 0
-            ? Math.round(
-                (session.activeSeconds / (session.activeSeconds + session.pausedSeconds)) * 100,
-              )
-            : null,
-        completedCycles: 0,
-        // Vínculo com o ciclo de estudo
-        cycle_id: session.cycleId || null,
-        cycle_item_id: session.cycleItemId || null,
+      if (isFinalizingRef.current) {
+        return { success: false, error: "Já existe um salvamento em andamento para esta sessão." }
       }
-
-      if (!snapshot.discipline_id) {
-        return {
-          success: false,
-          error: "Selecione uma disciplina existente na lista antes de salvar a sessão.",
+      isFinalizingRef.current = true
+      try {
+        // Capturar snapshot ANTES de qualquer alteração
+        const snapshot = {
+          // Timestamps para cálculo server-side
+          sessionStartTime: session.startTime,
+          sessionTotalPausedMs: session.totalPausedMs,
+          sessionLastPauseStartTime: session.lastPauseStartTime,
+          is_manual_mode: false,
+          // Dados que o saveStudySessionAction espera
+          // Prefere a seleção atual do formulário (pode ter sido escolhida após o início)
+          discipline_id: (formData?.["discipline_id"] as string) || session.disciplineId,
+          discipline_name: (formData?.["discipline_name"] as string) || session.disciplineName,
+          topic_name: (formData?.["topic_name"] as string) || session.topicName,
+          studyType: (formData?.["studyType"] as string) || session.studyType,
+          technique: (formData?.["technique"] as StudyTechnique) || session.technique,
+          notes: (formData?.["notes"] as string) ?? session.notes,
+          // Form data fields
+          pages_read: formData?.["pages_read"] || 0,
+          questions_answered: formData?.["questions_answered"] || 0,
+          questions_correct: formData?.["questions_correct"] || 0,
+          flashcards_reviewed: formData?.["flashcards_reviewed"] || 0,
+          flashcards_correct: formData?.["flashcards_correct"] || 0,
+          audio_name: formData?.["audio_name"] || null,
+          audio_author: formData?.["audio_author"] || null,
+          audio_platform: formData?.["audio_platform"] || null,
+          audio_speed: formData?.["audio_speed"] || null,
+          audio_url: formData?.["audio_url"] || null,
+          // Focus sound
+          focus_sound: focusSound.selectedSound !== "off" ? focusSound.selectedSound : null,
+          focus_sound_volume: focusSound.selectedSound !== "off" ? focusSound.volume : null,
+          // Vínculo com o planejamento (quando a sessão veio do Cronograma)
+          study_plan_item_id: session.planItemId || null,
+          planned_minutes:
+            session.plannedSeconds > 0 ? Math.round(session.plannedSeconds / 60) : null,
+          study_source: session.source || null,
+          // Avaliação (Cronograma)
+          energy_level: (formData?.["energy_level"] as number) ?? null,
+          interrupted: Boolean(formData?.["interrupted"]),
+          reviews_completed: (formData?.["reviews_completed"] as number) || 0,
+          // Tempo calculado
+          activeSeconds: session.activeSeconds,
+          pausedSeconds: session.pausedSeconds,
+          activeMinutes: Math.floor(session.activeSeconds / 60),
+          pausedMinutes: Math.floor(session.pausedSeconds / 60),
+          focusPercentage:
+            session.activeSeconds + session.pausedSeconds > 0
+              ? Math.round(
+                  (session.activeSeconds / (session.activeSeconds + session.pausedSeconds)) * 100,
+                )
+              : null,
+          completedCycles: 0,
+          // Vínculo com o ciclo de estudo
+          cycle_id: session.cycleId || null,
+          cycle_item_id: session.cycleItemId || null,
         }
+
+        if (!snapshot.discipline_id) {
+          return {
+            success: false,
+            error: "Selecione uma disciplina existente na lista antes de salvar a sessão.",
+          }
+        }
+
+        const res = await saveStudySessionAction(snapshot)
+
+        if (!res.success) {
+          console.error("[FINALIZE] Falha ao salvar:", res.error)
+          return { success: false, error: res.error || "Erro ao salvar sessão" }
+        }
+
+        // Parar o som e limpar sessão APÓS sucesso confirmado
+        focusSound.stopSound()
+        setSession(null)
+        localStorage.removeItem(STORAGE_KEY)
+
+        return { success: true, historyId: res.historyId, session: res.session }
+      } finally {
+        isFinalizingRef.current = false
       }
-
-      const res = await saveStudySessionAction(snapshot)
-
-      if (!res.success) {
-        console.error("[FINALIZE] Falha ao salvar:", res.error)
-        return { success: false, error: res.error || "Erro ao salvar sessão" }
-      }
-
-      // Parar o som e limpar sessão APÓS sucesso confirmado
-      focusSound.stopSound()
-      setSession(null)
-      localStorage.removeItem(STORAGE_KEY)
-
-      return { success: true, historyId: res.historyId, session: res.session }
     },
     [session, focusSound],
   )
@@ -598,12 +619,12 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  function formatTime(seconds: number): string {
+  const formatTime = useCallback((seconds: number): string => {
     const h = Math.floor(seconds / 3600)
     const m = Math.floor((seconds % 3600) / 60)
     const s = seconds % 60
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-  }
+  }, [])
 
   // Sync entre abas: quando outra aba salva/encerra a sessão,
   // recarrega o estado local para não ressuscitar sessão obsoleta.
@@ -628,551 +649,160 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage)
   }, [])
 
+  // Resumo estável da sessão: só muda de referência quando um campo que NÃO
+  // é atualizado a cada segundo realmente muda (início, pausa, fim,
+  // minimizar/restaurar, troca de disciplina/ciclo). Os campos que tickam a
+  // cada segundo (activeSeconds, pausedSeconds, startTime, etc.) ficam de
+  // fora de propósito — quem precisa deles usa useGlobalStudy(), não
+  // useStudyActions().
+  const sessionSummary = useMemo<StudySessionSummary | null>(() => {
+    if (!session) return null
+    return {
+      isActive: session.isActive,
+      isMinimized: session.isMinimized,
+      phase: session.phase,
+      disciplineName: session.disciplineName,
+      disciplineId: session.disciplineId,
+      source: session.source,
+      planItemId: session.planItemId,
+      cycleId: session.cycleId,
+      cycleItemId: session.cycleItemId,
+    }
+    // Proposital: NÃO depender do objeto `session` inteiro (ele muda de
+    // referência a cada segundo por causa do cronômetro), apenas dos campos
+    // estáveis abaixo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    session?.isActive,
+    session?.isMinimized,
+    session?.phase,
+    session?.disciplineName,
+    session?.disciplineId,
+    session?.source,
+    session?.planItemId,
+    session?.cycleId,
+    session?.cycleItemId,
+  ])
+
+  const hasActiveSession = Boolean(sessionSummary?.isActive)
+
+  // Valor do contexto de ações/flags estáveis: memoizado para NÃO trocar de
+  // referência a cada tick do cronômetro (que só afeta `session`/`formatTime`,
+  // expostos pelo StudyLiveContext). Isso evita que consumidores que só
+  // precisam de ações/flags (ex.: FloatingActionButton, StudyQuickAccess, os
+  // widgets de ciclo) re-renderizem a cada segundo durante uma sessão ativa.
+  const actionsValue = useMemo<StudyActionsContextType>(
+    () => ({
+      hasActiveSession,
+      sessionSummary,
+      startSession,
+      minimizeSession,
+      restoreSession,
+      unminimizeSession,
+      resetSession,
+      pauseSession,
+      resumeSession,
+      endSession,
+      updateNotes,
+      updatePlannedSeconds,
+      floatingTimerEnabled,
+      toggleFloatingTimer,
+      finalizeAndSaveSession,
+      isCentralOpen,
+      setIsCentralOpen,
+      focusSound: focusSound.selectedSound,
+      focusSoundVolume: focusSound.volume,
+      focusSoundIsPlaying: focusSound.isPlaying,
+      focusSoundActiveLabel: focusSound.activeSoundLabel,
+      selectFocusSound: focusSound.selectSound,
+      changeFocusSoundVolume: focusSound.changeVolume,
+    }),
+    [
+      hasActiveSession,
+      sessionSummary,
+      startSession,
+      minimizeSession,
+      restoreSession,
+      unminimizeSession,
+      resetSession,
+      pauseSession,
+      resumeSession,
+      endSession,
+      updateNotes,
+      updatePlannedSeconds,
+      floatingTimerEnabled,
+      toggleFloatingTimer,
+      finalizeAndSaveSession,
+      isCentralOpen,
+      setIsCentralOpen,
+      focusSound.selectedSound,
+      focusSound.volume,
+      focusSound.isPlaying,
+      focusSound.activeSoundLabel,
+      focusSound.selectSound,
+      focusSound.changeVolume,
+    ],
+  )
+
+  const liveValue = useMemo<StudyLiveContextType>(
+    () => ({ session, formatTime }),
+    [session, formatTime],
+  )
+
   return (
-    <StudyContext.Provider
-      value={{
-        session,
-        hasActiveSession: Boolean(session?.isActive),
-        startSession,
-        minimizeSession,
-        restoreSession,
-        unminimizeSession,
-        resetSession,
-        pauseSession,
-        resumeSession,
-        endSession,
-        updateNotes,
-        updatePlannedSeconds,
-        formatTime,
-        floatingTimerEnabled,
-        toggleFloatingTimer,
-        finalizeAndSaveSession,
-        isCentralOpen,
-        setIsCentralOpen,
-        focusSound: focusSound.selectedSound,
-        focusSoundVolume: focusSound.volume,
-        focusSoundIsPlaying: focusSound.isPlaying,
-        focusSoundActiveLabel: focusSound.activeSoundLabel,
-        selectFocusSound: focusSound.selectSound,
-        changeFocusSoundVolume: focusSound.changeVolume,
-      }}
-    >
-      {children}
-      <ResetTimerDialog
-        open={resetDialogOpen}
-        onOpenChange={setResetDialogOpen}
-        onConfirm={confirmReset}
-      />
-    </StudyContext.Provider>
+    <StudyActionsContext.Provider value={actionsValue}>
+      <StudyLiveContext.Provider value={liveValue}>
+        {children}
+        <ResetTimerDialog
+          open={resetDialogOpen}
+          onOpenChange={setResetDialogOpen}
+          onConfirm={confirmReset}
+        />
+      </StudyLiveContext.Provider>
+    </StudyActionsContext.Provider>
   )
 }
 
-export function useGlobalStudy() {
-  const context = useContext(StudyContext)
-  if (!context) throw new Error("useGlobalStudy must be used within StudyProvider")
-  return context
-}
-
-
-
-/* ═══════════════════════════════════════════════════════════════
-   FLOATING STUDY WIDGET — Mini cronômetro arrastável e persistido
-   ═══════════════════════════════════════════════════════════════ */
-function FloatingStudyWidget() {
-  const router = useRouter()
-  const {
-    session,
-    pauseSession,
-    resumeSession,
-    formatTime,
-    floatingTimerEnabled,
-    isCentralOpen,
-    focusSoundActiveLabel,
-    resetSession,
-  } = useGlobalStudy()
-
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const [isMobileExpanded, setIsMobileExpanded] = useState(false)
-
-  // Detectar mobile de forma responsiva
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
-
-  const dragRef = useRef<{
-    startX: number
-    startY: number
-    startPosX: number
-    startPosY: number
-    moved: boolean
-  } | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Carregar posição salva no mount (client-only)
-  useEffect(() => {
-    if (pos === null && !isDragging) {
-      const saved = loadSavedPosition()
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPos(saved || getDefaultPosition(isMobile))
-    }
-  }, [pos, isDragging, isMobile])
-
-  // Handlers de arraste com Pointer Events (funciona para mouse e touch)
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      const target = e.target as HTMLElement
-      // Não arrastar se clicou em um botão
-      if (target.closest("button") || target.closest("a") || target.closest("[role='button']")) return
-
-      const currentX = pos?.x ?? (isMobile ? 16 : Math.max(10, (window.innerWidth - 260) / 2))
-      const currentY = pos?.y ?? (isMobile ? window.innerHeight - 80 : 10)
-
-      dragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startPosX: currentX,
-        startPosY: currentY,
-        moved: false,
-      }
-      setIsDragging(true)
-      try {
-        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-      } catch {}
-    },
-    [pos, isMobile],
-  )
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragRef.current) return
-      const dx = e.clientX - dragRef.current.startX
-      const dy = e.clientY - dragRef.current.startY
-      if (!dragRef.current.moved && Math.hypot(dx, dy) < 4) return
-      dragRef.current.moved = true
-
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const floatingWidth = containerRef.current?.offsetWidth || (isMobile ? 180 : 250)
-      const floatingHeight = containerRef.current?.offsetHeight || (isMobile ? 48 : 56)
-      const minX = 8
-      const maxX = Math.max(minX, vw - floatingWidth - 8)
-      const minY = 8
-      const maxY = Math.max(minY, vh - floatingHeight - 8)
-
-      const newX = Math.max(minX, Math.min(dragRef.current.startPosX + dx, maxX))
-      const newY = Math.max(minY, Math.min(dragRef.current.startPosY + dy, maxY))
-      setPos({ x: newX, y: newY })
-    },
-    [isMobile],
-  )
-
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (dragRef.current) {
-        try {
-          if ((e.currentTarget as HTMLElement)?.hasPointerCapture?.(e.pointerId)) {
-            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-          }
-        } catch {}
-        if (dragRef.current.moved && pos) {
-          localStorage.setItem(POSITION_KEY, JSON.stringify(pos))
-        }
-      }
-      dragRef.current = null
-      setIsDragging(false)
-    },
-    [pos],
-  )
-
-  const handleResetPosition = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    localStorage.removeItem(POSITION_KEY)
-    setPos(null)
-  }, [])
-
-  // Sessão vinda do Cronograma ou disciplina: restaurar leva de volta à tela do cronômetro.
-  // Caso contrário, reabre a Central Inteligente.
-  const handleRestoreFull = useCallback(() => {
-    if (session?.source === "PLAN" && session?.planItemId) {
-      router.push(`/dashboard/study-session?planId=${session.planItemId}`)
-    } else if (session?.disciplineId) {
-      router.push(`/dashboard/study-session?disciplineId=${session.disciplineId}`)
-    } else if (session?.isActive) {
-      router.push("/dashboard/study-session")
-    } else if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("restore-study-session"))
-    }
-  }, [router, session])
-
-  const handleTimeClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
-      if (dragRef.current?.moved) return
-      handleRestoreFull()
-    },
-    [handleRestoreFull],
-  )
-
-  const isStudying = session?.phase === "STUDYING"
-
-  // Abrir a Central Inteligente pelo botão vermelho quadrado:
-  // Pausa imediatamente a sessão atual se estiver em execução, congelando o tempo, e abre a Central.
-  const handleEndOrOpenCentral = useCallback(() => {
-    try {
-      if (isStudying) {
-        pauseSession()
-      }
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("open-study-session-modal"))
-      }
-    } catch (error) {
-      console.error("[FloatingStudyWidget] Erro ao pausar/abrir central:", error)
-      Sentry.captureException(error, {
-        tags: { feature: "cronometro" },
-        extra: { step: "open_central_from_widget" },
-      })
-    }
-  }, [pauseSession, isStudying])
-
-  if (!session || !session.isMinimized || !floatingTimerEnabled || isCentralOpen) return null
-
-  // ═════════════════════════════════════════════════════════════════════════
-  // VERSÃO MOBILE (< 768px): Mini-player compacto e painel retrátil arrastável
-  // ═════════════════════════════════════════════════════════════════════════
-  if (isMobile) {
-    const defaultY = typeof window !== "undefined" ? window.innerHeight - 80 : 16
-    const posX = pos?.x ?? 16
-    const posY = pos?.y ?? defaultY
-
-    if (!isMobileExpanded) {
-      return (
-        <div
-          ref={containerRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          style={{
-            position: "fixed",
-            left: `${posX}px`,
-            top: `${posY}px`,
-            zIndex: 9999,
-          }}
-          className={cn(
-            "fixed z-[9999] max-w-[calc(100vw-2rem)] w-auto",
-            "flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border/80 rounded-full px-3.5 py-1.5 shadow-2xl select-none",
-            "touch-none cursor-grab active:cursor-grabbing",
-            isDragging ? "opacity-90 scale-105 shadow-blue-500/20" : "transition-transform",
-            "animate-in fade-in zoom-in-95 duration-200"
-          )}
-        >
-          {/* Indicador de Status + Tempo (clicável para restaurar) */}
-          <button
-            type="button"
-            onClick={handleTimeClick}
-            className="flex items-center gap-1.5 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-left"
-            title="Arraste para mover ou clique para abrir"
-          >
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              {isStudying && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              )}
-              <span
-                className={cn(
-                  "relative inline-flex rounded-full h-2.5 w-2.5",
-                  isStudying ? "bg-emerald-500" : "bg-amber-500"
-                )}
-              />
-            </span>
-            <span className="font-mono font-black text-sm text-foreground leading-none">
-              {formatTime(session.activeSeconds)}
-            </span>
-          </button>
-
-          {/* Botão Play / Pause Rápido */}
-          {isStudying ? (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={pauseSession}
-              aria-label="Pausar cronômetro"
-              className="w-7 h-7 rounded-full text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 shrink-0"
-            >
-              <Pause className="w-3.5 h-3.5" />
-            </Button>
-          ) : (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={resumeSession}
-              aria-label="Retomar cronômetro"
-              className="w-7 h-7 rounded-full text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 shrink-0"
-            >
-              <Play className="w-3.5 h-3.5" />
-            </Button>
-          )}
-
-          {/* Botão Expandir Painel Completo */}
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setIsMobileExpanded(true)}
-            aria-label="Expandir controles do cronômetro"
-            className="w-7 h-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
-            title="Expandir controles"
-          >
-            <ChevronUp className="w-4 h-4" />
-          </Button>
-        </div>
-      )
-    }
-
-    return (
-      <div
-        ref={containerRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        style={{
-          position: "fixed",
-          left: `${Math.min(posX, typeof window !== "undefined" ? window.innerWidth - 290 : posX)}px`,
-          top: `${Math.min(posY, typeof window !== "undefined" ? window.innerHeight - 150 : posY)}px`,
-          zIndex: 9999,
-        }}
-        className={cn(
-          "fixed z-[9999] w-[280px] max-w-[calc(100vw-2rem)]",
-          "flex flex-col gap-2 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl p-3 shadow-2xl select-none",
-          "touch-none cursor-grab active:cursor-grabbing",
-          isDragging ? "opacity-90 scale-102 shadow-blue-500/20" : "transition-transform",
-          "animate-in fade-in zoom-in-95 duration-200"
-        )}
-      >
-        {/* Header do mini player expandido */}
-        <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              {isStudying && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              )}
-              <span
-                className={cn(
-                  "relative inline-flex rounded-full h-2.5 w-2.5",
-                  isStudying ? "bg-emerald-500" : "bg-amber-500"
-                )}
-              />
-            </span>
-            <span className="font-mono font-black text-base text-foreground">
-              {formatTime(session.activeSeconds)}
-            </span>
-            <span className="text-[10px] font-bold text-muted-foreground ml-1">
-              {isStudying ? "Estudando" : "Pausado"}
-            </span>
-          </div>
-
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setIsMobileExpanded(false)}
-            aria-label="Minimizar para player compacto"
-            className="w-6 h-6 rounded-full text-muted-foreground hover:text-foreground"
-            title="Minimizar"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </Button>
-        </div>
-
-        {focusSoundActiveLabel && isStudying && (
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground px-1">
-            <Volume2 className="h-3 w-3 text-primary" />
-            <span className="truncate">Som: {focusSoundActiveLabel}</span>
-          </div>
-        )}
-
-        {/* Controles de Ação no Mobile */}
-        <div className="flex items-center justify-between gap-1 pt-0.5">
-          {isStudying ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={pauseSession}
-              className="flex-1 gap-1 h-8 text-amber-500 border-amber-500/30 hover:bg-amber-500/10 text-xs font-bold"
-            >
-              <Pause className="w-3.5 h-3.5" /> Pausar
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={resumeSession}
-              className="flex-1 gap-1 h-8 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 text-xs font-bold"
-            >
-              <Play className="w-3.5 h-3.5" /> Retomar
-            </Button>
-          )}
-
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={handleRestoreFull}
-            className="w-8 h-8 text-[#2563EB] border-[#2563EB]/30 hover:bg-[#2563EB]/10 shrink-0"
-            title="Restaurar tela do cronômetro"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-          </Button>
-
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={resetSession}
-            className="w-8 h-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 shrink-0"
-            title="Resetar cronômetro"
-          >
-            <RefreshCcw className="w-3.5 h-3.5" />
-          </Button>
-
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={handleEndOrOpenCentral}
-            className="w-8 h-8 text-rose-500 border-rose-500/30 hover:bg-rose-500/10 shrink-0"
-            title="Abrir Central Inteligente / Parar"
-          >
-            <Square className="w-3.5 h-3.5 fill-current" />
-          </Button>
-        </div>
-      </div>
-    )
+export function useGlobalStudy(): StudyContextType {
+  const live = useContext(StudyLiveContext)
+  const actions = useContext(StudyActionsContext)
+  if (!live || !actions) throw new Error("useGlobalStudy must be used within StudyProvider")
+  return {
+    session: live.session,
+    formatTime: live.formatTime,
+    hasActiveSession: actions.hasActiveSession,
+    startSession: actions.startSession,
+    minimizeSession: actions.minimizeSession,
+    restoreSession: actions.restoreSession,
+    unminimizeSession: actions.unminimizeSession,
+    resetSession: actions.resetSession,
+    pauseSession: actions.pauseSession,
+    resumeSession: actions.resumeSession,
+    endSession: actions.endSession,
+    updateNotes: actions.updateNotes,
+    updatePlannedSeconds: actions.updatePlannedSeconds,
+    floatingTimerEnabled: actions.floatingTimerEnabled,
+    toggleFloatingTimer: actions.toggleFloatingTimer,
+    finalizeAndSaveSession: actions.finalizeAndSaveSession,
+    isCentralOpen: actions.isCentralOpen,
+    setIsCentralOpen: actions.setIsCentralOpen,
+    focusSound: actions.focusSound,
+    focusSoundVolume: actions.focusSoundVolume,
+    focusSoundIsPlaying: actions.focusSoundIsPlaying,
+    focusSoundActiveLabel: actions.focusSoundActiveLabel,
+    selectFocusSound: actions.selectFocusSound,
+    changeFocusSoundVolume: actions.changeFocusSoundVolume,
   }
+}
 
-  // ═════════════════════════════════════════════════════════════════════════
-  // VERSÃO DESKTOP (>= 768px): Cronômetro completo e arrastável
-  // ═════════════════════════════════════════════════════════════════════════
-
-  return (
-    <div
-      ref={containerRef}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      style={{
-        position: "fixed",
-        top: pos === null ? "10px" : `${pos.y}px`,
-        left: pos === null ? "50%" : `${pos.x}px`,
-        transform: pos === null ? "translateX(-50%)" : "none",
-        zIndex: 9999,
-      }}
-      className={cn(
-        "z-[60] flex items-center gap-1 bg-card/95 backdrop-blur-md border rounded-2xl px-2 sm:px-2 py-1 sm:py-1",
-        "select-none touch-none cursor-grab active:cursor-grabbing",
-        "transition-opacity duration-150",
-        "animate-in fade-in zoom-in-95 duration-300",
-      )}
-    >
-      {/* Indicador de Status */}
-      <div className="flex items-center gap-1 pointer-events-none">
-        <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
-          {isStudying && (
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          )}
-          <span
-            className={cn(
-              "relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3",
-              isStudying ? "bg-emerald-500" : "bg-amber-500",
-            )}
-          />
-        </span>
-        <div className="font-mono font-black text-sm sm:text-base text-foreground">
-          {formatTime(session.activeSeconds)}
-        </div>
-        <span className="text-[10px] sm:text-xs font-bold text-muted-foreground">
-          {isStudying ? "Estudando" : "Pausado"}
-        </span>
-        {focusSoundActiveLabel && isStudying && (
-          <span
-            className="text-[10px] flex items-center gap-0.5 text-muted-foreground"
-            title={`Som de foco: ${focusSoundActiveLabel}`}
-          >
-            <Volume2 className="h-3 w-3" />
-          </span>
-        )}
-      </div>
-
-      {/* Botões de Ação */}
-      <div className="flex items-center gap-0.5 border-l pl-1">
-        {isStudying ? (
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={pauseSession}
-            aria-label="Pausar cronômetro"
-            className="w-7 h-7 sm:w-8 sm:h-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
-          >
-            <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </Button>
-        ) : (
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={resumeSession}
-            aria-label="Retomar cronômetro"
-            className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
-          >
-            <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </Button>
-        )}
-
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleRestoreFull}
-          aria-label="Restaurar cronômetro"
-          className="w-7 h-7 sm:w-8 sm:h-8 text-[#2563EB] hover:text-[#1D4ED8] hover:bg-[#2563EB]/10"
-          title="Restaurar tela do cronômetro"
-        >
-          <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-        </Button>
-
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={resetSession}
-          aria-label="Resetar cronômetro"
-          className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
-          title="Resetar cronômetro"
-        >
-          <RefreshCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-        </Button>
-
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleResetPosition}
-          aria-label="Restaurar posição do cronômetro flutuante"
-          className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground hover:text-foreground hover:bg-muted"
-          title="Voltar à posição original"
-        >
-          <RotateCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-        </Button>
-
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleEndOrOpenCentral}
-          aria-label="Abrir Central Inteligente"
-          className="w-7 h-7 sm:w-8 sm:h-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
-          title="Abrir Central Inteligente (pausa o cronômetro)"
-        >
-          <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />
-        </Button>
-      </div>
-    </div>
-  )
+/**
+ * Hook enxuto para consumidores que só precisam de ações e flags estáveis
+ * (não do cronômetro ao vivo). Evita re-render a cada segundo durante uma
+ * sessão ativa. Use `sessionSummary` para os campos estáveis da sessão
+ * (isActive, isMinimized, disciplineId, cycleId, etc.) em vez de `session`.
+ */
+export function useStudyActions(): StudyActionsContextType {
+  const actions = useContext(StudyActionsContext)
+  if (!actions) throw new Error("useStudyActions must be used within StudyProvider")
+  return actions
 }

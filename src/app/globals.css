@@ -17,6 +17,12 @@
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -38,57 +44,46 @@
 
 @layer base {
   :root {
-    /* ── Brand Colors (Azul Mentor IA) ─────────────────── */
-    --brand-50:  239 246 255;
-    --brand-100: 219 234 254;
-    --brand-200: 191 219 254;
-    --brand-300: 147 197 253;
-    --brand-400: 96 165 250;
-    --brand-500: 59 130 246;   
-    --brand-600: 37 99 235;   /* Primary #2563EB */
-    --brand-700: 29 78 216;   /* Primary Hover #1D4ED8 */
-    --brand-800: 30 64 175;   /* Primary Pressed #1E40AF */
-    --brand-900: 30 58 138;
-    --brand-950: 23 37 84;
-
-    /* ── Secondary & Accent (Sky Blue) ─── */
-    --secondary-500: 14 165 233; /* Secondary #0EA5E9 */
-    --accent-400: 56 189 248;   /* Accent #38BDF8 */
-
-    /* ── Success / Warning / Danger ───── */
-    --success-500: 16 185 129; /* #10B981 */
-    --warning-500: 245 158 11; /* #F59E0B */
-    --danger-500:  239 68 68;  /* #EF4444 */
-
-    /* ── Light Theme Semantic Tokens ─── */
-    --background:         210 40% 98%; /* #F8FAFC */
-    --foreground:         222 47% 11%;
-    --card:               0 0% 100%;   /* #FFFFFF */
-    --card-foreground:    222 47% 11%;
+    /* ── Light Theme Semantic Tokens ───────────────────────
+       Identidade "Caderno de Estudos" (Fase 7/8 do redesign):
+       superfície off-white quente + grafite, verde-petróleo
+       profundo como cor principal (nunca em fundos grandes),
+       terracota como destaque controlado (1 por tela). O azul
+       deixou de ser a identidade — ver docs/design-system/01-tokens.md. */
+    --background:         30 20% 98%;
+    --foreground:         220 20% 14%;
+    --card:               0 0% 100%;
+    --card-foreground:    220 20% 14%;
     --popover:            0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary:            221 83% 53%; /* #2563EB */
-    --primary-hover:      224 76% 48%; /* #1D4ED8 */
-    --primary-pressed:    226 71% 40%; /* #1E40AF */
+    --popover-foreground: 220 20% 14%;
+    --primary:            172 45% 24%; /* verde-petróleo profundo */
+    --primary-hover:      172 45% 20%;
+    --primary-pressed:    172 45% 16%;
     --primary-foreground: 0 0% 100%;
-    --secondary:          199 89% 48%; /* #0EA5E9 */
+    --secondary:          30 15% 35%; /* taupe/marrom neutro — ação secundária, nunca azul */
     --secondary-foreground: 0 0% 100%;
-    --muted:              210 40% 96%;
-    --muted-foreground:   215 16% 47%;
-    --accent:             199 94% 60%; /* #38BDF8 */
-    --accent-foreground:  222 47% 11%;
-    --destructive:        0 84% 60%;
+    --muted:              30 10% 92%;
+    --muted-foreground:   220 10% 40%;
+    --accent:             28 65% 52%; /* terracota — destaque controlado, 1 por tela */
+    --accent-foreground:  220 20% 14%;
+    --destructive:        0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border:             214 32% 91%;
-    --input:              214 32% 91%;
-    --ring:               221 83% 53%; /* #2563EB */
+    --success:            142 45% 32%;
+    --success-foreground: 0 0% 100%;
+    --warning:            38 75% 48%;
+    --warning-foreground: 220 20% 14%;
+    --info:               205 25% 45%; /* único uso semântico remanescente de tom azulado — só "informação", nunca ação/decoração */
+    --info-foreground:    0 0% 100%;
+    --border:             30 8% 88%;
+    --input:              30 8% 88%;
+    --ring:               172 45% 24%;
 
     /* ── Sidebar (Light: coerente com o tema claro) ── */
-    --sidebar-background:  214 33% 98%; /* #F8FAFC */
-    --sidebar-foreground:  222 47% 11%;
-    --sidebar-primary:     221 83% 53%; /* #2563EB */
-    --sidebar-accent:      214 32% 94%;
-    --sidebar-border:      214 32% 91%;
+    --sidebar-background:  30 15% 97%;
+    --sidebar-foreground:  220 20% 14%;
+    --sidebar-primary:     172 45% 24%;
+    --sidebar-accent:      30 10% 93%;
+    --sidebar-border:      30 8% 88%;
     --sidebar-width:       256px;
     --sidebar-width-collapsed: 76px;
 
@@ -101,13 +96,12 @@
     --radius-2xl: 1.5rem;
     --radius-full: 9999px;
 
-    /* ── Shadows ─────────────────────── */
+    /* ── Shadows (neutras, sem brilho colorido — ver Fase 7 do redesign) ─ */
     --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    --shadow-glow: 0 0 20px -5px hsl(var(--primary) / 0.5);
 
     /* ── Transitions ─────────────────── */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -124,38 +118,42 @@
     --z-tooltip:  1080;
   }
 
-  /* ── Dark Theme ──────────────────────── */
+  /* ── Dark Theme (mesmo caráter: grafite quente, nunca preto/azul puro) ── */
   .dark {
-    --background:         221 48% 6%;  /* #070C14 */
-    --foreground:         210 40% 98%;
-    --card:               221 45% 9%;  /* #0F172A */
-    --card-foreground:    210 40% 98%;
-    --popover:            221 45% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary:            221 83% 55%; /* #3B82F6 */
-    --primary-hover:      224 76% 48%; /* #1D4ED8 */
-    --primary-pressed:    226 71% 40%; /* #1E40AF */
+    --background:         220 15% 9%;
+    --foreground:         30 15% 94%;
+    --card:               220 14% 12%;
+    --card-foreground:    30 15% 94%;
+    --popover:            220 14% 12%;
+    --popover-foreground: 30 15% 94%;
+    --primary:            172 40% 42%;
+    --primary-hover:      172 40% 38%;
+    --primary-pressed:    172 40% 34%;
     --primary-foreground: 0 0% 100%;
-    --secondary:          199 89% 48%; /* #0EA5E9 */
-    --secondary-foreground: 0 0% 100%;
-    --muted:              217 33% 17%;
-    --muted-foreground:   215 20% 65%;
-    --accent:             199 94% 60%; /* #38BDF8 */
-    --accent-foreground:  0 0% 100%;
-    --destructive:        0 62% 50%;
+    --secondary:          30 12% 30%;
+    --secondary-foreground: 30 15% 94%;
+    --muted:              220 12% 16%;
+    --muted-foreground:   30 10% 65%;
+    --accent:             28 60% 58%;
+    --accent-foreground:  220 20% 10%;
+    --destructive:        0 62% 52%;
     --destructive-foreground: 0 0% 98%;
-    --border:             217 33% 17%;
-    --input:              217 33% 17%;
-    --ring:               221 83% 55%;
+    --success:            142 40% 45%;
+    --success-foreground: 220 20% 10%;
+    --warning:            38 70% 55%;
+    --warning-foreground: 220 20% 10%;
+    --info:               205 22% 55%;
+    --info-foreground:    220 20% 10%;
+    --border:             220 12% 18%;
+    --input:              220 12% 18%;
+    --ring:               172 40% 42%;
 
-    /* ── Sidebar (Dark Navy sofisticado, nunca preto puro) ── */
-    --sidebar-background: 221 47% 8%;   /* #0C1322 */
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary:    221 83% 55%;
-    --sidebar-accent:     221 42% 14%;
-    --sidebar-border:     221 32% 15%;
-
-    --shadow-glow: 0 0 30px -5px hsl(var(--primary) / 0.4);
+    /* ── Sidebar (Dark grafite sofisticado, nunca preto puro) ── */
+    --sidebar-background: 220 16% 7%;
+    --sidebar-foreground: 30 15% 92%;
+    --sidebar-primary:    172 40% 42%;
+    --sidebar-accent:     220 14% 13%;
+    --sidebar-border:     220 12% 15%;
   }
 }
 
@@ -228,59 +226,16 @@
 
 /* ── Utilities ───────────────────────────── */
 @layer utilities {
-  /* Glassmorphism */
-  .glass {
-    background: hsl(var(--card) / 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--border) / 0.5);
-  }
-
-  .glass-strong {
-    background: hsl(var(--card) / 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid hsl(var(--border) / 0.6);
-  }
-
-  /* Gradient Text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
-  }
-
-  .gradient-text-brand {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Glow effects */
-  .glow {
-    box-shadow: var(--shadow-glow);
-  }
-
-  /* Animated gradient border */
-  .gradient-border {
-    position: relative;
-    background: hsl(var(--card));
-    border-radius: var(--radius-lg);
-  }
-
-  .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
-    z-index: -1;
-    opacity: 0;
-    transition: opacity var(--transition-base);
-  }
-
-  .gradient-border:hover::before {
-    opacity: 1;
-  }
+  /* Removidos na Fase 7/8 do redesign visual (identidade "Caderno de
+     Estudos"), todos confirmados com ZERO uso real no código-fonte via
+     grep antes da remoção: .glass/.glass-strong (glassmorphism — o único
+     "glass" que existia no código era um falso-positivo de "Hourglass",
+     ícone do Lucide), .glow/--shadow-glow e .animate-pulse-glow (brilho
+     colorido, "AI look"), .gradient-border (borda com gradiente animado),
+     .gradient-text/.gradient-text-brand (texto com gradiente — os 4 usos
+     de bg-gradient-to-* encontrados na auditoria eram gradientes inline
+     nos próprios componentes, não esta classe). Regra da Fase 8: não usar
+     gradiente para compensar a troca de cor. */
 
   /* Truncate multi-line */
   .line-clamp-2 { -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
@@ -336,16 +291,10 @@
     to   { background-position: -200% 0; }
   }
 
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 10px hsl(var(--primary) / 0.3); }
-    50%       { box-shadow: 0 0 25px hsl(var(--primary) / 0.6); }
-  }
-
   .animate-fade-in     { animation: fade-in 0.4s ease-out forwards; }
   .animate-fade-in-up  { animation: fade-in-up 0.5s ease-out forwards; }
   .animate-slide-left  { animation: slide-in-left 0.3s ease-out forwards; }
   .animate-scale-in    { animation: scale-in 0.2s ease-out forwards; }
-  .animate-pulse-glow  { animation: pulse-glow 2s ease-in-out infinite; }
 
   .skeleton {
     background: linear-gradient(

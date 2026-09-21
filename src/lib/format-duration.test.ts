@@ -1,7 +1,7 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
 
-import { formatDuration, formatDurationMinutes } from "./format-duration"
+import { formatDuration, formatDurationMinutes, formatPlanMinutes, formatTimerClock } from "./format-duration"
 
 describe("formatDuration (unidade: segundos)", () => {
   it("0 segundos -> 0min", () => {
@@ -81,5 +81,61 @@ describe("formatDurationMinutes (unidade: minutos, pode ser fracionário)", () =
 
   it("0 minutos -> 0min", () => {
     assert.equal(formatDurationMinutes(0), "0min")
+  })
+})
+
+describe("formatTimerClock (relogio digital do timer ao vivo, extraida de StudyDock/StudyHeaderControl)", () => {
+  it("0 segundos -> 00:00", () => {
+    assert.equal(formatTimerClock(0), "00:00")
+  })
+
+  it("5 segundos -> 00:05", () => {
+    assert.equal(formatTimerClock(5), "00:05")
+  })
+
+  it("59 segundos -> 00:59", () => {
+    assert.equal(formatTimerClock(59), "00:59")
+  })
+
+  it("60 segundos -> 01:00", () => {
+    assert.equal(formatTimerClock(60), "01:00")
+  })
+
+  it("90 segundos -> 01:30", () => {
+    assert.equal(formatTimerClock(90), "01:30")
+  })
+
+  it("3599 segundos -> 59:59 (sem hora)", () => {
+    assert.equal(formatTimerClock(3599), "59:59")
+  })
+
+  it("3600 segundos -> 01:00:00 (primeira hora completa)", () => {
+    assert.equal(formatTimerClock(3600), "01:00:00")
+  })
+
+  it("3661 segundos -> 01:01:01", () => {
+    assert.equal(formatTimerClock(3661), "01:01:01")
+  })
+})
+
+describe("formatPlanMinutes (Xh Ymin, extraida de study-plan/page.tsx e study-plan-week.tsx)", () => {
+  it("0 minutos -> 0min", () => {
+    assert.equal(formatPlanMinutes(0), "0min")
+  })
+
+  it("45 minutos -> 45min", () => {
+    assert.equal(formatPlanMinutes(45), "45min")
+  })
+
+  it("60 minutos -> 1h", () => {
+    assert.equal(formatPlanMinutes(60), "1h")
+  })
+
+  it("90 minutos -> 1h 30min", () => {
+    assert.equal(formatPlanMinutes(90), "1h 30min")
+  })
+
+  it("125 minutos -> 2h 5min (sem padding do minuto, ao contrario de formatDurationMinutes)", () => {
+    assert.equal(formatPlanMinutes(125), "2h 5min")
   })
 })

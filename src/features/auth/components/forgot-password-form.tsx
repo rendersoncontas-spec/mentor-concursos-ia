@@ -33,7 +33,8 @@ export function ForgotPasswordForm() {
 
   function onSubmit(values: ForgotPasswordInput) {
     startTransition(async () => {
-      const response = await forgotPasswordAction(values)
+      const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined
+      const response = await forgotPasswordAction(values, redirectTo)
 
       if (!response.success) {
         toast.error(response.error)

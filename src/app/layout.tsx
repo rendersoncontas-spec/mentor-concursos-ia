@@ -9,7 +9,7 @@ import { fontMono, fontSans } from "./fonts"
 import "./globals.css"
 
 export const viewport: Viewport = {
-  themeColor: "#2563EB",
+  themeColor: "#225951",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,

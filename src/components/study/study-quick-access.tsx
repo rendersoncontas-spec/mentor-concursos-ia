@@ -9,18 +9,18 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DisciplinePopover } from "@/features/study-session/components/discipline-popover"
-import { useGlobalStudy } from "@/features/study-session/components/study-provider"
+import { useStudyActions } from "@/features/study-session/components/study-provider"
 import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
 import { cn } from "@/lib/utils"
 
 export function StudyQuickAccess() {
   const router = useRouter()
   const {
-    session,
+    sessionSummary,
     startSession,
     restoreSession,
     isCentralOpen,
-  } = useGlobalStudy()
+  } = useStudyActions()
   const { data: disciplineData } = useDisciplineData()
 
   const [selectedName, setSelectedName] = useState("")
@@ -35,9 +35,9 @@ export function StudyQuickAccess() {
     (s) => s.from === "CYCLE" && s.metadata?.isCurrentInCycle
   ) ?? null
 
-  const isActive = session?.isActive ?? false
-  const isMinimized = session?.isMinimized ?? false
-  const isQuickSession = isActive && !!session?.disciplineName
+  const isActive = sessionSummary?.isActive ?? false
+  const isMinimized = sessionSummary?.isMinimized ?? false
+  const isQuickSession = isActive && !!sessionSummary?.disciplineName
 
   const hasActiveCentralSession = isQuickSession
   const isCentralMinimized = hasActiveCentralSession && isMinimized

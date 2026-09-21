@@ -14,19 +14,12 @@ import {
   StudyPlanEmptyState,
   StudyPlanWeekView,
 } from "@/features/study-plan/components/study-plan-week"
+import { formatPlanMinutes } from "@/lib/format-duration"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export const metadata = {
   title: "Cronograma de Estudos",
   description: "Seu cronograma de estudos personalizado no NomeIA.",
-}
-
-function formatMinutes(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
 }
 
 import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
@@ -52,7 +45,7 @@ export default async function StudyPlanPage() {
           <h1 className="text-2xl font-bold tracking-tight">Cronograma de Estudos</h1>
           <p className="text-muted-foreground mt-1">
             {hasPlan
-              ? `Versão ${planWeek.plan.version} · Gerado em ${new Date(planWeek.plan.generated_at).toLocaleDateString("pt-BR")} · ${formatMinutes(planWeek.totalWeeklyMinutes)}/semana`
+              ? `Versão ${planWeek.plan.version} · Gerado em ${new Date(planWeek.plan.generated_at).toLocaleDateString("pt-BR")} · ${formatPlanMinutes(planWeek.totalWeeklyMinutes)}/semana`
               : "Gere seu cronograma personalizado baseado no seu concurso e disponibilidade."}
           </p>
         </div>

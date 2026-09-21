@@ -1,5 +1,5 @@
 import type { AnalyticsContext, TimeSeriesDataPoint } from "./types"
-import { formatDateToYYYYMMDD, getDaysAgoDate } from "./utils"
+import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 /**
  * Retorna as séries temporais de minutos estudados agrupados por dia.
@@ -14,7 +14,7 @@ export function getEvolutionTimeSeries(ctx: AnalyticsContext, sliceDays: number 
 
     // Soma os minutos de cada dia
     ctx.history.forEach(session => {
-      const dateStr = formatDateToYYYYMMDD(new Date(session.started_at))
+      const dateStr = getDayInSaoPaulo(session.started_at)
       const duration = session.duration_minutes || 0
       const current = map.get(dateStr) || 0
       map.set(dateStr, current + duration)
@@ -27,8 +27,7 @@ export function getEvolutionTimeSeries(ctx: AnalyticsContext, sliceDays: number 
 
     // Preenche todos os dias da janela, ordenados do mais antigo para hoje
     for (let i = limit - 1; i >= 0; i--) {
-      const d = getDaysAgoDate(i)
-      const dateStr = formatDateToYYYYMMDD(d)
+      const dateStr = daysAgoKeyInSaoPaulo(i)
       
       series.push({
         date: dateStr,

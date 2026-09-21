@@ -423,7 +423,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
             <Button
               type="submit"
               disabled={isSaving}
-              className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl py-2.5 h-auto gap-2"
+              className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl py-2.5 h-auto gap-2 shadow-sm hover:shadow-md transition-all"
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {submitLabel}
@@ -525,8 +525,8 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
     <div className={cn(
       "relative group rounded-2xl border bg-card p-5 flex flex-col gap-4 shadow-xs transition-all duration-200",
       concurso.is_active
-        ? "border-primary/40 ring-2 ring-primary/15 shadow-md"
-        : "border-border hover:border-border/80 hover:shadow-sm",
+        ? "border-primary/40 bg-primary/[0.02]"
+        : "border-border hover:border-border/80 hover:shadow-xs",
       concurso.is_archived && "opacity-60"
     )}>
       {/* Header do Card */}
@@ -612,7 +612,7 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
           <span className="truncate">{daysStr}</span>
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <BookOpen className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+          <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
           <span>Edital do concurso</span>
         </div>
         {concurso.banca && (
@@ -655,7 +655,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       </div>
       <Button
         onClick={onNew}
-        className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-6 rounded-xl"
+        className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-6 rounded-xl shadow-sm hover:shadow-md transition-all"
       >
         <Plus className="h-4 w-4" />
         Adicionar Primeiro Concurso
@@ -803,7 +803,7 @@ export function ConcursosManagerView({ initialConcursos }: ConcursosManagerViewP
         </div>
         <Button
           onClick={() => { setEditingConcurso(undefined); setFormOpen(true) }}
-          className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 rounded-xl shadow-sm w-full sm:w-auto"
+          className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 rounded-xl shadow-sm hover:shadow-md transition-all w-full sm:w-auto"
           disabled={isPending}
         >
           <Plus className="h-4 w-4" />

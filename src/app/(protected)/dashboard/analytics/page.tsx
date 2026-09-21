@@ -43,8 +43,8 @@ export default async function AnalyticsDashboardPage() {
               label: "Horas no Mês",
               value: `${Math.round(stats.monthlyMinutes / 60)}h`,
               sub: `${stats.monthlyMinutes}min totais`,
-              color: "text-blue-600 dark:text-blue-400",
-              bg: "bg-blue-500/10",
+              color: "text-primary",
+              bg: "bg-primary/10",
             },
             {
               label: "Ofensiva Atual",

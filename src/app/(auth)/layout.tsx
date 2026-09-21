@@ -9,9 +9,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Lado Esquerdo - Visual SaaS Pro (7 cols) */}
       <div className="hidden lg:flex lg:col-span-7 relative flex-col justify-between p-12 overflow-hidden bg-slate-950 text-white">
         {/* Background Gradients & Ambient Effects */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(37,99,235,0.35),rgba(255,255,255,0))]" />
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-600/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-10 right-10 w-80 h-80 bg-sky-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(34,89,81,0.35),rgba(255,255,255,0))]" />
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-teal-600/25 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-80 h-80 bg-teal-500/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header Superior com Logo */}
         <div className="relative z-10 flex items-center justify-between">
@@ -29,11 +29,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             />
             <span className="text-white flex items-center">
               <span>Nome</span>
-              <span className="text-sky-400">IA</span>
+              <span className="text-accent">IA</span>
             </span>
           </Link>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-medium backdrop-blur-sm">
-            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-400/20 text-teal-300 text-xs font-medium backdrop-blur-sm">
+            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
             <span>Sua preparação rumo à nomeação.</span>
           </div>
         </div>
@@ -43,7 +43,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="space-y-4">
             <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-white leading-[1.15]">
               Sua preparação rumo à{" "}
-              <span className="text-primary">
+              <span className="text-teal-400">
                 nomeação
               </span>
               .
@@ -63,7 +63,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               "Análise de desempenho e foco estratégico",
             ].map((feature, i) => (
               <div key={i} className="flex items-center gap-3 text-slate-200 text-sm xl:text-base">
-                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-sky-400">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-400">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                 </div>
                 <span>{feature}</span>

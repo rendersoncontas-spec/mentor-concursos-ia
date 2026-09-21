@@ -133,7 +133,7 @@ export default async function AdaptiveDashboardPage() {
 
         {/* Termômetro LHS */}
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="border rounded-lg p-6 bg-card flex flex-col justify-between shadow-sm md:col-span-2 relative overflow-hidden">
+          <div className="border rounded-lg p-6 bg-card flex flex-col justify-between shadow-xs md:col-span-2 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Activity className="h-48 w-48" />
             </div>
@@ -156,7 +156,7 @@ export default async function AdaptiveDashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4 mt-8 pt-6 border-t">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t">
               <div>
                 <p className="text-xs text-muted-foreground">Retenção</p>
                 <p className="font-semibold">{Math.round(lhs.components.retention)}%</p>
@@ -178,7 +178,7 @@ export default async function AdaptiveDashboardPage() {
             </div>
           </div>
 
-          <div className="border rounded-lg p-6 bg-card shadow-sm flex flex-col justify-center gap-4">
+          <div className="border rounded-lg p-6 bg-card shadow-xs flex flex-col justify-center gap-4">
             <h3 className="font-semibold flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-red-500" /> Detecção de Risco
             </h3>
@@ -200,7 +200,7 @@ export default async function AdaptiveDashboardPage() {
         </div>
 
         {/* Histórico e Auditoria */}
-        <div className="border rounded-lg bg-card shadow-sm mt-6">
+        <div className="border rounded-lg bg-card shadow-xs mt-6">
           <div className="p-6 border-b">
             <h3 className="font-semibold text-lg flex items-center gap-2">
               <History className="h-5 w-5 text-muted-foreground" /> Log de Adaptações (Auditoria)

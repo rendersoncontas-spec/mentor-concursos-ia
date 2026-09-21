@@ -27,6 +27,12 @@ export interface DashboardLayoutProps {
   serverDate: string
 }
 
+// Widgets-âncora: representam "o que preciso fazer agora" e ficam fixos em uma
+// área de destaque acima da grade, fora do fluxo de arrastar-e-soltar. Continuam
+// respeitando visibilidade (hide/show) e persistência do layout do usuário —
+// apenas não participam da reordenação/redimensionamento da grade abaixo.
+const HERO_WIDGET_IDS = new Set(["ciclo_estudo", "estudos_hoje"])
+
 export function DashboardLayout({ snapshot, initialLayout, serverDate }: DashboardLayoutProps) {
   const [layout, setLayout] = useState<WidgetConfigItem[]>(() => {
     if (typeof window !== "undefined") {
@@ -69,12 +75,23 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
   }).format(date)
   const capitalizedDate = formattedTodayDate.charAt(0).toUpperCase() + formattedTodayDate.slice(1)
 
-  const handleReorder = async (newLayout: WidgetConfigItem[]) => {
-    setLayout(newLayout)
+  // A grade arrastável agora só contém os widgets que não são âncora ("Hoje").
+  // Ao reordenar, reconstruímos o layout completo preservando a posição dos
+  // widgets-âncora e de quaisquer itens ocultos, para não perdê-los.
+  const handleReorder = async (newGridOrder: WidgetConfigItem[]) => {
+    const heroIds = new Set(heroWidgets.map((w) => w.widget_id))
+    const gridIds = new Set(newGridOrder.map((w) => w.widget_id))
+    const rest = layout.filter((w) => !heroIds.has(w.widget_id) && !gridIds.has(w.widget_id))
+    const merged = [...heroWidgets, ...newGridOrder, ...rest].map((item, index) => ({
+      ...item,
+      position_order: index + 1,
+    }))
+
+    setLayout(merged)
     try {
-      localStorage.setItem("mentor_dashboard_layout", JSON.stringify(newLayout))
+      localStorage.setItem("mentor_dashboard_layout", JSON.stringify(merged))
     } catch {}
-    const result = await saveDashboardLayoutAction(newLayout)
+    const result = await saveDashboardLayoutAction(merged)
     if (!result.success) {
       toast.error("Erro ao salvar ordem dos widgets.")
     }
@@ -110,6 +127,23 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
     .filter((item) => item.visible && item.widget_id !== "mensagem_dia" && !(item.widget_id === "estudos_hoje" && !hasActivePlan))
     .sort((a, b) => a.position_order - b.position_order)
 
+  // Widgets-âncora ("Hoje") ficam fora da grade arrastável, em destaque editorial.
+  // Continuam respeitando visibilidade e ordem entre si — apenas não são
+  // reordenados/redimensionados junto com o restante da grade.
+  const heroWidgets = visibleWidgets.filter((item) => HERO_WIDGET_IDS.has(item.widget_id))
+  const gridWidgets = visibleWidgets.filter((item) => !HERO_WIDGET_IDS.has(item.widget_id))
+
+  const buildCycleBlocks = () =>
+    snapshot?.cycleBlocks?.map((b) => ({
+      id: b.id,
+      disciplineName: b.disciplineName,
+      disciplineId: b.disciplineId,
+      durationMinutes: b.durationMinutes,
+      studiedMinutes: b.studiedMinutes ?? 0,
+      color: b.color || "#2563EB",
+      completed: b.status === "CONCLUIDO",
+    })) || []
+
   return (
     <div className="flex flex-col min-h-full bg-background/50">
       <div className="flex-1 px-4 sm:px-5 pt-4 pb-20 space-y-3 sm:space-y-3.5 w-full max-w-full">
@@ -120,7 +154,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 min-w-0 pb-1">
               <div className="flex-1 min-w-0 space-y-0.5">
                 <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight leading-snug">
-                  Olá, <span className="text-[#2563EB] dark:text-blue-400 font-extrabold">{snapshot?.user?.name || "Estudante"}</span>!
+                  Olá, <span className="text-primary font-extrabold">{snapshot?.user?.name || "Estudante"}</span>!
                 </h1>
                 <p className="text-xs sm:text-[13px] font-medium text-muted-foreground leading-relaxed">
                   Hoje é {capitalizedDate}. Bem-vindo de volta.
@@ -141,7 +175,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
                     setIsRegisterModalOpen(true)
                     window.dispatchEvent(new CustomEvent("study-center-opened"))
                   }}
-                  className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 shadow-sm hover:shadow-md hover:shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer rounded-xl h-9 sm:h-10 shrink-0 whitespace-nowrap min-w-0"
+                  className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer rounded-xl h-9 sm:h-10 shrink-0 whitespace-nowrap min-w-0"
                 >
                   <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
                   <span>Adicionar Estudo</span>
@@ -152,31 +186,51 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
           )
         })()}
 
-        {/* 2. Widgets do Dashboard (inclui TempodeEstudo, Desempenho, Constância, etc.) */}
-        <DashboardDndContext items={visibleWidgets} onReorder={handleReorder}>
-          {visibleWidgets.map((item) => {
+        {/* 2. Área de destaque: foco de hoje (fora da grade arrastável) */}
+        {heroWidgets.length > 0 && (
+          <section aria-label="Foco de hoje" className="space-y-3 sm:space-y-3.5">
+            <div className="flex items-center gap-2.5 px-0.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground shrink-0">
+                Foco de hoje
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            {heroWidgets.map((item) => {
+              const widgetInfo = WIDGET_REGISTRY[item.widget_id]
+              if (!widgetInfo) return null
+              const WidgetComponent = widgetInfo.component
+              return (
+                <div
+                  key={item.widget_id}
+                  className="rounded-2xl border border-primary/15 bg-card shadow-xs overflow-hidden"
+                >
+                  <WidgetComponent
+                    snapshot={snapshot}
+                    colSpan={item.col_span}
+                    cycleBlocks={buildCycleBlocks()}
+                    onOpenGoalsModal={() => setIsGoalsModalOpen(true)}
+                    onOpenExamModal={() => setIsExamModalOpen(true)}
+                  />
+                </div>
+              )
+            })}
+          </section>
+        )}
+
+        {/* 3. Grade personalizável (arrastar-e-soltar, redimensionar, ocultar) */}
+        <DashboardDndContext items={gridWidgets} onReorder={handleReorder}>
+          {gridWidgets.map((item) => {
             const widgetInfo = WIDGET_REGISTRY[item.widget_id]
             if (!widgetInfo) return null
 
             const WidgetComponent = widgetInfo.component
-
-            const cycleBlocks =
-              snapshot?.cycleBlocks?.map((b) => ({
-                id: b.id,
-                disciplineName: b.disciplineName,
-                disciplineId: b.disciplineId,
-                durationMinutes: b.durationMinutes,
-                studiedMinutes: b.studiedMinutes ?? 0,
-                color: b.color || "#2563EB",
-                completed: b.status === "CONCLUIDO",
-              })) || []
 
             return (
               <SortableWidget key={item.widget_id} id={item.widget_id} colSpan={item.col_span}>
                 <WidgetComponent
                   snapshot={snapshot}
                   colSpan={item.col_span}
-                  cycleBlocks={cycleBlocks}
+                  cycleBlocks={buildCycleBlocks()}
                   onOpenGoalsModal={() => setIsGoalsModalOpen(true)}
                   onOpenExamModal={() => setIsExamModalOpen(true)}
                 />

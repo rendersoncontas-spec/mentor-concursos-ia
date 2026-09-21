@@ -45,7 +45,7 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
       className={cn(
         "relative flex flex-col justify-between overflow-hidden transition-all duration-200 shadow-sm hover:shadow-xs",
         isZero && "border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/10",
-        isNormal && "border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/10",
+        isNormal && "border-info/20 bg-info/5",
         isWarning && "border-amber-500/20 bg-amber-500/5 dark:bg-amber-950/10",
         isCritical && "border-rose-500/20 bg-rose-500/5 dark:bg-rose-950/10",
         className,
@@ -64,7 +64,7 @@ export function PendingReviewsWidget({ data, className }: PendingReviewsWidgetPr
           </Badge>
         )}
         {isNormal && (
-          <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 dark:text-blue-400">
+          <Badge variant="secondary" className="bg-info/10 text-info">
             Tranquilo
           </Badge>
         )}

@@ -203,38 +203,38 @@ export function OnboardingWizard() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-1.5 sm:gap-4">
+              <Label htmlFor="name" className="sm:text-right">
                 Nome
               </Label>
               <Input
                 id="name"
                 placeholder="Ex: Receita Federal"
-                className="col-span-3"
+                className="sm:col-span-3"
                 value={newExamName}
                 onChange={(e) => setNewExamName(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="role" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-1.5 sm:gap-4">
+              <Label htmlFor="role" className="sm:text-right">
                 Cargo
               </Label>
               <Input
                 id="role"
                 placeholder="Ex: Analista-Tributário"
-                className="col-span-3"
+                className="sm:col-span-3"
                 value={newExamRole}
                 onChange={(e) => setNewExamRole(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="organizer" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-1.5 sm:gap-4">
+              <Label htmlFor="organizer" className="sm:text-right">
                 Órgão (Opcional)
               </Label>
               <Input
                 id="organizer"
                 placeholder="Ex: RFB"
-                className="col-span-3"
+                className="sm:col-span-3"
                 value={newExamOrganizer}
                 onChange={(e) => setNewExamOrganizer(e.target.value)}
               />

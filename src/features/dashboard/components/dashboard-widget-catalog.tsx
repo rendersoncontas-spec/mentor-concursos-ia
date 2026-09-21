@@ -72,9 +72,9 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
       <div className="p-3 sm:p-3.5 flex flex-col justify-between h-full space-y-2.5">
         <div className="flex items-center justify-between border-b pb-2">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO DE ESTUDO
+            <Clock className="w-3.5 h-3.5 text-primary" /> TEMPO DE ESTUDO
           </span>
-          <span className="text-[10px] sm:text-[11px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] sm:text-[11px] font-black text-primary font-mono">
             {pct === null ? "—" : `${pct}%`}
           </span>
         </div>
@@ -89,14 +89,14 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             <span className="text-[10px] sm:text-[11px] text-muted-foreground font-bold uppercase block mb-0.5">
               Semana
             </span>
-            <span className="text-sm sm:text-base font-black text-[#2563EB] font-mono leading-tight">
+            <span className="text-sm sm:text-base font-black text-primary font-mono leading-tight">
               {formatDurationMinutes(weeklyMins)}
             </span>
           </div>
         </div>
         <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
           <div
-            className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
+            className="bg-primary h-full rounded-full transition-all duration-500"
             style={{ width: `${pct ?? 0}%` }}
           />
         </div>
@@ -109,14 +109,14 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
       <div className="p-5 flex flex-col justify-between h-full space-y-3">
         <div className="flex items-center justify-between border-b pb-2">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> TEMPO DE ESTUDO SEMANAL
+            <Clock className="w-3.5 h-3.5 text-primary" /> TEMPO DE ESTUDO SEMANAL
           </span>
-          <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
+          <span className="text-xs font-black text-primary font-mono">
             {pct === null ? "—" : `${pct}% Concluído`}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-3 my-auto">
-          <div className="bg-muted/40 p-2.5 rounded-xl border">
+        <div className="grid grid-cols-2 divide-x divide-border rounded-xl border bg-card my-auto">
+          <div className="p-2.5">
             <span className="text-[10px] text-muted-foreground font-bold uppercase block">
               Hoje
             </span>
@@ -124,18 +124,18 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
               {formatDurationMinutes(dailyMins)}
             </span>
           </div>
-          <div className="bg-[#2563EB]/10 p-2.5 rounded-xl border border-[#2563EB]/20">
-            <span className="text-[10px] text-[#2563EB] font-bold uppercase block">
+          <div className="p-2.5">
+            <span className="text-[10px] text-muted-foreground font-bold uppercase block">
               Esta Semana
             </span>
-            <span className="text-base font-black text-[#2563EB] font-mono">
+            <span className="text-base font-black text-primary font-mono">
               {formatDurationMinutes(weeklyMins)}
             </span>
           </div>
         </div>
         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
           <div
-            className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
+            className="bg-primary h-full rounded-full transition-all duration-500"
             style={{ width: `${pct ?? 0}%` }}
           />
         </div>
@@ -148,14 +148,14 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
     <div className="p-6 flex flex-col justify-between h-full space-y-4">
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5 text-[#2563EB]" /> PAINEL GERAL DE TEMPO DE ESTUDO
+          <Clock className="w-3.5 h-3.5 text-primary" /> PAINEL GERAL DE TEMPO DE ESTUDO
         </span>
-        <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-3 py-1 rounded-full font-mono">
+        <span className="text-xs font-black text-primary font-mono">
           Meta Semanal: {targetMins === null ? "Não definida" : formatDurationMinutes(targetMins)}
         </span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-muted/30 p-3.5 rounded-xl border">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border rounded-xl border bg-card">
+        <div className="p-3.5">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
             Hoje
           </span>
@@ -163,19 +163,19 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             {formatDurationMinutes(dailyMins)}
           </span>
         </div>
-        <div className="bg-[#2563EB]/10 p-3.5 rounded-xl border border-[#2563EB]/20">
-          <span className="text-[10px] font-extrabold uppercase text-[#2563EB] block">
+        <div className="p-3.5">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
             Esta Semana
           </span>
-          <span className="text-xl font-black text-[#2563EB] font-mono">
+          <span className="text-xl font-black text-primary font-mono">
             {formatDurationMinutes(weeklyMins)}
           </span>
         </div>
-        <div className="bg-emerald-500/10 p-3.5 rounded-xl border border-emerald-500/20">
-          <span className="text-[10px] font-extrabold uppercase text-emerald-600 block">
+        <div className="p-3.5">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
             Progresso
           </span>
-          <span className="text-xl font-black text-emerald-600 font-mono">{pct}%</span>
+          <span className="text-xl font-black text-foreground font-mono">{pct}%</span>
         </div>
       </div>
 
@@ -192,7 +192,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
                 <div key={day} className="flex flex-col items-center gap-1">
                   <div className="w-2 bg-muted rounded-full h-12 relative flex items-end">
                     <div
-                      className="bg-[#2563EB] w-full rounded-full transition-all"
+                      className="bg-primary w-full rounded-full transition-all"
                       style={{ height: `${Math.min(100, (mins / 120) * 100)}%` }}
                     />
                   </div>
@@ -289,7 +289,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> DESEMPENHO
           </span>
-          <span className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] sm:text-[11px] font-black text-emerald-600 font-mono">
             {accuracy}%
           </span>
         </div>
@@ -336,7 +336,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
               value={selectedPeriod}
               onChange={setSelectedPeriod}
             />
-            <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-mono">
+            <span className="text-xs font-black text-emerald-600 font-mono">
               {accuracy}% Acurácia
             </span>
           </div>
@@ -379,29 +379,29 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             value={selectedPeriod}
             onChange={setSelectedPeriod}
           />
-          <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full font-mono">
+          <span className="text-xs font-black text-emerald-600 font-mono">
             Aproveitamento: {accuracy}%
           </span>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div className="bg-muted/30 p-3 rounded-xl border text-center">
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-border rounded-xl border bg-card">
+        <div className="p-3 text-center">
           <span className="text-[10px] text-muted-foreground font-bold uppercase block">
             Total ({periodLabel})
           </span>
           <span className="text-lg font-black text-foreground font-mono">{total}</span>
         </div>
-        <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-center">
+        <div className="p-3 text-center">
           <span className="text-[10px] text-emerald-600 font-bold uppercase block">Acertos</span>
           <span className="text-lg font-black text-emerald-600 font-mono">{correct}</span>
         </div>
-        <div className="bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 text-center">
+        <div className="p-3 text-center">
           <span className="text-[10px] text-rose-500 font-bold uppercase block">Erros</span>
           <span className="text-lg font-black text-rose-500 font-mono">{wrong}</span>
         </div>
-        <div className="bg-[#2563EB]/10 p-3 rounded-xl border border-[#2563EB]/20 text-center">
-          <span className="text-[10px] text-[#2563EB] font-bold uppercase block">Precisão</span>
-          <span className="text-lg font-black text-[#2563EB] font-mono">{accuracy}%</span>
+        <div className="p-3 text-center">
+          <span className="text-[10px] text-primary font-bold uppercase block">Precisão</span>
+          <span className="text-lg font-black text-primary font-mono">{accuracy}%</span>
         </div>
       </div>
 
@@ -456,9 +456,9 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
       >
         <div className="flex items-center justify-between border-b pb-2">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-[#2563EB]" /> PROGRESSO NO EDITAL
+            <FileText className="w-3.5 h-3.5 text-primary" /> PROGRESSO NO EDITAL
           </span>
-          <span className="text-[10px] font-black text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] font-black text-primary font-mono">
             {progress}%
           </span>
         </div>
@@ -470,7 +470,7 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
         </div>
         <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
           <div
-            className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
+            className="bg-primary h-full rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -485,9 +485,9 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
     >
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <FileText className="w-3.5 h-3.5 text-[#2563EB]" /> PROGRESSO NO EDITAL
+          <FileText className="w-3.5 h-3.5 text-primary" /> PROGRESSO NO EDITAL
         </span>
-        <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
+        <span className="text-xs font-black text-primary font-mono">
           {progress}% Concluído
         </span>
       </div>
@@ -500,7 +500,7 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
         </div>
         <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
           <div
-            className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
+            className="bg-primary h-full rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -526,7 +526,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <Flame className="w-3.5 h-3.5 text-orange-500" /> CONSTÂNCIA
           </span>
-          <span className="text-[10px] sm:text-[11px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] sm:text-[11px] font-black text-orange-500 font-mono">
             {streak}d
           </span>
         </div>
@@ -555,7 +555,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
                 <div
                   key={idx}
                   className={`w-2.5 h-2.5 rounded-xs transition-all ${
-                    studied ? "bg-gradient-to-r from-[#2563EB] to-emerald-500" : "bg-muted-foreground/20"
+                    studied ? "bg-emerald-500" : "bg-muted-foreground/20"
                   }`}
                   title={
                     day?.date ? `${day.date}: ${studied ? `${day.minutes} min` : "Sem estudo"}` : ""
@@ -575,7 +575,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Flame className="w-3.5 h-3.5 text-orange-500" /> CONSTÂNCIA E SEQUÊNCIA ATIVA
         </span>
-        <span className="text-xs font-black text-orange-500 bg-orange-500/10 px-2.5 py-0.5 rounded-full font-mono">
+        <span className="text-xs font-black text-orange-500 font-mono">
           {streak} dias consecutivos
         </span>
       </div>
@@ -603,7 +603,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
                   <div
                     key={idx}
                     className={`w-4 h-4 rounded-md transition-all ${
-                      studied ? "bg-gradient-to-r from-[#2563EB] to-emerald-500" : "bg-rose-500/80"
+                      studied ? "bg-emerald-500" : "bg-rose-500/80"
                     }`}
                     title={`${day.date}: ${studied ? `${day.minutes} min` : "Sem estudo"}`}
                   />
@@ -684,21 +684,19 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
         {/* Cabeçalho */}
         <div className="flex items-center justify-between border-b pb-2">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <HelpCircle className="w-3.5 h-3.5 text-[#2563EB]" /> QUESTÕES
+            <HelpCircle className="w-3.5 h-3.5 text-primary" /> QUESTÕES
           </span>
           {realPct !== null ? (
             <span
               className={cn(
-                "text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-full font-mono transition-colors",
-                realPct >= 100
-                  ? "text-emerald-600 bg-emerald-500/10 border border-emerald-500/20"
-                  : "text-[#2563EB] bg-[#2563EB]/10"
+                "text-[10px] sm:text-[11px] font-black font-mono transition-colors",
+                realPct >= 100 ? "text-emerald-600" : "text-primary",
               )}
             >
               {realPct}% da meta
             </span>
           ) : (
-            <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-muted-foreground">
               Livre
             </span>
           )}
@@ -736,8 +734,8 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
                   realPct !== null && realPct >= 100
-                    ? "bg-gradient-to-r from-[#2563EB] to-emerald-500"
-                    : "bg-[#2563EB]"
+                    ? "bg-emerald-500"
+                    : "bg-primary"
                 )}
                 style={{ width: `${progressWidth}%` }}
               />
@@ -779,28 +777,26 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
     >
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <HelpCircle className="w-3.5 h-3.5 text-[#2563EB]" /> META DE QUESTÕES SEMANAL
+          <HelpCircle className="w-3.5 h-3.5 text-primary" /> META DE QUESTÕES SEMANAL
         </span>
         {realPct !== null ? (
           <span
             className={cn(
-              "text-xs font-black px-2.5 py-0.5 rounded-full font-mono",
-              realPct >= 100
-                ? "text-emerald-600 bg-emerald-500/10 border border-emerald-500/20"
-                : "text-[#2563EB] bg-[#2563EB]/10"
+              "text-xs font-black font-mono",
+              realPct >= 100 ? "text-emerald-600" : "text-primary",
             )}
           >
             {realPct}% da Meta
           </span>
         ) : (
-          <span className="text-xs font-black text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full font-mono">
+          <span className="text-xs font-black text-primary font-mono">
             {achieved} resolvidas
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-auto">
-        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-border rounded-xl border bg-card my-auto">
+        <div className="p-3 space-y-0.5">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
             Realizadas
           </span>
@@ -810,7 +806,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           </span>
         </div>
 
-        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+        <div className="p-3 space-y-0.5">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
             Meta Semanal
           </span>
@@ -833,7 +829,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           </span>
         </div>
 
-        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+        <div className="p-3 space-y-0.5">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
             Acertos / Erros
           </span>
@@ -847,11 +843,11 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           </span>
         </div>
 
-        <div className="p-3 rounded-xl bg-muted/20 border space-y-0.5">
+        <div className="p-3 space-y-0.5">
           <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
             Aproveitamento
           </span>
-          <span className="text-2xl font-black font-mono text-[#2563EB]">
+          <span className="text-2xl font-black font-mono text-primary">
             {accuracy !== null ? `${accuracy}%` : "—"}
           </span>
           <span className="text-[10px] text-muted-foreground font-medium block">
@@ -872,8 +868,8 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             className={cn(
               "h-full rounded-full transition-all duration-500",
               realPct !== null && realPct >= 100
-                ? "bg-gradient-to-r from-[#2563EB] to-emerald-500"
-                : "bg-[#2563EB]"
+                ? "bg-emerald-500"
+                : "bg-primary"
             )}
             style={{ width: `${progressWidth}%` }}
           />
@@ -900,7 +896,7 @@ export function WidgetRevisoes({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <RotateCcw className="w-3.5 h-3.5 text-purple-500" /> REVISÕES
           </span>
-          <span className="text-[10px] font-black text-purple-600 bg-purple-500/10 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-[10px] font-black text-purple-600 font-mono">
             {count}
           </span>
         </div>
@@ -984,7 +980,7 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
             <div
-              className="bg-[#2563EB] h-full rounded-full transition-all duration-300"
+              className="bg-primary h-full rounded-full transition-all duration-300"
               style={{ width: `${hoursPct ?? 0}%` }}
             />
           </div>
@@ -1071,13 +1067,13 @@ export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetPr
     <div className="p-5 flex flex-col justify-between h-full space-y-4">
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <BarChart3 className="w-3.5 h-3.5 text-[#2563EB]" /> DESEMPENHO POR MATÉRIA
+          <BarChart3 className="w-3.5 h-3.5 text-primary" /> DESEMPENHO POR MATÉRIA
         </span>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.push("/estatisticas")}
-          className="text-xs font-bold text-[#2563EB]"
+          className="text-xs font-bold text-primary"
         >
           Ver Todas <ChevronRight className="w-3.5 h-3.5 ml-1" />
         </Button>
@@ -1189,7 +1185,7 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
                   </span>
                 )}
               </div>
-              <span className="font-mono text-[#2563EB] shrink-0">{item.value ?? 0} pts</span>
+              <span className="font-mono text-primary shrink-0">{item.value ?? 0} pts</span>
             </div>
           ))
         )}
@@ -1209,12 +1205,12 @@ export function WidgetUltimasAtividades({ snapshot, colSpan }: DashboardWidgetPr
     <div className="p-5 flex flex-col justify-between h-full space-y-3">
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Activity className="w-3.5 h-3.5 text-[#2563EB]" /> ÚLTIMAS ATIVIDADES
+          <Activity className="w-3.5 h-3.5 text-primary" /> ÚLTIMAS ATIVIDADES
         </span>
         <button
           type="button"
           onClick={() => router.push("/dashboard/history")}
-          className="text-xs font-bold text-[#2563EB]"
+          className="text-xs font-bold text-primary"
         >
           Ver Histórico
         </button>
@@ -1271,7 +1267,7 @@ export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Award className="w-3.5 h-3.5 text-purple-500" /> CONQUISTAS & MARCOS
         </span>
-        <span className="text-xs font-black text-purple-600 bg-purple-500/10 px-2 py-0.5 rounded-full font-mono">
+        <span className="text-xs font-black text-purple-600 font-mono">
           {badges.filter((b) => b.unlocked).length} / {badges.length}
         </span>
       </div>
@@ -1319,14 +1315,14 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
     <div className="p-3 flex flex-col space-y-1.5">
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Calendar className="w-3.5 h-3.5 text-[#2563EB]" /> DATA DA PROVA
+          <Calendar className="w-3.5 h-3.5 text-primary" /> DATA DA PROVA
         </span>
       </div>
       <div className="space-y-1">
         {targetDate ? (
           <>
             <div className="text-sm font-bold text-foreground leading-snug">{examName}</div>
-            <div className="text-sm font-bold text-[#2563EB] leading-tight">
+            <div className="text-sm font-bold text-primary leading-tight">
               {new Date(targetDate + "T00:00:00").toLocaleDateString("pt-BR")}
               {daysUntil !== null && (
                 <span className="block text-xs text-muted-foreground font-medium">
@@ -1370,7 +1366,7 @@ export function WidgetMensagemDia(_props: DashboardWidgetProps) {
     <div className="p-4 flex flex-col justify-between h-full space-y-2">
       <div className="flex items-center justify-between border-b pb-2">
         <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" /> MENSAGEM DO DIA
+          <Sparkles className="w-3.5 h-3.5 text-primary" /> MENSAGEM DO DIA
         </span>
         <span className="text-[10px] text-muted-foreground font-medium">{msg.category}</span>
       </div>

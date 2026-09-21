@@ -140,7 +140,7 @@ export async function searchDisciplinesAction(query: string) {
 export async function removeDisciplineAction(
   disciplineId: string,
   targetId: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; activeCyclesWithDiscipline?: number }> {
   try {
     const supabase = await createClient()
     const {
@@ -161,7 +161,48 @@ export async function removeDisciplineAction(
     revalidatePath("/dashboard")
     revalidatePath("/planejamento")
 
-    return { success: true }
+    // DECISAO DE PRODUTO (Fase 12 -> Fase 13, opcao A): Edital e Ciclo
+    // continuam desacoplados de proposito. Remover uma disciplina do Edital
+    // NUNCA apaga nada em study_cycle_items/study_cycle_sessions nem toca no
+    // motor de ciclos (src/application/study-cycle/**,
+    // src/domain/study-cycle/** permanecem intocados) - isso é so uma
+    // consulta de leitura para avisar o usuário, nunca uma ação que muda o
+    // Ciclo. Falha nesta checagem não pode derrubar a exclusão, que já
+    // aconteceu com sucesso acima - por isso ela é best-effort.
+    let activeCyclesWithDiscipline: number | undefined
+    try {
+      const { data: activeCycles } = await supabase
+        .from("study_cycles")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "ACTIVE")
+
+      if (activeCycles && activeCycles.length > 0) {
+        const { data: matchingItems } = await supabase
+          .from("study_cycle_items")
+          .select("cycle_id")
+          .eq("discipline_id", disciplineId)
+          .in(
+            "cycle_id",
+            activeCycles.map((cycle) => cycle.id),
+          )
+
+        const distinctCycleIds = new Set((matchingItems || []).map((item) => item.cycle_id))
+        activeCyclesWithDiscipline = distinctCycleIds.size
+      } else {
+        activeCyclesWithDiscipline = 0
+      }
+    } catch (warningCheckError) {
+      console.error(
+        "[removeDisciplineAction] falha ao verificar uso em ciclos ativos (não bloqueia a remoção):",
+        warningCheckError,
+      )
+    }
+
+    return {
+      success: true,
+      ...(activeCyclesWithDiscipline !== undefined ? { activeCyclesWithDiscipline } : {}),
+    }
   } catch {
     return { success: false, error: "Erro interno." }
   }

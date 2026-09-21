@@ -95,7 +95,7 @@ function statusBadge(status: PlanStatus) {
       return (
         <Badge
           variant="outline"
-          className="text-blue-600 border-blue-600 font-bold text-[10px] uppercase px-2 h-5"
+          className="text-info border-info font-bold text-[10px] uppercase px-2 h-5"
         >
           Concluído
         </Badge>
@@ -252,7 +252,7 @@ export function PlanosView() {
         <div className="flex items-center gap-3">
           <Button
             onClick={() => router.push("/planejamento")}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-6 h-11 rounded-2xl shadow-sm flex items-center gap-2 group"
+            className="bg-primary hover:bg-primary/90 text-white font-black text-xs px-6 h-11 rounded-2xl shadow-sm flex items-center gap-2 group"
           >
             <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform" />
             CRIAR NOVO PLANO
@@ -274,7 +274,7 @@ export function PlanosView() {
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
             Carga Semanal
           </span>
-          <span className="text-sm font-black text-[#2563EB] block">
+          <span className="text-sm font-black text-primary block">
             {activePlan ? formatMinutes(activePlan.totalMinutes) : "0h"}
           </span>
         </div>
@@ -301,7 +301,7 @@ export function PlanosView() {
 
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-[#2563EB]" />
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="text-sm font-bold text-muted-foreground">Carregando sua estratégia...</p>
         </div>
       )}
@@ -358,7 +358,7 @@ export function PlanosView() {
                           Metas
                         </span>
                         <div className="flex items-center gap-2 font-black text-lg">
-                          <Clock className="h-4 w-4 text-[#2563EB]" />
+                          <Clock className="h-4 w-4 text-primary" />
                           {formatMinutes(activePlan.totalMinutes)}/sem
                         </div>
                       </div>
@@ -398,7 +398,7 @@ export function PlanosView() {
                     <div className="flex flex-wrap items-center gap-3 pt-4">
                       <Button
                         onClick={() => router.push("/study-plan")}
-                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-6 h-10 rounded-2xl shadow-sm flex items-center gap-2"
+                        className="bg-primary hover:bg-primary/90 text-white font-black text-xs px-6 h-10 rounded-2xl shadow-sm flex items-center gap-2"
                       >
                         CONTINUAR ESTUDANDO
                         <ChevronRight className="h-4 w-4" />
@@ -456,7 +456,7 @@ export function PlanosView() {
                         <div key={d.id} className="flex flex-col gap-1">
                           <div className="flex items-center justify-between text-[11px] font-bold">
                             <span className="truncate w-32">{d.name}</span>
-                            <span className="text-[#2563EB]">{formatMinutes(d.weeklyMinutes)}</span>
+                            <span className="text-primary">{formatMinutes(d.weeklyMinutes)}</span>
                           </div>
                           <Progress
                             value={Math.min(
@@ -473,7 +473,7 @@ export function PlanosView() {
                     {activePlan.disciplinesCount > 5 && (
                       <button
                         onClick={() => setSelectedPlan(activePlan)}
-                        className="text-[10px] font-black text-[#2563EB] hover:underline uppercase text-center pt-2"
+                        className="text-[10px] font-black text-primary hover:underline uppercase text-center pt-2"
                       >
                         + {activePlan.disciplinesCount - 5} OUTRAS
                       </button>
@@ -485,8 +485,8 @@ export function PlanosView() {
           ) : (
             /* EMPTY STATE SEM PLANO ATIVO */
             <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-6 flex flex-col items-center gap-3 text-center">
-              <div className="h-24 w-24 rounded-full bg-[#2563EB]/10 flex items-center justify-center">
-                <Target className="h-12 w-12 text-[#2563EB]" />
+              <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
+                <Target className="h-12 w-12 text-primary" />
               </div>
               <div className="space-y-2 max-w-sm">
                 <h2 className="text-xl font-black text-foreground">Ainda não há um plano ativo</h2>
@@ -497,7 +497,7 @@ export function PlanosView() {
               </div>
               <Button
                 onClick={() => router.push("/planejamento")}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs px-10 h-14 rounded-2xl shadow-sm flex items-center gap-2"
+                className="bg-primary hover:bg-primary/90 text-white font-black text-xs px-10 h-14 rounded-2xl shadow-sm flex items-center gap-2"
               >
                 CRIAR MEU PRIMEIRO PLANO
               </Button>
@@ -536,7 +536,7 @@ export function PlanosView() {
                   <div
                     key={plan.id}
                     onClick={() => setSelectedPlan(plan)}
-                    className="group bg-card border rounded-2xl p-6 shadow-xs hover:shadow-sm hover:border-[#2563EB]/40 transition-all cursor-pointer relative"
+                    className="group bg-card border rounded-2xl p-6 shadow-xs hover:shadow-sm hover:border-primary/40 transition-all cursor-pointer relative"
                   >
                     <div className="absolute top-6 right-6 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
@@ -552,7 +552,7 @@ export function PlanosView() {
                         variant="ghost"
                         size="icon"
                         onClick={(e) => handleDuplicate(plan, e)}
-                        className="h-8 w-8 rounded-lg hover:bg-sky-50 text-[#2563EB]"
+                        className="h-8 w-8 rounded-lg hover:bg-primary/10 text-primary"
                         title="Duplicar"
                       >
                         <Copy className="h-4 w-4" />
@@ -589,7 +589,7 @@ export function PlanosView() {
                             Carga
                           </span>
                           <div className="text-xs font-black flex items-center gap-1.5">
-                            <Clock className="h-3 w-3 text-[#2563EB]" />{" "}
+                            <Clock className="h-3 w-3 text-primary" />{" "}
                             {formatMinutes(plan.totalMinutes)}
                           </div>
                         </div>
@@ -608,7 +608,7 @@ export function PlanosView() {
                           <Calendar className="h-3 w-3" /> {formatDate(plan.generatedAt)}
                         </div>
                         {plan.versionsCount > 1 && (
-                          <div className="flex items-center gap-1 text-[#2563EB]">
+                          <div className="flex items-center gap-1 text-primary">
                             <History className="h-3 w-3" /> {plan.versionsCount} versões
                           </div>
                         )}
@@ -720,7 +720,7 @@ export function PlanosView() {
                 {/* DISCIPLINAS LIST */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-[#2563EB]" />
+                    <Target className="h-4 w-4 text-primary" />
                     <span className="text-xs font-black uppercase tracking-widest">
                       Disciplinas do Plano
                     </span>
@@ -731,7 +731,7 @@ export function PlanosView() {
                       <div
                         key={d.id}
                         onClick={() => openDiscipline(d)}
-                        className="p-4 border rounded-2xl hover:border-[#2563EB] hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
+                        className="p-4 border rounded-2xl hover:border-primary hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
                       >
                         <div className="space-y-0.5">
                           <h4 className="font-black text-sm">{d.name}</h4>
@@ -740,7 +740,7 @@ export function PlanosView() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-black text-sm text-[#2563EB]">
+                          <p className="font-black text-sm text-primary">
                             {formatMinutes(d.weeklyMinutes)}
                           </p>
                           <p className="text-[10px] font-bold text-muted-foreground uppercase">
@@ -756,14 +756,15 @@ export function PlanosView() {
                 {selectedPlan.previousVersions.length > 0 && (
                   <div className="space-y-4 pt-6">
                     <div className="flex items-center gap-2">
-                      <History className="h-4 w-4 text-[#2563EB]" />
+                      <History className="h-4 w-4 text-primary" />
                       <span className="text-xs font-black uppercase tracking-widest">
                         Histórico de Versões do Grupo
                       </span>
                     </div>
 
                     <div className="border rounded-2xl overflow-hidden">
-                      <table className="w-full text-xs">
+                      <div className="overflow-x-auto">
+                      <table className="w-full text-xs min-w-[480px]">
                         <thead>
                           <tr className="bg-muted/50 text-muted-foreground font-black uppercase text-[10px] border-b">
                             <th className="text-left p-4">Versão</th>
@@ -789,7 +790,7 @@ export function PlanosView() {
                                 <Button
                                   variant="link"
                                   onClick={() => handleActivate(v.id)}
-                                  className="text-[#2563EB] font-bold text-[11px] p-0 h-auto"
+                                  className="text-primary font-bold text-[11px] p-0 h-auto"
                                 >
                                   Restaurar
                                 </Button>
@@ -798,6 +799,7 @@ export function PlanosView() {
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   </div>
                 )}

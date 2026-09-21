@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import type { ReviewCardReveal, ReviewDashboardData, ReviewFilters, ReviewItem, ReviewReport, ReviewSettings } from "@/domain/reviews/models"
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
+import { HISTORY_PATHS } from "@/application/study-history/study-history.constants"
+import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 import type { AnswerResult, CardDraft, ImportCardRow, SessionResult } from "./review.service"
 import {
   answerReviewCard,
@@ -140,7 +142,14 @@ export async function finalizeReviewSessionAction(
     if (!sessionRow) return { data: false, error: "Sessão não encontrada." }
     const answeredIds = sessionRow["answered_ids"] as string[] | null ?? []
     const { cycleSyncError } = await finalizeSession(supabase, user.id, sessionId, answeredIds)
+    // finalizeSession grava study_history quando a revisão gera tempo de estudo
+    // (ver review.service.ts) — sem isto, Dashboard/Histórico/Estatísticas/Ciclos
+    // ficavam com dados desatualizados após concluir uma revisão, já que só
+    // /dashboard/reviews era revalidada e o cache de 5 min de Estatísticas nunca
+    // era invalidado por este fluxo.
     revalidatePath("/dashboard/reviews")
+    for (const path of HISTORY_PATHS) revalidatePath(path)
+    await invalidateStatisticsCenterCache(user.id)
     return { data: true, error: null, cycleSyncError }
   } catch (err: unknown) {
     return { data: false, error: errorMessage(err) }

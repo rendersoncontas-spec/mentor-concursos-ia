@@ -271,7 +271,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
     }
 
     const useMode = entryMode
-    let finalTotals = computed
+    const finalTotals = computed
 
     if (useMode === "DETALHADO") {
       if (subjects.length === 0) {

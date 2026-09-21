@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { type RegisterInput, registerSchema } from "@/domain/auth/auth.schemas"
+import { GoogleAuthButton } from "@/features/auth/components/google-auth-button"
 
 export function RegisterForm() {
   const router = useRouter()
@@ -104,8 +105,9 @@ export function RegisterForm() {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 w-full animate-fade-in">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 w-full animate-fade-in">
         <FormField
           control={form.control}
           name="name"
@@ -163,6 +165,20 @@ export function RegisterForm() {
           Criar Conta
         </Button>
       </form>
-    </Form>
+      </Form>
+
+      <div className="relative py-2">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border/60" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Ou continue com
+          </span>
+        </div>
+      </div>
+
+      <GoogleAuthButton mode="register" />
+    </>
   )
 }

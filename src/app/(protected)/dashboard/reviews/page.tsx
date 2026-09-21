@@ -115,10 +115,12 @@ export default async function ReviewsDashboardPage() {
       </div>
 
       <div className="flex-1 p-4 md:p-6 space-y-5">
-        {/* KPI row */}
+        {/* KPI row: a fila de hoje é o widget-âncora (ação real, CTA);
+            Retenção e Dominados eram duas cards idênticas lado a lado —
+            consolidadas em uma única superfície com divisória. */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Queue */}
-          <div className="col-span-2 rounded-xl border bg-card p-5 flex items-center justify-between relative overflow-hidden">
+          <div className="col-span-2 rounded-xl border bg-card shadow-xs p-5 flex items-center justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Brain className="h-32 w-32" />
             </div>
@@ -132,50 +134,50 @@ export default async function ReviewsDashboardPage() {
             <StartReviewButton disabled={backlogCount === 0} />
           </div>
 
-          {/* Retention */}
-          <div className="rounded-xl border bg-card p-5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Retenção
-            </p>
-            <p className="text-3xl font-bold">{retentionData.retentionRate}%</p>
-            <div className="w-full bg-muted rounded-full h-1.5 mt-3 overflow-hidden">
-              <div
-                className="h-full bg-green-500 rounded-full transition-all duration-700"
-                style={{ width: `${retentionData.retentionRate}%` }}
-              />
+          <div className="col-span-2 rounded-xl border bg-card shadow-xs grid grid-cols-2 divide-x divide-border">
+            <div className="p-5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                Retenção
+              </p>
+              <p className="text-3xl font-bold text-primary">{retentionData.retentionRate}%</p>
+              <div className="w-full bg-muted rounded-full h-1.5 mt-3 overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all duration-700"
+                  style={{ width: `${retentionData.retentionRate}%` }}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Mastered */}
-          <div className="rounded-xl border bg-card p-5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Dominados
-            </p>
-            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-              {memoryStages.mastered}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              de{" "}
-              {memoryStages.new +
-                memoryStages.learning +
-                memoryStages.review +
-                memoryStages.mastered +
-                memoryStages.lapsed}{" "}
-              total
-            </p>
+            <div className="p-5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                Dominados
+              </p>
+              <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                {memoryStages.mastered}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                de{" "}
+                {memoryStages.new +
+                  memoryStages.learning +
+                  memoryStages.review +
+                  memoryStages.mastered +
+                  memoryStages.lapsed}{" "}
+                total
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Memory Funnel */}
-        <div className="rounded-xl border bg-card p-5">
+        <div className="rounded-xl border bg-card shadow-xs p-5">
           <p className="text-sm font-semibold mb-4">Funil de Spaced Repetition</p>
-          <div className="grid grid-cols-5 gap-3 text-center">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 text-center">
             {[
               { label: "Novos", value: memoryStages.new, className: "bg-muted/50" },
               {
                 label: "Aprendendo",
                 value: memoryStages.learning,
-                className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+                className: "bg-primary/10 text-primary",
               },
               {
                 label: "Revisando",

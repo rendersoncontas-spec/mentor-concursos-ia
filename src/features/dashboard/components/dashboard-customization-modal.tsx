@@ -101,7 +101,7 @@ export function DashboardCustomizationModal({
                         type="checkbox"
                         checked={item.visible}
                         onChange={(e) => handleToggleVisibility(item.widget_id, e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-[#2563EB] focus:ring-[#2563EB]"
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
                   </div>
                 </div>
@@ -115,7 +115,7 @@ export function DashboardCustomizationModal({
           </Button>
           <div className="flex gap-2 w-full sm:w-auto">
             <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Cancelar</Button>
-            <Button onClick={handleSave} className="bg-[#2563EB] text-white hover:bg-[#1D4ED8] w-full sm:w-auto">Salvar Alterações</Button>
+            <Button onClick={handleSave} className="bg-primary text-white hover:bg-primary/90 w-full sm:w-auto">Salvar Alterações</Button>
           </div>
         </div>
       </DialogContent>

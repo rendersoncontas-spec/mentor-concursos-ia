@@ -90,7 +90,7 @@ export function DisciplineDetailView({
         <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
+            className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
             <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
@@ -111,71 +111,59 @@ export function DisciplineDetailView({
         </div>
       </div>
 
-      {/* Row de 4 Cards Métricos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: TEMPO DE ESTUDO */}
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            TEMPO DE ESTUDO
+      {/* Resumo da disciplina: uma única superfície com hierarquia (não 4 cards repetidos) */}
+      <div className="rounded-2xl border bg-card shadow-xs grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border">
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Tempo de estudo
           </span>
-          <div className="text-right">
-            <span className="text-2xl font-black text-foreground font-mono">
-              {formatMinutesLabel(statsMinutes)}
-            </span>
-          </div>
+          <p className="text-2xl font-black text-primary font-mono">
+            {formatMinutesLabel(statsMinutes)}
+          </p>
         </div>
 
-        {/* Card 2: DESEMPENHO */}
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            DESEMPENHO
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Desempenho
           </span>
-          <div className="flex items-end justify-between">
-            <div className="text-[11px] font-bold space-y-0.5">
-              <span className="text-emerald-600 block">
-                {stats ? `${statsCorrect} Acertos` : "–"}
-              </span>
-              <span className="text-rose-500 block">{stats ? `${statsWrong} Erros` : "–"}</span>
-            </div>
-            <span className="text-2xl font-black text-foreground font-mono">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className="text-2xl font-black text-foreground font-mono">
               {accuracyPct === null ? "–" : `${accuracyPct}%`}
+            </p>
+            <span className="text-[11px] font-bold">
+              <span className="text-emerald-600">{stats ? `${statsCorrect} acertos` : "–"}</span>
+              <span className="text-muted-foreground"> · </span>
+              <span className="text-rose-500">{stats ? `${statsWrong} erros` : "–"}</span>
             </span>
           </div>
         </div>
 
-        {/* Card 3: PROGRESSO NO EDITAL */}
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            PROGRESSO NO EDITAL
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Progresso no edital
           </span>
-          <div className="flex items-end justify-between">
-            <div className="text-[11px] font-bold space-y-0.5">
-              <span className="text-emerald-600 block">{doneTopics} Tópicos Concluídos</span>
-              <span className="text-rose-500 block">
-                {totalTopics - doneTopics} Tópicos Pendentes
-              </span>
-            </div>
-            <span className="text-2xl font-black text-foreground font-mono">
-              {progressPercent}%
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className="text-2xl font-black text-foreground font-mono">{progressPercent}%</p>
+            <span className="text-[11px] font-bold">
+              <span className="text-emerald-600">{doneTopics} concluídos</span>
+              <span className="text-muted-foreground"> · </span>
+              <span className="text-rose-500">{totalTopics - doneTopics} pendentes</span>
             </span>
           </div>
         </div>
 
-        {/* Card 4: PÁGINAS LIDAS */}
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            PÁGINAS LIDAS
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Páginas lidas
           </span>
-          <div className="flex items-end justify-between">
-            <span className="text-[11px] text-muted-foreground font-semibold">
-              {statsPages === null || statsMinutes === null || statsMinutes <= 0
-                ? "–"
-                : `${((statsPages / statsMinutes) * 60).toFixed(1)} páginas por hora`}
-            </span>
-            <span className="text-2xl font-black text-foreground font-mono">
-              {statsPages === null ? "–" : statsPages}
-            </span>
-          </div>
+          <p className="text-2xl font-black text-foreground font-mono">
+            {statsPages === null ? "–" : statsPages}
+          </p>
+          <p className="text-[11px] text-muted-foreground font-semibold">
+            {statsPages === null || statsMinutes === null || statsMinutes <= 0
+              ? ""
+              : `${((statsPages / statsMinutes) * 60).toFixed(1)} páginas por hora`}
+          </p>
         </div>
       </div>
 
@@ -190,16 +178,16 @@ export function DisciplineDetailView({
           <div className="flex flex-col items-center justify-center text-center space-y-4 py-8">
             <div className="relative w-28 h-28 flex items-center justify-center">
               <div className="w-20 h-24 bg-muted/60 border border-muted rounded-lg transform -rotate-6 flex flex-col p-2 space-y-1">
-                <div className="w-8 h-2 bg-[#2563EB] rounded-xs mx-auto mb-1" />
+                <div className="w-8 h-2 bg-primary rounded-xs mx-auto mb-1" />
                 <div className="w-full h-1.5 bg-muted-foreground/30 rounded-xs" />
                 <div className="w-3/4 h-1.5 bg-muted-foreground/30 rounded-xs" />
               </div>
 
-              <div className="w-20 h-24 bg-card border border-[#2563EB] rounded-lg shadow-xs absolute transform rotate-3 flex flex-col p-2 space-y-1">
-                <div className="w-8 h-2 bg-[#2563EB] rounded-xs mx-auto mb-1" />
-                <div className="w-full h-1.5 bg-[#2563EB]/40 rounded-xs" />
-                <div className="w-4/5 h-1.5 bg-[#2563EB]/40 rounded-xs" />
-                <div className="w-2/3 h-1.5 bg-[#2563EB]/40 rounded-xs" />
+              <div className="w-20 h-24 bg-card border border-primary rounded-lg shadow-xs absolute transform rotate-3 flex flex-col p-2 space-y-1">
+                <div className="w-8 h-2 bg-primary rounded-xs mx-auto mb-1" />
+                <div className="w-full h-1.5 bg-primary/40 rounded-xs" />
+                <div className="w-4/5 h-1.5 bg-primary/40 rounded-xs" />
+                <div className="w-2/3 h-1.5 bg-primary/40 rounded-xs" />
               </div>
             </div>
 
@@ -212,7 +200,7 @@ export function DisciplineDetailView({
 
             <Button
               onClick={() => setIsRegisterModalOpen(true)}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 shadow-xs"
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-xs"
             >
               Adicionar Estudo
             </Button>
@@ -310,7 +298,7 @@ export function DisciplineDetailView({
                               type="checkbox"
                               checked={isDone}
                               onChange={() => toggleTopic(topic.id)}
-                              className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                              className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
                             />
                           </td>
                           <td
@@ -340,7 +328,7 @@ export function DisciplineDetailView({
                             <button
                               type="button"
                               onClick={() => toast.info("Adicionar link de caderno")}
-                              className="text-[#2563EB] font-bold hover:underline"
+                              className="text-primary font-bold hover:underline"
                             >
                               Adicionar
                             </button>
@@ -360,7 +348,7 @@ export function DisciplineDetailView({
                                   type="checkbox"
                                   checked={subDone}
                                   onChange={() => toggleTopic(sub.id)}
-                                  className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                                  className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
                                 />
                               </td>
                               <td
@@ -396,7 +384,7 @@ export function DisciplineDetailView({
                             type="checkbox"
                             checked={isDone}
                             onChange={() => toggleTopic(String(topic.id))}
-                            className="w-4 h-4 rounded text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                            className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
                           />
                         </td>
                         <td
@@ -424,7 +412,7 @@ export function DisciplineDetailView({
                           <button
                             type="button"
                             onClick={() => toast.info("Adicionar link de caderno")}
-                            className="text-[#2563EB] font-bold hover:underline"
+                            className="text-primary font-bold hover:underline"
                           >
                             Adicionar
                           </button>

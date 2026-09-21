@@ -4,6 +4,8 @@ import * as Sentry from "@sentry/nextjs"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
+import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo, startOfDayInSaoPauloMs } from "@/lib/sao-paulo"
+import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
 
 import {
   computeBgColor,
@@ -80,6 +82,7 @@ interface RawHistoryRow {
 
 export async function getPublicStudyProfileAction(
   targetUserId: string,
+  now: Date = new Date(),
 ): Promise<GetPublicStudyProfileResult> {
   if (!targetUserId || typeof targetUserId !== "string") {
     return { success: false, data: null, error: "Identificador de usuário inválido." }
@@ -191,19 +194,19 @@ export async function getPublicStudyProfileAction(
 
     const rows: RawHistoryRow[] = (historyRows as unknown as RawHistoryRow[]) || []
 
-    // Datas para cálculo de esta semana e semana passada
-    const now = new Date()
-    const getMonday = (d: Date) => {
-      const date = new Date(d)
-      const day = date.getDay()
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1)
-      date.setHours(0, 0, 0, 0)
-      return new Date(date.setDate(diff))
-    }
-
-    const thisMonday = getMonday(now)
-    const lastMonday = new Date(thisMonday)
-    lastMonday.setDate(lastMonday.getDate() - 7)
+    // Fase 5 da auditoria de estabilização (timezone — ranking): esta e
+    // "semana passada" eram calculadas com accessors de Date no fuso LOCAL
+    // DO RUNTIME (UTC em produção: getDay, getDate, setHours(0,0,0,0)), não
+    // no fuso de negócio (America/Sao_Paulo). Entre 21h e 23h59 em São
+    // Paulo, uma sessão podia ser contada em "semana passada" quando na
+    // verdade ainda era "esta semana" para o aluno (ou vice-versa) no
+    // perfil PÚBLICO de estudo. Corrigido para usar os helpers de fuso de
+    // São Paulo já usados no resto do projeto. O parâmetro `now` da action
+    // é opcional e permite testar de forma determinística.
+    const todayKey = getDayInSaoPaulo(now)
+    const weekRange = getSaoPauloWeekRange(todayKey, 1) // semana começa na Segunda (ISO)
+    const thisMondayMs = startOfDayInSaoPauloMs(weekRange.mondayKey)
+    const lastMondayMs = startOfDayInSaoPauloMs(daysAgoKeyInSaoPaulo(7, weekRange.mondayKey))
 
     let totalMinutes = 0
     let totalQuestions = 0
@@ -237,9 +240,10 @@ export async function getPublicStudyProfileAction(
         datesWithStudy.push(startedAt)
 
         if (startDate) {
-          if (startDate >= thisMonday) {
+          const startMs = startDate.getTime()
+          if (startMs >= thisMondayMs) {
             thisWeekMinutes += minutes
-          } else if (startDate >= lastMonday && startDate < thisMonday) {
+          } else if (startMs >= lastMondayMs && startMs < thisMondayMs) {
             lastWeekMinutes += minutes
           }
         }
@@ -284,14 +288,14 @@ export async function getPublicStudyProfileAction(
           disciplineName: discName,
           studiedMinutes: minutes,
           formattedDuration: formatMinutesToHours(minutes),
-          relativeDateLabel: getRelativeDateLabel(startedAt),
+          relativeDateLabel: getRelativeDateLabel(startedAt, todayKey),
           dateIso: startedAt,
         })
       }
     }
 
     // Streaks
-    const { currentStreak, longestStreak } = computeStreaksFromDates(datesWithStudy)
+    const { currentStreak, longestStreak } = computeStreaksFromDates(datesWithStudy, todayKey)
 
     // Acurácia de questões
     const accuracyPercentage =

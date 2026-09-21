@@ -370,9 +370,9 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
         </div>
       </div>
 
-      {/* RESUMO GERAL */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+      {/* RESUMO GERAL: uma única superfície com divisórias (não 5 cards repetidos) */}
+      <div className="bg-card border rounded-2xl shadow-xs grid grid-cols-2 md:grid-cols-5 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-border">
+        <div className="p-4 space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
             Tempo de Estudo
           </span>
@@ -380,15 +380,15 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
             {totalStats.studyTimeFormatted}
           </span>
         </div>
-        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+        <div className="p-4 space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
             Questões
           </span>
-          <span className="text-base font-black text-[#2563EB] block">
+          <span className="text-base font-black text-primary block">
             {totalStats.totalQuestions}
           </span>
         </div>
-        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+        <div className="p-4 space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
             Acerto
           </span>
@@ -396,13 +396,13 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
             {totalStats.accuracyPercentage}%
           </span>
         </div>
-        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+        <div className="p-4 space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
             Disciplinas
           </span>
           <span className="text-base font-black text-foreground block">{disciplines.length}</span>
         </div>
-        <div className="bg-card border rounded-2xl p-4 shadow-xs space-y-1">
+        <div className="p-4 space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
             Progresso Edital
           </span>
@@ -411,7 +411,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
       </div>
 
       {/* BARRA DE PROGRESSO DA PREPARAÇÃO */}
-      <div className="bg-slate-900 dark:bg-slate-100 text-slate-100 dark:text-slate-900 rounded-2xl p-6 shadow-sm space-y-3">
+      <div className="bg-slate-900 dark:bg-slate-100 text-slate-100 dark:text-slate-900 rounded-2xl p-6 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-black uppercase tracking-widest opacity-80">
             Progresso da Preparação
@@ -431,7 +431,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
 
       {/* PAINÉIS DE PRIORIDADE E DESEMPENHO */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <Target className="h-4 w-4 text-rose-500" />
@@ -476,7 +476,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
           )}
         </div>
 
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
             <Trophy className="h-4 w-4 text-amber-500" />
             Melhor Desempenho
@@ -589,7 +589,7 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
             <div
               key={disc.id}
               onClick={() => openDiscipline(disc)}
-              className="group rounded-2xl border bg-card p-5 shadow-sm hover:shadow-xs hover:border-emerald-500/50 cursor-pointer transition-all relative overflow-hidden"
+              className="group rounded-2xl border bg-card p-5 hover:shadow-xs hover:border-emerald-500/50 cursor-pointer transition-all relative overflow-hidden"
             >
               {/* Top Status Line */}
               <div

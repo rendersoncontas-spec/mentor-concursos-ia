@@ -1,3 +1,5 @@
+import { buildIsoFromSaoPauloDateTime } from "@/lib/sao-paulo"
+
 const EXCEL_EPOCH_OFFSET_MS = (new Date(Date.UTC(1899, 11, 30)).getTime())
 
 function toNumber(value: unknown): number | null {
@@ -11,8 +13,35 @@ function toNumber(value: unknown): number | null {
   return null
 }
 
+// Fase 5 da auditoria de estabilização (timezone — "Aprovado"/Excel import):
+// a parte inteira do serial do Excel identifica só a DATA de calendário (não
+// depende de fuso — é uma contagem de dias desde 1899-12-30), mas a parte
+// fracionária codifica um horário do dia que, nas planilhas de origem,
+// representa o horário LOCAL do aluno (São Paulo), não UTC. O código
+// original somava essa fração como milissegundos UTC diretamente, o que
+// deslocava todo horário importado em ~3h (e, para horários entre
+// 00h-02h59 em SP, até para o dia de calendário errado quando lido de volta
+// pelos helpers de fuso de São Paulo usados no resto do projeto). Corrigido
+// para separar data e hora e reconstruir o instante UTC correto a partir do
+// horário de São Paulo, com o mesmo helper canônico usado em parseDmy logo
+// abaixo.
 function parseExcelSerial(serial: number): Date | null {
-  const date = new Date(EXCEL_EPOCH_OFFSET_MS + Math.round(serial * 86400000))
+  if (!Number.isFinite(serial)) return null
+
+  const wholeDays = Math.floor(serial)
+  const fractionalDay = serial - wholeDays
+
+  const dateOnly = new Date(EXCEL_EPOCH_OFFSET_MS + wholeDays * 86400000)
+  if (Number.isNaN(dateOnly.getTime())) return null
+
+  const totalSeconds = Math.round(fractionalDay * 86400)
+  const hour = Math.floor(totalSeconds / 3600) % 24
+  const minute = Math.floor((totalSeconds % 3600) / 60) % 60
+  const second = totalSeconds % 60
+
+  const dateKey = `${dateOnly.getUTCFullYear()}-${String(dateOnly.getUTCMonth() + 1).padStart(2, "0")}-${String(dateOnly.getUTCDate()).padStart(2, "0")}`
+  const timeKey = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`
+  const date = new Date(buildIsoFromSaoPauloDateTime(dateKey, timeKey))
   return Number.isNaN(date.getTime()) ? null : date
 }
 
@@ -35,13 +64,51 @@ function parseDmy(input: string): Date | null {
   const hour = match[4] ? Number(match[4]) : 0
   const minute = match[5] ? Number(match[5]) : 0
   const second = match[6] ? Number(match[6]) : 0
-  const date = new Date(year, month - 1, day, hour, minute, second)
+  if (hour > 23 || minute > 59 || second > 59) return null
+
+  // Fase 5 da auditoria de estabilização (timezone — "Aprovado"/Excel
+  // import): as planilhas de origem trazem data e hora no horário local do
+  // aluno (São Paulo), sem fuso explícito. Antes,
+  // `new Date(year, month-1, day, hour, minute, second)` interpretava
+  // esses componentes no fuso LOCAL DO RUNTIME (UTC em produção) em vez de
+  // -03:00, deslocando TODO registro importado com horário em ~3h — e, para
+  // horários entre 00h-02h59, até para o dia de calendário errado quando
+  // lido de volta pelos helpers de fuso de São Paulo usados no resto do
+  // projeto (getDayInSaoPaulo etc.). Corrigido para construir o instante
+  // UTC correto a partir do horário de São Paulo, com o helper canônico já
+  // usado no resto do projeto.
+  const dateKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+  const timeKey = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`
+  const iso = buildIsoFromSaoPauloDateTime(dateKey, timeKey)
+  const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? null : date
 }
+
+const TRAILING_OFFSET_RE = /(Z|[+-]\d{2}:?\d{2})$/
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+const TIME_ONLY_RE = /^\d{1,2}:\d{2}(:\d{2})?$/
 
 function parseIso(input: string): Date | null {
   const trimmed = input.trim().replace(/^[«"'']+|[»"'']+$/g, "")
   const normalized = trimmed.includes("T") ? trimmed : trimmed.replace(" ", "T")
+
+  // Fase 5 da auditoria (timezone): mesmo problema de parseDmy acima —
+  // quando a string NÃO traz fuso explícito (nem "Z" nem "±HH:MM"), ela
+  // representa o horário local do aluno (São Paulo), não o fuso do runtime
+  // do servidor. Só aplicamos a conversão quando reconhecemos claramente o
+  // formato "YYYY-MM-DD" (+ hora opcional "HH:mm[:ss]"); qualquer outro
+  // formato mantém o parsing original (mais tolerante a texto inesperado),
+  // para não arriscar um regresso silencioso em entradas malformadas.
+  if (!TRAILING_OFFSET_RE.test(normalized)) {
+    const [datePart, timePart] = normalized.split("T")
+    const timeOk = timePart === undefined || timePart === "" || TIME_ONLY_RE.test(timePart)
+    if (datePart && DATE_ONLY_RE.test(datePart) && timeOk) {
+      const iso = buildIsoFromSaoPauloDateTime(datePart, timePart || "00:00:00")
+      const date = new Date(iso)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+  }
+
   const date = new Date(normalized)
   return Number.isNaN(date.getTime()) ? null : date
 }

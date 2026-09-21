@@ -4,8 +4,10 @@ import assert from "node:assert/strict"
 import {
   calculateWeeklyDistribution,
   calculateCycleDistribution,
+  distributeDaily,
   SAME_DISCIPLINE_PENALTY,
   SAME_AREA_PENALTY,
+  type InternalSession,
 } from "./study-plan.algorithm"
 import type { AlgorithmDisciplineInput, DayOfWeek } from "@/domain/study-plan/study-plan.types"
 import { getTodayDayOfWeekInSaoPaulo } from "./study-plan.service"
@@ -267,4 +269,65 @@ test("getTodayDayOfWeekInSaoPaulo: borda de meia-noite 23:30 SP vs 00:30 SP dia 
   const afterMidnight = new Date("2026-08-24T03:30:00.000Z")
   assert.equal(getTodayDayOfWeekInSaoPaulo(beforeMidnight), 0)
   assert.equal(getTodayDayOfWeekInSaoPaulo(afterMidnight), 1)
+})
+
+function makeSession(id: string, mins: number): InternalSession {
+  return {
+    type: "study",
+    disciplineId: id,
+    disciplineName: id,
+    disciplineArea: "Humanas",
+    durationMinutes: mins,
+    priorityScore: 1,
+    originalPriority: 1,
+  }
+}
+
+// ─── Fase 5 da auditoria (timezone) ─────────────────────────────────────────
+// distributeDaily usava `new Date().getDay()` (dia da semana no fuso do
+// runtime, UTC em produção) para decidir de qual dia começar a distribuição
+// diária do cronograma. Corrigido para usar os helpers de fuso de São Paulo
+// (ver comentário em distributeDaily). Os testes abaixo fixam `now` num
+// instante que cai em dias de calendário diferentes em SP (Domingo vs
+// Segunda) para provar que o dia inicial agora segue o fuso de negócio, não
+// o fuso do servidor.
+
+test("distributeDaily: instante 23h30 SP (Domingo) inicia a distribuição no Domingo, não no dia UTC", () => {
+  // 2026-08-24T02:30:00Z = 2026-08-23T23:30:00-03:00 -> ainda Domingo (0) em SP.
+  const beforeMidnightSp = new Date("2026-08-24T02:30:00.000Z")
+  const result = distributeDaily([makeSession("d1", 30)], [0, 1], 60, beforeMidnightSp)
+  assert.equal(result.get(0)?.length, 1)
+  assert.equal(result.get(1)?.length ?? 0, 0)
+})
+
+test("distributeDaily: instante 00h30 SP (Segunda) inicia a distribuição na Segunda, não no Domingo", () => {
+  // 2026-08-24T03:30:00Z = 2026-08-24T00:30:00-03:00 -> já é Segunda (1) em SP.
+  const afterMidnightSp = new Date("2026-08-24T03:30:00.000Z")
+  const result = distributeDaily([makeSession("d1", 30)], [0, 1], 60, afterMidnightSp)
+  assert.equal(result.get(1)?.length, 1)
+  assert.equal(result.get(0)?.length ?? 0, 0)
+})
+
+// ─── Bug separado encontrado durante o mesmo ajuste (Erros/Corretude) ───────
+// Dentro do loop de "estouro de horas" de distributeDaily, `day` é um
+// DayOfWeek numérico (0-6) e 0 (Domingo) é falsy em JS. `if (!day) continue`
+// pulava a atualização de estado sempre que o avanço de dia caía em
+// Domingo, fazendo o algoritmo pular Domingo como candidato válido mesmo
+// quando ele tinha vaga e era o próximo dia correto no rodízio — o bloco
+// acabava indo parar num dia posterior por engano. Corrigido para checar
+// `day === undefined`, como nos outros dois pontos equivalentes do mesmo
+// loop. Este teste reproduz exatamente esse cenário.
+test("distributeDaily: sessão que estoura o dia respeita Domingo como próximo dia disponível (não pula para o dia seguinte)", () => {
+  const monday = new Date("2026-08-24T03:30:00.000Z") // hoje = Segunda (1) em SP
+  const sessions = [
+    makeSession("s1", 40), // Segunda: 0+40 <= 50, cabe
+    makeSession("s2", 10), // Domingo: 0+10 <= 50, cabe
+    makeSession("s3", 5),  // Terça: 0+5 <= 50, cabe
+    makeSession("s4", 20), // Segunda de novo: 40+20 > 50, precisa estourar;
+                            // Domingo (10+20=30 <= 50) tem vaga e deveria ser escolhido
+  ]
+  const result = distributeDaily(sessions, [1, 0, 2], 50, monday)
+  assert.deepEqual(result.get(0)?.map(s => s.durationMinutes), [10, 20]) // Domingo recebe s2 e s4
+  assert.deepEqual(result.get(1)?.map(s => s.durationMinutes), [40])     // Segunda fica só com s1
+  assert.deepEqual(result.get(2)?.map(s => s.durationMinutes), [5])      // Terça fica só com s3
 })

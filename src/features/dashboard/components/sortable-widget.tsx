@@ -37,7 +37,7 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
       style={style}
       className={cn(
         "group relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col h-auto w-full min-w-0",
-        isDragging && "shadow-xl opacity-80 ring-2 ring-[#2563EB] z-50",
+        isDragging && "shadow-xl opacity-80 ring-2 ring-primary z-50",
         colSpan >= 2 && "w-full",
       )}
     >

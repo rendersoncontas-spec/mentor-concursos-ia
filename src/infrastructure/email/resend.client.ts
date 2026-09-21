@@ -38,11 +38,35 @@ export function getDefaultFromEmail(): string {
 }
 
 export function getAppUrl(): string {
-  return (
+  const configured =
     process.env["NEXT_PUBLIC_APP_URL"]?.trim() ||
     process.env["NEXT_PUBLIC_SITE_URL"]?.trim() ||
-    (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : "http://localhost:3000")
-  )
+    (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : null)
+
+  if (configured) return configured
+
+  // BUG CORRIGIDO (hardening 2026-09-21): o fallback para localhost:3000 já
+  // existia (só é alcançado se NENHUMA das três variáveis acima estiver
+  // definida — NEXT_PUBLIC_APP_URL é a variável já usada por este projeto,
+  // ver .env.local; NEXT_PUBLIC_SITE_URL e VERCEL_URL são fallbacks
+  // adicionais). Não inventamos uma variável nova: NEXT_PUBLIC_APP_URL já é
+  // a configurada localmente e deve ser a mesma configurada em produção. O
+  // que faltava era visibilidade: se esse fallback for atingido em
+  // produção, os links enviados por e-mail (recuperação de senha,
+  // confirmação, boas-vindas) apontariam silenciosamente para
+  // localhost:3000 e quebrariam para o usuário sem nenhum log de erro. Este
+  // aviso não muda a URL retornada (comportamento de dev preservado
+  // exatamente como antes) — só torna o problema visível caso ocorra fora
+  // do ambiente de desenvolvimento.
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[RESEND] getAppUrl(): nenhuma de NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_SITE_URL ou VERCEL_URL " +
+        "está definida em produção — usando http://localhost:3000 como URL base dos links de e-mail. " +
+        "Configure NEXT_PUBLIC_APP_URL no ambiente de produção.",
+    )
+  }
+
+  return "http://localhost:3000"
 }
 
 export function getResendDiagnosticInfo(): {

@@ -241,7 +241,7 @@ export function PublicStudyProfileModal({
                 {/* Tempo Estudado */}
                 <div className="rounded-xl border bg-muted/15 p-3 space-y-1">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5 text-blue-500" />
+                    <Clock className="h-3.5 w-3.5 text-primary" />
                     <span className="text-[10px] font-bold uppercase tracking-wider">
                       Tempo Total
                     </span>

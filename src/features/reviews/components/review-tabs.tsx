@@ -152,7 +152,7 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReview
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
                 isActive
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground",
                 tab.id === "overdue" && count > 0 && !isActive && "text-red-500 hover:text-red-600",
               )}

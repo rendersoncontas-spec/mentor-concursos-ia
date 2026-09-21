@@ -223,7 +223,7 @@ export function TargetSelectorDropdown({
           {/* Estado de Carregando */}
           {loadingTargets && targets.length === 0 && (
             <div className="flex items-center justify-center py-6 text-muted-foreground gap-2 text-xs font-semibold">
-              <Loader2 className="h-4 w-4 animate-spin text-[#2563EB]" />
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
               Carregando seus concursos...
             </div>
           )}
@@ -253,7 +253,7 @@ export function TargetSelectorDropdown({
                     className={cn(
                       "group flex items-start gap-3 p-2.5 rounded-lg transition-all cursor-pointer border text-left",
                       isActive
-                        ? "border-[#2563EB]/40 bg-[#2563EB]/10 shadow-2xs"
+                        ? "border-primary/40 bg-primary/10 shadow-2xs"
                         : "border-transparent hover:bg-muted/80 hover:border-border",
                     )}
                   >
@@ -263,14 +263,14 @@ export function TargetSelectorDropdown({
                         className={cn(
                           "w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden border shadow-2xs",
                           isActive
-                            ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#2563EB]"
+                            ? "bg-primary/20 border-primary/40 text-primary"
                             : "bg-muted border-border text-muted-foreground",
                         )}
                       >
                         <RenderConcursoIcon iconKey={target.icon} className="h-4 w-4" />
                       </div>
                       {isActive ? (
-                        <div className="w-4 h-4 rounded-full bg-[#2563EB] text-white flex items-center justify-center shadow-xs">
+                        <div className="w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center shadow-xs">
                           <Check className="h-3 w-3 stroke-[3]" />
                         </div>
                       ) : (
@@ -295,7 +295,7 @@ export function TargetSelectorDropdown({
                           className={cn(
                             "px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider shrink-0",
                             isActive
-                              ? "bg-[#2563EB] text-white shadow-2xs"
+                              ? "bg-primary text-white shadow-2xs"
                               : "bg-muted text-muted-foreground",
                           )}
                         >
@@ -306,11 +306,11 @@ export function TargetSelectorDropdown({
                       {/* Metadados: Data da prova + Progresso do Edital */}
                       <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-medium flex-wrap">
                         <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-[#2563EB]" />
+                          <Calendar className="h-3 w-3 text-primary" />
                           {countdownStr}
                         </span>
                         <span className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3 text-blue-500" />
+                          <BookOpen className="h-3 w-3 text-primary" />
                           {target.editalProgress ?? 0}% do edital
                         </span>
                       </div>
@@ -330,7 +330,7 @@ export function TargetSelectorDropdown({
               <Button
                 onClick={handleAddNewExam}
                 size="sm"
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs gap-1.5 w-full cursor-pointer"
+                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs gap-1.5 w-full cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 Adicionar Concurso
@@ -345,7 +345,7 @@ export function TargetSelectorDropdown({
               <button
                 type="button"
                 onClick={handleAddNewExam}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-bold text-[#2563EB] hover:bg-[#2563EB]/10 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-bold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 Adicionar Novo Concurso

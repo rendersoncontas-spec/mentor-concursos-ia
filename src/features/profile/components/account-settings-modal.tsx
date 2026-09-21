@@ -432,7 +432,7 @@ export function AccountSettingsModal({
 
               {/* Avatar + Carregar Foto */}
               <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-full border border-[#2563EB] bg-white dark:bg-slate-900 text-[#2563EB] flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
+                <div className="relative w-14 h-14 rounded-full border border-primary bg-white dark:bg-slate-900 text-primary flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
                   {avatarImg ? (
                     <Image
                       src={avatarImg}
@@ -487,7 +487,7 @@ export function AccountSettingsModal({
                   onClick={() => setActiveTab("DADOS")}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
                     activeTab === "DADOS"
-                      ? "bg-[#2563EB] text-white shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
@@ -499,7 +499,7 @@ export function AccountSettingsModal({
                   onClick={() => setActiveTab("PREFERENCIAS")}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
                     activeTab === "PREFERENCIAS"
-                      ? "bg-[#2563EB] text-white shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
@@ -511,7 +511,7 @@ export function AccountSettingsModal({
                   onClick={() => setActiveTab("RANKING")}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
                     activeTab === "RANKING"
-                      ? "bg-[#2563EB] text-white shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
@@ -523,7 +523,7 @@ export function AccountSettingsModal({
                   onClick={() => setActiveTab("CATEGORIAS")}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
                     activeTab === "CATEGORIAS"
-                      ? "bg-[#2563EB] text-white shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
@@ -535,7 +535,7 @@ export function AccountSettingsModal({
                   onClick={() => setActiveTab("NOTIFICACOES")}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
                     activeTab === "NOTIFICACOES"
-                      ? "bg-[#2563EB] text-white shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
@@ -547,7 +547,7 @@ export function AccountSettingsModal({
                   onClick={() => setActiveTab("SEGURANCA")}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
                     activeTab === "SEGURANCA"
-                      ? "bg-[#2563EB] text-white shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
@@ -575,7 +575,7 @@ export function AccountSettingsModal({
           <div className="flex-1 p-6 flex flex-col justify-between space-y-6 overflow-y-auto">
             {isLoadingProfile ? (
               <div className="flex flex-1 items-center justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : (
               <>
@@ -777,7 +777,7 @@ export function AccountSettingsModal({
                             {r}
                           </span>
                         ))}
-                        <button className="p-1 rounded-md border text-xs font-bold hover:text-[#2563EB]">
+                        <button className="p-1 rounded-md border text-xs font-bold hover:text-primary">
                           +
                         </button>
                       </div>
@@ -852,7 +852,7 @@ export function AccountSettingsModal({
                         <label
                           className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
                             perfilPublico
-                              ? "bg-primary/10 border-primary shadow-xs"
+                              ? "bg-primary/10 border-primary"
                               : "bg-muted/10 border-border hover:bg-muted/20"
                           }`}
                         >
@@ -877,7 +877,7 @@ export function AccountSettingsModal({
                         <label
                           className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
                             !perfilPublico
-                              ? "bg-primary/10 border-primary shadow-xs"
+                              ? "bg-primary/10 border-primary"
                               : "bg-muted/10 border-border hover:bg-muted/20"
                           }`}
                         >
@@ -911,9 +911,9 @@ export function AccountSettingsModal({
                             name="foto"
                             checked={tipoFoto === "foto"}
                             onChange={() => setTipoFoto("foto")}
-                            className="text-[#2563EB]"
+                            className="text-primary"
                           />
-                          <div className="w-7 h-7 rounded-full border border-[#2563EB] text-[#2563EB] flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full border border-primary text-primary flex items-center justify-center">
                             <User className="h-4 w-4" />
                           </div>
                           <span>Usar minha foto de perfil</span>
@@ -925,9 +925,9 @@ export function AccountSettingsModal({
                             name="foto"
                             checked={tipoFoto === "iniciais"}
                             onChange={() => setTipoFoto("iniciais")}
-                            className="text-[#2563EB]"
+                            className="text-primary"
                           />
-                          <div className="w-7 h-7 rounded-full bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center">
                             {nome?.[0] || "?"}
                             {sobrenome?.[0] || ""}
                           </div>
@@ -948,7 +948,7 @@ export function AccountSettingsModal({
                             name="nome"
                             checked={tipoNome === "nome"}
                             onChange={() => setTipoNome("nome")}
-                            className="text-[#2563EB]"
+                            className="text-primary"
                           />
                           <span>Usar meu nome de perfil</span>
                         </label>
@@ -959,7 +959,7 @@ export function AccountSettingsModal({
                             name="nome"
                             checked={tipoNome === "apelido"}
                             onChange={() => setTipoNome("apelido")}
-                            className="text-[#2563EB]"
+                            className="text-primary"
                           />
                           <span>Usar meu apelido</span>
                         </label>
@@ -1040,7 +1040,7 @@ export function AccountSettingsModal({
                             <Button
                               size="sm"
                               onClick={handleAddCategory}
-                              className="bg-[#2563EB] text-white h-8 text-xs"
+                              className="bg-primary text-white h-8 text-xs"
                             >
                               <Check className="h-3.5 w-3.5" />
                             </Button>
@@ -1048,7 +1048,7 @@ export function AccountSettingsModal({
                         ) : (
                           <button
                             onClick={() => setShowAddCat(true)}
-                            className="px-3 py-1 border rounded-md text-xs font-bold hover:text-[#2563EB] transition-colors"
+                            className="px-3 py-1 border rounded-md text-xs font-bold hover:text-primary transition-colors"
                           >
                             +
                           </button>
@@ -1065,115 +1065,114 @@ export function AccountSettingsModal({
                       PREFERÊNCIAS DE E-MAIL E NOTIFICAÇÕES
                     </span>
 
-                    {/* Card 1: Resumo Semanal */}
-                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                      <input
-                        type="checkbox"
-                        checked={notifResumoSemanal}
-                        onChange={(e) => setNotifResumoSemanal(e.target.checked)}
-                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                      />
-                      <div>
-                        <h4 className="font-bold text-xs text-foreground">Resumo Semanal</h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Relatório semanal consolidado com horas estudadas, questões respondidas e
-                          taxa de acerto.
-                        </p>
+                    {/* Preferências de notificação: seis opções idênticas em estrutura —
+                        uma única superfície com divisórias no lugar de seis cards
+                        repetidos com borda própria (grade de cards iguais). */}
+                    <div className="rounded-xl border bg-card divide-y divide-border">
+                      <div className="p-4 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={notifResumoSemanal}
+                          onChange={(e) => setNotifResumoSemanal(e.target.checked)}
+                          className="mt-1 rounded text-primary focus:ring-primary"
+                        />
+                        <div>
+                          <h4 className="font-bold text-xs text-foreground">Resumo Semanal</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Relatório semanal consolidado com horas estudadas, questões respondidas e
+                            taxa de acerto.
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Card 2: Lembretes de Estudo */}
-                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                      <input
-                        type="checkbox"
-                        checked={notifConstancia}
-                        onChange={(e) => setNotifConstancia(e.target.checked)}
-                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                      />
-                      <div>
-                        <h4 className="font-bold text-xs text-foreground">
-                          Lembretes de Estudo & Constância
-                        </h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Lembretes para manter o ritmo dos seus estudos e proteger sua sequência de
-                          dias consecutivos.
-                        </p>
+                      <div className="p-4 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={notifConstancia}
+                          onChange={(e) => setNotifConstancia(e.target.checked)}
+                          className="mt-1 rounded text-primary focus:ring-primary"
+                        />
+                        <div>
+                          <h4 className="font-bold text-xs text-foreground">
+                            Lembretes de Estudo & Constância
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Lembretes para manter o ritmo dos seus estudos e proteger sua sequência de
+                            dias consecutivos.
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Card 3: Revisões */}
-                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                      <input
-                        type="checkbox"
-                        checked={notifRevisao}
-                        onChange={(e) => setNotifRevisao(e.target.checked)}
-                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                      />
-                      <div>
-                        <h4 className="font-bold text-xs text-foreground">Alertas de Revisão</h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Avisos quando houver flashcards e matérias agendadas pelo algoritmo de
-                          repetição espaçada.
-                        </p>
+                      <div className="p-4 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={notifRevisao}
+                          onChange={(e) => setNotifRevisao(e.target.checked)}
+                          className="mt-1 rounded text-primary focus:ring-primary"
+                        />
+                        <div>
+                          <h4 className="font-bold text-xs text-foreground">Alertas de Revisão</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Avisos quando houver flashcards e matérias agendadas pelo algoritmo de
+                            repetição espaçada.
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Card 4: Importações */}
-                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                      <input
-                        type="checkbox"
-                        checked={notifImportacoes}
-                        onChange={(e) => setNotifImportacoes(e.target.checked)}
-                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                      />
-                      <div>
-                        <h4 className="font-bold text-xs text-foreground">
-                          Importações de Histórico
-                        </h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          E-mail de confirmação e resumo de processamento ao importar dados
-                          externos.
-                        </p>
+                      <div className="p-4 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={notifImportacoes}
+                          onChange={(e) => setNotifImportacoes(e.target.checked)}
+                          className="mt-1 rounded text-primary focus:ring-primary"
+                        />
+                        <div>
+                          <h4 className="font-bold text-xs text-foreground">
+                            Importações de Histórico
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            E-mail de confirmação e resumo de processamento ao importar dados
+                            externos.
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Card 5: Ranking e Conquistas */}
-                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                      <input
-                        type="checkbox"
-                        checked={notifRanking}
-                        onChange={(e) => setNotifRanking(e.target.checked)}
-                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                      />
-                      <div>
-                        <h4 className="font-bold text-xs text-foreground">Ranking & Conquistas</h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Notificações sobre evolução de posição no ranking geral e novos troféus
-                          conquistados.
-                        </p>
+                      <div className="p-4 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={notifRanking}
+                          onChange={(e) => setNotifRanking(e.target.checked)}
+                          className="mt-1 rounded text-primary focus:ring-primary"
+                        />
+                        <div>
+                          <h4 className="font-bold text-xs text-foreground">Ranking & Conquistas</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Notificações sobre evolução de posição no ranking geral e novos troféus
+                            conquistados.
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Card 6: Feedback & Análise */}
-                    <div className="rounded-xl border p-4 flex items-start gap-3 bg-card">
-                      <input
-                        type="checkbox"
-                        checked={notifFeedback}
-                        onChange={(e) => setNotifFeedback(e.target.checked)}
-                        className="mt-1 rounded text-[#2563EB] focus:ring-[#2563EB]"
-                      />
-                      <div>
-                        <h4 className="font-bold text-xs text-foreground">Feedback & Insights</h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Mensagens com insights inteligentes e observações sobre sua evolução.
-                        </p>
+                      <div className="p-4 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={notifFeedback}
+                          onChange={(e) => setNotifFeedback(e.target.checked)}
+                          className="mt-1 rounded text-primary focus:ring-primary"
+                        />
+                        <div>
+                          <h4 className="font-bold text-xs text-foreground">Feedback & Insights</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Mensagens com insights inteligentes e observações sobre sua evolução.
+                          </p>
+                        </div>
                       </div>
                     </div>
 
                     {/* Card de Teste do Serviço de E-mail */}
-                    <div className="rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 p-4 space-y-3">
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
                       <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-[#2563EB]" />
+                        <Mail className="h-4 w-4 text-primary" />
                         <h4 className="font-bold text-xs text-foreground">
                           Teste do Serviço Resend
                         </h4>
@@ -1204,7 +1203,7 @@ export function AccountSettingsModal({
                             setIsSendingTestEmail(false)
                           }
                         }}
-                        className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+                        className="border-primary text-primary hover:bg-primary/10 font-bold text-xs gap-2"
                       >
                         {isSendingTestEmail ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1261,7 +1260,7 @@ export function AccountSettingsModal({
                       <Button
                         onClick={handleChangePassword}
                         disabled={isChangingPassword}
-                        className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs w-full mt-2"
+                        className="bg-primary hover:bg-primary/90 text-white font-bold text-xs w-full mt-2"
                       >
                         {isChangingPassword ? (
                           <>
@@ -1283,7 +1282,7 @@ export function AccountSettingsModal({
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs px-6 h-9"
+                className="border-primary text-primary hover:bg-primary/10 font-bold text-xs px-6 h-9"
               >
                 Cancelar
               </Button>
@@ -1291,7 +1290,7 @@ export function AccountSettingsModal({
               <Button
                 onClick={handleSave}
                 disabled={isSaving || isLoadingProfile || isUploadingAvatar}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-6 h-9 shadow-xs gap-1.5"
+                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 h-9 shadow-xs gap-1.5"
               >
                 {isSaving ? (
                   <>

@@ -5,8 +5,7 @@ import { getUserDisciplines } from "@/application/disciplines/disciplines.servic
 import { getStudyHistoryForAnalytics, AnalyticsEngine } from "@/application/study-analytics/study-analytics.service"
 import { getPendingReviewsSummary } from "@/application/review-engine/review-engine.service"
 import { getRecentActivities } from "@/application/study-history/study-history.service"
-import { getStartOfWeek } from "@/application/study-analytics/utils"
-import { getDayInSaoPaulo } from "@/lib/sao-paulo"
+import { getDayInSaoPaulo, startOfDayInSaoPauloMs } from "@/lib/sao-paulo"
 import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
 import { formatDurationMinutes } from "@/lib/format-duration"
 
@@ -20,8 +19,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       rawHistory,
       reviewsSummary,
       recentActivities,
-      questionAttemptsResult,
-      userLayoutResult
+      questionAttemptsResult
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -51,12 +49,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       supabase
         .from("question_attempts")
         .select("id, correct, question_id, created_at, answered_at, questions!inner ( discipline_id )")
-        .eq("user_id", userId),
-      supabase
-        .from("user_dashboard_layouts")
-        .select("widget_id, position_order, col_span, row_span, visible")
         .eq("user_id", userId)
-        .order("position_order")
     ])
 
     const profile = profileResult?.data || null;
@@ -125,11 +118,16 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
           : (profile?.week_start_day ?? 0)
 
     // Calcular desempenho por período (Hoje, Semana, Mês, Ano, Total)
+    // Fase 5 da auditoria: os limites eram calculados com Date local do
+    // runtime do servidor (UTC em produção), não com o fuso de São Paulo,
+    // causando um desvio de até ~3h na virada do dia/semana/mês/ano.
     const now = new Date()
-    const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-    const startOfWeekMs = getStartOfWeek(now, weekStartDay).getTime()
-    const startOfMonthMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
-    const startOfYearMs = new Date(now.getFullYear(), 0, 1).getTime()
+    const todayKey = getDayInSaoPaulo(now)
+    const weekRange = getSaoPauloWeekRange(todayKey, weekStartDay)
+    const startOfTodayMs = startOfDayInSaoPauloMs(todayKey)
+    const startOfWeekMs = startOfDayInSaoPauloMs(weekRange.mondayKey)
+    const startOfMonthMs = startOfDayInSaoPauloMs(`${todayKey.slice(0, 7)}-01`)
+    const startOfYearMs = startOfDayInSaoPauloMs(`${todayKey.slice(0, 4)}-01-01`)
 
     const periodThresholds = [
       { key: "HOJE" as const, minMs: startOfTodayMs },
@@ -187,10 +185,10 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       }
     }
 
-    let totalQuestions = performanceByPeriod.TOTAL.totalQuestions
-    let correctQuestions = performanceByPeriod.TOTAL.correctQuestions
-    let wrongQuestions = performanceByPeriod.TOTAL.wrongQuestions
-    let accuracyPercentage = performanceByPeriod.TOTAL.accuracyPercentage
+    const totalQuestions = performanceByPeriod.TOTAL.totalQuestions
+    const correctQuestions = performanceByPeriod.TOTAL.correctQuestions
+    const wrongQuestions = performanceByPeriod.TOTAL.wrongQuestions
+    const accuracyPercentage = performanceByPeriod.TOTAL.accuracyPercentage
 
     const typedDisciplines = (disciplines || []) as Array<{ status: string }>
     const disciplinesStats = {
@@ -212,9 +210,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     const targetDays = profile?.weekly_study_days_goal ?? null
     
     // Calcular metas adicionais não presentes na base
-    let weeklyQuestions = performanceByPeriod.SEMANA.totalQuestions
-
-    const weekRange = getSaoPauloWeekRange(now, weekStartDay)
+    const weeklyQuestions = performanceByPeriod.SEMANA.totalQuestions
 
     // Revisões concluídas na semana = sessões registradas como revisão no histórico (Segunda a Domingo)
     const weeklyRevisions = rawHistory.filter((h) => {
@@ -412,16 +408,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
           }
         },
         insights: AnalyticsEngine.ai.getInsights(ctx)
-      },
-      userLayout: (userLayoutResult?.data && userLayoutResult.data.length > 0)
-        ? userLayoutResult.data.map((item) => ({
-            widget_id: item.widget_id,
-            position_order: item.position_order,
-            col_span: Math.min(3, Math.max(1, item.col_span || 1)) as 1 | 2 | 3,
-            row_span: item.row_span || 1,
-            visible: item.visible
-          }))
-        : undefined
+      }
     }
   } catch (error) {
     console.error("Erro ao carregar Dashboard:", error)

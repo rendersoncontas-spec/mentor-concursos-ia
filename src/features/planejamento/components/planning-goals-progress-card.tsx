@@ -29,7 +29,7 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
 
 function getProgressBarClass(isCompleted: boolean, percentage: number): string {
   if (isCompleted) return "bg-emerald-500 shadow-sm"
-  if (percentage >= 50) return "bg-[#2563EB]"
+  if (percentage >= 50) return "bg-primary"
   return "bg-amber-500"
 }
 
@@ -198,7 +198,7 @@ export function PlanningGoalsProgressCard({
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   period === f
-                    ? "bg-[#2563EB] text-white shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -261,7 +261,9 @@ export function PlanningGoalsProgressCard({
         {/* Global Progress Bar */}
         <div className="w-full bg-muted rounded-full h-3.5 sm:h-4 overflow-hidden border">
           <div
-            className="h-full bg-gradient-to-r from-[#2563EB] to-emerald-500 rounded-full transition-all duration-700"
+            className={`h-full rounded-full transition-all duration-700 ${
+              totalPercentage >= 100 ? "bg-emerald-500" : "bg-primary"
+            }`}
             style={{ width: `${Math.min(totalPercentage, 100)}%` }}
           />
         </div>
@@ -330,7 +332,7 @@ export function PlanningGoalsProgressCard({
                   if (onStartSession) onStartSession(d.id)
                   else toast.info(`Iniciando estudo de ${d.name}...`)
                 }}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs h-9 px-4 rounded-xl gap-1.5 shrink-0"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs h-9 px-4 rounded-xl gap-1.5 shrink-0"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 Iniciar

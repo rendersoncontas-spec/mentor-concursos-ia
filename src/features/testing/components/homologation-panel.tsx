@@ -9,7 +9,7 @@ import { runHomologationFlow1Action, runHomologationMentorAction } from "@/appli
 
 function getLogStatusClass(status: HomologationResult["status"]): string | undefined {
   if (status === "FAILED") return "text-red-400"
-  if (status === "PENDING") return "text-blue-300"
+  if (status === "PENDING") return "text-info"
   return undefined
 }
 
@@ -91,7 +91,7 @@ export function HomologationPanel() {
               <div key={i} className="flex gap-3 items-start border-b border-gray-800 pb-2">
                 {log.status === "SUCCESS" && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />}
                 {log.status === "FAILED" && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
-                {log.status === "PENDING" && <RefreshCcw className="w-5 h-5 text-blue-400 shrink-0 animate-spin" />}
+                {log.status === "PENDING" && <RefreshCcw className="w-5 h-5 text-info shrink-0 animate-spin" />}
                 
                 <div className="space-y-1 w-full">
                   <div className="flex gap-2">

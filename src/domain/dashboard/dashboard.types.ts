@@ -144,7 +144,6 @@ export interface DashboardSnapshot {
   reviews: PendingReviewsSummary
   recentActivities: RecentActivityItem[]
   analytics: DashboardAnalytics
-  userLayout?: WidgetConfigItem[] | null | undefined
 }
 
 // Compatibilidade durante refatoração

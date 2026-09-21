@@ -15,15 +15,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
 import { DisciplinePopover } from "@/features/study-session/components/discipline-popover"
 import { useGlobalStudy } from "@/features/study-session/components/study-provider"
+import { formatTimerClock } from "@/lib/format-duration"
 import { cn } from "@/lib/utils"
-
-function formatTimer(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-}
 
 export function StudyHeaderControl() {
   const {
@@ -175,7 +168,7 @@ export function StudyHeaderControl() {
                 />
               </span>
               <span className="font-mono font-black text-sm text-foreground tabular-nums whitespace-nowrap">
-                {formatTimer(displayTime)}
+                {formatTimerClock(displayTime)}
               </span>
               <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap hidden sm:inline">
                 {isStudying ? "Estudando" : isPaused ? "Pausado" : "Parado"}

@@ -12,12 +12,13 @@ import {
   type AlgorithmItem,
   type DayOfWeek,
 } from "@/domain/study-plan/study-plan.types"
+import { getDayInSaoPaulo, dayOfWeekForDateKey } from "@/lib/sao-paulo"
 
 // ==============================================================================
 // 1. Tipos Internos e Constantes
 // ==============================================================================
 
-type InternalSession = {
+export type InternalSession = {
   type: "study" | "review"
   disciplineId: string
   disciplineName: string
@@ -246,16 +247,27 @@ function insertReviewBlocks(sessions: InternalSession[]): InternalSession[] {
 /**
  * Distribui a pilha sequencial nos dias disponíveis garantindo que não estoure o limite diário.
  */
-function distributeDaily(
+export function distributeDaily(
   sessions: InternalSession[],
   availableDays: DayOfWeek[],
-  maxDailyMinutes: number
+  maxDailyMinutes: number,
+  now: Date = new Date()
 ): Map<DayOfWeek, InternalSession[]> {
   const dailyDistribution = new Map<DayOfWeek, InternalSession[]>()
   availableDays.forEach(day => dailyDistribution.set(day, []))
 
-  // Starts distributing from the current day of the week to ensure the user gets blocks today
-  const today = new Date().getDay()
+  // Fase 5 da auditoria (timezone): `new Date().getDay()` retorna o dia da
+  // semana no fuso LOCAL DO RUNTIME (UTC em produção), não no fuso de
+  // negócio (America/Sao_Paulo) — o mesmo desvio já corrigido em outros
+  // pontos do projeto (ver src/lib/sao-paulo.ts). Entre 21h e 23h59 em São
+  // Paulo (00h-02h59 UTC do dia seguinte), isso fazia o "hoje" usado para
+  // iniciar a distribuição do cronograma ficar um dia adiantado em relação
+  // ao dia real do aluno. Já existe um helper equivalente e correto em
+  // study-plan.service.ts (getTodayDayOfWeekInSaoPaulo), mas importá-lo
+  // aqui criaria uma dependência circular (service.ts importa funções
+  // deste módulo). Usamos os helpers de fuso de São Paulo diretamente. O
+  // parâmetro `now` é opcional e permite testar de forma determinística.
+  const today = dayOfWeekForDateKey(getDayInSaoPaulo(now))
   let currentDayIndex = availableDays.indexOf(today as DayOfWeek)
   if (currentDayIndex === -1) currentDayIndex = 0
   
@@ -272,7 +284,19 @@ function distributeDaily(
     while (currentDayMinutes + session.durationMinutes > maxDailyMinutes && attempts < availableDays.length) {
       currentDayIndex = (currentDayIndex + 1) % availableDays.length
       day = availableDays[currentDayIndex]
-      if (!day) continue
+      // Fase 5 da auditoria (Erros/Corretude): `day` é um DayOfWeek numérico
+      // (0-6), e 0 (Domingo) é falsy em JS. `if (!day) continue` pulava
+      // silenciosamente a atualização de `dayItems`/`currentDayMinutes`/
+      // `attempts` sempre que o avanço de dia caía em Domingo, dessincronizando
+      // `currentDayIndex` do restante do estado do loop. Na prática, isso
+      // corrompia a distribuição diária do Cronograma Inteligente sempre que
+      // Domingo estava entre os dias disponíveis e alguma sessão precisava
+      // "estourar" para o próximo dia (comum, já que blocos de até 60min podem
+      // exceder a cota diária média): o fallback de "dia mais vazio" acabava
+      // sempre recaindo em Domingo por ordem de iteração, mesmo quando outro
+      // dia era o correto. Corrigido para checar `undefined` explicitamente,
+      // como já era feito nos outros dois pontos equivalentes deste loop.
+      if (day === undefined) continue
       const nextDayItems = dailyDistribution.get(day)
       if (!nextDayItems) continue
       dayItems = nextDayItems
@@ -339,7 +363,7 @@ function finalizeSchedule(dailyDistribution: Map<DayOfWeek, InternalSession[]>):
 // 3. Ponto de Entrada Exportado
 // ==============================================================================
 
-export function calculateWeeklyDistribution(input: AlgorithmInput): AlgorithmItem[] {
+export function calculateWeeklyDistribution(input: AlgorithmInput, now: Date = new Date()): AlgorithmItem[] {
   const { weeklyMinutes, availableDays, disciplines, adaptiveDecisions } = input
 
   if (disciplines.length === 0 || weeklyMinutes <= 0 || availableDays.length === 0) {
@@ -406,7 +430,7 @@ export function calculateWeeklyDistribution(input: AlgorithmInput): AlgorithmIte
 
   // 7. Distribuição Diária Limitada
   const maxDailyMinutes = Math.ceil(weeklyMinutes / availableDays.length)
-  const dailyDistribution = distributeDaily(sessionsWithReviews, availableDays, maxDailyMinutes)
+  const dailyDistribution = distributeDaily(sessionsWithReviews, availableDays, maxDailyMinutes, now)
 
   // 8. Saída Formatada
   return finalizeSchedule(dailyDistribution)

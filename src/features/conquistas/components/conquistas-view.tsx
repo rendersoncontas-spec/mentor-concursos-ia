@@ -657,7 +657,7 @@ export function ConquistasView() {
                 </div>
                 <div className="h-3 w-full rounded-full bg-muted/80 overflow-hidden p-0.5 border border-border/50">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-primary via-blue-500 to-sky-400 transition-all duration-700"
+                    className="h-full rounded-full bg-primary transition-all duration-700"
                     style={{ width: `${overallPercentage}%` }}
                   />
                 </div>
@@ -673,8 +673,8 @@ export function ConquistasView() {
                     {unlockedCount}
                   </span>
                 </div>
-                <div className="bg-background/80 border border-blue-500/20 rounded-xl px-3 sm:px-4 py-2 text-center shadow-xs">
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
+                <div className="bg-background/80 border border-primary/20 rounded-xl px-3 sm:px-4 py-2 text-center shadow-xs">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-primary block">
                     Em Progresso
                   </span>
                   <span className="text-lg sm:text-xl font-mono font-extrabold text-foreground">
@@ -731,7 +731,7 @@ export function ConquistasView() {
             className={cn(
               "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap",
               statusFilter === "em_progresso"
-                ? "bg-background text-blue-600 dark:text-blue-400 shadow-xs border border-border/50 font-bold"
+                ? "bg-background text-primary shadow-xs border border-border/50 font-bold"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/40",
             )}
           >

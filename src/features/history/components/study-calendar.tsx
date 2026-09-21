@@ -146,7 +146,7 @@ export function StudyCalendar({
             {MONTH_NAMES[currentMonth - 1]} de {currentYear}
           </h2>
           {isLoading && (
-            <span className="text-[10px] font-bold text-[#2563EB] animate-pulse">
+            <span className="text-[10px] font-bold text-primary animate-pulse">
               CARREGANDO...
             </span>
           )}
@@ -229,16 +229,16 @@ export function StudyCalendar({
                 disabled={!hasData}
                 className={`
                   min-h-[105px] sm:min-h-[125px] flex flex-col items-start justify-start p-2.5 border-r border-b last:border-r-0 
-                  transition-all relative text-left w-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#2563EB]
+                  transition-all relative text-left w-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary
                   ${intensityClass}
-                  ${isToday ? "ring-2 ring-inset ring-[#2563EB] z-10" : ""}
+                  ${isToday ? "ring-2 ring-inset ring-primary z-10" : ""}
                   ${!hasData ? "cursor-default opacity-85" : "cursor-pointer"}
                 `}
                 aria-label={`${day} de ${MONTH_NAMES[currentMonth - 1]} de ${currentYear}. ${hasData ? `${formatDurationMinutes(totalMinutes)} estudados em ${daySessions.length} sessões.` : "Nenhum estudo."}`}
               >
                 <div className="flex items-center justify-between w-full mb-1.5">
                   <span
-                    className={`text-xs sm:text-sm font-black ${isToday ? "text-[#2563EB]" : "text-foreground/80"}`}
+                    className={`text-xs sm:text-sm font-black ${isToday ? "text-primary" : "text-foreground/80"}`}
                   >
                     {day}
                   </span>
@@ -330,7 +330,7 @@ export function StudyCalendar({
                         {session.disciplines?.name || "Estudo Livre"}
                       </h4>
                       {session.origin_source && (
-                        <span className="inline-flex items-center rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#2563EB]">
+                        <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
                           Importado ·{" "}
                           {originDisplayName(session.origin_source, session.origin_source_name)}
                         </span>

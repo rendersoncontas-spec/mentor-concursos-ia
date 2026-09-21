@@ -119,7 +119,7 @@ export function UserExamModal({
       <DialogContent className="sm:max-w-md p-6 rounded-2xl">
         <DialogHeader className="space-y-1 text-left border-b pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-[#2563EB]/10 text-[#2563EB]">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
               <Calendar className="h-5 w-5" />
             </div>
             <div>
@@ -150,7 +150,7 @@ export function UserExamModal({
           {/* Data da Prova */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-foreground flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5 text-[#2563EB]" />
+              <Calendar className="h-3.5 w-3.5 text-primary" />
               Data da Prova <span className="text-rose-500">*</span>
             </label>
             <Input
@@ -219,7 +219,7 @@ export function UserExamModal({
               <Button
                 type="submit"
                 disabled={loading || deleting}
-                className="h-9 px-5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl shadow-xs"
+                className="h-9 px-5 bg-primary hover:bg-primary/90 text-white text-xs font-bold rounded-xl shadow-xs"
               >
                 {saveButtonLabel}
               </Button>

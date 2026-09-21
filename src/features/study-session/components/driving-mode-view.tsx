@@ -26,13 +26,13 @@ export function DrivingModeView({ phase, formattedTime, onStart, onPause, onStop
       <div className="z-10 flex flex-col items-center space-y-12 w-full max-w-md">
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold tracking-wider text-slate-300 flex items-center justify-center gap-3">
-            <Car className="w-6 h-6 text-blue-500" />
+            <Car className="w-6 h-6 text-teal-400" />
             Modo Dirigindo
           </h2>
           <p className="text-slate-400">Áudio / Podcast</p>
         </div>
 
-        <div className="text-8xl font-mono font-bold tracking-tighter tabular-nums text-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+        <div className="text-8xl font-mono font-bold tracking-tighter tabular-nums text-teal-400 drop-shadow-[0_0_15px_rgba(45,212,191,0.35)]">
           {formattedTime}
         </div>
 
@@ -41,7 +41,7 @@ export function DrivingModeView({ phase, formattedTime, onStart, onPause, onStop
             <button
               type="button"
               onClick={onStart}
-              className="col-span-2 h-32 rounded-2xl bg-blue-600 hover:bg-blue-500 flex flex-col items-center justify-center gap-3 transition-colors active:scale-95"
+              className="col-span-2 h-32 rounded-2xl bg-teal-600 hover:bg-teal-500 flex flex-col items-center justify-center gap-3 transition-colors active:scale-95"
             >
               <Play className="w-12 h-12 fill-white" />
               <span className="font-bold text-xl uppercase tracking-wider">Iniciar</span>

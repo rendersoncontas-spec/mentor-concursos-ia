@@ -1,6 +1,7 @@
 import type { AnalyticsContext } from "./types"
 import { formatDateToYYYYMMDD } from "./utils"
 import { computeStudyTimeFromHistory } from "@/lib/study-time-calculator"
+import { todayKeyInSaoPaulo, daysAgoKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 type BaseAggregations = {
   dailyMinutes: number
@@ -57,7 +58,18 @@ export function getBaseAggregations(ctx: AnalyticsContext): BaseAggregations {
   })
 }
 
-function calculateStreaks(uniqueDaysSet: Set<string>): { currentStreak: number, longestStreak: number } {
+// Fase 5 da auditoria (timezone): antes, todayStr/yesterdayStr eram calculados
+// com `new Date()` + accessors locais do runtime (UTC em produção), enquanto
+// uniqueDaysSet já vem corretamente no fuso de São Paulo (via
+// computeStudyTimeFromHistory -> getDayInSaoPaulo). No intervalo ~21h-23h59
+// (SP) / 00h-02h59 (UTC), isso podia fazer a sequência aparecer como
+// quebrada mesmo quando o aluno tinha estudado "ontem" (SP) e a sequência
+// continuava viva. `todayKey` agora é exportado com valor padrão em SP para
+// permitir teste determinístico sem mockar o relógio do sistema.
+export function calculateStreaks(
+  uniqueDaysSet: Set<string>,
+  todayKey: string = todayKeyInSaoPaulo(),
+): { currentStreak: number, longestStreak: number } {
   if (uniqueDaysSet.size === 0) return { currentStreak: 0, longestStreak: 0 }
 
   const sortedDays = Array.from(uniqueDaysSet).sort((a, b) => b.localeCompare(a)) // Mais recente pro mais antigo
@@ -65,10 +77,8 @@ function calculateStreaks(uniqueDaysSet: Set<string>): { currentStreak: number, 
   let currentStreak = 0
   let longestStreak = 1
   
-  const todayStr = formatDateToYYYYMMDD(new Date())
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  const yesterdayStr = formatDateToYYYYMMDD(d)
+  const todayStr = todayKey
+  const yesterdayStr = daysAgoKeyInSaoPaulo(1, todayKey)
 
   // Verifica se a sequência atual ainda está viva
   if (sortedDays[0] === todayStr || sortedDays[0] === yesterdayStr) {

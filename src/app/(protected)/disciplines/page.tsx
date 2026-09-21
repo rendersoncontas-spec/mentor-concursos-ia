@@ -25,7 +25,7 @@ export default async function DisciplinesPage() {
     <div className="flex flex-col min-h-full">
       {/* Page Header */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-3">
-        <BookOpen className="h-5 w-5 text-[#2563EB]" />
+        <BookOpen className="h-5 w-5 text-primary" />
         <div>
           <h1 className="text-lg font-bold leading-none">Disciplinas</h1>
           <p className="text-xs text-muted-foreground mt-0.5">

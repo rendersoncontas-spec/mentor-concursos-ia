@@ -10,15 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { DisciplinePopover } from "@/features/study-session/components/discipline-popover"
 import { useGlobalStudy } from "@/features/study-session/components/study-provider"
 import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
+import { formatTimerClock } from "@/lib/format-duration"
 import { cn } from "@/lib/utils"
-
-function formatTimer(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-}
 
 export function StudyDock() {
   const router = useRouter()
@@ -146,7 +139,7 @@ export function StudyDock() {
                 />
               </span>
               <span className="font-mono font-black text-base text-foreground tabular-nums">
-                {formatTimer(displayTime)}
+                {formatTimerClock(displayTime)}
               </span>
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                 {displayPhase === "STUDYING" ? "Estudando" : "Pausado"}

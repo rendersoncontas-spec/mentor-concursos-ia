@@ -15,6 +15,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react"
+import dynamic from "next/dynamic"
 import { toast } from "sonner"
 
 import {
@@ -26,7 +27,6 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
-import { ImportHistoryModal } from "@/features/importacao/components/import-history-modal"
 import { ManageImportsModal } from "@/features/importacao/components/manage-imports-modal"
 import { originDisplayName } from "@/features/importacao/lib/origin"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
@@ -38,6 +38,20 @@ import { formatDayLabel, getDayInSaoPaulo, getTimeInSaoPaulo } from "@/lib/sao-p
 import { formatDuration, formatDurationMinutes } from "@/lib/format-duration"
 
 import { StudyCalendar } from "./study-calendar"
+
+// Carregado sob demanda (Fase 6, auditoria de bundle): ImportHistoryModal
+// importa estaticamente a biblioteca xlsx (pesada) via excel-reader.ts. Como
+// antes era um import estático no topo do arquivo, o JS do xlsx era baixado
+// sempre que a página Histórico carregava, mesmo que o usuário nunca abrisse
+// o modal de importação. Com next/dynamic, esse JS fica num chunk separado,
+// fora do bundle principal desta página.
+const ImportHistoryModal = dynamic(
+  () =>
+    import("@/features/importacao/components/import-history-modal").then(
+      (mod) => mod.ImportHistoryModal,
+    ),
+  { ssr: false },
+)
 
 type HistorySession = StudyHistory & {
   disciplines?: {
@@ -537,7 +551,7 @@ export function HistoryView() {
             <button
               type="button"
               onClick={() => setViewMode("list")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "list" ? "bg-background text-[#2563EB] shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "list" ? "bg-background text-primary shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             >
               <HistoryIcon className="h-3.5 w-3.5" />
               Lista
@@ -545,7 +559,7 @@ export function HistoryView() {
             <button
               type="button"
               onClick={() => setViewMode("calendar")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "calendar" ? "bg-background text-[#2563EB] shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "calendar" ? "bg-background text-primary shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             >
               <Clock className="h-3.5 w-3.5" />
               Calendário
@@ -556,7 +570,7 @@ export function HistoryView() {
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
           <Button
             onClick={() => setIsRegisterOpen(true)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5 shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-xs"
           >
             Adicionar Estudo
           </Button>
@@ -567,7 +581,7 @@ export function HistoryView() {
                 <Button
                   variant="outline"
                   onClick={() => setIsImportOpen(true)}
-                  className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+                  className="border-primary text-primary hover:bg-primary/10 font-bold text-xs gap-2"
                 >
                   <Upload className="h-4 w-4" />
                   Importar Histórico
@@ -579,18 +593,19 @@ export function HistoryView() {
             </Tooltip>
           </TooltipProvider>
 
+          {/* Ações administrativas menos frequentes: hierarquia mais discreta (ghost) */}
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => setIsManageOpen(true)}
-            className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted font-bold text-xs gap-2"
           >
             <Database className="h-4 w-4" />
             Gerenciar Importações
           </Button>
 
           <Button
-            variant="outline"
-            className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2"
+            variant="ghost"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted font-bold text-xs gap-2"
           >
             <GraduationCap className="h-4 w-4" />
             Cargo Alvo
@@ -601,7 +616,7 @@ export function HistoryView() {
               ref={filterButtonRef}
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className={`border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs gap-2 ${activeFilterCount > 0 ? "bg-[#2563EB]/5" : ""}`}
+              className={`border-primary text-primary hover:bg-primary/10 font-bold text-xs gap-2 ${activeFilterCount > 0 ? "bg-primary/5" : ""}`}
             >
               <Filter className="h-3.5 w-3.5" />
               Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
@@ -764,7 +779,7 @@ export function HistoryView() {
                   <Button
                     size="sm"
                     onClick={() => setShowFilters(false)}
-                    className="flex-1 text-xs font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
+                    className="flex-1 text-xs font-bold bg-primary text-white hover:bg-primary/90"
                   >
                     Aplicar
                   </Button>
@@ -775,78 +790,67 @@ export function HistoryView() {
         </div>
       </div>
 
-      {/* Top Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            TEMPO DE ESTUDO
+      {/* Resumo do período: uma única superfície com hierarquia (não 4 cards repetidos) */}
+      <div className="rounded-2xl border bg-card shadow-xs grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border">
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Tempo de estudo
           </span>
-          <div className="text-right">
-            <span className="text-2xl font-black text-foreground font-mono">
-              {formatDurationMinutes(totalMinutes)}
+          <p className="text-2xl font-black text-primary font-mono">
+            {formatDurationMinutes(totalMinutes)}
+          </p>
+        </div>
+
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Desempenho
+          </span>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className="text-2xl font-black text-foreground font-mono">{accuracy}%</p>
+            <span className="text-[11px] font-bold">
+              <span className="text-emerald-600">{totalCorrect} acertos</span>
+              <span className="text-muted-foreground"> · </span>
+              <span className="text-rose-500">{totalWrong > 0 ? totalWrong : 0} erros</span>
             </span>
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            DESEMPENHO
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Sessões
           </span>
-          <div className="flex items-end justify-between">
-            <div className="text-[11px] font-bold space-y-0.5">
-              <span className="text-emerald-600 block">{totalCorrect} Acertos</span>
-              <span className="text-rose-500 block">{totalWrong > 0 ? totalWrong : 0} Erros</span>
-            </div>
-            <span className="text-2xl font-black text-foreground font-mono">{accuracy}%</span>
-          </div>
-        </div>
-
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            SESSÕES
-          </span>
-          <div className="flex items-end justify-between">
-            <div className="text-[11px] font-bold space-y-0.5">
-              {viewMode === "list" ? (
-                <>
-                  <span className="text-primary block">
-                    {filteredSessions.length.toLocaleString("pt-BR")} registro
-                    {filteredSessions.length !== 1 ? "s" : ""}
-                  </span>
-                  {activeFilterCount > 0 && (
-                    <span className="text-muted-foreground block">Com filtros aplicados</span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <span className="text-primary block">
-                    {filteredMonthlySessions.length} registro
-                    {filteredMonthlySessions.length !== 1 ? "s" : ""} neste mês
-                  </span>
-                  {activeFilterCount > 0 && (
-                    <span className="text-muted-foreground block">Com filtros aplicados</span>
-                  )}
-                </>
+          {viewMode === "list" ? (
+            <p className="text-2xl font-black text-foreground font-mono">
+              {filteredSessions.length.toLocaleString("pt-BR")}
+              {activeFilterCount > 0 && (
+                <span className="text-[11px] font-bold text-muted-foreground ml-2 align-middle">
+                  com filtros
+                </span>
               )}
-            </div>
-          </div>
+            </p>
+          ) : (
+            <p className="text-2xl font-black text-foreground font-mono">
+              {filteredMonthlySessions.length}
+              <span className="text-[11px] font-bold text-muted-foreground ml-2 align-middle">
+                neste mês{activeFilterCount > 0 ? " · com filtros" : ""}
+              </span>
+            </p>
+          )}
         </div>
 
-        <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between h-28">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
-            PÁGINAS LIDAS
+        <div className="p-5 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            Páginas lidas
           </span>
-          <div className="text-right">
-            <span className="text-2xl font-black text-foreground font-mono">{totalPagesRead}</span>
-          </div>
+          <p className="text-2xl font-black text-foreground font-mono">{totalPagesRead}</p>
         </div>
       </div>
 
       {/* Registros */}
       {importFilterId && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2563EB]/30 bg-[#2563EB]/5 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
           <div className="space-y-0.5 min-w-0">
-            <p className="text-xs font-extrabold text-[#2563EB]">Filtrando uma importação</p>
+            <p className="text-xs font-extrabold text-primary">Filtrando uma importação</p>
             <p className="text-[11px] text-muted-foreground truncate">
               {filteredSessions.length} sessão{filteredSessions.length !== 1 ? "es" : ""} desta
               importação.
@@ -901,7 +905,7 @@ export function HistoryView() {
                 <Button
                   size="sm"
                   onClick={() => void loadHistory()}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5"
+                  className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5"
                 >
                   Tentar novamente
                 </Button>
@@ -925,7 +929,7 @@ export function HistoryView() {
                   <Button
                     size="sm"
                     onClick={() => setIsRegisterOpen(true)}
-                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-5"
+                    className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5"
                   >
                     Adicionar estudo
                   </Button>
@@ -933,7 +937,7 @@ export function HistoryView() {
                     size="sm"
                     variant="outline"
                     onClick={() => setIsImportOpen(true)}
-                    className="border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 font-bold text-xs"
+                    className="border-primary text-primary hover:bg-primary/10 font-bold text-xs"
                   >
                     Importar histórico
                   </Button>
@@ -958,7 +962,7 @@ export function HistoryView() {
                   {activeFilterCount > 0 &&
                     ` (${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""})`}
                 </span>
-                <div className="flex-1 h-0.5 bg-[#2563EB]/30" />
+                <div className="flex-1 h-0.5 bg-primary/30" />
               </div>
 
               {dayGroups.map((day) => (
@@ -970,7 +974,7 @@ export function HistoryView() {
                         {day.activityCount} atividade{day.activityCount !== 1 ? "s" : ""}
                       </span>
                     </div>
-                    <span className="text-sm font-mono font-black text-[#2563EB]">
+                    <span className="text-sm font-mono font-black text-primary">
                       Total: {formatDuration(day.totalSeconds)}
                     </span>
                   </div>
@@ -985,7 +989,7 @@ export function HistoryView() {
                       return (
                         <div
                           key={session.id}
-                          className="rounded-xl border bg-card p-4 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 hover:border-[#2563EB]/60 transition-all"
+                          className="rounded-xl border bg-card p-4 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 hover:border-primary/60 transition-all"
                         >
                           <div className="flex items-start gap-3 min-w-0 flex-1">
                             <div
@@ -997,7 +1001,7 @@ export function HistoryView() {
                                 {disc?.name || "Estudo Livre"}
                               </h3>
                               {session.origin_source && (
-                                <span className="inline-flex items-center rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#2563EB]">
+                                <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
                                   Importado ·{" "}
                                   {originDisplayName(
                                     session.origin_source,
@@ -1022,7 +1026,7 @@ export function HistoryView() {
                                 </p>
                               )}
                               {Number(session.metadata?.["questions_answered"] || 0) > 0 && (
-                                <p className="text-[11px] text-blue-600 font-semibold">
+                                <p className="text-[11px] text-primary font-semibold">
                                   Questões: {Number(session.metadata?.["questions_correct"] || 0)}/
                                   {Number(session.metadata?.["questions_answered"] || 0)} acertos
                                 </p>
@@ -1036,8 +1040,10 @@ export function HistoryView() {
                               {formatDuration(sessionRealSeconds(session))}
                             </span>
 
-                            <span className="px-4 py-1 rounded-md bg-[#2563EB] text-white font-extrabold text-[10px] tracking-wider uppercase shadow-xs">
-                              FOCO{" "}
+                            <span className="text-xs font-black text-primary tabular-nums">
+                              <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground mr-1">
+                                Foco
+                              </span>
                               {session.metadata?.["focus_percentage"] !== null &&
                               session.metadata?.["focus_percentage"] !== undefined
                                 ? `${String(session.metadata["focus_percentage"])}%`

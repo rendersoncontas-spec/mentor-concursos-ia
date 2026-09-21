@@ -167,7 +167,7 @@ export function AdminDashboardView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
           <h1 className="text-2xl font-black text-foreground flex items-center gap-2.5">
-            <ShieldAlert className="w-6 h-6 text-[#2563EB]" />
+            <ShieldAlert className="w-6 h-6 text-primary" />
             Painel de Administração e Suporte
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -229,7 +229,7 @@ export function AdminDashboardView({
       <div className="bg-card rounded-2xl border shadow-xs overflow-hidden">
         {loading && users.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-muted-foreground space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-[#2563EB]" />
+            <RefreshCw className="w-8 h-8 animate-spin text-primary" />
             <p className="text-xs font-medium">Carregando usuários...</p>
           </div>
         ) : users.length === 0 ? (
@@ -289,7 +289,7 @@ export function AdminDashboardView({
                           <Button
                             size="sm"
                             onClick={() => setTargetForSupport(u)}
-                            className="h-7 px-2.5 text-[11px] font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-lg cursor-pointer shadow-xs"
+                            className="h-7 px-2.5 text-[11px] font-bold bg-primary text-white hover:bg-primary/90 rounded-lg cursor-pointer shadow-xs"
                           >
                             <LifeBuoy className="w-3.5 h-3.5 mr-1" /> Entrar como usuário
                           </Button>
@@ -353,7 +353,7 @@ export function AdminDashboardView({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-black text-foreground">
-              <LifeBuoy className="w-5 h-5 text-[#2563EB]" />
+              <LifeBuoy className="w-5 h-5 text-primary" />
               Iniciar Modo de Suporte
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground pt-1.5 leading-relaxed">
@@ -383,7 +383,7 @@ export function AdminDashboardView({
               size="sm"
               onClick={() => void handleStartSupport()}
               disabled={startingSupport}
-              className="text-xs font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl cursor-pointer"
+              className="text-xs font-bold bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer"
             >
               {startingSupport ? (
                 <>
@@ -443,7 +443,7 @@ export function AdminDashboardView({
                   name="roleSelect"
                   checked={selectedNewRole === opt.id}
                   onChange={() => setSelectedNewRole(opt.id)}
-                  className="mt-0.5 accent-[#2563EB] cursor-pointer"
+                  className="mt-0.5 accent-primary cursor-pointer"
                 />
                 <div>
                   <div className="text-xs font-bold text-foreground">{opt.label}</div>

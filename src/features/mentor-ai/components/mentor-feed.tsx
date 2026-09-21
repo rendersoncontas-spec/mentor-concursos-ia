@@ -81,10 +81,10 @@ export function MentorFeed({ response }: MentorFeedProps) {
         {/* ESTA SEMANA */}
         {feed.week.length > 0 && (
           <section>
-            <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-600 dark:text-blue-400">
+            <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-info">
               <Clock className="h-5 w-5" /> Estratégia da Semana
             </h2>
-            <ul className="space-y-3 pl-7 list-disc marker:text-blue-500/50">
+            <ul className="space-y-3 pl-7 list-disc marker:text-info/60">
               {feed.week.map((item, i) => (
                 <li key={i} className="text-base text-foreground/90 leading-relaxed">
                   {item.message}

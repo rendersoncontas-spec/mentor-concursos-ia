@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 
 import * as Sentry from "@sentry/nextjs"
 
@@ -11,6 +12,11 @@ import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import { buildIsoFromSaoPauloDateTime, getDayInSaoPaulo } from "@/lib/sao-paulo"
 import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
+// HISTORY_PATHS mora num arquivo separado, sem "use server": um arquivo
+// "use server" só pode exportar funções async, e exportar esse array
+// diretamente daqui quebrava o build em runtime (ver comentário em
+// study-history.constants.ts). Não redefinir o array aqui.
+import { HISTORY_PATHS } from "./study-history.constants"
 
 import {
   createStudySession,
@@ -22,8 +28,6 @@ import {
   getUserHistory,
   updateStudySession,
 } from "./study-history.service"
-
-const HISTORY_PATHS = ["/dashboard", "/dashboard/history", "/estatisticas", "/disciplines", "/planejamento", "/ciclos"]
 
 export async function getUserHistoryAction(page: number = 1, pageSize: number = 50) {
   try {
@@ -84,6 +88,10 @@ export async function startStudySessionAction(data: Omit<StudyHistoryInsert, "us
     const cycleResult = await registerStudyToCycle()
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
+    // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+    // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+    // desatualizados por até 5 minutos após qualquer mutação de study_history.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     return {
       data: session,
       error: cycleResult.success ? null : `Sessão iniciada, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
@@ -124,6 +132,10 @@ export async function finishStudySessionAction(
     const cycleResult = await registerStudyToCycle()
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
+    // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+    // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+    // desatualizados por até 5 minutos após qualquer mutação de study_history.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     return {
       data: session,
       error: cycleResult.success ? null : `Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
@@ -157,6 +169,10 @@ export async function updateStudySessionAction(
     const cycleResult = await registerStudyToCycle()
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
+    // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+    // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+    // desatualizados por até 5 minutos após qualquer mutação de study_history.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     return {
       data: session,
       error: cycleResult.success ? null : `Estudo atualizado, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
@@ -189,6 +205,10 @@ export async function deleteStudySessionAction(sessionId: string) {
     const cycleResult = await registerStudyToCycle()
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
+    // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+    // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+    // desatualizados por até 5 minutos após qualquer mutação de study_history.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     return {
       error: cycleResult.success ? null : `Sessão excluída, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
     }
@@ -224,6 +244,10 @@ export async function cancelStudySessionAction(sessionId: string) {
     const cycleResult = await registerStudyToCycle()
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
+    // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+    // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+    // desatualizados por até 5 minutos após qualquer mutação de study_history.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     return {
       error: cycleResult.success ? null : `Sessão cancelada, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
     }
@@ -363,6 +387,10 @@ export async function saveManualStudyTimeAction(
       const cycleResult = await registerStudyToCycle()
       
       for (const path of HISTORY_PATHS) revalidatePath(path)
+      // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+      // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+      // desatualizados por até 5 minutos após qualquer mutação de study_history.
+      await invalidateStatisticsCenterCache(effectiveUserId)
       return { data: updated, error: cycleResult.success ? null : `Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}` }
     }
 
@@ -392,6 +420,10 @@ export async function saveManualStudyTimeAction(
     const cycleResult = await registerStudyToCycle()
     
     for (const path of HISTORY_PATHS) revalidatePath(path)
+    // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+    // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+    // desatualizados por até 5 minutos após qualquer mutação de study_history.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     return { data: created, error: cycleResult.success ? null : `Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}` }
   } catch (error) {
     Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
@@ -428,6 +460,10 @@ export async function deleteManualStudyTimeAction(dateStr: string) {
     const cycleResult = await registerStudyToCycle()
 
     for (const path of HISTORY_PATHS) revalidatePath(path)
+    // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
+    // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
+    // desatualizados por até 5 minutos após qualquer mutação de study_history.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     return {
       error: cycleResult.success ? null : `Registro removido, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}`,
     }

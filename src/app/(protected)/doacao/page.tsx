@@ -25,7 +25,7 @@ export default function DoacaoPage() {
   const handleCopyPix = () => {
     navigator.clipboard.writeText(pixKey)
     setCopied(true)
-    toast.success("Chave PIX copiada para a área de transferência! 🎉")
+    toast.success("Chave PIX copiada para a área de transferência!")
     setTimeout(() => setCopied(false), 3000)
   }
 
@@ -52,11 +52,11 @@ export default function DoacaoPage() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -z-10" />
 
           <div className="space-y-3">
-            <Badge className="bg-[#dbeafe] text-[#2563EB] hover:bg-[#2563EB] hover:text-white font-extrabold text-[10px] uppercase px-3 py-1 border-0">
+            <Badge className="bg-primary/10 text-primary hover:bg-primary hover:text-white font-extrabold text-[10px] uppercase px-3 py-1 border-0">
               <Sparkles className="h-3 w-3 mr-1 inline" /> Doação Voluntária
             </Badge>
             <h2 className="text-xl font-extrabold text-foreground">
-              O NomeIA é um projeto feito de concurseiro para concurseiro! 🚀
+              O NomeIA é um projeto feito de concurseiro para concurseiro
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed font-medium">
               O <strong>NomeIA</strong> nasceu com o objetivo de oferecer uma ferramenta completa,
@@ -66,17 +66,17 @@ export default function DoacaoPage() {
             <p className="text-xs text-muted-foreground leading-relaxed font-medium">
               Se a plataforma tem ajudado na sua rotina diária e você deseja apoiar a manutenção do
               servidor e a criação de novas funcionalidades, qualquer contribuição é imensamente
-              bem-vinda! ❤️
+              bem-vinda.
             </p>
           </div>
 
           {/* PIX Box */}
-          <div className="rounded-xl border border-[#2563EB]/40 bg-[#dbeafe]/20 p-6 space-y-4">
+          <div className="rounded-xl border border-primary/40 bg-primary/20 p-6 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
                 CHAVE PIX (E-MAIL)
               </span>
-              <span className="text-[11px] font-bold text-[#2563EB] flex items-center gap-1">
+              <span className="text-[11px] font-bold text-primary flex items-center gap-1">
                 <ShieldCheck className="h-3.5 w-3.5" /> Pix Seguro
               </span>
             </div>
@@ -91,7 +91,7 @@ export default function DoacaoPage() {
                 className={`w-full sm:w-auto font-bold text-xs px-6 h-10 gap-2 transition-all ${
                   copied
                     ? "bg-emerald-600 text-white"
-                    : "bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs"
+                    : "bg-primary hover:bg-primary/90 text-white shadow-xs"
                 }`}
               >
                 {copied ? (

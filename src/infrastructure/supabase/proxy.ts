@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 
 import { env } from "@/config/env"
+import { isProtectedPath } from "@/domain/auth/protected-routes"
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -45,24 +46,13 @@ export async function updateSession(request: NextRequest) {
 
   const isAdminRoute = pathname.startsWith("/admin")
 
-  const isProtectedRoute =
-    isAdminRoute ||
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/profile") ||
-    pathname.startsWith("/planejamento") ||
-    pathname.startsWith("/onboarding") ||
-    pathname.startsWith("/estudos") ||
-    pathname.startsWith("/revisoes") ||
-    pathname.startsWith("/historico") ||
-    pathname.startsWith("/estatisticas") ||
-    pathname.startsWith("/concursos") ||
-    pathname.startsWith("/simulados") ||
-    pathname.startsWith("/biblioteca") ||
-    pathname.startsWith("/comunidade") ||
-    pathname.startsWith("/ranking") ||
-    pathname.startsWith("/conquistas") ||
-    pathname.startsWith("/notas") ||
-    pathname.startsWith("/planos")
+  // Lista canonica em src/domain/auth/protected-routes.ts (testada em
+  // protected-routes.test.ts) - evita que uma rota nova em
+  // src/app/(protected)/ fique acessivel sem sessao por falta de entrada
+  // aqui (bug real encontrado no QA funcional de 2026-09: /assinatura,
+  // /ciclos, /disciplines, /doacao, /edital, /pedidos-editais e /study-plan
+  // ficaram de fora da lista antiga por um tempo).
+  const isProtectedRoute = isProtectedPath(pathname)
 
   if (isProtectedRoute && !user) {
     const redirectUrl = request.nextUrl.clone()

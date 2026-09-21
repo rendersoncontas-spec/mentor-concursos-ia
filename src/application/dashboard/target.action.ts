@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
+import { getDayInSaoPaulo, daysBetweenSaoPauloDateKeys } from "@/lib/sao-paulo"
 
 export interface UserTargetSummary {
   id: string
@@ -61,8 +62,11 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
       disciplinesByTarget = {}
     }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // Fase 5 da auditoria (timezone — contagem regressiva de prova): ver
+    // comentário equivalente em concurso.action.ts. `todayKey` substitui o
+    // antigo `today` (meia-noite no fuso do servidor) por uma chave de
+    // calendário calculada em São Paulo.
+    const todayKey = getDayInSaoPaulo(new Date())
 
     const targets: UserTargetSummary[] = (rawTargets || []).map((t) => {
       let exam_date = t.exam_date || null
@@ -88,9 +92,7 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
 
       let daysRemaining: number | null = null
       if (exam_date) {
-        const targetDate = new Date(exam_date + "T00:00:00")
-        const diffTime = targetDate.getTime() - today.getTime()
-        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        daysRemaining = daysBetweenSaoPauloDateKeys(todayKey, exam_date)
       }
 
       const disc = disciplinesByTarget[t.id] ?? { total: 0, completed: 0 }

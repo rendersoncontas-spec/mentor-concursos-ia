@@ -442,7 +442,7 @@ export function RankingView() {
   return (
     <div className="space-y-6 pb-16 animate-fade-in">
       {/* ── CABEÇALHO & FILTROS ────────────────────────────────────────────── */}
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card/60 backdrop-blur-md p-5 rounded-2xl border shadow-sm">
+      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card/60 backdrop-blur-md p-5 rounded-2xl border shadow-xs">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 shrink-0 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
             <Trophy className="h-6 w-6 text-amber-500" />
@@ -464,7 +464,7 @@ export function RankingView() {
 
         <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
           <Select value="global" onValueChange={() => undefined}>
-            <SelectTrigger className="h-10 w-[150px] rounded-xl border bg-background text-xs font-bold shadow-sm hover:border-primary/50 transition-colors">
+            <SelectTrigger className="h-10 w-[150px] rounded-xl border bg-background text-xs font-bold shadow-xs hover:border-primary/50 transition-colors">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -473,7 +473,7 @@ export function RankingView() {
           </Select>
 
           <Select value={period} onValueChange={(value) => setPeriod(value as RankingPeriod)}>
-            <SelectTrigger className="h-10 w-[160px] rounded-xl border bg-background text-xs font-bold shadow-sm hover:border-primary/50 transition-colors">
+            <SelectTrigger className="h-10 w-[160px] rounded-xl border bg-background text-xs font-bold shadow-xs hover:border-primary/50 transition-colors">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -541,15 +541,16 @@ export function RankingView() {
         </div>
       </div>
 
-      {/* ── CARDS DE RESUMO DO SEU DESEMPENHO (4 CARDS MODERNOS) ───────────── */}
+      {/* ── RESUMO DO SEU DESEMPENHO: uma única superfície dividida, não 4
+             cards idênticos repetindo ícone + título + número ────────────── */}
       <section
         key={`band-${activeTab}`}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-fade-in"
+        className="rounded-2xl border bg-card shadow-xs grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border animate-fade-in"
         aria-label="Resumo das suas métricas"
       >
         <MetricSummaryCard
           icon={Timer}
-          iconColor="text-blue-500 bg-blue-500/10 border-blue-500/20"
+          iconColor="text-primary bg-primary/10 border-primary/20"
           label="Tempo Estudado"
           value={data?.userStats.tempo?.hours || "0min"}
           caption="no período selecionado"
@@ -632,7 +633,7 @@ export function RankingView() {
             </span>
           </div>
 
-          <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
+          <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-xs">
             <div className="grid grid-cols-3 gap-2 sm:gap-6 items-end max-w-3xl mx-auto pt-4 pb-2">
               {/* 2º Lugar */}
               <PodiumPedestal
@@ -666,7 +667,7 @@ export function RankingView() {
       {/* ── GRID PRINCIPAL: LISTA GERAL + SIDEBAR ──────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* COLUNA ESQUERDA: LISTA COMPLETA DE PARTICIPANTES (8 cols) */}
-        <section className="lg:col-span-8 rounded-2xl border bg-card shadow-sm overflow-hidden min-w-0">
+        <section className="lg:col-span-8 rounded-2xl border bg-card shadow-xs overflow-hidden min-w-0">
           <div className="px-5 py-4 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
@@ -826,9 +827,7 @@ function MetricSummaryCard({
 }) {
   return (
     <div
-      className={`relative p-4 rounded-2xl border transition-all duration-200 overflow-hidden bg-card ${
-        highlight ? "border-primary/40 shadow-sm ring-1 ring-primary/20" : "hover:border-border/80"
-      }`}
+      className={`relative p-4 transition-colors duration-200 ${highlight ? "bg-primary/[0.05]" : ""}`}
     >
       <div className="flex items-center gap-3">
         <div
@@ -964,7 +963,7 @@ function SuaPosicaoCard({
   }
 
   return (
-    <div className="relative rounded-2xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
+    <div className="relative rounded-2xl border bg-card p-6 shadow-xs overflow-hidden flex flex-col justify-between gap-5">
       <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
 
       <div className="flex items-start justify-between gap-3">
@@ -1139,7 +1138,7 @@ function ProximoAlvoCard({
   const belowValue = below ? metricNumber(below, metric) : null
 
   return (
-    <div className="relative rounded-2xl border bg-card p-6 shadow-sm overflow-hidden flex flex-col justify-between gap-5">
+    <div className="relative rounded-2xl border bg-card p-6 shadow-xs overflow-hidden flex flex-col justify-between gap-5">
       <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
       <div>
@@ -1437,7 +1436,7 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
   const done = !!goal && goal.remainingMinutes <= 0 && goal.achievedMinutes > 0
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+    <section className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <Target className="h-4 w-4 text-primary" /> Meta de Estudo
@@ -1478,7 +1477,7 @@ function ConsistencyCard({ personal }: { personal: RankingPersonalContext | null
   const days = streak?.consecutiveDays ?? 0
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+    <section className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
       <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
         <Flame className="h-4 w-4 text-amber-500" /> Fogo da Constância
       </span>
@@ -1601,7 +1600,7 @@ function WeeklyWinnersCard({
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+    <section className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <Crown className="h-4 w-4 text-amber-500" /> Histórico de Campeões

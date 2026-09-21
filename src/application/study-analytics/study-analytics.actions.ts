@@ -1,9 +1,12 @@
 "use server"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { getStudyHistoryForAnalytics, AnalyticsEngine } from "./study-analytics.service"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
+import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo, startOfDayInSaoPauloMs, endOfDayInSaoPauloMs } from "@/lib/sao-paulo"
+import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -287,44 +290,39 @@ export async function getGlobalRankingAction(period: RankingPeriod = 'this_week'
 }
 
 // Fallback: query direta (caso a RPC não esteja disponível no banco).
-async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPeriod, currentUserId?: string, weekOffset: number = 0) {
-  const now = new Date()
-  const getMonday = (d: Date) => {
-    const date = new Date(d)
-    const day = date.getDay()
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1)
-    date.setHours(0, 0, 0, 0)
-    return new Date(date.setDate(diff))
-  }
-
-  const thisMonday = getMonday(now)
-  const lastMonday = new Date(thisMonday)
-  lastMonday.setDate(lastMonday.getDate() - 7)
-  const lastSunday = new Date(thisMonday)
-  lastSunday.setMilliseconds(-1)
-
-  const offsetMonday = new Date(thisMonday)
-  offsetMonday.setDate(offsetMonday.getDate() + weekOffset * 7)
-  const offsetSunday = new Date(offsetMonday)
-  offsetSunday.setDate(offsetSunday.getDate() + 7)
-  offsetSunday.setMilliseconds(-1)
+async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPeriod, currentUserId?: string, weekOffset: number = 0, now: Date = new Date()) {
+  // Fase 5 da auditoria de estabilização (timezone — ranking): os limites de
+  // período abaixo eram calculados com accessors de Date no fuso LOCAL DO
+  // RUNTIME (UTC em produção: getDay, getDate, getFullYear, getMonth,
+  // setHours(0,0,0,0)), não no fuso de negócio (America/Sao_Paulo). Entre
+  // 21h e 23h59 em São Paulo (00h-02h59 UTC do dia seguinte), uma sessão de
+  // estudo podia ser contada no período errado do ranking público (ex.:
+  // "semana passada" quando na verdade ainda era "esta semana" para o
+  // aluno). Corrigido para usar os helpers de fuso de São Paulo já usados
+  // no resto do projeto. O parâmetro `now` é opcional e permite testar de
+  // forma determinística.
+  const todayKey = getDayInSaoPaulo(now)
+  const weekRange = getSaoPauloWeekRange(todayKey, 1) // semana começa na Segunda (ISO)
+  const thisMondayKey = weekRange.mondayKey
+  const lastMondayKey = daysAgoKeyInSaoPaulo(7, thisMondayKey)
+  const lastSundayKey = daysAgoKeyInSaoPaulo(1, thisMondayKey)
+  const offsetMondayKey = daysAgoKeyInSaoPaulo(-weekOffset * 7, thisMondayKey)
+  const offsetSundayKey = daysAgoKeyInSaoPaulo(-6, offsetMondayKey)
 
   let startDate: string | null = null
   let endDate: string | null = null
 
   if (period === 'today') {
-    const todayStart = new Date(now)
-    todayStart.setHours(0, 0, 0, 0)
-    startDate = todayStart.toISOString()
+    startDate = new Date(startOfDayInSaoPauloMs(todayKey)).toISOString()
   } else if (period === 'this_week') {
-    startDate = offsetMonday.toISOString()
-    if (weekOffset < 0) endDate = offsetSunday.toISOString()
+    startDate = new Date(startOfDayInSaoPauloMs(offsetMondayKey)).toISOString()
+    if (weekOffset < 0) endDate = new Date(endOfDayInSaoPauloMs(offsetSundayKey)).toISOString()
   } else if (period === 'last_week') {
-    startDate = lastMonday.toISOString()
-    endDate = lastSunday.toISOString()
+    startDate = new Date(startOfDayInSaoPauloMs(lastMondayKey)).toISOString()
+    endDate = new Date(endOfDayInSaoPauloMs(lastSundayKey)).toISOString()
   } else if (period === 'this_month') {
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    startDate = monthStart.toISOString()
+    const monthStartKey = `${todayKey.slice(0, 7)}-01`
+    startDate = new Date(startOfDayInSaoPauloMs(monthStartKey)).toISOString()
   }
 
   let query = supabase
@@ -576,14 +574,22 @@ export async function getRecentStudyHistoryAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { data: [], error: null }
+    // BUG CORRIGIDO (Fase 13, decisao aprovada na Fase 12): esta action
+    // alimenta o widget de "atividades recentes" do Dashboard
+    // (dashboard-widget-catalog.tsx). O restante do Dashboard nesse mesmo
+    // domínio (dashboard-layout.action.ts, statistics-center.action.ts) ja
+    // usa getEffectiveUserId - antes desta correção, um admin em modo
+    // suporte veria as estatisticas do usuario-alvo, mas este widget
+    // especifico mostraria o HISTORICO DO PROPRIO ADMIN, misturando dados
+    // de duas contas na mesma tela.
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: [], error: null }
 
     const since = new Date(Date.now() - days * 86_400_000).toISOString()
     const { data: rows, error } = await supabase
       .from("study_history")
       .select("discipline_id, duration_minutes, started_at, study_plan_item_id")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .gte("started_at", since)
       .order("started_at", { ascending: false })
       .limit(500)

@@ -329,7 +329,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
               style={{ backgroundColor: planColor }}
             />
             <h2 className="text-xl font-bold text-foreground">{disciplineName}</h2>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#2563EB]/10 text-[#2563EB] px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
               Cronograma
             </span>
           </div>
@@ -391,7 +391,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
           <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
           <h2 className="text-xl font-bold text-foreground">{session.disciplineName}</h2>
           {session.source === "PLAN" && (
-            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#2563EB]/10 text-[#2563EB] px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
               Cronograma
             </span>
           )}
@@ -532,8 +532,8 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
               <span className="font-bold text-foreground">{session.disciplineName}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/50 rounded-xl p-3 text-center">
+            <div className="grid grid-cols-2 divide-x divide-border rounded-xl border border-border/50">
+              <div className="p-3 text-center">
                 <div className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                   Tempo estudado
                 </div>
@@ -541,11 +541,11 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
                   {formatDurationShort(session.activeSeconds)}
                 </div>
               </div>
-              <div className="bg-blue-500/10 rounded-xl p-3 text-center">
-                <div className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">
+              <div className="p-3 text-center">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
                   Foco calculado
                 </div>
-                <div className="font-black text-xl tabular-nums text-blue-600">
+                <div className="font-black text-xl tabular-nums text-primary">
                   {focusPercent !== null ? `${focusPercent}%` : "—"}
                 </div>
               </div>
@@ -645,8 +645,8 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
               <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
               {finalStats.disciplineName}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-muted p-3 rounded-xl text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-border rounded-xl border border-border/50">
+              <div className="p-3 text-center">
                 <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
                   Tempo
                 </div>
@@ -654,19 +654,19 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
                   {formatDurationShort(finalStats.durationSeconds)}
                 </div>
               </div>
-              <div className="bg-blue-500/10 p-3 rounded-xl text-center">
-                <div className="text-[10px] font-extrabold uppercase text-blue-600">Foco</div>
-                <div className="font-black text-lg tabular-nums text-blue-600">
+              <div className="p-3 text-center">
+                <div className="text-[10px] font-extrabold uppercase text-primary">Foco</div>
+                <div className="font-black text-lg tabular-nums text-primary">
                   {finalStats.focusPercent !== null ? `${finalStats.focusPercent}%` : "—"}
                 </div>
               </div>
-              <div className="bg-muted p-3 rounded-xl text-center">
+              <div className="p-3 text-center">
                 <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
                   Questões
                 </div>
                 <div className="font-black text-lg tabular-nums">{finalStats.questions}</div>
               </div>
-              <div className="bg-muted p-3 rounded-xl text-center">
+              <div className="p-3 text-center">
                 <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
                   Acertos
                 </div>
