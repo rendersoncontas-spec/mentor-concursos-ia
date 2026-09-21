@@ -15,6 +15,7 @@ import { getDailyMessage } from "@/features/dashboard/components/daily-message-b
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { UserExamModal } from "@/features/dashboard/components/user-exam-modal"
 import { WeeklyGoalsModal } from "@/features/dashboard/components/weekly-goals-modal"
+import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
 import { DashboardCustomizationModal } from "./dashboard-customization-modal"
 import { DashboardDndContext } from "./dashboard-dnd-context"
@@ -171,10 +172,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
               </div>
               <div className="flex items-center gap-2 sm:gap-2.5 w-full md:w-auto shrink-0 pt-1 md:pt-0">
                 <Button
-                  onClick={() => {
-                    setIsRegisterModalOpen(true)
-                    window.dispatchEvent(new CustomEvent("study-center-opened"))
-                  }}
+                  onClick={() => setIsRegisterModalOpen(true)}
                   className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer rounded-xl h-9 sm:h-10 shrink-0 whitespace-nowrap min-w-0"
                 >
                   <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
@@ -258,6 +256,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
         onOpenChange={setIsGoalsModalOpen}
         profile={snapshot?.user}
       />
+      <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
     </div>
   )
 }

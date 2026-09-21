@@ -1385,16 +1385,12 @@ export function WidgetMensagemDia(_props: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getIntensityClass(mins: number): string {
-  if (mins <= 0) return "bg-transparent hover:bg-muted/40 border border-transparent"
-  if (mins < 60)
-    return "bg-emerald-500/15 dark:bg-emerald-600/30 border border-emerald-500/25 dark:border-emerald-500/40"
-  if (mins < 180)
-    return "bg-emerald-500/30 dark:bg-emerald-600/50 border border-emerald-500/35 dark:border-emerald-400/50"
-  if (mins < 300)
-    return "bg-emerald-500/50 dark:bg-emerald-600/70 border border-emerald-600/40 dark:border-emerald-400/60"
-  if (mins < 480)
-    return "bg-emerald-500/70 dark:bg-emerald-500/85 border border-emerald-600/50 dark:border-emerald-300/70"
-  return "bg-emerald-500/90 dark:bg-emerald-500 border border-emerald-700/60 dark:border-emerald-200/80"
+  if (mins <= 0) return "bg-transparent hover:bg-muted/50"
+  if (mins < 60) return "bg-emerald-500/20 dark:bg-emerald-600/25"
+  if (mins < 180) return "bg-emerald-500/35 dark:bg-emerald-600/45"
+  if (mins < 300) return "bg-emerald-500/55 dark:bg-emerald-600/65"
+  if (mins < 480) return "bg-emerald-500/75 dark:bg-emerald-500/80"
+  return "bg-emerald-500 dark:bg-emerald-500"
 }
 
 const MONTH_NAMES = [
@@ -1480,54 +1476,53 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
   const weekDays = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
 
   return (
-    <div className="p-2.5 sm:p-3 flex flex-col h-auto bg-card">
-      {/* Cabeçalho compacto */}
-      <div className="flex items-center justify-center gap-1 mb-0.5">
-        <div className="flex items-center gap-1">
+    <div className="p-3 sm:p-3.5 flex flex-col h-auto bg-card">
+      {/* Cabeçalho — mesmo padrão dos demais widgets do dashboard */}
+      <div className="flex items-center justify-between border-b pb-2 mb-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-primary" />
+          {monthName} {year}
+        </span>
+        <div className="flex items-center gap-0.5">
           <button
             onClick={() => changeMonth(-1)}
             className="p-1 hover:bg-muted rounded-md cursor-pointer transition-colors"
             aria-label="Mês anterior"
           >
-            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
-          <div className="text-center min-w-[120px]">
-            <h3 className="text-sm sm:text-base font-bold text-foreground uppercase tracking-wide leading-tight">
-              {monthName} {year}
-            </h3>
-          </div>
           <button
             onClick={() => changeMonth(1)}
             className="p-1 hover:bg-muted rounded-md cursor-pointer transition-colors"
             aria-label="Próximo mês"
           >
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
         </div>
       </div>
 
       {/* Stats do mês — linha única compacta */}
       {monthlyStats && monthlyStats.totalMinutes > 0 && (
-        <div className="flex items-center justify-center gap-1.5 mb-1 text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap">
+        <div className="flex items-center justify-center gap-1.5 mb-2 text-[10px] sm:text-[11px] text-muted-foreground font-semibold whitespace-nowrap">
           <span>
-            Total <strong className="text-foreground font-mono">{formatDurationMinutes(monthlyStats.totalMinutes)}</strong>
+            Total <strong className="text-foreground font-mono font-bold">{formatDurationMinutes(monthlyStats.totalMinutes)}</strong>
           </span>
           <span className="text-muted-foreground/40">•</span>
           <span>
-            Média <strong className="text-foreground font-mono">{formatDurationMinutes(monthlyStats.averageMinutes)}</strong>/dia
+            Média <strong className="text-foreground font-mono font-bold">{formatDurationMinutes(monthlyStats.averageMinutes)}</strong>/dia
           </span>
           <span className="text-muted-foreground/40">•</span>
           <span>
-            <strong className="text-foreground font-mono">{monthlyStats.daysStudied}</strong> dias
+            <strong className="text-foreground font-mono font-bold">{monthlyStats.daysStudied}</strong> dias
           </span>
         </div>
       )}
 
       {/* Grid do calendário */}
-      <div className="grid grid-cols-7 gap-[2px] sm:gap-1 text-center">
+      <div className="grid grid-cols-7 gap-[3px] sm:gap-1 text-center">
         {/* Cabeçalho dos dias da semana */}
         {weekDays.map((d, i) => (
-          <div key={i} className="text-[10px] sm:text-xs font-bold text-muted-foreground pb-0.5">
+          <div key={i} className="text-[10px] sm:text-xs font-bold text-muted-foreground pb-1">
             {d}
           </div>
         ))}
@@ -1554,74 +1549,63 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
               key={i}
               onClick={() => handleDayClick(day)}
               aria-label={`${day} de ${monthName} de ${year}${mins > 0 ? `, ${formatDurationMinutes(mins)} estudados` : ""}`}
-              className={`relative rounded-md font-medium flex flex-col items-center justify-center
-                ${mins > 0 ? "p-1 sm:p-1.5 min-h-[62px] sm:min-h-[68px]" : isToday ? "p-0.5 sm:p-1 min-h-[40px] sm:min-h-[44px]" : "p-0.5 sm:p-1 min-h-[36px] sm:min-h-[40px]"}
+              className={`relative rounded-lg font-medium flex flex-col items-center justify-center gap-0.5
+                ${mins > 0 ? "p-1 sm:p-1.5 min-h-[56px] sm:min-h-[62px]" : "p-0.5 sm:p-1 min-h-[34px] sm:min-h-[38px]"}
                 cursor-pointer transition-all duration-150
-                hover:brightness-110 hover:scale-[1.02]
+                hover:brightness-105 hover:scale-[1.02]
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
-                ${intensityClass} ${
-                isToday
-                  ? "ring-2 ring-primary shadow-sm"
-                  : mins > 0
-                    ? "hover:ring-1 hover:ring-emerald-500/50"
-                    : "hover:bg-muted/60"
-              }`}
+                ${intensityClass}
+                ${isToday ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : ""}
+              `}
               title={`${day}/${paddedMonth}/${year}${mins > 0 ? ` — ${formatDurationMinutes(mins)} estudados` : " — Clique para registrar estudo"}`}
             >
-{/* Dia */}
-                <span
-                  className={`text-[11px] sm:text-sm leading-none font-extrabold ${
-                    isToday
-                      ? "text-primary font-black"
-                      : mins > 0
-                        ? "text-slate-900 dark:text-white"
-                        : "text-foreground/60"
-                  }`}
-                >
-                  {day}
+              {/* Dia */}
+              <span
+                className={`text-[11px] sm:text-sm leading-none font-bold ${
+                  isToday
+                    ? "text-primary"
+                    : mins > 0
+                      ? "text-emerald-950 dark:text-emerald-50"
+                      : "text-muted-foreground"
+                }`}
+              >
+                {day}
+              </span>
+
+              {/* Tempo estudado */}
+              {mins > 0 && (
+                <span className="text-[9px] sm:text-[10px] leading-none font-semibold text-emerald-900/80 dark:text-emerald-100/80">
+                  {formatDurationMinutes(mins)}
                 </span>
+              )}
 
-               {/* Label HOJE */}
-               {isToday && (
-                 <span className="text-[9px] sm:text-[10px] leading-none font-black uppercase tracking-wider text-primary mt-1">
-                   Hoje
-                 </span>
-               )}
-
-               {/* Tempo estudado */}
-               {mins > 0 && (
-                 <span className="text-[10px] sm:text-xs leading-none font-black mt-1 text-emerald-950 dark:text-emerald-50 drop-shadow-xs">
-                   {(mins > 0 ? formatDurationMinutes(mins) : "")}
-                 </span>
-               )}
-
-{/* Percentual da meta */}
-                {goalPct !== null && (
-                  <span
-                    className={[
-                      "text-[9px] sm:text-[10px] leading-none font-black mt-0.5",
-                      goalPct >= 100
-                        ? "text-emerald-900 dark:text-emerald-200"
-                        : "text-emerald-800/80 dark:text-emerald-300/80"
-                    ].join(" ")}
-                  >
-                    {goalPct}%
-                  </span>
-                )}
+              {/* Percentual da meta */}
+              {goalPct !== null && (
+                <span
+                  className={[
+                    "text-[8px] sm:text-[9px] leading-none font-bold",
+                    goalPct >= 100
+                      ? "text-emerald-900 dark:text-emerald-200"
+                      : "text-emerald-900/70 dark:text-emerald-200/70",
+                  ].join(" ")}
+                >
+                  {goalPct}%
+                </span>
+              )}
             </button>
           )
         })}
       </div>
 
       {/* Legenda do heatmap */}
-      <div className="flex items-center justify-center gap-1 mt-1 pt-1 border-t border-border/50">
+      <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-border/50">
         <span className="text-[10px] sm:text-xs text-muted-foreground font-semibold mr-1">Menos</span>
         {[
-          "bg-emerald-500/15 dark:bg-emerald-600/30 border border-emerald-500/25",
-          "bg-emerald-500/30 dark:bg-emerald-600/50 border border-emerald-500/35",
-          "bg-emerald-500/50 dark:bg-emerald-600/70 border border-emerald-600/40",
-          "bg-emerald-500/70 dark:bg-emerald-500/85 border border-emerald-600/50",
-          "bg-emerald-500/90 dark:bg-emerald-500 border border-emerald-700/60",
+          "bg-emerald-500/20 dark:bg-emerald-600/25",
+          "bg-emerald-500/35 dark:bg-emerald-600/45",
+          "bg-emerald-500/55 dark:bg-emerald-600/65",
+          "bg-emerald-500/75 dark:bg-emerald-500/80",
+          "bg-emerald-500 dark:bg-emerald-500",
         ].map((cls, i) => (
           <div
             key={i}

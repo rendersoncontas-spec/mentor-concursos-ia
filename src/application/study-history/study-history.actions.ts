@@ -348,53 +348,19 @@ export async function saveManualStudyTimeAction(
       return { data: null, error: "Duração deve ser maior que zero." }
     }
 
-    // Check for existing manual entry on this date
-    const startOfDay = buildIsoFromSaoPauloDateTime(dateStr, "00:00")
-    const endOfDay = buildIsoFromSaoPauloDateTime(dateStr, "23:59")
-
-    const { data: existing } = await supabase
-      .from("study_history")
-      .select("id")
-      .eq("user_id", effectiveUserId)
-      .gte("started_at", startOfDay)
-      .lte("started_at", endOfDay)
-      .eq("study_source", "FREE")
-      .contains("metadata", { manual_entry: true })
-      .maybeSingle()
-
     const startedAt = buildIsoFromSaoPauloDateTime(dateStr, "12:00")
 
-    if (existing) {
-      // Update existing manual entry
-      const { data: updated, error } = await supabase
-        .from("study_history")
-        .update({
-          duration_minutes: durationMinutes,
-          active_minutes: durationMinutes,
-          discipline_id: disciplineId,
-          finished_at: startedAt,
-          completed: true,
-        })
-        .eq("id", existing.id)
-        .eq("user_id", effectiveUserId)
-        .select()
-        .single()
-
-      if (error) throw new Error("Erro ao atualizar registro: " + error.message)
-      await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
-      
-// Registrar no ciclo se a disciplina estiver no ciclo ativo
-      const cycleResult = await registerStudyToCycle()
-      
-      for (const path of HISTORY_PATHS) revalidatePath(path)
-      // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
-      // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
-      // desatualizados por até 5 minutos após qualquer mutação de study_history.
-      await invalidateStatisticsCenterCache(effectiveUserId)
-      return { data: updated, error: cycleResult.success ? null : `Estudo salvo, mas o ciclo não foi atualizado: ${cycleResult.error || "erro desconhecido"}` }
-    }
-
-    // Create new manual entry
+    // Fase 18: lançamentos manuais são ILIMITADOS (igual ao histórico do
+    // Aprovado) — o usuário pode registrar quantas atividades independentes
+    // quiser no mesmo dia, na mesma disciplina ou em disciplinas diferentes.
+    // Por isso esta função NÃO checa mais se já existe um lançamento manual
+    // do mesmo dia antes de gravar (checagem e UPDATE-on-existing removidos
+    // nesta fase): toda chamada cria uma linha nova e independente em
+    // study_history. O índice único que impedia isso
+    // (study_history_manual_entry_unique_idx) foi removido — ver
+    // supabase/migrations/20260921_4_drop_study_history_manual_entry_unique_idx.sql
+    // — então o INSERT abaixo não pode mais colidir com erro 23505 por
+    // conta desta regra.
     const { data: created, error } = await supabase
       .from("study_history")
       .insert({
@@ -414,11 +380,12 @@ export async function saveManualStudyTimeAction(
       .single()
 
     if (error) throw new Error("Erro ao registrar estudo: " + error.message)
+
     await reconcileWeeklyPlan(supabase, effectiveUserId).catch(() => null)
-    
+
     // Registrar no ciclo se a disciplina estiver no ciclo ativo
     const cycleResult = await registerStudyToCycle()
-    
+
     for (const path of HISTORY_PATHS) revalidatePath(path)
     // Estatísticas tem cache próprio de 5 min (ver statistics-center.action.ts) que
     // revalidatePath NÃO invalida — sem esta linha, /estatisticas ficava com dados
@@ -433,7 +400,7 @@ export async function saveManualStudyTimeAction(
   }
 }
 
-export async function deleteManualStudyTimeAction(dateStr: string) {
+export async function deleteManualStudyTimeAction(dateStr: string, sessionId?: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
@@ -443,14 +410,26 @@ export async function deleteManualStudyTimeAction(dateStr: string) {
     const startOfDay = buildIsoFromSaoPauloDateTime(dateStr, "00:00")
     const endOfDay = buildIsoFromSaoPauloDateTime(dateStr, "23:59")
 
-    const { error } = await supabase
+    // Fase 18: com lançamentos manuais ilimitados, um dia pode ter vários
+    // registros manuais independentes — apagar "tudo que bate com o dia"
+    // apagaria lançamentos que o usuário não pediu para remover. Quando o
+    // chamador sabe qual registro está editando (sessionId, vindo de
+    // getManualEntryForDayAction), a exclusão é restrita a essa linha
+    // específica; sem sessionId, mantém o comportamento anterior (todas as
+    // linhas manuais do dia) para não quebrar chamadores que ainda não
+    // repassam o id.
+    let query = supabase
       .from("study_history")
       .delete()
       .eq("user_id", effectiveUserId)
-      .gte("started_at", startOfDay)
-      .lte("started_at", endOfDay)
       .eq("study_source", "FREE")
       .contains("metadata", { manual_entry: true })
+
+    query = sessionId
+      ? query.eq("id", sessionId)
+      : query.gte("started_at", startOfDay).lte("started_at", endOfDay)
+
+    const { error } = await query
 
     if (error) throw new Error("Erro ao remover registro: " + error.message)
 
@@ -529,7 +508,13 @@ export async function getManualEntryForDayAction(dateStr: string): Promise<{
     const startOfDay = buildIsoFromSaoPauloDateTime(dateStr, "00:00")
     const endOfDay = buildIsoFromSaoPauloDateTime(dateStr, "23:59")
 
-    const { data, error } = await supabase
+    // Fase 18: com lançamentos manuais ilimitados, pode haver mais de um
+    // registro manual no mesmo dia — usar maybeSingle aqui lançaria erro
+    // ("multiple (or no) rows returned") nesse caso. Este modal ("Registrar
+    // estudo" do calendário do Dashboard) foi desenhado para editar um único
+    // lançamento por dia, então, havendo mais de um, mostra o mais recente
+    // (criado por último) em vez de quebrar.
+    const { data: rows, error } = await supabase
       .from("study_history")
       .select("id, duration_minutes, discipline_id, disciplines ( id, name )")
       .eq("user_id", effectiveUserId)
@@ -537,9 +522,11 @@ export async function getManualEntryForDayAction(dateStr: string): Promise<{
       .lte("started_at", endOfDay)
       .eq("study_source", "FREE")
       .contains("metadata", { manual_entry: true })
-      .maybeSingle()
+      .order("created_at", { ascending: false })
+      .limit(1)
 
     if (error) throw new Error("Erro ao buscar registro: " + error.message)
+    const data = rows?.[0]
     if (!data) return { data: null, error: null }
 
     const disc = Array.isArray(data.disciplines) ? data.disciplines[0] : data.disciplines

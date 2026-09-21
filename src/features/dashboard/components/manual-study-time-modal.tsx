@@ -106,7 +106,7 @@ export function ManualStudyTimeModal({
 
   const handleDelete = async () => {
     setLoading(true)
-    const res = await deleteManualStudyTimeAction(dateStr)
+    const res = await deleteManualStudyTimeAction(dateStr, existingSessionId ?? undefined)
     setLoading(false)
     if (res.error) {
       toast.error(res.error)

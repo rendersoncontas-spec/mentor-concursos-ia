@@ -1,0 +1,21 @@
+-- Fase 18: reversão da regra "1 lançamento manual por dia" (Fase 14).
+--
+-- REGRA OFICIAL (Fase 18): lançamentos manuais são ILIMITADOS — igual ao
+-- histórico do Aprovado. O usuário pode registrar quantas atividades
+-- independentes quiser no mesmo dia, na mesma disciplina ou em disciplinas
+-- diferentes, em horários diferentes. Cada lançamento representa uma
+-- atividade real independente.
+--
+-- Este índice (criado em 20260921_3_study_history_manual_entry_unique_idx.sql,
+-- NÃO editado nesta migration) impedia isso: rejeitava com erro 23505
+-- qualquer segundo INSERT de lançamento manual (metadata->>'manual_entry' =
+-- 'true') no mesmo dia para o mesmo usuário. A aplicação (ver
+-- saveManualStudyTimeAction em src/application/study-history/
+-- study-history.actions.ts) foi ajustada nesta mesma fase para não fazer
+-- mais essa checagem/UPDATE de conflito, então a constraint no banco também
+-- precisa deixar de existir.
+--
+-- Não altera study_history_import_fingerprint_idx (deduplicação de
+-- importação, criada em 20260921_2_study_history_import_fingerprint_unique_idx.sql)
+-- nem nenhuma outra constraint — regra diferente, continua válida.
+DROP INDEX IF EXISTS study_history_manual_entry_unique_idx;

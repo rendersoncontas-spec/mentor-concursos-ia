@@ -486,6 +486,7 @@ export async function importHistoryChunkAction(
     }
 
     let insertedHistoryIds: string[] = []
+    let concurrentDuplicates = 0
 
     if (rows.length > 0) {
       const { data: inserted, error } = await supabase
@@ -494,10 +495,43 @@ export async function importHistoryChunkAction(
         .select("id, discipline_id, duration_minutes, study_source")
 
       if (error) {
-        return { success: false, error: `Erro ao gravar histórico: ${error.message}` }
-      }
+        // BUG CORRIGIDO (Fase 14): o dedupe em memoria acima (existingSet/
+        // seenInRun) so enxerga o snapshot carregado no inicio desta
+        // requisicao via loadExistingFingerprints — duas abas importando o
+        // mesmo arquivo ao mesmo tempo podem ambas decidir "isto e novo" e
+        // tentar inserir a mesma linha. Agora existe um indice unico parcial
+        // no banco (study_history_import_fingerprint_idx, WHERE
+        // import_batch_id IS NOT NULL, ver supabase/migrations/
+        // 20260921_2_study_history_import_fingerprint_unique_idx.sql) que
+        // rejeita essa segunda gravacao com erro 23505 (unique_violation).
+        // Em vez de falhar a importacao inteira (que pode ter, no mesmo
+        // lote, outras linhas legitimas e novas), refaz a gravacao linha a
+        // linha quando o insert em lote esbarra nesse conflito, tratando
+        // cada violacao de unicidade como duplicata (nao como erro) e
+        // seguindo com as demais.
+        if (error.code === "23505") {
+          for (const row of rows) {
+            const { data: singleInserted, error: singleError } = await supabase
+              .from("study_history")
+              .insert(row)
+              .select("id, discipline_id, duration_minutes, study_source")
+              .single()
 
-      insertedHistoryIds = (inserted || []).map((r) => r.id)
+            if (singleError) {
+              if (singleError.code === "23505") {
+                concurrentDuplicates++
+                continue
+              }
+              return { success: false, error: `Erro ao gravar histórico: ${singleError.message}` }
+            }
+            if (singleInserted) insertedHistoryIds.push(singleInserted.id)
+          }
+        } else {
+          return { success: false, error: `Erro ao gravar histórico: ${error.message}` }
+        }
+      } else {
+        insertedHistoryIds = (inserted || []).map((r) => r.id)
+      }
     }
 
     // Um rebuild ao fim de cada chunk considera inclusive imports menores que um minuto.
@@ -541,8 +575,8 @@ export async function importHistoryChunkAction(
     return {
       success: true,
       result: {
-        imported: rows.length,
-        duplicates,
+        imported: insertedHistoryIds.length,
+        duplicates: duplicates + concurrentDuplicates,
         errors: errorDetails.length,
         createdSubjects: [...createdSubjects],
         errorDetails,

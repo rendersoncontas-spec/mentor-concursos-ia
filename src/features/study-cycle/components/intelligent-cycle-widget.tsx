@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { CycleOverview, CycleItemProgress } from "@/domain/study-cycle/study-cycle.types"
 import { useStudyActions } from "@/features/study-session/components/study-provider"
+import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 import { useCachedServerAction } from "@/hooks/use-cached-server-action"
 import { cn } from "@/lib/utils"
 
@@ -69,6 +70,24 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  // Fase 18 (Bug 2 do smoke test): o overview deste widget vem de um cache
+  // local (useCachedServerAction, TTL de 2min) que revalidatePath() NÃO
+  // invalida — por isso "Foco de Hoje" ficava com o progresso antigo até o
+  // usuário navegar/recarregar a página, mesmo já com o Ciclo e o Histórico
+  // corretos no banco. Reaproveita o evento global que já existe para isso
+  // (STUDY_SESSION_SAVED_EVENT, já usado por history-view.tsx) em vez de
+  // criar polling ou um novo mecanismo: sempre que qualquer estudo é salvo
+  // em qualquer lugar do app (Central, cronômetro ou lançamento manual),
+  // este widget força o próprio refresh() que já usa nas suas mutações
+  // internas (pausar, retomar, pular etapa etc.).
+  useEffect(() => {
+    const handleStudySessionSaved = () => {
+      refresh()
+    }
+    window.addEventListener(STUDY_SESSION_SAVED_EVENT, handleStudySessionSaved)
+    return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handleStudySessionSaved)
+  }, [refresh])
 
   const handlePauseCycle = useCallback(async () => {
     if (!overview) return

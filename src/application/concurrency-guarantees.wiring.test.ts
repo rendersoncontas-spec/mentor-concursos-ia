@@ -49,10 +49,19 @@ describe("1. Duas operacoes de importacao identicas (mesmo request)", () => {
     assert.match(body, /\.from\("study_history"\)\s*\n\s*\.insert\(rows\)/)
   })
 
-  it("RISCO CONHECIDO, NAO COBERTO: duas requisicoes concorrentes de verdade (duplo clique, duas abas) "
-    + "cada uma carrega seu proprio existingSet no inicio do request — nao ha lock nem constraint UNIQUE "
-    + "no banco (ver docs/overnight-stability-report.md, Fase 3, secao Importador Aprovado). Este teste "
-    + "documenta a lacuna e NAO afirma que ela foi corrigida.", () => {
+  it("CONCORRENCIA (duplo clique, duas abas): duas requisicoes concorrentes de verdade "
+    + "cada uma carrega seu proprio existingSet no inicio do request (loadExistingFingerprints e chamada "
+    + "uma unica vez por request, ver assercao abaixo) — isso NAO mudou. O que mudou desde a Fase 14/15: "
+    + "existe agora um indice UNICO parcial no banco real (study_history_import_fingerprint_idx, ver "
+    + "supabase/migrations/20260921_2_study_history_import_fingerprint_unique_idx.sql) que replica o mesmo "
+    + "fingerprint usado aqui, e importHistoryChunkAction trata o erro 23505 (unique_violation) desse "
+    + "indice com fallback de insercao linha a linha, contando o conflito como duplicata em vez de falhar "
+    + "(ver import-concurrency-conflict-handling.wiring.test.ts). Ou seja: o dedupe em memoria continua "
+    + "checando o banco uma unica vez por request (nao ha uma segunda verificacao logo antes do insert), "
+    + "mas a corrida entre duas requisicoes concorrentes agora e coberta por uma constraint real no banco, "
+    + "nao apenas pelo dedupe em memoria. Este teste documenta o comportamento estrutural atual (uma unica "
+    + "chamada a loadExistingFingerprints por request) e nao afirma, por si so, cobertura de concorrencia — "
+    + "essa cobertura esta em import-concurrency-conflict-handling.wiring.test.ts.", () => {
     // loadExistingFingerprints e chamada uma unica vez por request, antes do loop de insercao —
     // ou seja, duas chamadas concorrentes de importHistoryChunkAction podem ambas carregar o
     // mesmo existingSet (sem o registro uma da outra ainda inserido) e ambas decidirem inserir.
@@ -83,7 +92,14 @@ describe("5. Duas gravacoes rapidas de estudo / 6. Importacao + estudo (ponto un
   it("todas as mutacoes de study_history em study-history.actions.ts passam por registerStudyToCycle", () => {
     const source = readSource("src/application/study-history/study-history.actions.ts")
     const calls = (source.match(/await registerStudyToCycle\(\)/g) ?? []).length
-    assert.ok(calls >= 8, `esperado pelo menos 8 chamadas a registerStudyToCycle, encontrado ${calls}`)
+    // Fase 18: saveManualStudyTimeAction perdeu os ramos de UPDATE-on-existing e
+    // de tratamento de conflito 23505 (a regra "1 lancamento manual por dia" foi
+    // revertida — lancamentos manuais agora sao ilimitados), entao o total caiu
+    // de 8 para 7: cada ramo removido tinha sua propria chamada a
+    // registerStudyToCycle, e agora so sobra a do caminho unico de INSERT. O
+    // numero minimo aqui existe para travar que nenhuma mutacao real perca essa
+    // chamada, nao para congelar a contagem de ramos de codigo.
+    assert.ok(calls >= 7, `esperado pelo menos 7 chamadas a registerStudyToCycle, encontrado ${calls}`)
   })
 
   it("a importacao (commit) registra os estudos no ciclo pelo mesmo mecanismo central (registerStudiesToCycleBatch)", () => {
