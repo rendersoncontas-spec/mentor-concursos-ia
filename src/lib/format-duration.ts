@@ -61,7 +61,7 @@ export function formatDurationMinutes(totalMinutes: number): string {
 /**
  * Formata uma duração em SEGUNDOS como relógio digital: "mm:ss", ou
  * "hh:mm:ss" quando há pelo menos 1 hora completa. Usada no timer ao vivo
- * da sessão de estudo (StudyDock, StudyHeaderControl) — extraída de duas
+ * da sessão de estudo (StudyHeaderControl) — extraída de duas
  * implementações locais idênticas para eliminar a duplicação (Fase 4 da
  * auditoria de estabilização). Comportamento preservado byte a byte em
  * relação às implementações originais (nenhum clamp/round adicional).

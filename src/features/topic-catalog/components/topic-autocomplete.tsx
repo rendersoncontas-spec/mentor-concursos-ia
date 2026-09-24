@@ -190,7 +190,7 @@ export function TopicAutocomplete({
               onTouchStart={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
             >
-              <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="type-label px-3 pt-1 pb-1">
                 {value.trim() ? "SUGESTÕES" : "TÓPICOS SUGERIDOS"}
               </p>
               {candidates.map((candidate, index) => (

@@ -117,14 +117,14 @@ export function PedirEditalView() {
 
   const statusBadgeClass = (status: EditalRequestItem["status"]) => {
     if (status === "Concluído") return "bg-emerald-500/10 text-emerald-600"
-    if (status === "Em Análise") return "bg-sky-500/10 text-sky-600"
+    if (status === "Em Análise") return "bg-primary/10 text-primary"
     return "bg-amber-500/10 text-amber-600"
   }
 
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
+        <div className="rounded-xl border bg-card p-6 flex flex-col items-center justify-center text-center space-y-3 my-4">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
           <p className="text-xs text-muted-foreground font-medium">Carregando seus pedidos...</p>
         </div>
@@ -133,14 +133,14 @@ export function PedirEditalView() {
 
     if (loadError) {
       return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
-          <h3 className="text-lg font-bold text-foreground">
+        <div className="rounded-xl border bg-card p-6 flex flex-col items-center justify-center text-center space-y-3 my-4">
+          <h3 className="text-lg font-semibold text-foreground">
             Não foi possível carregar os pedidos
           </h3>
           <p className="text-xs text-muted-foreground font-medium">{loadError}</p>
           <Button
             onClick={loadRequests}
-            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-xs mt-2"
+            className="mt-2"
           >
             Tentar novamente
           </Button>
@@ -150,9 +150,9 @@ export function PedirEditalView() {
 
     if (filteredRequests.length === 0) {
       return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3 my-4">
+        <div className="rounded-xl border bg-card p-6 flex flex-col items-center justify-center text-center space-y-3 my-4">
           <div className="space-y-1 max-w-md">
-            <h3 className="text-lg font-bold text-foreground">Nenhum pedido de edital ainda</h3>
+            <h3 className="text-lg font-semibold text-foreground">Nenhum pedido de edital ainda</h3>
             <p className="text-xs text-muted-foreground font-medium">
               Quando você não encontrar um edital, pode enviar um pedido para nossa equipe.
             </p>
@@ -160,7 +160,7 @@ export function PedirEditalView() {
 
           <Button
             onClick={() => setIsModalOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-xs mt-2"
+            className="mt-2"
           >
             Pedir agora
           </Button>
@@ -169,9 +169,9 @@ export function PedirEditalView() {
     }
 
     return (
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         <div className="p-4 border-b bg-card flex items-center justify-between">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+          <h3 className="text-[13px] font-semibold text-foreground">
             MEUS PEDIDOS DE EDITAIS
           </h3>
           <Badge variant="outline" className="text-[10px] font-semibold">
@@ -193,13 +193,13 @@ export function PedirEditalView() {
             <tbody className="divide-y">
               {filteredRequests.map((req) => (
                 <tr key={req.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3 font-mono text-muted-foreground">{req.date}</td>
-                  <td className="px-4 py-3 font-bold text-foreground">{req.editalName}</td>
+                  <td className="px-4 py-3 tabular-nums text-muted-foreground">{req.date}</td>
+                  <td className="px-4 py-3 font-semibold text-foreground">{req.editalName}</td>
                   <td className="px-4 py-3 text-muted-foreground">{req.cargo || "—"}</td>
                   <td className="px-3 py-3 text-center">
                     <Badge
                       variant="secondary"
-                      className={`text-[10px] font-bold ${statusBadgeClass(req.status)}`}
+                      className={`font-semibold text-[10px] ${statusBadgeClass(req.status)}`}
                     >
                       {req.status}
                     </Badge>
@@ -230,24 +230,23 @@ export function PedirEditalView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-black text-foreground">Pedidos de Editais</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Pedidos de Editais</h1>
 
         <Button
           onClick={() => setIsModalOpen(true)}
-          className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-xs"
         >
           Novo pedido
         </Button>
       </div>
 
       <div className="max-w-xs space-y-1">
-        <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
+        <label className="type-label block">
           STATUS
         </label>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full h-9 bg-transparent border-b border-primary text-xs font-bold text-foreground focus:outline-none cursor-pointer py-1"
+          className="w-full h-9 bg-transparent border-b border-primary text-xs font-semibold text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer py-1"
         >
           <option value="Todos">Todos</option>
           <option value="Pendente">Pendente</option>
@@ -259,9 +258,9 @@ export function PedirEditalView() {
       {renderContent()}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-xl p-6 rounded-2xl">
+        <DialogContent className="sm:max-w-xl p-6 rounded-xl">
           <div className="space-y-4">
-            <h2 className="text-xl font-black text-foreground tracking-tight">Pedir edital</h2>
+            <h2 className="text-xl font-semibold text-foreground tracking-tight">Pedir edital</h2>
 
             <p className="text-xs text-muted-foreground font-medium leading-relaxed">
               Não encontrou seu edital? Envie os dados abaixo. Nosso time analisa seu pedido em até
@@ -271,7 +270,7 @@ export function PedirEditalView() {
             <form onSubmit={handleSendRequest} className="space-y-4 pt-1">
               {/* Campo 1: Nome do Edital */}
               <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                <label className="type-label">
                   NOS CONTE, QUAL É O EDITAL QUE VOCÊ PROCURA? (OBRIGATÓRIO)
                 </label>
                 <input
@@ -288,7 +287,7 @@ export function PedirEditalView() {
               {/* Campos 2 & 3: Cargo e Link */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                  <label className="type-label">
                     CARGO (OPCIONAL)
                   </label>
                   <input
@@ -301,7 +300,7 @@ export function PedirEditalView() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                  <label className="type-label">
                     LINK DO EDITAL (OBRIGATÓRIO SE NÃO ANEXAR PDF)
                   </label>
                   <input
@@ -316,7 +315,7 @@ export function PedirEditalView() {
 
               {/* Campo 4: Descrição */}
               <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                <label className="type-label">
                   DESCRIÇÃO (OPCIONAL)
                 </label>
                 <textarea
@@ -326,20 +325,20 @@ export function PedirEditalView() {
                   maxLength={100}
                   className="w-full bg-transparent border-b border-primary text-xs font-semibold text-foreground py-1.5 focus:outline-none resize-none h-16 placeholder:text-muted-foreground/50"
                 />
-                <div className="text-right text-[10px] text-muted-foreground font-mono">
+                <div className="text-right text-[10px] text-muted-foreground tabular-nums">
                   {description.length}/100
                 </div>
               </div>
 
               {/* Campo 5: Anexar PDF */}
               <div className="space-y-1.5 pt-1">
-                <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                <label className="type-label block">
                   ANEXAR EDITAL (OBRIGATÓRIO SE NÃO INFORMAR LINK: 1 ARQUIVO PDF, ATÉ 20MB)
                 </label>
 
                 <label className="border border-dashed border-muted hover:border-primary rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/20">
                   <Upload className="h-5 w-5 text-muted-foreground mb-1" />
-                  <span className="text-xs font-bold text-muted-foreground">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     {pdfFile ? pdfFile.name : "Inserir seu PDF aqui"}
                   </span>
                   <input
@@ -363,7 +362,7 @@ export function PedirEditalView() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsModalOpen(false)}
-                  className="border-muted-foreground/40 text-muted-foreground hover:bg-muted font-bold text-xs px-6 h-9 rounded-xl"
+                  className="border-muted-foreground/40 text-muted-foreground hover:bg-muted font-semibold text-xs px-6 h-9 rounded-xl"
                 >
                   Cancelar
                 </Button>
@@ -371,7 +370,6 @@ export function PedirEditalView() {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-7 h-9 rounded-xl shadow-xs"
                 >
                   {isSubmitting ? (
                     <>

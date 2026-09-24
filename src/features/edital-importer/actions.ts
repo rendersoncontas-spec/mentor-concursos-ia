@@ -1,6 +1,7 @@
 "use server"
 
 import { createHash } from "node:crypto"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { revalidatePath } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
@@ -68,10 +69,20 @@ export async function parseEditalFileAction(
       }
     }
 
+    // Fase F.1: os `.limit(5000/10000/20000)` nunca passavam de 1.000 (corte do
+    // PostgREST) — e o catálogo de subtópicos já tem 1.136 linhas, então parte
+    // deles não era encontrada e aparecia como "novo" na prévia. Agora cada
+    // catálogo é lido por completo (paginado) até o mesmo teto pretendido.
+    const readCatalog = <T,>(table: string, columns: string, maxRows: number) =>
+      fetchAllRowsPaged<T>(
+        (withCount) => supabase.from(table).select(columns, countOption(withCount)),
+        [{ column: "id", ascending: true }],
+        { maxRows },
+      ).then(({ data, error }) => ({ data: error ? null : data }))
     const [{ data: discRows }, { data: topicRows }, { data: subRows }] = await Promise.all([
-      supabase.from("disciplines").select("id, name").limit(5000),
-      supabase.from("topics").select("id, discipline_id, name").limit(10000),
-      supabase.from("subtopics").select("id, topic_id, name").limit(20000),
+      readCatalog<{ id: string; name: string }>("disciplines", "id, name", 5000),
+      readCatalog<{ id: string; discipline_id: string; name: string }>("topics", "id, discipline_id, name", 10000),
+      readCatalog<{ id: string; topic_id: string; name: string }>("subtopics", "id, topic_id, name", 20000),
     ])
 
     const catalogDisciplines: CatalogDiscipline[] = (discRows ?? []).map((d) => ({

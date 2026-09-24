@@ -1,6 +1,7 @@
 "use server"
 
 import * as Sentry from "@sentry/nextjs"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { computeStreak, localDateKey } from "@/utils/study-streak"
@@ -48,11 +49,30 @@ export async function getAchievementsAction(): Promise<{
 
     const [historyRes, attemptsRes, reviewsRes, simuladosRes, plansRes, profileRes] =
       await Promise.all([
-        supabase
-          .from("study_history")
-          .select("started_at, duration_minutes, study_type, discipline_id, metadata")
-          .eq("user_id", user.id),
-        supabase.from("question_attempts").select("is_correct").eq("user_id", user.id),
+        // Fase F.1: paginados (antes 1 requisição cada, cortada em 1.000 linhas
+        // → conquistas calculadas sobre um recorte arbitrário do histórico).
+        // Mesmo formato { data, error } de antes.
+        fetchAllRowsPaged<{
+          started_at: string
+          duration_minutes: number | null
+          study_type: string | null
+          discipline_id: string | null
+          metadata: Record<string, unknown> | null
+        }>(
+          (withCount) =>
+            supabase
+              .from("study_history")
+              .select("started_at, duration_minutes, study_type, discipline_id, metadata", countOption(withCount))
+              .eq("user_id", user.id),
+          [
+            { column: "started_at", ascending: true },
+            { column: "id", ascending: true },
+          ],
+        ).then(({ data, error }) => ({ data: error ? null : data, error })),
+        fetchAllRowsPaged<{ is_correct: boolean | null }>(
+          (withCount) => supabase.from("question_attempts").select("is_correct", countOption(withCount)).eq("user_id", user.id),
+          [{ column: "id", ascending: true }],
+        ).then(({ data, error }) => ({ data: error ? null : data, error })),
         supabase
           .from("review_history")
           .select("id", { count: "exact", head: true })

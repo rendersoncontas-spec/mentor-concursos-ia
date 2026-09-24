@@ -22,7 +22,6 @@ import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive
 import {
   CUSTOM_SCALE_RE,
   LS_SHIFT_ANCHOR_DATE,
-  type ScheduleMode,
 } from "@/features/planejamento/lib/planning-form"
 import {
   getSavedScaleConfig,
@@ -70,7 +69,7 @@ export function WeeklyPlanningView({
   // Configuração unificada de escala e plantão
   const [scaleConfig, setScaleConfig] = useState<SharedPlanConfig>(() => getSavedScaleConfig())
 
-  const { scheduleMode, firstShiftDay, anchorShiftDate, studyDays, customShiftDays } = scaleConfig
+  const { scheduleMode, firstShiftDay, anchorShiftDate, studyDays } = scaleConfig
 
   const [firstDayOfWeek, setFirstDayOfWeek] = useState<string>(() => {
     if (typeof window !== "undefined") {
@@ -118,9 +117,9 @@ export function WeeklyPlanningView({
           setReplanInfo(res.data)
           try {
             localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
-          } catch {}
+          } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
         }
-      } catch {}
+      } catch { /* falha de rede ao buscar o replanejamento: mantém o último valor exibido */ }
     }
     load()
     const handleSaved = () => {
@@ -335,14 +334,14 @@ export function WeeklyPlanningView({
   return (
     <div className="space-y-6">
       {/* Legenda de Status de Meta */}
-      <div className="flex items-center justify-between bg-card border rounded-2xl p-4 shadow-xs text-xs font-semibold">
+      <div className="flex items-center justify-between bg-card border rounded-xl p-4 text-xs font-semibold">
         <span className="text-muted-foreground">Status da Meta Diária de Estudo:</span>
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+            <span className="w-2 h-2 rounded-full bg-success inline-block" />
             Meta Batida
           </span>
-          <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
+          <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-semibold">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
             Meta Incompleta / Pendente
           </span>
@@ -350,7 +349,7 @@ export function WeeklyPlanningView({
       </div>
 
       {scheduleMode !== "normal" && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
@@ -358,7 +357,7 @@ export function WeeklyPlanningView({
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <span className="text-[11px] font-bold">Plantão de referência:</span>
+            <span className="text-[11px] font-semibold">Plantão de referência:</span>
             <input
               type="date"
               value={
@@ -380,7 +379,7 @@ export function WeeklyPlanningView({
                   toast.success("Data de referência do plantão atualizada!")
                 }
               }}
-              className="bg-card border rounded-lg px-2.5 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer font-mono shadow-xs"
+              className="bg-card border rounded-lg px-2.5 py-1 text-xs font-semibold text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer tabular-nums"
             />
           </div>
         </div>
@@ -389,27 +388,15 @@ export function WeeklyPlanningView({
       {/* Main Weekly Agenda Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Coluna Esquerda: Grade da Agenda Semanal (3 Colunas no Grid Layout) */}
-        <div className="lg:col-span-3 rounded-2xl border bg-card p-5 shadow-xs space-y-4">
-          {/* Header da Agenda com Mês/Ano + Navegação + Dropdown Semanal */}
+        <div className="lg:col-span-3 rounded-xl border bg-card p-5 space-y-4">
+          {/* Header da Agenda com Mês/Ano.
+              Fase E: removidos as setas de navegação e o botão "Semanal ▾",
+              que não tinham nenhuma ação ligada (a agenda mostra sempre a
+              semana atual). */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button type="button" className="p-1 hover:bg-muted rounded-md text-muted-foreground">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <h2 className="text-lg font-black text-primary">
-                {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
-              </h2>
-              <button type="button" className="p-1 hover:bg-muted rounded-md text-muted-foreground">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            <Button
-              variant="outline"
-              className="border-purple-300 text-purple-700 font-bold text-xs h-8 gap-1.5 rounded-xl"
-            >
-              Semanal ▾
-            </Button>
+            <h2 className="text-[15px] font-semibold text-foreground first-letter:uppercase">
+              {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+            </h2>
           </div>
 
           {/* Grade dos 7 Dias da Semana */}
@@ -431,17 +418,17 @@ export function WeeklyPlanningView({
 
                 if (hasEvts) {
                   if (isAllCompleted) {
-                    headerStyle = "bg-emerald-600 text-white font-black"
+                    headerStyle = "bg-emerald-600 text-white font-semibold"
                     statusTag = "Meta Batida"
                   } else if (isPastOrToday) {
-                    headerStyle = "bg-rose-600 text-white font-black"
+                    headerStyle = "bg-rose-600 text-white font-semibold"
                     statusTag = "Incompleta"
                   } else {
-                    headerStyle = "bg-primary text-white font-black"
+                    headerStyle = "bg-primary text-white font-semibold"
                     statusTag = "Programado"
                   }
                 } else if (isDuty) {
-                  headerStyle = "bg-rose-500/10 text-rose-500 font-black border-b-rose-500/20"
+                  headerStyle = "bg-rose-500/10 text-rose-500 font-semibold border-b-rose-500/20"
                   statusTag = "Plantão"
                 }
 
@@ -453,7 +440,7 @@ export function WeeklyPlanningView({
                     >
                       <span>{d.label}</span>
                       {statusTag && (
-                        <span className="text-[9px] font-extrabold opacity-90 tracking-tight">
+                        <span className="text-[10px] font-semibold opacity-90 tracking-tight">
                           {statusTag}
                         </span>
                       )}
@@ -463,14 +450,14 @@ export function WeeklyPlanningView({
                     <div className="p-2 flex-1 space-y-2">
                       {isDuty && (
                         <div className="text-center py-8">
-                          <p className="text-[10px] font-bold text-rose-500/80 bg-rose-500/10 p-2 rounded-md">
+                          <p className="text-[10px] font-semibold text-rose-500/80 bg-rose-500/10 p-2 rounded-md">
                             Sem estudos (Plantão)
                           </p>
                         </div>
                       )}
                       {isOffDay && (
                         <div className="text-center py-8">
-                          <p className="text-[10px] font-bold text-muted-foreground bg-muted p-2 rounded-md">
+                          <p className="text-[10px] font-semibold text-muted-foreground bg-muted p-2 rounded-md">
                             Folga Programada
                           </p>
                         </div>
@@ -498,7 +485,7 @@ export function WeeklyPlanningView({
                                 >
                                   <div className="flex items-start justify-between gap-1">
                                     <h4
-                                      className={`text-[11px] font-extrabold leading-tight truncate ${
+                                      className={`text-[11px] font-semibold leading-tight truncate ${
                                         isDone
                                           ? "text-emerald-700 dark:text-emerald-300 opacity-80"
                                           : "text-foreground"
@@ -522,7 +509,7 @@ export function WeeklyPlanningView({
 
                                   <div className="flex items-center justify-between text-[10px]">
                                     <span
-                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-bold font-mono ${
+                                      className={`font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md tabular-nums ${
                                         isDone
                                           ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                                           : "bg-primary/10 text-primary"
@@ -548,10 +535,10 @@ export function WeeklyPlanningView({
         {/* Coluna Direita: Mini Calendário + Agendas (Screenshot 3) */}
         <div className="space-y-6">
           {/* Mini Calendário Mensal */}
-          <div className="rounded-2xl border bg-card p-4 shadow-xs space-y-3 text-center">
-            <div className="flex items-center justify-between text-xs font-extrabold text-foreground border-b pb-2">
-              <span className="text-muted-foreground uppercase text-[10px]">AGO.</span>
-              <div className="flex items-center gap-1 font-mono text-[11px] text-primary">
+          <div className="rounded-xl border bg-card p-4 space-y-3 text-center">
+            <div className="flex items-center justify-between text-xs font-semibold text-foreground border-b pb-2">
+              <span className="type-label">AGO.</span>
+              <div className="flex items-center gap-1 tabular-nums text-[11px] text-primary">
                 <ChevronLeft className="h-3.5 w-3.5 cursor-pointer" />
                 <span>02/08 ~ 08/08</span>
                 <ChevronRight className="h-3.5 w-3.5 cursor-pointer" />
@@ -559,7 +546,7 @@ export function WeeklyPlanningView({
             </div>
 
             {/* Dias da Semana (D S T Q Q S S) */}
-            <div className="grid grid-cols-7 text-[10px] font-bold text-muted-foreground gap-1">
+            <div className="grid grid-cols-7 text-[10px] font-semibold text-muted-foreground gap-1">
               <span>D</span>
               <span>S</span>
               <span>T</span>
@@ -580,15 +567,15 @@ export function WeeklyPlanningView({
               <span>1</span>
 
               {/* Semana Ativa Destacada */}
-              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">2</span>
-              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">3</span>
-              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">4</span>
-              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">5</span>
-              <span className="bg-primary text-white font-bold rounded-md py-0.5 shadow-xs">
+              <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">2</span>
+              <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">3</span>
+              <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">4</span>
+              <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">5</span>
+              <span className="bg-primary text-white font-semibold rounded-md py-0.5 shadow-xs">
                 6
               </span>
-              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">7</span>
-              <span className="bg-primary/10 text-primary font-bold rounded-md py-0.5">8</span>
+              <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">7</span>
+              <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">8</span>
 
               <span>9</span>
               <span>10</span>
@@ -617,12 +604,12 @@ export function WeeklyPlanningView({
           </div>
 
           {/* Seção MINHAS AGENDAS */}
-          <div className="rounded-2xl border bg-card p-4 shadow-xs space-y-3">
-            <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block border-b pb-2">
+          <div className="rounded-xl border bg-card p-4 space-y-3">
+            <span className="type-label block border-b pb-2">
               MINHAS AGENDAS
             </span>
 
-            <div className="space-y-2 text-xs font-bold">
+            <div className="space-y-2 text-xs font-semibold">
               <label className="flex items-center gap-2 cursor-pointer text-foreground">
                 <input
                   type="checkbox"
@@ -632,7 +619,7 @@ export function WeeklyPlanningView({
                   }
                   className="rounded text-primary focus:ring-primary"
                 />
-                <span>REVISÕES</span>
+                <span>Revisões</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer text-foreground">
@@ -644,7 +631,7 @@ export function WeeklyPlanningView({
                   }
                   className="rounded text-primary focus:ring-primary"
                 />
-                <span>HISTÓRICO</span>
+                <span>Histórico</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer text-foreground">
@@ -656,7 +643,7 @@ export function WeeklyPlanningView({
                   }
                   className="rounded text-primary focus:ring-primary"
                 />
-                <span>PLANEJAMENTO</span>
+                <span>Planejamento</span>
               </label>
             </div>
           </div>
@@ -665,7 +652,7 @@ export function WeeklyPlanningView({
 
       {/* Modal Agendar Estudo / Evento */}
       <Dialog open={isEventModalOpen} onOpenChange={setIsEventModalOpen}>
-        <DialogContent className="sm:max-w-md p-6 rounded-2xl">
+        <DialogContent className="sm:max-w-md p-6 rounded-xl">
           <div className="space-y-5">
             {/* Header com Ícone de Lixeira no canto esquerdo e Fechar */}
             <div className="flex items-center justify-between border-b pb-3">
@@ -692,7 +679,7 @@ export function WeeklyPlanningView({
                   placeholder="Disciplina"
                   value={formDiscipline}
                   onChange={(e) => setFormDiscipline(e.target.value)}
-                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold placeholder:text-muted-foreground/60 focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-semibold placeholder:text-muted-foreground/60 focus-visible:ring-0"
                 />
               </div>
 
@@ -704,7 +691,7 @@ export function WeeklyPlanningView({
                   placeholder="00:00"
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
-                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold font-mono focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-semibold tabular-nums focus-visible:ring-0"
                 />
               </div>
 
@@ -715,7 +702,7 @@ export function WeeklyPlanningView({
                   type="text"
                   value={formDate}
                   onChange={(e) => setFormDate(e.target.value)}
-                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold font-mono focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-semibold tabular-nums focus-visible:ring-0"
                 />
               </div>
 
@@ -724,7 +711,7 @@ export function WeeklyPlanningView({
                 <select
                   value={formRepeat}
                   onChange={(e) => setFormRepeat(e.target.value)}
-                  className="w-full border-0 border-b border-primary bg-transparent text-xs font-bold text-foreground py-1 focus:outline-none cursor-pointer"
+                  className="w-full border-0 border-b border-primary bg-transparent text-xs font-semibold text-foreground py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 >
                   <option value="Não se repete">Não se repete</option>
                   <option value="Todos os dias">Todos os dias</option>
@@ -740,7 +727,7 @@ export function WeeklyPlanningView({
                   placeholder="Tópico"
                   value={formTopic}
                   onChange={(e) => setFormTopic(e.target.value)}
-                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-bold focus-visible:ring-0"
+                  className="border-0 border-b border-primary rounded-none shadow-none px-0 text-sm font-semibold focus-visible:ring-0"
                 />
               </div>
             </div>
@@ -750,7 +737,7 @@ export function WeeklyPlanningView({
               <Button
                 type="button"
                 onClick={handleSaveEvent}
-                className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-white font-bold text-xs py-5 rounded-xl transition-all shadow-xs"
+                className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-white font-semibold text-xs py-5 rounded-xl transition-all shadow-xs"
               >
                 Salvar
               </Button>

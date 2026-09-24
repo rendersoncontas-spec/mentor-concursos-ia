@@ -1,4 +1,4 @@
-import { AlertCircle, Brain, Clock, Target, TrendingUp } from "lucide-react"
+import { AlertCircle, Clock, Target, TrendingUp } from "lucide-react"
 
 import type { MentorResponse } from "@/domain/mentor-ai/mentor-ai.types"
 
@@ -20,12 +20,9 @@ export function MentorFeed({ response }: MentorFeedProps) {
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
       {/* Header Estilo Documento */}
       <div className="flex items-center gap-4 mb-10">
-        <div className="bg-primary/10 text-primary p-4 rounded-2xl">
-          <Brain className="h-10 w-10" />
-        </div>
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">
-            Análise Inteligente Nomeia
+          <h1 className="type-h1 text-foreground">
+            Análise de desempenho
           </h1>
           <p className="text-muted-foreground text-lg mt-1 flex items-center gap-2">
             Índice Geral de Aprendizado:{" "}
@@ -41,7 +38,7 @@ export function MentorFeed({ response }: MentorFeedProps) {
         {/* AGORA */}
         {feed.now.length > 0 && (
           <section>
-            <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-red-600 dark:text-red-400">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-4 text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5" /> Agora
             </h2>
             <div className="space-y-4">
@@ -61,7 +58,7 @@ export function MentorFeed({ response }: MentorFeedProps) {
         {/* HOJE */}
         {feed.today.length > 0 && (
           <section>
-            <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-orange-600 dark:text-orange-400">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-4 text-orange-600 dark:text-orange-400">
               <Target className="h-5 w-5" /> Hoje
             </h2>
             <div className="space-y-4">
@@ -81,7 +78,7 @@ export function MentorFeed({ response }: MentorFeedProps) {
         {/* ESTA SEMANA */}
         {feed.week.length > 0 && (
           <section>
-            <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-info">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-4 text-info">
               <Clock className="h-5 w-5" /> Estratégia da Semana
             </h2>
             <ul className="space-y-3 pl-7 list-disc marker:text-info/60">
@@ -98,7 +95,7 @@ export function MentorFeed({ response }: MentorFeedProps) {
         {/* LONGO PRAZO */}
         {feed.longTerm.length > 0 && (
           <section>
-            <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-green-600 dark:text-green-400">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-4 text-green-600 dark:text-green-400">
               <TrendingUp className="h-5 w-5" /> Visão de Longo Prazo
             </h2>
             <ul className="space-y-3 pl-7 list-disc marker:text-green-500/50">

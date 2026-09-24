@@ -4,18 +4,16 @@ import { revalidatePath } from "next/cache"
 
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
-import { buildCycleOverview } from "@/application/study-cycle/cycle-progress.service"
 import type {
   CreateCycleInput,
   CycleItemDifficulty,
   CycleItemPriority,
   CycleOverview,
-  StudyCycle,
-  StudyCycleItemWithDetails,
-  StudyCycleSession,
   UpdateCycleInput,
 } from "@/domain/study-cycle/study-cycle.types"
 import { createClient } from "@/infrastructure/supabase/server"
+import { loadActiveCycleOverview, loadCycleOverviewById, loadCyclesOverview } from "./cycle-overview.reader"
+import { fetchAllCycleSessions } from "./cycle-sessions.reader"
 import { reconcileCycleProgress, registerStudyToCycle, skipCurrentCycleItem } from "./cycle-study-registration.service"
 
 async function getUser() {
@@ -33,62 +31,16 @@ function mapDifficultyToPriority(difficulty?: CycleItemDifficulty | string): Cyc
 
 /**
  * Busca todos os ciclos do usuário com seus itens e dados computados.
+ *
+ * Fase F.1: a leitura em si fica em `loadCyclesOverview` (cycle-overview.reader.ts),
+ * testável com um banco falso: somente leitura, sessões paginadas (sem o corte
+ * de 1.000 linhas) e a mesma matemática (buildCycleOverview).
  */
 export async function getCyclesAction(): Promise<{ data: CycleOverview[]; reconcileErrors: string[] }> {
   const reconcileErrors: string[] = []
   try {
     const { supabase, userId } = await getUser()
-
-    const { data: cycles, error } = await supabase
-      .from("study_cycles")
-      .select("*")
-      .eq("user_id", userId)
-      .neq("status", "ARCHIVED")
-      .order("created_at", { ascending: false })
-
-    if (error || !cycles || cycles.length === 0) {
-      return { data: [], reconcileErrors }
-    }
-
-    const cycleIds = cycles.map((c) => c.id)
-
-    const [itemsResult, sessionsResult, skipsResult] = await Promise.all([
-      supabase
-        .from("study_cycle_items")
-        .select("*, discipline:disciplines(id, name, area, color_hex)")
-        .in("cycle_id", cycleIds)
-        .order("order", { ascending: true }),
-      supabase.from("study_cycle_sessions").select("*").in("cycle_id", cycleIds),
-      supabase.from("study_cycle_item_skips").select("cycle_id, cycle_item_id, round_number").in("cycle_id", cycleIds),
-    ])
-
-    const itemsByCycle = new Map<string, StudyCycleItemWithDetails[]>()
-    for (const item of itemsResult.data || []) {
-      const list = itemsByCycle.get(item.cycle_id) || []
-      list.push(item as StudyCycleItemWithDetails)
-      itemsByCycle.set(item.cycle_id, list)
-    }
-
-    const sessionsByCycle = new Map<string, StudyCycleSession[]>()
-    for (const s of sessionsResult.data || []) {
-      const list = sessionsByCycle.get(s.cycle_id) || []
-      list.push(s as StudyCycleSession)
-      sessionsByCycle.set(s.cycle_id, list)
-    }
-
-    const skipRows = (skipsResult.data || []) as { cycle_id: string; cycle_item_id: string; round_number: number }[]
-
-    const data = cycles.map((cycle) => {
-      const cycleItems = itemsByCycle.get(cycle.id) || []
-      const cycleSessions = sessionsByCycle.get(cycle.id) || []
-      const skippedItemIds = new Set(
-        skipRows
-          .filter((row) => row.cycle_id === cycle.id && row.round_number === (cycle.current_round || 1))
-          .map((row) => row.cycle_item_id)
-      )
-      return buildCycleOverview(cycle as StudyCycle, cycleItems, cycleSessions, skippedItemIds)
-    })
-
+    const data = await loadCyclesOverview(supabase, userId)
     return { data, reconcileErrors }
   } catch (err) {
     console.error("[getCyclesAction] Erro:", err)
@@ -97,45 +49,12 @@ export async function getCyclesAction(): Promise<{ data: CycleOverview[]; reconc
 }
 
 /**
- * Busca a visão detalhada do ciclo atualmente ativo.
+ * Busca a visão detalhada do ciclo atualmente ativo (somente leitura).
  */
 export async function getActiveCycleAction(): Promise<CycleOverview | null> {
   try {
     const { supabase, userId } = await getUser()
-
-    const { data: cycle, error } = await supabase
-      .from("study_cycles")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("status", "ACTIVE")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (error || !cycle) return null
-
-    const [itemsResult, sessionsResult, skipsResult] = await Promise.all([
-      supabase
-        .from("study_cycle_items")
-        .select("*, discipline:disciplines(id, name, area, color_hex)")
-        .eq("cycle_id", cycle.id)
-        .order("order", { ascending: true }),
-      supabase.from("study_cycle_sessions").select("*").eq("cycle_id", cycle.id),
-      supabase
-        .from("study_cycle_item_skips")
-        .select("cycle_item_id")
-        .eq("cycle_id", cycle.id)
-        .eq("round_number", cycle.current_round || 1),
-    ])
-
-    const skippedItemIds = new Set((skipsResult.data || []).map((row) => row.cycle_item_id as string))
-
-    return buildCycleOverview(
-      cycle as StudyCycle,
-      (itemsResult.data || []) as StudyCycleItemWithDetails[],
-      (sessionsResult.data || []) as StudyCycleSession[],
-      skippedItemIds
-    )
+    return await loadActiveCycleOverview(supabase, userId)
   } catch (err) {
     console.error("[getActiveCycleAction] Erro:", err)
     return null
@@ -143,44 +62,12 @@ export async function getActiveCycleAction(): Promise<CycleOverview | null> {
 }
 
 /**
- * Busca a visão detalhada de um ciclo específico por ID.
+ * Busca a visão detalhada de um ciclo específico por ID (somente leitura).
  */
 export async function getCycleByIdAction(cycleId: string): Promise<CycleOverview | null> {
   try {
     const { supabase, userId } = await getUser()
-
-    const { data: cycle, error } = await supabase
-      .from("study_cycles")
-      .select("*")
-      .eq("id", cycleId)
-      .eq("user_id", userId)
-      .maybeSingle()
-
-    if (error || !cycle) return null
-
-    const { data: items } = await supabase
-      .from("study_cycle_items")
-      .select("*, discipline:disciplines(id, name, area, color_hex)")
-      .eq("cycle_id", cycle.id)
-      .order("order", { ascending: true })
-
-    const { data: sessions } = await supabase
-      .from("study_cycle_sessions")
-      .select("*")
-      .eq("cycle_id", cycle.id)
-
-    const { data: skipRows } = await supabase
-      .from("study_cycle_item_skips")
-      .select("cycle_item_id")
-      .eq("cycle_id", cycle.id)
-      .eq("round_number", cycle.current_round || 1)
-
-    return buildCycleOverview(
-      cycle as StudyCycle,
-      (items || []) as StudyCycleItemWithDetails[],
-      (sessions || []) as StudyCycleSession[],
-      new Set((skipRows || []).map((row) => row.cycle_item_id as string))
-    )
+    return await loadCycleOverviewById(supabase, userId, cycleId)
   } catch (err) {
     console.error("[getCycleByIdAction] Erro:", err)
     return null
@@ -876,7 +763,8 @@ export async function diagnoseUserCyclesAction(): Promise<{
     const ids = cycles.map((c) => c.id)
     const [itemsRes, sessionsRes] = await Promise.all([
       supabase.from("study_cycle_items").select("cycle_id").in("cycle_id", ids),
-      supabase.from("study_cycle_sessions").select("cycle_id").in("cycle_id", ids),
+      // Fase F.1: contagem por ciclo sobre a leitura paginada (antes cortada em 1.000).
+      fetchAllCycleSessions<{ cycle_id: string }>(supabase, { cycleIds: ids }, "cycle_id"),
     ])
 
     const countBy = (rows: { cycle_id: string }[] | null) => {

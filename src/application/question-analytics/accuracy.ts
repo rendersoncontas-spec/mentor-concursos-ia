@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 export type AccuracyMetric = {
   id: string
@@ -16,17 +17,30 @@ export async function getAccuracyByDiscipline(
   const d = new Date()
   d.setDate(d.getDate() - periodDays)
 
-  const { data, error } = await supabase
-    .from("question_attempts")
-    .select(`
+  // Fase F.1: paginado (question_attempts pode passar de 1.000 linhas em 30
+  // dias para quem resolve muitas questões; antes 1 requisição cortada em
+  // 1.000). Mesmo formato { data, error } de antes.
+  const { data, error } = await fetchAllRowsPaged<{
+    correct: boolean
+    questions:
+      | { discipline_id: string; disciplines: { name: string } }
+      | { discipline_id: string; disciplines: { name: string } }[]
+      | null
+  }>(
+    (withCount) =>
+      supabase
+        .from("question_attempts")
+        .select(`
       correct,
       questions!inner (
         discipline_id,
         disciplines ( name )
       )
-    `)
-    .eq("user_id", userId)
-    .gte("answered_at", d.toISOString())
+    `, countOption(withCount))
+        .eq("user_id", userId)
+        .gte("answered_at", d.toISOString()),
+    [{ column: "id", ascending: true }],
+  )
 
   if (error || !data) return []
 

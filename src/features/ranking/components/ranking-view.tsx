@@ -48,8 +48,6 @@ import {
 import {
   formatDuration,
   minutesToSeconds,
-  formatMetricValue,
-  formatAccumulated,
   getMetricValue,
   calculateDistanceAhead,
   formatDistance,
@@ -231,7 +229,7 @@ function Avatar({
   }
   return (
     <div
-      className={`${sizeClass} rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${student.bgColor}`}
+      className={`${sizeClass} font-semibold rounded-full flex items-center justify-center text-white flex-shrink-0 ${student.bgColor}`}
     >
       {student.initials}
     </div>
@@ -408,14 +406,14 @@ export function RankingView() {
   if (positionDelta !== null) {
     if (positionDelta > 0) {
       positionCaption = (
-        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
           <TrendingUp className="h-3.5 w-3.5" />
           Subiu {positionDelta} {positionDelta === 1 ? "posição" : "posições"}
         </span>
       )
     } else if (positionDelta < 0) {
       positionCaption = (
-        <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
           <TrendingDown className="h-3.5 w-3.5" />
           Caiu {Math.abs(positionDelta)} {Math.abs(positionDelta) === 1 ? "posição" : "posições"}
         </span>
@@ -440,40 +438,16 @@ export function RankingView() {
   const isOnlyParticipant = totalParticipants <= 1 && rankedStudents.length === 1 && myIndex >= 0
 
   return (
-    <div className="space-y-6 pb-16 animate-fade-in">
-      {/* ── CABEÇALHO & FILTROS ────────────────────────────────────────────── */}
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card/60 backdrop-blur-md p-5 rounded-2xl border shadow-xs">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 shrink-0 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
-            <Trophy className="h-6 w-6 text-amber-500" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
-                Ranking de Estudantes
-              </h1>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
-                <Users className="h-3 w-3" /> {totalParticipants} alunos
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Acompanhe sua evolução e dispute o topo com a comunidade de concurseiros.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-          <Select value="global" onValueChange={() => undefined}>
-            <SelectTrigger className="h-10 w-[150px] rounded-xl border bg-background text-xs font-bold shadow-xs hover:border-primary/50 transition-colors">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="global">Ranking Global</SelectItem>
-            </SelectContent>
-          </Select>
-
+    <div className="space-y-6 pb-8">
+      {/* ── FILTROS ──────────────────────────────────────────────────────────
+          Fase E: o título fica no cabeçalho fixo da página. Aqui, uma única
+          barra com período, participantes e métrica (antes: um cartão de
+          cabeçalho com ícone grande + uma segunda barra de status). O select
+          "Ranking Global" tinha só uma opção e nenhuma ação — virou texto. */}
+      <div className="flex flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px]">
           <Select value={period} onValueChange={(value) => setPeriod(value as RankingPeriod)}>
-            <SelectTrigger className="h-10 w-[160px] rounded-xl border bg-background text-xs font-bold shadow-xs hover:border-primary/50 transition-colors">
+            <SelectTrigger aria-label="Período do ranking" className="h-8 w-[160px] text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -484,31 +458,26 @@ export function RankingView() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </header>
-
-      {/* ── BARRA DE STATUS + SELETOR DE MÉTRICA ───────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card/40 p-2.5 rounded-2xl border shadow-xs">
-        <div className="flex flex-wrap items-center gap-2 px-1">
-          <div className="flex items-center gap-2 rounded-xl bg-background/80 border px-3 py-1.5 shadow-2xs">
-            <CalendarDays className="h-4 w-4 text-primary" />
-            <span className="text-xs font-black uppercase tracking-wider text-foreground">
-              {periodInfo.label}
-            </span>
-            <span className="text-xs text-muted-foreground">({periodInfo.range})</span>
-          </div>
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <CalendarDays aria-hidden className="h-3.5 w-3.5" />
+            <span className="tabular-nums">{periodInfo.range}</span>
+          </span>
           {period === "this_week" && (
-            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5">
-              <Flame className="h-4 w-4 text-amber-500 animate-pulse" />
-              <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                Em andamento
-              </span>
-            </div>
+            <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-warning" />
+              Em andamento
+            </span>
           )}
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <Users aria-hidden className="h-3.5 w-3.5" />
+            <span className="tabular-nums">
+              {totalParticipants} {totalParticipants === 1 ? "participante" : "participantes"} · ranking global
+            </span>
+          </span>
           {loading && data && (
-            <div className="flex items-center gap-1.5 text-xs font-bold text-primary animate-fade-in pl-2">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Atualizando...
-            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" /> Atualizando…
+            </span>
           )}
         </div>
 
@@ -516,7 +485,7 @@ export function RankingView() {
         <div
           role="group"
           aria-label="Métrica do ranking"
-          className="flex items-center gap-1.5 p-1 bg-background/80 rounded-xl border shadow-2xs"
+          className="inline-flex items-center rounded-md bg-muted p-0.5 self-start"
         >
           {METRICS.map(({ id, label, icon: MetricIcon }) => {
             const selected = activeTab === id
@@ -525,15 +494,14 @@ export function RankingView() {
                 key={id}
                 onClick={() => setActiveTab(id)}
                 aria-pressed={selected}
-                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all duration-200 ${FOCUS_RING} ${
+                type="button"
+                className={`inline-flex whitespace-nowrap items-center justify-center gap-1.5 rounded-[5px] px-3 py-1 text-xs font-medium transition-colors ${FOCUS_RING} ${
                   selected
-                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <MetricIcon
-                  className={`h-4 w-4 ${selected ? "text-primary-foreground" : "text-muted-foreground"}`}
-                />
+                <MetricIcon aria-hidden className="h-3.5 w-3.5" />
                 <span>{label}</span>
               </button>
             )
@@ -545,12 +513,11 @@ export function RankingView() {
              cards idênticos repetindo ícone + título + número ────────────── */}
       <section
         key={`band-${activeTab}`}
-        className="rounded-2xl border bg-card shadow-xs grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border animate-fade-in"
+        className="rounded-xl border bg-card grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border animate-fade-in"
         aria-label="Resumo das suas métricas"
       >
         <MetricSummaryCard
           icon={Timer}
-          iconColor="text-primary bg-primary/10 border-primary/20"
           label="Tempo Estudado"
           value={data?.userStats.tempo?.hours || "0min"}
           caption="no período selecionado"
@@ -558,7 +525,6 @@ export function RankingView() {
         />
         <MetricSummaryCard
           icon={ListChecks}
-          iconColor="text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
           label="Questões Feitas"
           value={data?.userStats.tempo?.questions ?? 0}
           caption="questões resolvidas"
@@ -566,7 +532,6 @@ export function RankingView() {
         />
         <MetricSummaryCard
           icon={BookOpen}
-          iconColor="text-purple-500 bg-purple-500/10 border-purple-500/20"
           label="Páginas Lidas"
           value={data?.userStats.tempo?.pages ?? 0}
           caption="páginas concluídas"
@@ -574,7 +539,6 @@ export function RankingView() {
         />
         <MetricSummaryCard
           icon={Flame}
-          iconColor="text-amber-500 bg-amber-500/10 border-amber-500/20"
           label="Sequência Atual"
           value={`${personal?.streak.consecutiveDays ?? 0} dias`}
           caption={`Recorde: ${personal?.streak.longestDays ?? 0} dias`}
@@ -612,9 +576,9 @@ export function RankingView() {
       {data &&
         rankedStudents.length > 0 &&
         (!currentUserStats || !currentUserStats.hasActivity) && (
-          <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 animate-fade-in">
-            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-            <p className="text-xs sm:text-sm font-semibold leading-relaxed">
+          <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-4 py-3 text-foreground">
+            <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-[13px] leading-relaxed">
               Você ainda não registrou {metricLabelFor(activeTab).toLowerCase()} no período
               selecionado. Estude hoje para pontuar e subir no ranking!
             </p>
@@ -625,15 +589,15 @@ export function RankingView() {
       {top3.length > 0 && (
         <section key={`podium-${activeTab}-${period}`} className="animate-fade-in space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <Crown className="h-4 w-4 text-amber-500" /> Pódio dos Campeões
+            <h2 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
+              <Crown className="h-4 w-4 text-amber-500" /> Pódio
             </h2>
             <span className="text-xs text-muted-foreground font-medium">
-              Top 3 melhores desempenhos
+              Três melhores do período
             </span>
           </div>
 
-          <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-xs">
+          <div className="bg-card border rounded-xl p-4 sm:p-6">
             <div className="grid grid-cols-3 gap-2 sm:gap-6 items-end max-w-3xl mx-auto pt-4 pb-2">
               {/* 2º Lugar */}
               <PodiumPedestal
@@ -667,10 +631,10 @@ export function RankingView() {
       {/* ── GRID PRINCIPAL: LISTA GERAL + SIDEBAR ──────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* COLUNA ESQUERDA: LISTA COMPLETA DE PARTICIPANTES (8 cols) */}
-        <section className="lg:col-span-8 rounded-2xl border bg-card shadow-xs overflow-hidden min-w-0">
+        <section className="lg:col-span-8 rounded-xl border bg-card overflow-hidden min-w-0">
           <div className="px-5 py-4 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+              <h2 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
                 <Trophy className="h-4 w-4 text-primary" /> Classificação Geral
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -680,14 +644,14 @@ export function RankingView() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
                 {rankedStudents.length}{" "}
                 {rankedStudents.length === 1 ? "aluno ativo" : "alunos ativos"}
               </span>
               {myIndex >= 0 && (
                 <button
                   onClick={scrollToMyRow}
-                  className={`inline-flex items-center gap-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 text-xs font-extrabold transition-colors ${FOCUS_RING}`}
+                  className={`inline-flex items-center gap-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 text-xs font-semibold transition-colors ${FOCUS_RING}`}
                   aria-label="Ir para a minha posição na lista"
                 >
                   <Crosshair className="h-3.5 w-3.5" /> Minha posição
@@ -699,11 +663,11 @@ export function RankingView() {
           <div className="p-4 sm:p-5 space-y-2">
             {rankedStudents.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
                   <Users className="h-6 w-6 text-muted-foreground/40" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-foreground">Nenhum registro ainda</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Nenhum registro ainda</h3>
                   <p className="text-xs text-muted-foreground max-w-xs mx-auto">
                     Seja o primeiro a estudar e garantir o topo do pódio!
                   </p>
@@ -768,7 +732,7 @@ export function RankingView() {
                 id="minha-posicao-ranking"
                 className="pt-4 mt-4 border-t border-dashed border-border space-y-2 scroll-mt-8"
               >
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground px-1">
+                <p className="type-label px-1">
                   Sua posição atual (sem atividade no período)
                 </p>
                 <RankRankingRow
@@ -812,14 +776,12 @@ export function RankingView() {
 ──────────────────────────────────────────────────────────────────────────────*/
 function MetricSummaryCard({
   icon: Icon,
-  iconColor,
   label,
   value,
   caption,
   highlight,
 }: {
   icon: LucideIcon
-  iconColor: string
   label: string
   value: ReactNode
   caption: string
@@ -827,24 +789,16 @@ function MetricSummaryCard({
 }) {
   return (
     <div
-      className={`relative p-4 transition-colors duration-200 ${highlight ? "bg-primary/[0.05]" : ""}`}
+      className={`relative px-4 py-3 transition-colors duration-150 ${highlight ? "bg-primary/[0.05] shadow-[inset_2px_0_0_hsl(var(--primary))]" : ""}`}
     >
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${iconColor}`}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <span className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground truncate">
-            {label}
-          </span>
-          <span className="block text-lg sm:text-xl font-black text-foreground tracking-tight tabular-nums truncate">
-            {value}
-          </span>
-        </div>
-      </div>
-      <p className="text-[11px] text-muted-foreground font-medium mt-2 truncate">{caption}</p>
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon aria-hidden className="h-3.5 w-3.5" />
+        <span className="truncate">{label}</span>
+      </span>
+      <span className="mt-0.5 block text-lg font-semibold text-foreground tabular-nums truncate">
+        {value}
+      </span>
+      <p className="text-[11px] text-muted-foreground truncate">{caption}</p>
     </div>
   )
 }
@@ -963,24 +917,23 @@ function SuaPosicaoCard({
   }
 
   return (
-    <div className="relative rounded-2xl border bg-card p-6 shadow-xs overflow-hidden flex flex-col justify-between gap-5">
-      <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+    <div className="relative rounded-lg border border-border bg-card p-5 flex flex-col justify-between gap-4">
 
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <span className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-primary flex items-center gap-1.5">
             <Trophy className="h-4 w-4" /> Sua Classificação
           </span>
           <div className="flex items-baseline gap-3 pt-1">
-            <span className="text-2xl sm:text-3xl font-black tracking-tight text-primary leading-none tabular-nums">
+            <span className="text-2xl sm:text-3xl font-semibold tracking-tight text-primary leading-none tabular-nums">
               {rank > 0 ? `#${rank}` : "#--"}
             </span>
             <div>
-              <p className="text-base font-black text-foreground flex items-center gap-1.5">
+              <p className="text-base font-semibold text-foreground flex items-center gap-1.5">
                 {rankLabel}
                 {isMedalRank(rank) && <Medal className="h-4 w-4" style={medalStyleFor(rank)} />}
               </p>
-              <p className="text-xs font-bold text-muted-foreground mt-0.5 tabular-nums">
+              <p className="text-xs font-semibold text-muted-foreground mt-0.5 tabular-nums">
                 {student ? metricValueFor(student, metric) : "0"} acumulados
               </p>
             </div>
@@ -991,14 +944,14 @@ function SuaPosicaoCard({
       </div>
 
       <div className="space-y-2.5 pt-2 border-t border-border/60">
-        <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">{message}</p>
+        <p className="text-xs sm:text-sm font-semibold text-foreground leading-snug">{message}</p>
 
         {goalLabel && (
           <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Target className="h-3.5 w-3.5 text-primary" /> {goalLabel}
             </span>
-            <span className="font-bold text-foreground">{progress}%</span>
+            <span className="font-semibold text-foreground">{progress}%</span>
           </div>
         )}
 
@@ -1024,12 +977,12 @@ function renderAboveTargetBanner(
     const distance = calculateDistanceAhead(metricNumber(above, metric), userValue, metric)
 
     return (
-      <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-primary/20 bg-primary/[0.03] p-3.5">
+      <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
         <Avatar student={above} sizeClass="h-12 w-12 text-sm shadow-sm" imgSize={96} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-primary">#{above.rank}</span>
-            <p className="text-sm font-black text-foreground truncate">
+            <span className="text-xs font-semibold text-primary">#{above.rank}</span>
+            <p className="text-sm font-semibold text-foreground truncate">
               {cleanStudentName(above.name)}
             </p>
           </div>
@@ -1038,10 +991,10 @@ function renderAboveTargetBanner(
           </p>
         </div>
         <div className="text-right">
-          <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+          <span className="type-label block">
             Faltam
           </span>
-          <span className="text-sm font-black text-primary tabular-nums">
+          <span className="text-sm font-semibold text-primary tabular-nums">
             {distance > 0 ? formatDistance(distance, metric) : "Empatado"}
           </span>
         </div>
@@ -1051,10 +1004,10 @@ function renderAboveTargetBanner(
 
   if (isTop1) {
     return (
-      <div className="mt-3 flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3.5">
-        <Crown className="h-6 w-6 text-amber-500 shrink-0" />
+      <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+        <Crown aria-hidden className="h-5 w-5 text-amber-500 shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-foreground">Você está no topo!</p>
+          <p className="text-sm font-semibold text-foreground">Você está no topo!</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Mantenha o ritmo para defender sua posição.
           </p>
@@ -1064,10 +1017,10 @@ function renderAboveTargetBanner(
   }
 
   return (
-    <div className="mt-3 flex items-center gap-3 rounded-2xl border bg-muted/20 p-3.5">
+    <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
       <Target className="h-6 w-6 text-muted-foreground/50 shrink-0" />
       <div className="min-w-0">
-        <p className="text-sm font-bold text-foreground">Disputa aberta</p>
+        <p className="text-sm font-semibold text-foreground">Disputa aberta</p>
         <p className="text-xs text-muted-foreground mt-0.5">
           Estude para registrar seu tempo e definir o próximo alvo.
         </p>
@@ -1088,13 +1041,13 @@ function renderBelowDefenseBanner(
     const advantageFormatted = formatDistance(advantage, metric)
 
     return (
-      <div className="flex items-center gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
-        <Eye className="h-4 w-4 shrink-0 text-amber-500" />
-        <p className="text-xs font-bold text-foreground leading-snug truncate">
+      <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+        <Eye aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <p className="text-xs font-semibold text-foreground leading-snug truncate">
           Atenção:{" "}
-          <span className="text-amber-600 dark:text-amber-400">{cleanStudentName(below.name)}</span>{" "}
+          <span className="font-medium text-foreground">{cleanStudentName(below.name)}</span>{" "}
           (#{below.rank}) está a apenas{" "}
-          <span className="text-amber-600 dark:text-amber-400 tabular-nums font-black">
+          <span className="text-foreground tabular-nums font-semibold">
             {advantageFormatted}
           </span>{" "}
           de você.
@@ -1138,11 +1091,10 @@ function ProximoAlvoCard({
   const belowValue = below ? metricNumber(below, metric) : null
 
   return (
-    <div className="relative rounded-2xl border bg-card p-6 shadow-xs overflow-hidden flex flex-col justify-between gap-5">
-      <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+    <div className="relative rounded-lg border border-border bg-card p-5 flex flex-col justify-between gap-4">
 
       <div>
-        <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+        <span className="type-label flex items-center gap-1.5">
           <Crosshair className="h-4 w-4 text-primary" />
           {isTop1 ? "Defesa da Liderança" : "Próximo Adversário à Frente"}
         </span>
@@ -1176,31 +1128,31 @@ function getRankMetalName(rank: 1 | 2 | 3): string {
 function getRowRankBadge(rank: number) {
   if (rank === 1) {
     return (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15 text-amber-600 font-black text-xs">
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15 text-amber-600 font-semibold text-xs">
         1º
       </span>
     )
   }
   if (rank === 2) {
     return (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-400/20 text-slate-600 dark:text-slate-300 font-black text-xs">
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-400/20 text-slate-600 dark:text-slate-300 font-semibold text-xs">
         2º
       </span>
     )
   }
   if (rank === 3) {
     return (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-700 dark:text-amber-400 font-black text-xs">
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-700 dark:text-amber-400 font-semibold text-xs">
         3º
       </span>
     )
   }
-  return <span className="text-xs font-black text-muted-foreground tabular-nums">#{rank}</span>
+  return <span className="text-xs font-semibold text-muted-foreground tabular-nums">#{rank}</span>
 }
 
 function getMetricValueClass(isYou: boolean, inMedal: boolean): string {
   if (isYou) return "bg-primary text-primary-foreground"
-  if (inMedal) return "bg-muted/80 text-foreground font-extrabold"
+  if (inMedal) return "bg-muted/80 text-foreground font-semibold"
   return "text-muted-foreground font-bold"
 }
 
@@ -1223,16 +1175,18 @@ function PodiumPedestal({
   const isFirst = rank === 1
 
   // Configurações visuais por posição
+  // Fase E: pedestais mais baixos e neutros (antes 176px de altura, em
+  // dourado/prata/bronze preenchidos). A cor da medalha fica só no ícone.
   const pedestalHeights = {
-    1: "h-40 sm:h-44",
-    2: "h-32 sm:h-36",
-    3: "h-24 sm:h-28",
+    1: "h-16 sm:h-20",
+    2: "h-12 sm:h-14",
+    3: "h-9 sm:h-10",
   }
 
   const pedestalGradients = {
-    1: "bg-gradient-to-t from-amber-500/30 via-amber-500/15 to-transparent border-amber-500/40 text-amber-500",
-    2: "bg-gradient-to-t from-slate-400/30 via-slate-400/15 to-transparent border-slate-400/40 text-slate-400",
-    3: "bg-gradient-to-t from-amber-700/30 via-amber-700/15 to-transparent border-amber-700/40 text-amber-700",
+    1: "bg-muted/60 border-border text-foreground",
+    2: "bg-muted/40 border-border text-muted-foreground",
+    3: "bg-muted/30 border-border text-muted-foreground",
   }
 
   const crownColors = {
@@ -1245,12 +1199,12 @@ function PodiumPedestal({
     return (
       <div className="flex flex-col items-center justify-end text-center">
         <div className="w-12 h-12 rounded-full border border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/40 mb-3">
-          <span className="text-xs font-black">{rank}º</span>
+          <span className="text-xs font-semibold">{rank}º</span>
         </div>
         <div
-          className={`w-full rounded-t-2xl border-t border-x border-dashed border-border/60 bg-muted/10 flex items-center justify-center ${pedestalHeights[rank]}`}
+          className={`w-full rounded-t-md border-t border-x border-dashed border-border bg-muted/10 flex items-center justify-center ${pedestalHeights[rank]}`}
         >
-          <span className="text-[11px] font-bold text-muted-foreground/60">Vago</span>
+          <span className="text-[11px] font-semibold text-muted-foreground/60">Vago</span>
         </div>
       </div>
     )
@@ -1268,7 +1222,7 @@ function PodiumPedestal({
           onSelect?.(student)
         }
       }}
-      className={`flex flex-col items-center justify-end text-center transition-transform hover:-translate-y-1 duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-2xl ${getPedestalOrderClass(
+      className={`flex flex-col items-center justify-end text-center transition-transform duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-xl ${getPedestalOrderClass(
         rank,
       )}`}
     >
@@ -1276,7 +1230,7 @@ function PodiumPedestal({
       <div className="relative mb-2 flex flex-col items-center">
         {isFirst && (
           <Crown
-            className={`h-6 w-6 mb-1 filter drop-shadow-xs animate-bounce ${crownColors[1]}`}
+            className={`h-6 w-6 mb-1 ${crownColors[1]}`}
           />
         )}
         {!isFirst && <Medal className={`h-5 w-5 mb-1 ${crownColors[rank]}`} />}
@@ -1287,12 +1241,12 @@ function PodiumPedestal({
             isYou={isYou}
             sizeClass={`${
               isFirst ? "h-16 w-16 sm:h-20 sm:w-20" : "h-12 w-12 sm:h-16 sm:w-16"
-            } text-base font-black border-4 ${getPedestalBorderClass(rank)} shadow-sm`}
+            } text-base font-semibold border-2 ${getPedestalBorderClass(rank)}`}
             imgSize={isFirst ? 160 : 128}
           />
           {isYou && (
-            <Badge className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground border-background text-[9px] font-black px-2 py-0 rounded-full shadow-sm">
-              VOCÊ
+            <Badge variant="solid" className="absolute -bottom-2 left-1/2 -translate-x-1/2 border-background px-1.5 py-0 text-[11px]">
+              Você
             </Badge>
           )}
         </div>
@@ -1301,15 +1255,13 @@ function PodiumPedestal({
       {/* Nome e Pontuação */}
       <div className="mb-2 max-w-full px-1">
         <p
-          className={`font-black text-foreground truncate ${isFirst ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}
+          className={`font-semibold text-foreground truncate ${isFirst ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}
         >
           {cleanStudentName(student.name)}
         </p>
         <span
-          className={`inline-block font-black tabular-nums mt-0.5 rounded-full px-2.5 py-0.5 text-[11px] sm:text-xs ${
-            isFirst
-              ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold"
-              : "bg-muted text-muted-foreground"
+          className={`inline-block font-semibold tabular-nums mt-0.5 rounded-full px-2.5 py-0.5 text-[11px] sm:text-xs ${
+            isFirst ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
           }`}
         >
           {metricValueFor(student, metric)}
@@ -1318,14 +1270,10 @@ function PodiumPedestal({
 
       {/* Pedestal estilizado */}
       <div
-        className={`w-full rounded-t-2xl sm:rounded-t-3xl border-t border-x flex flex-col items-center justify-start pt-3 shadow-inner ${pedestalHeights[rank]} ${pedestalGradients[rank]}`}
+        className={`w-full rounded-t-md border-t border-x flex items-start justify-center gap-1.5 pt-2 ${pedestalHeights[rank]} ${pedestalGradients[rank]}`}
       >
-        <span className="text-2xl sm:text-3xl font-black tabular-nums tracking-tighter opacity-80">
-          {rank}º
-        </span>
-        <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest opacity-70 mt-0.5">
-          {getRankMetalName(rank)}
-        </span>
+        <span className="text-lg font-semibold tabular-nums">{rank}º</span>
+        <span className="hidden text-[11px] sm:inline pt-1.5">{getRankMetalName(rank)}</span>
       </div>
     </div>
   )
@@ -1359,7 +1307,7 @@ function RankRankingRow({
           onSelect?.(student)
         }
       }}
-      className={`flex items-center gap-3 sm:gap-4 px-4 py-3 rounded-2xl border transition-all duration-150 cursor-pointer group select-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${
+      className={`flex items-center gap-3 sm:gap-4 px-4 py-3 rounded-xl border transition-all duration-150 cursor-pointer group select-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${
         isYou
           ? "bg-primary/[0.08] border-primary/40 shadow-xs ring-1 ring-primary/20 hover:bg-primary/[0.14]"
           : "bg-card/70 border-border/70 hover:bg-muted/60 hover:border-border/90 hover:shadow-xs"
@@ -1381,13 +1329,13 @@ function RankRankingRow({
         <div className="flex items-center gap-2">
           <p
             className={`text-sm truncate ${
-              isYou ? "font-black text-primary" : "font-bold text-foreground"
+              isYou ? "font-semibold text-primary" : "font-semibold text-foreground"
             }`}
           >
             {cleanStudentName(student.name)}
           </p>
           {isYou && (
-            <Badge className="bg-primary text-primary-foreground text-[9px] font-black px-1.5 py-0 rounded-md">
+            <Badge className="bg-primary text-primary-foreground text-[10px] font-semibold px-1.5 py-0 rounded-md">
               VOCÊ
             </Badge>
           )}
@@ -1400,7 +1348,7 @@ function RankRankingRow({
       {/* Valor da Métrica */}
       <div className="text-right shrink-0">
         <span
-          className={`text-xs sm:text-sm font-black tabular-nums px-2.5 py-1 rounded-xl ${getMetricValueClass(
+          className={`text-xs sm:text-sm font-semibold tabular-nums px-2.5 py-1 rounded-xl ${getMetricValueClass(
             isYou,
             inMedal,
           )}`}
@@ -1417,7 +1365,7 @@ function RankRankingRow({
 ──────────────────────────────────────────────────────────────────────────────*/
 function GapLine({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 text-[11px] font-bold text-primary bg-primary/[0.04] rounded-xl border border-dashed border-primary/20 my-1">
+    <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 text-[11px] font-semibold text-primary bg-primary/[0.04] rounded-xl border border-dashed border-primary/20 my-1">
       {icon}
       <span>{text}</span>
     </div>
@@ -1436,13 +1384,13 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
   const done = !!goal && goal.remainingMinutes <= 0 && goal.achievedMinutes > 0
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
+    <section className="rounded-xl border bg-card p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+        <span className="type-label flex items-center gap-1.5">
           <Target className="h-4 w-4 text-primary" /> Meta de Estudo
         </span>
         <span
-          className={`rounded-full px-2.5 py-0.5 text-xs font-black tabular-nums ${
+          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${
             done
               ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
               : "bg-primary/10 text-primary border border-primary/20"
@@ -1454,7 +1402,7 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
 
       <div className="flex items-baseline justify-between">
         <div>
-          <p className="text-2xl sm:text-3xl font-black text-foreground leading-none tabular-nums">
+          <p className="text-2xl sm:text-3xl font-semibold text-foreground leading-none tabular-nums">
             {achieved}
             <span className="text-xs text-muted-foreground font-semibold ml-1">/ {target}</span>
           </p>
@@ -1477,19 +1425,19 @@ function ConsistencyCard({ personal }: { personal: RankingPersonalContext | null
   const days = streak?.consecutiveDays ?? 0
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
-      <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+    <section className="rounded-xl border bg-card p-5 space-y-4">
+      <span className="type-label flex items-center gap-1.5">
         <Flame className="h-4 w-4 text-amber-500" /> Fogo da Constância
       </span>
 
       <div className="flex items-center gap-3.5">
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-500 shrink-0">
-          <Flame className="h-6 w-6 animate-pulse" />
+        <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-500 shrink-0">
+          <Flame aria-hidden className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-2xl sm:text-3xl font-black text-foreground leading-none tabular-nums">
+          <p className="text-2xl sm:text-3xl font-semibold text-foreground leading-none tabular-nums">
             {days}{" "}
-            <span className="text-sm font-bold text-muted-foreground">
+            <span className="text-sm font-semibold text-muted-foreground">
               {days === 1 ? "dia" : "dias"}
             </span>
           </p>
@@ -1499,9 +1447,9 @@ function ConsistencyCard({ personal }: { personal: RankingPersonalContext | null
         </div>
       </div>
 
-      <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 border text-xs font-semibold text-muted-foreground">
+      <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border text-xs font-semibold text-muted-foreground">
         <span>Melhor sequência:</span>
-        <span className="text-foreground font-black tabular-nums">
+        <span className="text-foreground font-semibold tabular-nums">
           {streak?.longestDays ?? 0} dias
         </span>
       </div>
@@ -1600,9 +1548,9 @@ function WeeklyWinnersCard({
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
+    <section className="rounded-xl border bg-card p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+        <span className="type-label flex items-center gap-1.5">
           <Crown className="h-4 w-4 text-amber-500" /> Histórico de Campeões
         </span>
 
@@ -1616,7 +1564,7 @@ function WeeklyWinnersCard({
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-[11px] font-bold text-muted-foreground px-1">
+          <span className="text-[11px] font-semibold text-muted-foreground px-1">
             {current?.rangeLabel ?? "—"}
           </span>
           <button
@@ -1632,7 +1580,7 @@ function WeeklyWinnersCard({
 
       {loading && !current && (
         <div className="space-y-2 py-4">
-          <div className="skeleton h-14 rounded-2xl" />
+          <div className="skeleton h-14 rounded-xl" />
         </div>
       )}
 
@@ -1658,7 +1606,7 @@ function WeeklyWinnersCard({
                     onSelectStudent?.(champion)
                   }
                 }}
-                className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 cursor-pointer group hover:bg-amber-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 cursor-pointer group hover:bg-amber-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
                 <div className="relative">
                   <Avatar
@@ -1669,14 +1617,14 @@ function WeeklyWinnersCard({
                   <Crown className="absolute -top-2 -right-1 h-3.5 w-3.5 text-amber-500 fill-amber-500" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 block">
+                  <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 block">
                     1º Lugar da Semana
                   </span>
-                  <p className="text-sm font-black text-foreground truncate group-hover:text-amber-600 transition-colors">
+                  <p className="text-sm font-semibold text-foreground truncate group-hover:text-amber-600 transition-colors">
                     {cleanStudentName(champion.name)}
                   </p>
                 </div>
-                <span className="text-xs font-black text-amber-600 dark:text-amber-400 tabular-nums">
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
                   {champion.hours}
                 </span>
               </div>
@@ -1700,12 +1648,12 @@ function WeeklyWinnersCard({
               className="flex items-center justify-between px-3 py-2 rounded-xl bg-muted/20 text-xs cursor-pointer group hover:bg-muted/40 transition-all focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <div className="flex items-center gap-2 truncate">
-                <span className="font-bold text-muted-foreground">{student.rank}º</span>
+                <span className="font-semibold text-muted-foreground">{student.rank}º</span>
                 <span className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {cleanStudentName(student.name)}
                 </span>
               </div>
-              <span className="font-bold text-muted-foreground tabular-nums">{student.hours}</span>
+              <span className="font-semibold text-muted-foreground tabular-nums">{student.hours}</span>
             </div>
           ))}
         </div>
@@ -1732,21 +1680,21 @@ function ordinalLabelFor(rank: number): string {
 function RankingSkeleton() {
   return (
     <div className="space-y-6 pb-16" aria-busy="true" role="status">
-      <div className="skeleton h-24 rounded-2xl w-full" />
-      <div className="skeleton h-14 rounded-2xl w-full" />
+      <div className="skeleton h-24 rounded-xl w-full" />
+      <div className="skeleton h-14 rounded-xl w-full" />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="skeleton h-28 rounded-2xl" />
+          <div key={item} className="skeleton h-28 rounded-xl" />
         ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="skeleton h-48 rounded-3xl" />
-        <div className="skeleton h-48 rounded-3xl" />
+        <div className="skeleton h-48 rounded-xl" />
+        <div className="skeleton h-48 rounded-xl" />
       </div>
-      <div className="skeleton h-64 rounded-3xl" />
+      <div className="skeleton h-64 rounded-xl" />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 skeleton h-96 rounded-3xl" />
-        <div className="lg:col-span-4 skeleton h-96 rounded-3xl" />
+        <div className="lg:col-span-8 skeleton h-96 rounded-xl" />
+        <div className="lg:col-span-4 skeleton h-96 rounded-xl" />
       </div>
     </div>
   )
@@ -1755,16 +1703,16 @@ function RankingSkeleton() {
 function RankingErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center space-y-5 animate-fade-in">
-      <div className="w-16 h-16 rounded-3xl bg-destructive/10 flex items-center justify-center text-destructive">
+      <div className="w-16 h-16 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive">
         <AlertCircle className="h-8 w-8" />
       </div>
       <div className="space-y-1">
-        <h2 className="text-xl font-black text-foreground">Não foi possível carregar o ranking</h2>
+        <h2 className="text-xl font-semibold text-foreground">Não foi possível carregar o ranking</h2>
         <p className="text-xs text-muted-foreground max-w-sm mx-auto">{message}</p>
       </div>
       <button
         onClick={onRetry}
-        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:bg-primary/90 transition-colors shadow-sm ${FOCUS_RING}`}
+        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-sm ${FOCUS_RING}`}
       >
         <RotateCw className="h-4 w-4" /> Tentar novamente
       </button>

@@ -83,14 +83,14 @@ export function DisciplineDetailView({
 
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-6 bg-[#fef08a] rounded-full" />
-            <h1 className="text-2xl font-black text-foreground tracking-tight">{disciplineName}</h1>
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">{disciplineName}</h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <Button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap min-w-0"
+            className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap min-w-0"
           >
             <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
             Adicionar Estudo
@@ -112,25 +112,25 @@ export function DisciplineDetailView({
       </div>
 
       {/* Resumo da disciplina: uma única superfície com hierarquia (não 4 cards repetidos) */}
-      <div className="rounded-2xl border bg-card shadow-xs grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border">
+      <div className="rounded-xl border bg-card grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border">
         <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+          <span className="type-label">
             Tempo de estudo
           </span>
-          <p className="text-2xl font-black text-primary font-mono">
+          <p className="text-2xl font-semibold text-primary tabular-nums">
             {formatMinutesLabel(statsMinutes)}
           </p>
         </div>
 
         <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+          <span className="type-label">
             Desempenho
           </span>
           <div className="flex items-baseline gap-2 flex-wrap">
-            <p className="text-2xl font-black text-foreground font-mono">
+            <p className="text-2xl font-semibold text-foreground tabular-nums">
               {accuracyPct === null ? "–" : `${accuracyPct}%`}
             </p>
-            <span className="text-[11px] font-bold">
+            <span className="text-[11px] font-semibold">
               <span className="text-emerald-600">{stats ? `${statsCorrect} acertos` : "–"}</span>
               <span className="text-muted-foreground"> · </span>
               <span className="text-rose-500">{stats ? `${statsWrong} erros` : "–"}</span>
@@ -139,12 +139,12 @@ export function DisciplineDetailView({
         </div>
 
         <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+          <span className="type-label">
             Progresso no edital
           </span>
           <div className="flex items-baseline gap-2 flex-wrap">
-            <p className="text-2xl font-black text-foreground font-mono">{progressPercent}%</p>
-            <span className="text-[11px] font-bold">
+            <p className="text-2xl font-semibold text-foreground tabular-nums">{progressPercent}%</p>
+            <span className="text-[11px] font-semibold">
               <span className="text-emerald-600">{doneTopics} concluídos</span>
               <span className="text-muted-foreground"> · </span>
               <span className="text-rose-500">{totalTopics - doneTopics} pendentes</span>
@@ -153,10 +153,10 @@ export function DisciplineDetailView({
         </div>
 
         <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+          <span className="type-label">
             Páginas lidas
           </span>
-          <p className="text-2xl font-black text-foreground font-mono">
+          <p className="text-2xl font-semibold text-foreground tabular-nums">
             {statsPages === null ? "–" : statsPages}
           </p>
           <p className="text-[11px] text-muted-foreground font-semibold">
@@ -168,8 +168,8 @@ export function DisciplineDetailView({
       </div>
 
       {/* Card Central: HISTÓRICO DE REGISTROS (Estado Vazio ou Populado - Fotos 2 e 5) */}
-      <div className="rounded-xl border bg-card p-6 shadow-xs space-y-4">
-        <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground block border-b pb-3">
+      <div className="rounded-xl border bg-card p-6 space-y-4">
+        <span className="text-[13px] font-semibold text-foreground block border-b pb-3">
           HISTÓRICO DE REGISTROS
         </span>
 
@@ -192,7 +192,7 @@ export function DisciplineDetailView({
             </div>
 
             <div className="space-y-1 max-w-sm">
-              <h3 className="text-base font-extrabold text-foreground">
+              <h3 className="text-base font-semibold text-foreground">
                 Você ainda não fez nenhum registro de estudo nesta disciplina
               </h3>
               <p className="text-xs text-muted-foreground font-medium">Vamos registrar?</p>
@@ -200,7 +200,6 @@ export function DisciplineDetailView({
 
             <Button
               onClick={() => setIsRegisterModalOpen(true)}
-              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 shadow-xs"
             >
               Adicionar Estudo
             </Button>
@@ -210,7 +209,7 @@ export function DisciplineDetailView({
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] text-left">
               <thead>
-                <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <tr className="type-label border-b">
                   <th className="px-2 py-2">Data</th>
                   <th className="px-2 py-2">Categoria</th>
                   <th className="px-2 py-2 text-center">Tempo</th>
@@ -226,22 +225,22 @@ export function DisciplineDetailView({
               </thead>
               <tbody className="divide-y divide-border font-semibold">
                 <tr className="hover:bg-muted/20 transition-colors">
-                  <td className="px-2 py-2 font-mono text-muted-foreground">06/08/26</td>
+                  <td className="px-2 py-2 tabular-nums text-muted-foreground">06/08/26</td>
                   <td className="px-2 py-2">
-                    <span className="px-3 py-0.5 rounded bg-[#f87171] text-white font-extrabold text-[10px] tracking-wider uppercase">
+                    <span className="px-3 py-0.5 rounded bg-[#f87171] text-white font-semibold text-[11px]">
                       REVISÃO
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center font-mono font-bold">10:00:00</td>
-                  <td className="px-2 py-2 text-center font-mono text-emerald-600">0</td>
-                  <td className="px-2 py-2 text-center font-mono text-rose-500">0</td>
-                  <td className="px-2 py-2 text-center font-mono">0</td>
-                  <td className="px-2 py-2 text-center font-mono text-muted-foreground">-</td>
-                  <td className="px-2 py-2 text-foreground font-bold max-w-[200px] truncate">
+                  <td className="px-2 py-2 text-center tabular-nums font-semibold">10:00:00</td>
+                  <td className="px-2 py-2 text-center tabular-nums text-emerald-600">0</td>
+                  <td className="px-2 py-2 text-center tabular-nums text-rose-500">0</td>
+                  <td className="px-2 py-2 text-center tabular-nums">0</td>
+                  <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">-</td>
+                  <td className="px-2 py-2 text-foreground font-semibold max-w-[200px] truncate">
                     1. Teoria da administração e das organizações.
                   </td>
-                  <td className="px-2 py-2 text-center font-mono text-muted-foreground">-</td>
-                  <td className="px-2 py-2 text-center font-mono text-muted-foreground">-</td>
+                  <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">-</td>
+                  <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">-</td>
                   <td className="px-2 py-2 text-center">
                     <button
                       type="button"
@@ -258,15 +257,15 @@ export function DisciplineDetailView({
       </div>
 
       {/* Seção Inferior: EDITAL VERTICALIZADO da Disciplina */}
-      <div className="rounded-xl border bg-card shadow-xs overflow-hidden space-y-4 p-6">
-        <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground block border-b pb-3">
+      <div className="rounded-xl border bg-card overflow-hidden space-y-4 p-6">
+        <span className="text-[13px] font-semibold text-foreground block border-b pb-3">
           EDITAL VERTICALIZADO
         </span>
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <tr className="type-label border-b">
                 <th className="py-2.5 px-3 w-10 text-center" />
                 <th className="py-2.5 px-3">Tópicos</th>
                 <th className="py-2.5 px-3 text-center" title="Acertos">Acertos</th>
@@ -302,33 +301,33 @@ export function DisciplineDetailView({
                             />
                           </td>
                           <td
-                            className={`py-2.5 px-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
+                            className={`font-semibold py-2.5 px-3 ${isDone ? "text-emerald-700" : "text-foreground"}`}
                           >
                             {topic.name}
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-emerald-600">
+                          <td className="py-2.5 px-3 text-center tabular-nums text-emerald-600">
                             {subsDone}
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-rose-500">
+                          <td className="py-2.5 px-3 text-center tabular-nums text-rose-500">
                             {subs.length - subsDone}
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
+                          <td className="py-2.5 px-3 text-center tabular-nums text-muted-foreground">
                             -
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono">
+                          <td className="py-2.5 px-3 text-center tabular-nums">
                             {subsPercent === null ? "-" : `${subsPercent}%`}
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
+                          <td className="py-2.5 px-3 text-center tabular-nums text-muted-foreground">
                             -
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
+                          <td className="py-2.5 px-3 text-center tabular-nums text-muted-foreground">
                             -
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <button
                               type="button"
                               onClick={() => toast.info("Adicionar link de caderno")}
-                              className="text-primary font-bold hover:underline"
+                              className="text-primary font-semibold hover:underline"
                             >
                               Adicionar
                             </button>
@@ -388,31 +387,31 @@ export function DisciplineDetailView({
                           />
                         </td>
                         <td
-                          className={`py-2.5 px-3 font-bold ${isDone ? "text-emerald-700" : "text-foreground"}`}
+                          className={`font-semibold py-2.5 px-3 ${isDone ? "text-emerald-700" : "text-foreground"}`}
                         >
                           {topic.title}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-emerald-600">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-emerald-600">
                           {topic.correct}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-rose-500">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-rose-500">
                           {topic.wrong}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-muted-foreground">
                           {topic.notebook}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono">{topic.accuracy}</td>
-                        <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
+                        <td className="py-2.5 px-3 text-center tabular-nums">{topic.accuracy}</td>
+                        <td className="py-2.5 px-3 text-center tabular-nums text-muted-foreground">
                           {topic.date}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-muted-foreground">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-muted-foreground">
                           {topic.questions}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
                             onClick={() => toast.info("Adicionar link de caderno")}
-                            className="text-primary font-bold hover:underline"
+                            className="text-primary font-semibold hover:underline"
                           >
                             Adicionar
                           </button>

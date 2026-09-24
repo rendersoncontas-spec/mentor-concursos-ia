@@ -6,9 +6,9 @@ import * as Sentry from "@sentry/nextjs"
 import {
   AlertTriangle,
   Clock,
+  CloudOff,
   Database,
   Filter,
-  GraduationCap,
   History as HistoryIcon,
   Loader2,
   SquarePen,
@@ -20,20 +20,33 @@ import { toast } from "sonner"
 
 import {
   deleteStudySessionAction,
-  getAllHistoryAction,
+  getHistoryListAction,
+  getHistorySessionForEditAction,
   getMonthlyHistoryAction,
 } from "@/application/study-history/study-history.actions"
+import { unpackHistoryList } from "@/application/study-history/history-list-payload"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
+import { filterHistorySessions } from "@/features/history/lib/filter-history-sessions"
+import {
+  HISTORY_INITIAL_VISIBLE_SESSIONS,
+  HISTORY_VISIBLE_SESSIONS_STEP,
+  selectVisibleDayGroups,
+} from "@/features/history/lib/visible-day-groups"
 import { ManageImportsModal } from "@/features/importacao/components/manage-imports-modal"
 import { originDisplayName } from "@/features/importacao/lib/origin"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 import {
+  STUDY_SESSION_OFFLINE_RESOLVED_EVENT,
+  STUDY_SESSION_QUEUED_EVENT,
   STUDY_SESSION_SAVED_EVENT,
+  readStudySessionOfflineResolved,
+  readStudySessionQueued,
   readStudySessionSaved,
 } from "@/features/study-session/lib/study-session-events"
+import { buildPendingStudySession, getClientUserId, syncQueue } from "@/infrastructure/offline"
 import { formatDayLabel, getDayInSaoPaulo, getTimeInSaoPaulo } from "@/lib/sao-paulo"
 import { formatDuration, formatDurationMinutes } from "@/lib/format-duration"
 
@@ -60,6 +73,9 @@ type HistorySession = StudyHistory & {
     area?: string | null
     color_hex?: string | null
   } | null
+  /** Fase C (offline-first): true enquanto o registro só existe localmente, aguardando sincronização. */
+  _offlinePending?: true
+  _operationId?: string
 }
 
 type DayGroup = {
@@ -178,17 +194,36 @@ export function HistoryView() {
 
   const loadHistory = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await getAllHistoryAction()
-    if (error) {
-      setQueryError(true)
-      Sentry.captureMessage("Falha ao carregar histórico", {
-        level: "error",
-        extra: { feature: "historico", error },
+    try {
+      // Fase F.2: payload enxuto (só o que a lista, os filtros e os totais
+      // usam); a linha completa é buscada ao clicar em "Editar".
+      const { data: payload, error } = await getHistoryListAction()
+      const data = payload ? unpackHistoryList(payload) : null
+      if (error) {
+        setQueryError(true)
+        Sentry.captureMessage("Falha ao carregar histórico", {
+          level: "error",
+          extra: { feature: "historico", error },
+        })
+        toast.error("Erro ao carregar histórico: " + error)
+      } else if (data) {
+        setQueryError(false)
+        // Preserva os itens pendentes locais (Fase C): o servidor nunca vai
+        // devolvê-los (ainda não existem lá), então eles não fazem parte de
+        // `data` — sem isto, cada refresh do Histórico os apagaria da tela.
+        setSessions((prev) => {
+          const stillPending = prev.filter((s) => s._offlinePending)
+          return [...(data as HistorySession[]), ...stillPending]
+        })
+      }
+    } catch (err) {
+      // Falha de rede ao chamar a Server Action (ex.: offline) — item 6:
+      // isto não pode derrubar a tela nem esconder os estudos pendentes já
+      // visíveis localmente. O indicador global de conectividade (item 14)
+      // já avisa o usuário; aqui só evitamos um erro não tratado.
+      Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+        extra: { feature: "historico", step: "load_history_offline" },
       })
-      toast.error("Erro ao carregar histórico: " + error)
-    } else if (data) {
-      setQueryError(false)
-      setSessions(data as HistorySession[])
     }
     setLoading(false)
   }, [])
@@ -251,6 +286,63 @@ export function HistoryView() {
     window.addEventListener(STUDY_SESSION_SAVED_EVENT, handler)
     return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handler)
   }, [upsertSession])
+
+  // Fase C (offline-first) — item 6: um estudo salvo offline aparece aqui
+  // IMEDIATAMENTE (evento separado de STUDY_SESSION_SAVED_EVENT — ver
+  // study-session-events.ts — porque ainda não existe no servidor).
+  useEffect(() => {
+    const handleQueued = (event: Event) => {
+      const saved = readStudySessionQueued(event)
+      if (saved) upsertSession(saved as HistorySession)
+    }
+    const handleResolved = (event: Event) => {
+      const operationId = readStudySessionOfflineResolved(event)
+      if (!operationId) return
+      // A sincronização terminou (com sucesso ou erro definitivo) — o
+      // placeholder local dá lugar ao registro real (já upsertado pelo
+      // handler de STUDY_SESSION_SAVED_EVENT acima) ou simplesmente sai da
+      // lista, sem duplicar a linha do tempo.
+      setSessions((prev) => prev.filter((s) => s.id !== `pending:${operationId}`))
+    }
+    window.addEventListener(STUDY_SESSION_QUEUED_EVENT, handleQueued)
+    window.addEventListener(STUDY_SESSION_OFFLINE_RESOLVED_EVENT, handleResolved)
+    return () => {
+      window.removeEventListener(STUDY_SESSION_QUEUED_EVENT, handleQueued)
+      window.removeEventListener(STUDY_SESSION_OFFLINE_RESOLVED_EVENT, handleResolved)
+    }
+  }, [upsertSession])
+
+  // Fase C, item 16 do teste real: fechar/reabrir o app deve continuar
+  // mostrando os estudos ainda não sincronizados — eles vivem no IndexedDB
+  // (sync_queue), não em memória, então precisam ser recarregados no mount.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const userId = await getClientUserId()
+      if (!userId || cancelled) return
+      const [pending, syncing, failed] = await Promise.all([
+        syncQueue.getByStatus(userId, "PENDING"),
+        syncQueue.getByStatus(userId, "SYNCING"),
+        syncQueue.getByStatus(userId, "FAILED"),
+      ])
+      const ops = [...pending, ...syncing, ...failed].filter(
+        (op) => op.type === "STUDY_SESSION_CREATE",
+      )
+      if (ops.length === 0 || cancelled) return
+      setSessions((prev) => {
+        const existingIds = new Set(prev.map((s) => s.id))
+        const additions = ops
+          .map((op) =>
+            buildPendingStudySession(op.payload as Record<string, unknown>, op.operationId, userId),
+          )
+          .filter((s) => !existingIds.has(s.id)) as HistorySession[]
+        return additions.length > 0 ? [...prev, ...additions] : prev
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -320,74 +412,12 @@ export function HistoryView() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
   }, [sessions])
 
-  // Apply filters
-  const filteredSessions = useMemo(() => {
-    let result = [...sessions]
-
-    if (importFilterId) {
-      result = result.filter((s) => s.import_batch_id === importFilterId)
-    }
-    if (filters.dateStart) {
-      result = result.filter((s) => getStudyDate(s) >= filters.dateStart)
-    }
-    if (filters.dateEnd) {
-      result = result.filter((s) => getStudyDate(s) <= filters.dateEnd)
-    }
-    if (filters.disciplineId) {
-      result = result.filter((s) => s.discipline_id === filters.disciplineId)
-    }
-    if (filters.origin) {
-      if (filters.origin === "mentor") {
-        result = result.filter((s) => !s.origin_source)
-      } else {
-        result = result.filter((s) => s.origin_source_name === filters.origin)
-      }
-    }
-    if (filters.studyType) {
-      result = result.filter((s) => s.study_type === filters.studyType)
-    }
-    if (filters.technique) {
-      result = result.filter((s) => s.technique === filters.technique)
-    }
-    if (filters.timeRange) {
-      result = result.filter((s) => {
-        const mins = s.duration_minutes || 0
-        switch (filters.timeRange) {
-          case "0-30":
-            return mins <= 30
-          case "30-60":
-            return mins > 30 && mins <= 60
-          case "60-120":
-            return mins > 60 && mins <= 120
-          case "120+":
-            return mins > 120
-          default:
-            return true
-        }
-      })
-    }
-    if (filters.focusRange) {
-      result = result.filter((s) => {
-        const rawFocus = s.metadata?.["focus_percentage"]
-        if (rawFocus === null || rawFocus === undefined) return false
-        const focus = Number(rawFocus)
-        switch (filters.focusRange) {
-          case "0-49":
-            return focus >= 0 && focus < 50
-          case "50-69":
-            return focus >= 50 && focus < 70
-          case "70-89":
-            return focus >= 70 && focus < 90
-          case "90-100":
-            return focus >= 90 && focus <= 100
-          default:
-            return true
-        }
-      })
-    }
-
-    return result
-  }, [sessions, filters, importFilterId])
+  // Apply filters (Fase F.1: lógica movida sem alteração para
+  // lib/filter-history-sessions.ts, onde é coberta por testes)
+  const filteredSessions = useMemo(
+    () => filterHistorySessions(sessions, filters, importFilterId),
+    [sessions, filters, importFilterId],
+  )
 
   const filteredMonthlySessions = useMemo(() => {
     let result = [...monthlySessions]
@@ -499,8 +529,42 @@ export function HistoryView() {
     return groups
   }, [filteredSessions])
 
-  const handleEditSession = (session: HistorySession) => {
-    setEditingSession(session)
+  // Fase F (performance): a lista desenha dias inteiros aos poucos (≈150
+  // registros na 1ª tela, +300 por clique) em vez de ≈2.800 linhas de uma vez.
+  // Totais, contagens e filtros continuam valendo para TODAS as sessões. Ao
+  // mudar qualquer filtro a lista volta ao começo (o limite é guardado junto
+  // com a "assinatura" dos filtros em que foi ampliado).
+  const filtersSignature = JSON.stringify(filters)
+  const [visibleBudget, setVisibleBudget] = useState({
+    signature: filtersSignature,
+    sessions: HISTORY_INITIAL_VISIBLE_SESSIONS,
+  })
+  const sessionBudget =
+    visibleBudget.signature === filtersSignature
+      ? visibleBudget.sessions
+      : HISTORY_INITIAL_VISIBLE_SESSIONS
+  const visibleDays = useMemo(
+    () => selectVisibleDayGroups(dayGroups, sessionBudget),
+    [dayGroups, sessionBudget],
+  )
+  const handleShowMoreDays = () => {
+    setVisibleBudget({
+      signature: filtersSignature,
+      sessions: visibleDays.visibleSessionCount + HISTORY_VISIBLE_SESSIONS_STEP,
+    })
+  }
+
+  // Fase F.2: a lista só tem os campos de exibição; o modal de edição precisa
+  // da linha COMPLETA (notes, metadata inteiro — que é espalhado no update).
+  // Busca só aquela sessão; se falhar, não abre o modal com dados parciais
+  // (salvar com dados parciais apagaria campos da sessão).
+  const handleEditSession = async (session: HistorySession) => {
+    const { data: full, error } = await getHistorySessionForEditAction(session.id)
+    if (error || !full) {
+      toast.error("Não foi possível abrir a sessão para edição: " + (error ?? "sessão não encontrada"))
+      return
+    }
+    setEditingSession(full as unknown as HistorySession)
     setIsRegisterOpen(true)
   }
 
@@ -508,7 +572,11 @@ export function HistoryView() {
     setIsRegisterOpen(open)
     if (!open) {
       setEditingSession(null)
-      void loadHistory()
+      // Fase F.2: sem recarregar o histórico inteiro ao fechar o modal. Um
+      // estudo salvo/editado já entra na lista pelo STUDY_SESSION_SAVED_EVENT
+      // (ou QUEUED, offline) com a linha real do banco — o mesmo mecanismo que
+      // já atualizava o Histórico quando se salva pelo botão flutuante global.
+      // Antes, até "Cancelar" recarregava as ~2.800 sessões.
       if (viewMode === "calendar") {
         void loadMonthlyHistory(calendarYear, calendarMonth)
       }
@@ -544,14 +612,15 @@ export function HistoryView() {
   return (
     <div className="space-y-6">
       {/* Top Header Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <h1 className="text-2xl font-black text-foreground">Histórico</h1>
-          <div className="inline-flex items-center bg-muted/60 p-1 rounded-xl border shadow-xs">
+          <div role="tablist" aria-label="Visualização do histórico" className="inline-flex items-center bg-muted p-0.5 rounded-md">
             <button
               type="button"
               onClick={() => setViewMode("list")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "list" ? "bg-background text-primary shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+              role="tab"
+              aria-selected={viewMode === "list"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-[5px] transition-colors ${viewMode === "list" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             >
               <HistoryIcon className="h-3.5 w-3.5" />
               Lista
@@ -559,7 +628,9 @@ export function HistoryView() {
             <button
               type="button"
               onClick={() => setViewMode("calendar")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-lg transition-all ${viewMode === "calendar" ? "bg-background text-primary shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+              role="tab"
+              aria-selected={viewMode === "calendar"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-[5px] transition-colors ${viewMode === "calendar" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             >
               <Clock className="h-3.5 w-3.5" />
               Calendário
@@ -567,12 +638,9 @@ export function HistoryView() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
-          <Button
-            onClick={() => setIsRegisterOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-xs"
-          >
-            Adicionar Estudo
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:justify-end flex-wrap">
+          <Button onClick={() => setIsRegisterOpen(true)}>
+            Adicionar estudo
           </Button>
 
           <TooltipProvider>
@@ -581,10 +649,11 @@ export function HistoryView() {
                 <Button
                   variant="outline"
                   onClick={() => setIsImportOpen(true)}
-                  className="border-primary text-primary hover:bg-primary/10 font-bold text-xs gap-2"
+                  aria-label="Importar histórico"
+                  className="gap-2 max-sm:px-3"
                 >
-                  <Upload className="h-4 w-4" />
-                  Importar Histórico
+                  <Upload aria-hidden className="h-4 w-4" />
+                  <span className="hidden sm:inline">Importar histórico</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -597,71 +666,71 @@ export function HistoryView() {
           <Button
             variant="ghost"
             onClick={() => setIsManageOpen(true)}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted font-bold text-xs gap-2"
+            aria-label="Gerenciar importações"
+            title="Gerenciar importações"
+            className="text-muted-foreground hover:text-foreground gap-2 max-sm:px-3"
           >
-            <Database className="h-4 w-4" />
-            Gerenciar Importações
+            <Database aria-hidden className="h-4 w-4" />
+            <span className="hidden sm:inline">Gerenciar importações</span>
           </Button>
 
-          <Button
-            variant="ghost"
-            className="text-muted-foreground hover:text-foreground hover:bg-muted font-bold text-xs gap-2"
-          >
-            <GraduationCap className="h-4 w-4" />
-            Cargo Alvo
-          </Button>
-
+          {/* Fase E: removido o botão "Cargo alvo" — ele nunca teve ação (entrou
+              sem onClick no commit 5acd970) e o Histórico não tem filtro nem
+              vínculo por cargo/concurso para ele acionar. */}
           <div className="relative">
             <Button
               ref={filterButtonRef}
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className={`border-primary text-primary hover:bg-primary/10 font-bold text-xs gap-2 ${activeFilterCount > 0 ? "bg-primary/5" : ""}`}
+              aria-expanded={showFilters}
+              aria-label={activeFilterCount > 0 ? `Filtros (${activeFilterCount} ativos)` : "Filtros"}
+              className={`gap-2 max-sm:px-3 ${activeFilterCount > 0 ? "border-primary/40 text-primary" : ""}`}
             >
-              <Filter className="h-3.5 w-3.5" />
-              Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              <Filter aria-hidden className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Filtros</span>
+              {activeFilterCount > 0 ? <span className="tabular-nums">({activeFilterCount})</span> : null}
             </Button>
 
             {showFilters && (
               <div
                 ref={filterPanelRef}
-                className="absolute right-0 top-full mt-2 z-50 bg-card border rounded-xl shadow-lg p-4 w-[min(360px,calc(100vw-2rem))] space-y-4"
+                className="absolute right-0 top-full mt-2 z-50 bg-popover border border-border rounded-lg shadow-lg p-4 w-[min(360px,calc(100vw-2rem))] space-y-3"
               >
                 {/* Date Start */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Data Início
                   </label>
                   <input
                     type="date"
                     value={filters.dateStart}
                     onChange={(e) => setFilters((f) => ({ ...f, dateStart: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   />
                 </div>
 
                 {/* Date End */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Data Fim
                   </label>
                   <input
                     type="date"
                     value={filters.dateEnd}
                     onChange={(e) => setFilters((f) => ({ ...f, dateEnd: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   />
                 </div>
 
                 {/* Discipline */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Disciplina
                   </label>
                   <select
                     value={filters.disciplineId}
                     onChange={(e) => setFilters((f) => ({ ...f, disciplineId: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   >
                     <option value="">Todas</option>
                     {disciplines.map((d) => (
@@ -674,13 +743,13 @@ export function HistoryView() {
 
                 {/* Origin */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Origem
                   </label>
                   <select
                     value={filters.origin}
                     onChange={(e) => setFilters((f) => ({ ...f, origin: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   >
                     <option value="">Todas as origens</option>
                     <option value="mentor">Nomeia</option>
@@ -694,13 +763,13 @@ export function HistoryView() {
 
                 {/* Study Type */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Tipo de Estudo
                   </label>
                   <select
                     value={filters.studyType}
                     onChange={(e) => setFilters((f) => ({ ...f, studyType: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   >
                     <option value="">Todos</option>
                     {STUDY_TYPES.map((t) => (
@@ -713,13 +782,13 @@ export function HistoryView() {
 
                 {/* Technique / Mode */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Modo
                   </label>
                   <select
                     value={filters.technique}
                     onChange={(e) => setFilters((f) => ({ ...f, technique: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   >
                     <option value="">Todos</option>
                     {TECHNIQUES.map((t) => (
@@ -732,13 +801,13 @@ export function HistoryView() {
 
                 {/* Time Range */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Tempo Estudado
                   </label>
                   <select
                     value={filters.timeRange}
                     onChange={(e) => setFilters((f) => ({ ...f, timeRange: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   >
                     <option value="">Todos</option>
                     <option value="0-30">Até 30 min</option>
@@ -750,13 +819,13 @@ export function HistoryView() {
 
                 {/* Focus Range */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Foco
                   </label>
                   <select
                     value={filters.focusRange}
                     onChange={(e) => setFilters((f) => ({ ...f, focusRange: e.target.value }))}
-                    className="w-full h-8 px-3 text-xs border rounded-lg bg-background"
+                    className="w-full h-9 px-2.5 text-[13px] border border-input rounded-md bg-card"
                   >
                     <option value="">Todos</option>
                     <option value="0-49">0–49%</option>
@@ -772,14 +841,14 @@ export function HistoryView() {
                     variant="outline"
                     size="sm"
                     onClick={handleClearFilters}
-                    className="flex-1 text-xs font-bold"
+                    className="flex-1"
                   >
                     Limpar
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => setShowFilters(false)}
-                    className="flex-1 text-xs font-bold bg-primary text-white hover:bg-primary/90"
+                    className="flex-1"
                   >
                     Aplicar
                   </Button>
@@ -791,66 +860,64 @@ export function HistoryView() {
       </div>
 
       {/* Resumo do período: uma única superfície com hierarquia (não 4 cards repetidos) */}
-      <div className="rounded-2xl border bg-card shadow-xs grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x-0 lg:divide-x divide-border">
-        <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+      <div className="grid grid-cols-2 lg:grid-cols-4 border-y border-border [&>*]:border-border max-lg:[&>*:nth-child(even)]:border-l max-lg:[&>*:nth-child(n+3)]:border-t lg:divide-x lg:divide-border">
+        <div className="px-4 py-3 space-y-0.5">
+          <span className="text-xs text-muted-foreground">
             Tempo de estudo
           </span>
-          <p className="text-2xl font-black text-primary font-mono">
+          <p className="text-xl font-semibold text-foreground tabular-nums">
             {formatDurationMinutes(totalMinutes)}
           </p>
         </div>
 
-        <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+        <div className="px-4 py-3 space-y-0.5">
+          <span className="text-xs text-muted-foreground">
             Desempenho
           </span>
           <div className="flex items-baseline gap-2 flex-wrap">
-            <p className="text-2xl font-black text-foreground font-mono">{accuracy}%</p>
-            <span className="text-[11px] font-bold">
-              <span className="text-emerald-600">{totalCorrect} acertos</span>
-              <span className="text-muted-foreground"> · </span>
-              <span className="text-rose-500">{totalWrong > 0 ? totalWrong : 0} erros</span>
+            <p className="text-xl font-semibold text-foreground tabular-nums">{accuracy}%</p>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {totalCorrect} acertos · {totalWrong > 0 ? totalWrong : 0} erros
             </span>
           </div>
         </div>
 
-        <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+        <div className="px-4 py-3 space-y-0.5">
+          <span className="text-xs text-muted-foreground">
             Sessões
           </span>
           {viewMode === "list" ? (
-            <p className="text-2xl font-black text-foreground font-mono">
+            <p className="text-xl font-semibold text-foreground tabular-nums">
               {filteredSessions.length.toLocaleString("pt-BR")}
               {activeFilterCount > 0 && (
-                <span className="text-[11px] font-bold text-muted-foreground ml-2 align-middle">
+                <span className="text-xs font-normal text-muted-foreground ml-2 align-middle">
                   com filtros
                 </span>
               )}
             </p>
           ) : (
-            <p className="text-2xl font-black text-foreground font-mono">
+            <p className="text-xl font-semibold text-foreground tabular-nums">
               {filteredMonthlySessions.length}
-              <span className="text-[11px] font-bold text-muted-foreground ml-2 align-middle">
+              <span className="text-xs font-normal text-muted-foreground ml-2 align-middle">
                 neste mês{activeFilterCount > 0 ? " · com filtros" : ""}
               </span>
             </p>
           )}
         </div>
 
-        <div className="p-5 space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+        <div className="px-4 py-3 space-y-0.5">
+          <span className="text-xs text-muted-foreground">
             Páginas lidas
           </span>
-          <p className="text-2xl font-black text-foreground font-mono">{totalPagesRead}</p>
+          <p className="text-xl font-semibold text-foreground tabular-nums">{totalPagesRead}</p>
         </div>
       </div>
 
       {/* Registros */}
       {importFilterId && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-l-2 border-primary bg-primary/5 px-4 py-2.5">
           <div className="space-y-0.5 min-w-0">
-            <p className="text-xs font-extrabold text-primary">Filtrando uma importação</p>
+            <p className="text-[13px] font-medium text-foreground">Filtrando uma importação</p>
             <p className="text-[11px] text-muted-foreground truncate">
               {filteredSessions.length} sessão{filteredSessions.length !== 1 ? "es" : ""} desta
               importação.
@@ -860,14 +927,14 @@ export function HistoryView() {
             variant="outline"
             size="sm"
             onClick={clearImportFilter}
-            className="text-[11px] font-bold shrink-0"
+            className="shrink-0"
           >
             Limpar filtro
           </Button>
         </div>
       )}
 
-      <div className="space-y-4 pt-2">
+      <div className="space-y-4">
         {(() => {
           if (viewMode === "calendar") {
             return (
@@ -894,18 +961,18 @@ export function HistoryView() {
             )
           if (queryError)
             return (
-              <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 border rounded-xl bg-card/50">
-                <AlertTriangle className="h-10 w-10 text-rose-500/70" />
-                <h3 className="text-base font-extrabold text-foreground">
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-2 border border-border rounded-lg bg-card">
+                <AlertTriangle aria-hidden className="h-5 w-5 text-destructive" />
+                <h3 className="text-sm font-medium text-foreground">
                   Não foi possível carregar seu histórico
                 </h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground">
                   Ocorreu um erro ao consultar seus registros. Tente novamente em instantes.
                 </p>
                 <Button
                   size="sm"
                   onClick={() => void loadHistory()}
-                  className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5"
+                  className="mt-2"
                 >
                   Tentar novamente
                 </Button>
@@ -913,23 +980,22 @@ export function HistoryView() {
             )
           if (filteredSessions.length === 0)
             return (
-              <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 border rounded-xl bg-card/50">
-                <HistoryIcon className="h-10 w-10 text-muted-foreground/30" />
-                <h3 className="text-base font-extrabold text-foreground">
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-2 border border-border rounded-lg bg-card">
+                <HistoryIcon aria-hidden className="h-5 w-5 text-muted-foreground/70" />
+                <h3 className="text-sm font-medium text-foreground">
                   {activeFilterCount > 0
                     ? "Nenhum estudo encontrado com os filtros selecionados"
-                    : "Você ainda não realizou nenhum estudo"}
+                    : "Nenhum estudo registrado"}
                 </h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground max-w-sm">
                   {activeFilterCount > 0
                     ? "Tente ajustar ou limpar os filtros para ver seus registros."
-                    : "Inicie uma sessão de estudos ou cadastre manualmente para visualizar aqui."}
+                    : "Comece um estudo ou registre manualmente para acompanhar seu progresso."}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pt-2">
                   <Button
                     size="sm"
                     onClick={() => setIsRegisterOpen(true)}
-                    className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5"
                   >
                     Adicionar estudo
                   </Button>
@@ -937,7 +1003,6 @@ export function HistoryView() {
                     size="sm"
                     variant="outline"
                     onClick={() => setIsImportOpen(true)}
-                    className="border-primary text-primary hover:bg-primary/10 font-bold text-xs"
                   >
                     Importar histórico
                   </Button>
@@ -947,135 +1012,153 @@ export function HistoryView() {
                     variant="outline"
                     size="sm"
                     onClick={handleClearFilters}
-                    className="text-xs font-bold"
                   >
                     Limpar filtros
                   </Button>
                 )}
               </div>
             )
+          // Redesign 2.0 — registro em formato de diário/log: um bloco por
+          // dia, linhas compactas separadas por divisórias (sem um card por
+          // registro). Pendência offline é informação funcional discreta.
           return (
-            <div className="space-y-8">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold tracking-wider text-muted-foreground">
-                  LINHA DO TEMPO
-                  {activeFilterCount > 0 &&
-                    ` (${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""})`}
-                </span>
-                <div className="flex-1 h-0.5 bg-primary/30" />
-              </div>
+            <div className="space-y-6">
+              {activeFilterCount > 0 && (
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  {filteredSessions.length} resultado{filteredSessions.length !== 1 ? "s" : ""} com os filtros atuais
+                </p>
+              )}
 
-              {dayGroups.map((day) => (
-                <div key={day.day} className="space-y-3">
-                  <div className="flex items-end justify-between gap-3 flex-wrap">
-                    <div className="flex items-baseline gap-3">
-                      <h2 className="text-lg font-bold text-foreground">{day.label}</h2>
-                      <span className="text-[11px] font-bold text-muted-foreground">
-                        {day.activityCount} atividade{day.activityCount !== 1 ? "s" : ""}
+              {visibleDays.visible.map((day) => (
+                <section key={day.day} aria-label={day.label} className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                    <div className="flex items-baseline gap-2">
+                      <h2 className="type-h3 text-foreground">{day.label}</h2>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {day.activityCount} registro{day.activityCount !== 1 ? "s" : ""}
                       </span>
                     </div>
-                    <span className="text-sm font-mono font-black text-primary">
-                      Total: {formatDuration(day.totalSeconds)}
+                    <span className="text-[13px] tabular-nums text-foreground">
+                      <span className="text-muted-foreground">Total </span>
+                      {formatDuration(day.totalSeconds)}
                     </span>
                   </div>
 
-                  <div className="space-y-3">
+                  <ul className="rounded-lg border border-border bg-card divide-y divide-border">
                     {day.sessions.map((session) => {
                       const disc = session.disciplines
                       const color = disciplineColorHex(
                         session.discipline_id || "",
                         disc?.color_hex ?? null,
                       )
+                      const studyTypeLabel = session.study_type
+                        ? STUDY_TYPES.find((t) => t.value === session.study_type)?.label ||
+                          session.study_type
+                        : null
+                      const questionsAnswered = Number(session.metadata?.["questions_answered"] || 0)
+                      const flashcardsReviewed = Number(session.metadata?.["flashcards_reviewed"] || 0)
                       return (
-                        <div
+                        <li
                           key={session.id}
-                          className="rounded-xl border bg-card p-4 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 hover:border-primary/60 transition-all"
+                          className="group grid grid-cols-[3.25rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_5.5rem_4.5rem_4.5rem] items-center gap-x-3 gap-y-1 px-3 py-2.5 hover:bg-muted/30 transition-colors"
                         >
-                          <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <div
-                              className="w-1.5 h-10 rounded-full shrink-0 mt-0.5"
-                              style={{ backgroundColor: color }}
-                            />
-                            <div className="space-y-0.5 min-w-0">
-                              <h3 className="font-extrabold text-xs text-foreground tracking-tight">
-                                {disc?.name || "Estudo Livre"}
-                              </h3>
-                              {session.origin_source && (
-                                <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
-                                  Importado ·{" "}
-                                  {originDisplayName(
-                                    session.origin_source,
-                                    session.origin_source_name,
-                                  )}
-                                </span>
-                              )}
-                              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                Horário: {formatSavedAt(session.started_at) || "Não informado"}
-                              </p>
-                              {session.study_type && (
-                                <p className="text-[11px] font-bold text-primary">
-                                  {STUDY_TYPES.find((t) => t.value === session.study_type)?.label ||
-                                    session.study_type}
-                                </p>
-                              )}
-                              {Number(session.metadata?.["flashcards_reviewed"] || 0) > 0 && (
-                                <p className="text-[11px] text-emerald-600 font-semibold">
-                                  Flashcards:{" "}
-                                  {Number(session.metadata?.["flashcards_reviewed"] || 0)} revisados
-                                  ({Number(session.metadata?.["flashcards_correct"] || 0)} acertos)
-                                </p>
-                              )}
-                              {Number(session.metadata?.["questions_answered"] || 0) > 0 && (
-                                <p className="text-[11px] text-primary font-semibold">
-                                  Questões: {Number(session.metadata?.["questions_correct"] || 0)}/
-                                  {Number(session.metadata?.["questions_answered"] || 0)} acertos
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {formatSavedAt(session.started_at) || "—"}
+                          </span>
 
-                          <div className="flex items-center gap-4 self-end lg:self-center shrink-0">
-                            <span className="text-xs font-mono text-muted-foreground font-bold flex items-center gap-1">
-                              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                              {formatDuration(sessionRealSeconds(session))}
-                            </span>
-
-                            <span className="text-xs font-black text-primary tabular-nums">
-                              <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground mr-1">
-                                Foco
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-2 min-w-0">
+                              <span
+                                aria-hidden
+                                className="h-2 w-2 rounded-full shrink-0"
+                                style={{ backgroundColor: color }}
+                              />
+                              <span className="line-clamp-2 sm:line-clamp-1 break-words text-sm font-medium text-foreground">
+                                {disc?.name || "Estudo livre"}
                               </span>
-                              {session.metadata?.["focus_percentage"] !== null &&
-                              session.metadata?.["focus_percentage"] !== undefined
-                                ? `${String(session.metadata["focus_percentage"])}%`
-                                : "—"}
-                            </span>
-
-                            <div className="flex items-center gap-2 text-muted-foreground/50">
-                              <button
-                                type="button"
-                                onClick={() => handleEditSession(session)}
-                                className="hover:text-foreground p-1 transition-colors"
-                                title="Editar"
-                              >
-                                <SquarePen className="h-4 w-4" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSession(session.id)}
-                                className="hover:text-rose-500 p-1 transition-colors"
-                                title="Excluir"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
+                            </p>
+                            <p className="pl-4 text-xs text-muted-foreground truncate">
+                              {[
+                                studyTypeLabel,
+                                session.origin_source
+                                  ? `Importado · ${originDisplayName(
+                                      session.origin_source,
+                                      session.origin_source_name,
+                                    )}`
+                                  : null,
+                                questionsAnswered > 0
+                                  ? `Questões ${Number(session.metadata?.["questions_correct"] || 0)}/${questionsAnswered}`
+                                  : null,
+                                flashcardsReviewed > 0
+                                  ? `Flashcards ${flashcardsReviewed} (${Number(session.metadata?.["flashcards_correct"] || 0)} acertos)`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                            {session._offlinePending && (
+                              <p className="pl-4 mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                                <CloudOff aria-hidden className="h-3 w-3" />
+                                Pendente de sincronização
+                              </p>
+                            )}
                           </div>
-                        </div>
+
+                          <span className="text-[13px] tabular-nums font-medium text-foreground text-right">
+                            {formatDuration(sessionRealSeconds(session))}
+                          </span>
+
+                          <span className="hidden sm:block text-xs tabular-nums text-muted-foreground text-right">
+                            {session.metadata?.["focus_percentage"] !== null &&
+                            session.metadata?.["focus_percentage"] !== undefined
+                              ? `Foco ${String(session.metadata["focus_percentage"])}%`
+                              : "—"}
+                          </span>
+
+                          <div className="col-start-3 row-start-2 sm:col-start-auto sm:row-start-auto flex items-center justify-end gap-0.5">
+                            {!session._offlinePending && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleEditSession(session)}
+                                  className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+                                  title="Editar"
+                                  aria-label="Editar registro"
+                                >
+                                  <SquarePen className="h-3.5 w-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSession(session.id)}
+                                  className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                  title="Excluir"
+                                  aria-label="Excluir registro"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </li>
                       )
                     })}
-                  </div>
-                </div>
+                  </ul>
+                </section>
               ))}
+
+              {visibleDays.hiddenDayCount > 0 && (
+                <div className="flex flex-col items-center gap-1 pt-2">
+                  <Button variant="outline" size="sm" onClick={handleShowMoreDays}>
+                    Mostrar dias anteriores
+                  </Button>
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {visibleDays.visibleSessionCount.toLocaleString("pt-BR")} de{" "}
+                    {(visibleDays.visibleSessionCount + visibleDays.hiddenSessionCount).toLocaleString("pt-BR")}{" "}
+                    registros exibidos
+                  </p>
+                </div>
+              )}
             </div>
           )
         })()}

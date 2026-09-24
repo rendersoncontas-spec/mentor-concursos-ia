@@ -98,7 +98,6 @@ describe("StudyContext dividido em StudyLiveContext + StudyActionsContext", () =
 describe("Consumidores que só precisam de ações/flags migraram para useStudyActions()", () => {
   const consumersThatShouldNotNeedLiveTimer = [
     "src/components/layout/floating-action-button.tsx",
-    "src/components/study/study-quick-access.tsx",
     "src/features/study-cycle/components/active-cycle-panel.tsx",
     "src/features/study-cycle/components/intelligent-cycle-widget.tsx",
   ]
@@ -116,8 +115,9 @@ describe("Consumidores que só precisam de ações/flags migraram para useStudyA
     "src/features/study-session/components/active-session-runner.tsx",
     "src/features/study-session/components/study-register-modal.tsx",
     "src/components/study/study-header-control.tsx",
-    "src/components/study/study-dock.tsx",
-    "src/features/dashboard/components/quick-start-bar.tsx",
+    // Fase G: study-dock.tsx e quick-start-bar.tsx (e study-quick-access.tsx,
+    // na lista acima) eram componentes sem nenhum import no app e foram
+    // removidos — os consumidores reais continuam verificados aqui.
   ]
 
   for (const file of consumersThatNeedLiveTimer) {

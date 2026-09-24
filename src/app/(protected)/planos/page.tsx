@@ -1,6 +1,10 @@
-import { Folder } from "lucide-react"
+import Link from "next/link"
+
+import { CalendarRange, Plus } from "lucide-react"
 
 import { PlanosView } from "@/features/planos/components/planos-view"
+import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/page-header"
 
 export const metadata = {
   title: "Planos de Estudo",
@@ -10,18 +14,21 @@ export const metadata = {
 export default function PlanosPage() {
   return (
     <div className="flex flex-col min-h-full">
-      {/* Page Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-3">
-        <Folder className="h-5 w-5 text-emerald-500" />
-        <div>
-          <h1 className="text-lg font-bold leading-none">Planos de Estudo</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Catálogo e gerenciamento dos planos de concursos
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={CalendarRange}
+        title="Planos de Estudo"
+        description="Escolha qual plano seguir e acompanhe a carga de cada um"
+        actions={
+          <Button asChild size="sm">
+            <Link href="/planejamento">
+              <Plus aria-hidden className="h-4 w-4" />
+              Criar plano
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full">
+      <div className="flex-1 page-container py-5">
         <PlanosView />
       </div>
     </div>

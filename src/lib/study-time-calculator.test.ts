@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { computeStudyTimeFromHistory, getSaoPauloWeekRange } from "./study-time-calculator"
+import { computeStudyTimeFromHistory, getSaoPauloWeekRange, resolveWeekStartDay } from "./study-time-calculator"
 
 describe("study-time-calculator engine", () => {
   const history = [
@@ -73,5 +73,28 @@ describe("study-time-calculator engine", () => {
     const mondayStart = getSaoPauloWeekRange("2026-09-01", 1)
     assert.equal(mondayStart.mondayKey, "2026-08-31")
     assert.equal(mondayStart.sundayKey, "2026-09-06")
+  })
+})
+
+describe("resolveWeekStartDay (Fase G — substitui 5 ternários idênticos)", () => {
+  it("mesma tabela de resultados da expressão antiga (prefs → coluna → 0)", () => {
+    const prefs: unknown[] = ["Domingo", "Segunda-feira", "Terça-feira", "", "domingo", undefined, null, 0, 1]
+    const columns: Array<number | null | undefined> = [0, 1, 3, null, undefined]
+    for (const p of prefs) {
+      for (const c of columns) {
+        // Só os dois textos exatos mudam o resultado; qualquer outro valor cai na coluna (ou 0).
+        let expected = c ?? 0
+        if (p === "Domingo") expected = 0
+        if (p === "Segunda-feira") expected = 1
+        assert.equal(resolveWeekStartDay(p, c), expected, `prefs=${String(p)} coluna=${String(c)}`)
+      }
+    }
+  })
+
+  it("preferência tem prioridade sobre a coluna; sem nenhuma, Domingo", () => {
+    assert.equal(resolveWeekStartDay("Segunda-feira", 0), 1)
+    assert.equal(resolveWeekStartDay("Domingo", 1), 0)
+    assert.equal(resolveWeekStartDay(undefined, 1), 1)
+    assert.equal(resolveWeekStartDay(undefined, null), 0)
   })
 })

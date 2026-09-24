@@ -153,7 +153,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
           }
         }
       }
-    } catch {}
+    } catch { /* cache local ausente ou corrompido: as notas vêm do servidor logo abaixo */ }
 
     // Buscar dados atualizados do servidor
     getUserNotesAction().then((res) => {
@@ -186,7 +186,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
           setNotes(serverNotes)
           try {
             localStorage.setItem(LOCAL_STORAGE_CACHE_KEY, JSON.stringify(serverNotes))
-          } catch {}
+          } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
 
           const savedActiveId = localStorage.getItem(LOCAL_STORAGE_ACTIVE_ID)
           const currentActive =
@@ -273,7 +273,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
           const next = [updatedNotePayload, ...filtered]
           try {
             localStorage.setItem(LOCAL_STORAGE_CACHE_KEY, JSON.stringify(next))
-          } catch {}
+          } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
           return next
         })
 
@@ -336,7 +336,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
     }
     try {
       localStorage.setItem(LOCAL_STORAGE_ACTIVE_ID, newId)
-    } catch {}
+    } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
     void saveUserNoteAction(newNote)
     toast.success("Nova nota criada!")
   }
@@ -350,7 +350,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
       const filtered = prev.filter((n) => n.id !== idToDelete)
       try {
         localStorage.setItem(LOCAL_STORAGE_CACHE_KEY, JSON.stringify(filtered))
-      } catch {}
+      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
       return filtered
     })
 
@@ -424,7 +424,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
     return (
       <div
         className={cn(
-          "fixed bottom-24 right-4 sm:right-6 z-50 rounded-full border shadow-2xl transition-all duration-200 flex items-center gap-2 px-4 py-2 cursor-pointer hover:scale-105 select-none backdrop-blur-md",
+          "fixed bottom-24 right-4 sm:right-6 z-50 rounded-full border shadow-2xl transition-all duration-200 flex items-center gap-2 px-4 py-2 cursor-pointer select-none",
           currentTheme.bg,
           currentTheme.border,
           currentTheme.text
@@ -433,7 +433,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
         title="Clique para restaurar o Bloco de Notas"
       >
         <SquarePen className="h-4 w-4" />
-        <span className="text-xs font-bold truncate max-w-[160px]">
+        <span className="text-xs font-semibold truncate max-w-[160px]">
           {noteTitle || "Nota Rápida"}
         </span>
         <span className="text-[10px] opacity-70 font-semibold">• {lastSavedText}</span>
@@ -453,7 +453,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
   return (
     <div
       className={cn(
-        "fixed bottom-24 right-3 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[410px] rounded-2xl border shadow-xl transition-all duration-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95",
+        "fixed bottom-24 right-3 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[410px] rounded-xl border shadow-xl transition-all duration-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95",
         currentTheme.bg,
         currentTheme.border,
         currentTheme.text
@@ -472,7 +472,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
           {viewMode === "LIST" ? (
             <button
               onClick={() => setViewMode("EDITOR")}
-              className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg hover:bg-black/10 transition-colors"
+              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg hover:bg-black/10 transition-colors"
               title="Voltar ao editor"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -505,7 +505,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
                     key={theme.id}
                     onClick={() => handleColorChange(theme.id)}
                     className={cn(
-                      "w-3.5 h-3.5 rounded-full transition-transform hover:scale-125 border border-black/10",
+                      "w-3.5 h-3.5 rounded-full transition-transform border border-black/10",
                       theme.dot,
                       noteColor === theme.id && "ring-2 ring-primary ring-offset-1 scale-110"
                     )}
@@ -593,7 +593,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
             </div>
             <button
               onClick={handleCreateNewNote}
-              className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-bold shadow-xs hover:bg-primary/90 transition-all shrink-0"
+              className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-semibold shadow-xs hover:bg-primary/90 transition-all shrink-0"
             >
               <Plus className="h-3.5 w-3.5" /> Nova
             </button>
@@ -623,10 +623,10 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
                       setViewMode("EDITOR")
                       try {
                         localStorage.setItem(LOCAL_STORAGE_ACTIVE_ID, note.id)
-                      } catch {}
+                      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
                     }}
                     className={cn(
-                      "p-3 rounded-2xl border transition-all cursor-pointer select-none space-y-1 hover:shadow-xs",
+                      "p-3 rounded-xl border transition-all cursor-pointer select-none space-y-1 hover:shadow-xs",
                       noteTheme?.bg,
                       noteTheme?.border,
                       noteTheme?.text,
@@ -634,12 +634,12 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <h4 className="font-bold text-xs truncate flex-1 flex items-center gap-1.5">
+                      <h4 className="font-semibold text-xs truncate flex-1 flex items-center gap-1.5">
                         {note.is_pinned && <Pin className="h-3 w-3 fill-current text-primary shrink-0" />}
                         <span>{note.title || "Sem título"}</span>
                       </h4>
                       {note.discipline_name && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-black/10 truncate max-w-[120px]">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-black/10 truncate max-w-[120px]">
                           {note.discipline_name}
                         </span>
                       )}
@@ -654,7 +654,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
                         {note.tags.slice(0, 3).map((tag, idx) => (
                           <span
                             key={idx}
-                            className="text-[9px] font-semibold opacity-70 bg-black/5 px-1 py-0.2 rounded"
+                            className="text-[10px] font-semibold opacity-70 bg-black/5 px-1 py-0.2 rounded"
                           >
                             {tag}
                           </span>
@@ -677,13 +677,13 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
               placeholder="Título da anotação..."
               value={noteTitle}
               onChange={(e) => handleTitleChange(e.target.value)}
-              className="w-full bg-transparent font-black text-base border-none focus:outline-none placeholder:opacity-40 leading-tight"
+              className="w-full bg-transparent font-semibold text-base border-none focus:outline-none placeholder:opacity-40 leading-tight"
             />
           </div>
 
           {/* Painel Expansível de Disciplina & Tags */}
           {isDetailsOpen && (
-            <div className="px-4 py-2 mx-3 mb-2 rounded-2xl bg-black/5 border border-black/10 space-y-2 text-xs animate-in fade-in slide-in-from-top-1">
+            <div className="px-4 py-2 mx-3 mb-2 rounded-xl bg-black/5 border border-black/10 space-y-2 text-xs animate-in fade-in slide-in-from-top-1">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-3.5 w-3.5 opacity-60 shrink-0" />
                 <input
@@ -749,7 +749,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
               <button
                 type="button"
                 onClick={() => execFormat("bold")}
-                className="p-1 rounded hover:bg-black/10 font-bold transition-colors"
+                className="p-1 rounded hover:bg-black/10 font-semibold transition-colors"
                 title="Negrito (Ctrl+B)"
               >
                 <Bold className="h-3.5 w-3.5" />
@@ -853,7 +853,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
                 </>
               )}
               {saveStatus === "error" && (
-                <span className="text-amber-600 font-bold">{lastSavedText}</span>
+                <span className="text-amber-600 font-semibold">{lastSavedText}</span>
               )}
             </div>
           </div>
@@ -862,13 +862,13 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
 
       {/* ── MODAL DE CONFIRMAÇÃO DE EXCLUSÃO ──────────────────────────────────── */}
       {isDeleteDialogOpen && (
-        <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-card text-foreground rounded-2xl p-5 border shadow-xl max-w-xs space-y-4 text-center">
+        <div className="absolute inset-0 z-50 bg-black/40 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card text-foreground rounded-xl p-5 border shadow-xl max-w-xs space-y-4 text-center">
             <div className="w-10 h-10 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-sm font-black">Excluir esta anotação?</h4>
+              <h4 className="text-sm font-semibold">Excluir esta anotação?</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Esta ação removerá a nota permanentemente e não poderá ser desfeita.
               </p>
@@ -876,13 +876,13 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
             <div className="flex items-center justify-center gap-2 pt-1">
               <button
                 onClick={() => setIsDeleteDialogOpen(false)}
-                className="px-3 py-1.5 rounded-xl border text-xs font-bold hover:bg-muted transition-colors"
+                className="px-3 py-1.5 rounded-xl border text-xs font-semibold hover:bg-muted transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDeleteNote}
-                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-xs"
+                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors shadow-xs"
               >
                 Excluir
               </button>

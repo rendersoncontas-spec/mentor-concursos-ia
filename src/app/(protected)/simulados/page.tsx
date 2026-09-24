@@ -1,5 +1,3 @@
-import { ListCheck } from "lucide-react"
-
 import { SimuladosView } from "@/features/simulados/components/simulados-view"
 
 export const metadata = {
@@ -8,22 +6,10 @@ export const metadata = {
 }
 
 export default function SimuladosPage() {
+  // O cabeçalho fixo (com a ação "Registrar simulado") é renderizado pela view.
   return (
     <div className="flex flex-col min-h-full">
-      {/* Page Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-3">
-        <ListCheck className="h-5 w-5 text-emerald-500" />
-        <div>
-          <h1 className="text-lg font-bold leading-none">Simulados</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Gestão de provas e simulados preparatórios
-          </p>
-        </div>
-      </div>
-
-      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full">
-        <SimuladosView />
-      </div>
+      <SimuladosView />
     </div>
   )
 }

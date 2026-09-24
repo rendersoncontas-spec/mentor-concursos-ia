@@ -129,12 +129,12 @@ export function StudyCalendar({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between rounded-xl border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between rounded-xl border bg-card p-4">
         <Button
           variant="outline"
           size="sm"
           onClick={handlePrev}
-          className="gap-1 h-9 font-bold text-xs shadow-xs"
+          className="gap-1 h-9 font-semibold text-xs shadow-xs"
           disabled={isLoading}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -142,12 +142,12 @@ export function StudyCalendar({
         </Button>
 
         <div className="text-center">
-          <h2 className="text-lg sm:text-xl font-black text-foreground">
+          <h2 className="text-lg sm:text-xl font-semibold text-foreground">
             {MONTH_NAMES[currentMonth - 1]} de {currentYear}
           </h2>
           {isLoading && (
-            <span className="text-[10px] font-bold text-primary animate-pulse">
-              CARREGANDO...
+            <span className="text-[11px] text-muted-foreground" role="status">
+              Carregando…
             </span>
           )}
         </div>
@@ -157,7 +157,7 @@ export function StudyCalendar({
             variant="outline"
             size="sm"
             onClick={handleToday}
-            className="h-9 font-bold text-xs shadow-xs"
+            className="h-9 font-semibold text-xs shadow-xs"
             disabled={isLoading}
           >
             Hoje
@@ -166,7 +166,7 @@ export function StudyCalendar({
             variant="outline"
             size="sm"
             onClick={handleNext}
-            className="gap-1 h-9 font-bold text-xs shadow-xs"
+            className="gap-1 h-9 font-semibold text-xs shadow-xs"
             disabled={isLoading}
           >
             <span>Próximo</span>
@@ -176,11 +176,11 @@ export function StudyCalendar({
       </div>
 
       {/* Grid */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
         {/* Days of week */}
         <div className="grid grid-cols-7 border-b bg-muted/30">
           {WEEK_DAYS.map((day) => (
-            <div key={day} className="py-2.5 text-center text-xs font-black text-muted-foreground">
+            <div key={day} className="py-2.5 text-center text-xs font-semibold text-muted-foreground">
               {day}
             </div>
           ))}
@@ -238,7 +238,7 @@ export function StudyCalendar({
               >
                 <div className="flex items-center justify-between w-full mb-1.5">
                   <span
-                    className={`text-xs sm:text-sm font-black ${isToday ? "text-primary" : "text-foreground/80"}`}
+                    className={`text-xs sm:text-sm font-semibold ${isToday ? "text-primary" : "text-foreground/80"}`}
                   >
                     {day}
                   </span>
@@ -255,14 +255,14 @@ export function StudyCalendar({
                         />
                       ))}
                     </div>
-                    <div className="text-[11px] font-extrabold text-foreground flex items-center gap-1 truncate">
+                    <div className="text-[11px] font-semibold text-foreground flex items-center gap-1 truncate">
                       <BookOpen className="h-3 w-3 shrink-0" /> {daySessions.length} Ativ.
                     </div>
-                    <div className="text-[11px] font-black text-foreground flex items-center gap-1 truncate">
+                    <div className="text-[11px] font-semibold text-foreground flex items-center gap-1 truncate">
                       <Timer className="h-3 w-3 shrink-0" /> {formatDurationMinutes(totalMinutes)}
                     </div>
                     {totalQuestions > 0 && (
-                      <div className="text-[10px] font-bold text-foreground/80 flex items-center gap-1 truncate">
+                      <div className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1 truncate">
                         <FileText className="h-3 w-3 shrink-0" /> {totalQuestions} qst{" "}
                         {totalCorrect > 0 && (
                           <span className="inline-flex items-center gap-0.5 text-emerald-600">
@@ -283,29 +283,29 @@ export function StudyCalendar({
       <Dialog open={!!selectedDate} onOpenChange={(open) => !open && setSelectedDate(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
+            <DialogTitle className="text-xl font-semibold">
               Estudos do dia {selectedDate ? selectedDate.split("-").reverse().join("/") : ""}
             </DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 shrink-0">
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase">
+              <div className="type-label">
                 Tempo Total
               </div>
-              <div className="text-lg font-bold">{formatDurationMinutes(dayTotalMinutes)}</div>
+              <div className="text-lg font-semibold">{formatDurationMinutes(dayTotalMinutes)}</div>
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase">Sessões</div>
-              <div className="text-lg font-bold">{selectedDaySessions.length}</div>
+              <div className="type-label">Sessões</div>
+              <div className="text-lg font-semibold">{selectedDaySessions.length}</div>
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase">Questões</div>
-              <div className="text-lg font-bold">{dayTotalQuestions}</div>
+              <div className="type-label">Questões</div>
+              <div className="text-lg font-semibold">{dayTotalQuestions}</div>
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase">Acertos</div>
-              <div className="text-lg font-bold text-emerald-600">{dayTotalCorrect}</div>
+              <div className="type-label">Acertos</div>
+              <div className="text-lg font-semibold text-emerald-600">{dayTotalCorrect}</div>
             </div>
           </div>
 
@@ -318,7 +318,7 @@ export function StudyCalendar({
               return (
                 <div
                   key={session.id}
-                  className="rounded-xl border bg-card p-3 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                  className="rounded-xl border bg-card p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                 >
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <div
@@ -326,11 +326,11 @@ export function StudyCalendar({
                       style={{ backgroundColor: color }}
                     />
                     <div className="space-y-0.5 min-w-0">
-                      <h4 className="font-extrabold text-xs text-foreground truncate">
+                      <h4 className="font-semibold text-xs text-foreground truncate">
                         {session.disciplines?.name || "Estudo Livre"}
                       </h4>
                       {session.origin_source && (
-                        <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                        <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                           Importado ·{" "}
                           {originDisplayName(session.origin_source, session.origin_source_name)}
                         </span>
@@ -342,7 +342,7 @@ export function StudyCalendar({
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                    <span className="text-xs font-mono font-bold">
+                    <span className="text-xs tabular-nums font-semibold">
                       {formatDuration(sessionRealSeconds(session))}
                     </span>
                     <div className="flex items-center gap-1">

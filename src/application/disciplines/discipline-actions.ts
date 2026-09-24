@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
 import {
@@ -61,17 +62,27 @@ export async function getDisciplineDetailStatsAction(
       .maybeSingle()
     if (!disc) return { success: true, data: null }
 
+    // Fase F.1: paginados (antes 1 requisição cada, cortada em 1.000 linhas).
+    // Mesmo formato { data } de antes; erro → data null.
     const [historyRes, attemptsRes] = await Promise.all([
-      supabase
-        .from("study_history")
-        .select("duration_minutes, metadata")
-        .eq("user_id", effectiveUserId)
-        .eq("discipline_id", disc.id),
-      supabase
-        .from("question_attempts")
-        .select("correct")
-        .eq("user_id", effectiveUserId)
-        .eq("discipline_id", disc.id),
+      fetchAllRowsPaged<{ duration_minutes: number | null; metadata: Record<string, unknown> | null }>(
+        (withCount) =>
+          supabase
+            .from("study_history")
+            .select("duration_minutes, metadata", countOption(withCount))
+            .eq("user_id", effectiveUserId)
+            .eq("discipline_id", disc.id),
+        [{ column: "id", ascending: true }],
+      ).then(({ data, error }) => ({ data: error ? null : data })),
+      fetchAllRowsPaged<{ correct: boolean }>(
+        (withCount) =>
+          supabase
+            .from("question_attempts")
+            .select("correct", countOption(withCount))
+            .eq("user_id", effectiveUserId)
+            .eq("discipline_id", disc.id),
+        [{ column: "id", ascending: true }],
+      ).then(({ data, error }) => ({ data: error ? null : data })),
     ])
 
     let minutes = 0

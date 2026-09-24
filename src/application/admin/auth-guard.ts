@@ -1,3 +1,5 @@
+import { cache } from "react"
+
 import { cookies } from "next/headers"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -33,8 +35,15 @@ export interface EffectiveUser {
  * Retorna o usuário efetivo para a renderização das telas.
  * Se o operador for Admin/Moderador e estiver com uma sessão de suporte ativa,
  * retorna o ID e perfil do estudante alvo (impersonação em suporte).
+ *
+ * Fase F (performance): memorizada por requisição com `cache()` do React. O
+ * layout protegido, a página e os loaders da mesma renderização usam a mesma
+ * instância de client (ver `createClient`), então `auth.getUser()` + papel +
+ * perfil rodam uma vez por navegação em vez de uma vez por chamador. Em
+ * Server Actions e Route Handlers `cache()` não memoriza (comportamento
+ * idêntico ao anterior).
  */
-export async function getEffectiveSessionUser(
+export const getEffectiveSessionUser = cache(async function getEffectiveSessionUser(
   supabase: SupabaseClient,
 ): Promise<EffectiveUser | null> {
   const {
@@ -43,7 +52,17 @@ export async function getEffectiveSessionUser(
 
   if (!user) return null
 
-  const userRole = await getUserRole(supabase, user.id)
+  // Fase F (performance): papel e perfil não dependem um do outro — antes eram
+  // 2 idas ao banco em sequência (papel → perfil), agora vão juntas. O perfil
+  // só não é usado quando há sessão de suporte ativa (caso raro, de admin).
+  const [userRole, { data: profileData }] = await Promise.all([
+    getUserRole(supabase, user.id),
+    supabase
+      .from("profiles")
+      .select("name, full_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ])
 
   let supportSession: ActiveSupportSession | null = null
   if (userRole === "admin" || userRole === "moderator") {
@@ -65,12 +84,6 @@ export async function getEffectiveSessionUser(
     }
   }
 
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("name, full_name, avatar_url")
-    .eq("id", user.id)
-    .maybeSingle()
-
   const profileName =
     profileData?.name ||
     profileData?.full_name ||
@@ -91,7 +104,7 @@ export async function getEffectiveSessionUser(
     operatorId: user.id,
     supportSession: null,
   }
-}
+})
 
 /**
  * Retorna o ID do usuário efetivo para operações (próprio usuário ou estudante em suporte).

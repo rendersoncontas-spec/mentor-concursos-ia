@@ -116,14 +116,14 @@ export function UserExamModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-6 rounded-2xl">
+      <DialogContent className="sm:max-w-md p-6 rounded-xl">
         <DialogHeader className="space-y-1 text-left border-b pb-4">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-primary/10 text-primary">
               <Calendar className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-black text-foreground">
+              <DialogTitle className="text-lg font-semibold text-foreground">
                 {isEditing ? "Editar Data da Prova" : "Cadastrar Data da Prova"}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
@@ -136,7 +136,7 @@ export function UserExamModal({
         <form onSubmit={handleSave} className="space-y-4 pt-2">
           {/* Nome da Prova */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-foreground block">
+            <label className="text-xs font-semibold text-foreground block">
               Nome do Concurso / Cargo <span className="text-muted-foreground font-normal">(opcional)</span>
             </label>
             <Input
@@ -149,7 +149,7 @@ export function UserExamModal({
 
           {/* Data da Prova */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-foreground flex items-center gap-1">
+            <label className="text-xs font-semibold text-foreground flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5 text-primary" />
               Data da Prova <span className="text-rose-500">*</span>
             </label>
@@ -165,7 +165,7 @@ export function UserExamModal({
           {/* Horário e Local (Grid 2 colunas) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground flex items-center gap-1">
+              <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                 Horário <span className="text-muted-foreground font-normal">(opcional)</span>
               </label>
@@ -178,7 +178,7 @@ export function UserExamModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground flex items-center gap-1">
+              <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                 Local <span className="text-muted-foreground font-normal">(opcional)</span>
               </label>
@@ -199,7 +199,7 @@ export function UserExamModal({
                 variant="destructive"
                 onClick={handleDelete}
                 disabled={deleting || loading}
-                className="h-9 px-3 text-xs font-bold rounded-xl flex items-center gap-1"
+                className="h-9 px-3 text-xs font-semibold rounded-xl flex items-center gap-1"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>{deleting ? "Excluindo..." : "Excluir"}</span>
@@ -209,7 +209,7 @@ export function UserExamModal({
                 type="button"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
-                className="h-9 text-xs font-bold rounded-xl"
+                className="h-9 text-xs font-semibold rounded-xl"
               >
                 Cancelar
               </Button>
@@ -219,7 +219,6 @@ export function UserExamModal({
               <Button
                 type="submit"
                 disabled={loading || deleting}
-                className="h-9 px-5 bg-primary hover:bg-primary/90 text-white text-xs font-bold rounded-xl shadow-xs"
               >
                 {saveButtonLabel}
               </Button>

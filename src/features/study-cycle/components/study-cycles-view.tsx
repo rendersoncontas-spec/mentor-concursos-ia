@@ -1,20 +1,22 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
-import { ArrowLeft, Layers, Plus, RefreshCcw } from "lucide-react"
+import { ArrowLeft, CircleDot, Layers, Plus, RefreshCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import {
   activateCycleAction,
   deleteCycleAction,
-  getActiveCycleAction,
   getCyclesAction,
   pauseCycleAction,
 } from "@/application/study-cycle/study-cycle.actions"
+import { pickActiveCycleOverview } from "@/application/study-cycle/pick-active-cycle"
 import { getDisciplinesForAutocomplete } from "@/application/study-session/get-disciplines.action"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { PageHeader } from "@/components/ui/page-header"
 import type { CycleOverview } from "@/domain/study-cycle/study-cycle.types"
 import { ActiveCyclePanel } from "@/features/study-cycle/components/active-cycle-panel"
 import { CreateCycleModal } from "@/features/study-cycle/components/create-cycle-modal"
@@ -28,42 +30,80 @@ interface DisciplineOption {
   area: string | null
 }
 
-export function StudyCyclesView() {
-  const [cycles, setCycles] = useState<CycleOverview[]>([])
-  const [activeCycle, setActiveCycle] = useState<CycleOverview | null>(null)
+/**
+ * Fase F (performance): dados já carregados no servidor pela página
+ * (`app/(protected)/ciclos/page.tsx`), em paralelo e na mesma renderização.
+ * Antes, a tela montava vazia com "Carregando seus ciclos de estudo..." e só
+ * então disparava 3 Server Actions — que o Next.js executa em fila, uma por
+ * vez, cada uma repetindo a autenticação.
+ */
+export interface StudyCyclesInitialData {
+  cycles: CycleOverview[]
+  activeCycle: CycleOverview | null
+  disciplines: DisciplineOption[]
+  reconcileErrors: string[]
+}
+
+function notifyReconcileErrors(reconcileErrors: string[]) {
+  if (reconcileErrors.length === 0) return
+  const hasMigrationError = reconcileErrors.some(e =>
+    e.includes("COLUNAS V2") || e.includes("does not exist")
+  )
+  if (hasMigrationError) {
+    toast.error("Erro ao sincronizar estudos com o ciclo. Execute a migration V2 no painel do Supabase.", {
+      duration: 10000,
+    })
+  } else {
+    toast.warning(`Sincronização do ciclo com erros: ${reconcileErrors[0]}`, {
+      duration: 8000,
+    })
+  }
+}
+
+export function StudyCyclesView({ initialData }: { initialData?: StudyCyclesInitialData | undefined }) {
+  const [cycles, setCycles] = useState<CycleOverview[]>(initialData?.cycles ?? [])
+  const [activeCycle, setActiveCycle] = useState<CycleOverview | null>(initialData?.activeCycle ?? null)
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingOverview, setEditingOverview] = useState<CycleOverview | null>(null)
-  const [availableDisciplines, setAvailableDisciplines] = useState<DisciplineOption[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [availableDisciplines, setAvailableDisciplines] = useState<DisciplineOption[]>(
+    initialData?.disciplines ?? [],
+  )
+  const [isLoading, setIsLoading] = useState(!initialData)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
+  // Fase F.2: quando a página é re-renderizada no servidor (ex.: um estudo
+  // salvo nesta aba — a Server Action revalida /ciclos e devolve a página
+  // nova), os dados novos chegam aqui como um NOVO `initialData`. Antes eles
+  // eram ignorados depois da montagem e a lista ficava com os números antigos.
+  // Padrão "valor da renderização anterior" do React (sem efeito).
+  const [seenInitialData, setSeenInitialData] = useState(initialData)
+  if (initialData && initialData !== seenInitialData) {
+    setSeenInitialData(initialData)
+    setCycles(initialData.cycles)
+    setActiveCycle(initialData.activeCycle)
+    setAvailableDisciplines(initialData.disciplines)
+  }
+
+  // `withDisciplines`: a lista de disciplinas só muda ao criar/editar um ciclo
+  // (que pode cadastrar disciplinas novas). Ativar, pausar, excluir ou pular
+  // etapa não a altera — nesses casos ela não é buscada de novo.
+  const loadData = useCallback(async (options?: { withDisciplines?: boolean }) => {
     try {
-      const [cyclesResult, activeData, disciplinesResult] = await Promise.all([
+      // Fase F.1: o ciclo ativo sai da própria lista (mesmo critério e mesmos
+      // dados de getActiveCycleAction) — uma Server Action a menos na fila e
+      // as sessões do ciclo ativo não são lidas duas vezes.
+      const [cyclesResult, disciplinesResult] = await Promise.all([
         getCyclesAction(),
-        getActiveCycleAction(),
-        getDisciplinesForAutocomplete(),
+        options?.withDisciplines ? getDisciplinesForAutocomplete() : Promise.resolve(null),
       ])
       setCycles(cyclesResult.data)
-      setActiveCycle(activeData)
-      setAvailableDisciplines(disciplinesResult?.allDisciplines || [])
-
-      if (cyclesResult.reconcileErrors.length > 0) {
-        const hasMigrationError = cyclesResult.reconcileErrors.some(e =>
-          e.includes("COLUNAS V2") || e.includes("does not exist")
-        )
-        if (hasMigrationError) {
-          toast.error("Erro ao sincronizar estudos com o ciclo. Execute a migration V2 no painel do Supabase.", {
-            duration: 10000,
-          })
-        } else {
-          toast.warning(`Sincronização do ciclo com erros: ${cyclesResult.reconcileErrors[0]}`, {
-            duration: 8000,
-          })
-        }
+      setActiveCycle(pickActiveCycleOverview(cyclesResult.data))
+      if (disciplinesResult) {
+        setAvailableDisciplines(disciplinesResult.allDisciplines || [])
       }
+      notifyReconcileErrors(cyclesResult.reconcileErrors)
     } catch (err) {
       console.error("[StudyCyclesView] Erro ao carregar ciclos:", err)
       toast.error("Erro ao carregar ciclos de estudo.")
@@ -73,13 +113,26 @@ export function StudyCyclesView() {
     }
   }, [])
 
+  const reloadWithDisciplines = useCallback(() => loadData({ withDisciplines: true }), [loadData])
+
+  const refreshCycles = useCallback(() => loadData(), [loadData])
+
+  // initialData vale só para a montagem (vem do servidor); mudanças de
+  // referência depois disso não devem disparar nova carga.
+  const initialDataRef = useRef(initialData)
   useEffect(() => {
-    loadData()
+    const serverData = initialDataRef.current
+    if (serverData) {
+      // Os avisos de sincronização que vieram do servidor continuam aparecendo.
+      notifyReconcileErrors(serverData.reconcileErrors)
+      return
+    }
+    loadData({ withDisciplines: true })
   }, [loadData])
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true)
-    loadData()
+    loadData({ withDisciplines: true })
   }, [loadData])
 
   const handleActivate = useCallback(
@@ -127,54 +180,47 @@ export function StudyCyclesView() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[450px] gap-3">
-        <RefreshCcw className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          Carregando seus ciclos de estudo...
-        </p>
+      <div className="flex flex-col min-h-full">
+        <PageHeader
+          icon={CircleDot}
+          title="Ciclos de estudo"
+          description="Suas matérias em uma sequência contínua, sem dias fixos"
+        />
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-2">
+          <RefreshCcw aria-hidden className="h-5 w-5 animate-spin text-muted-foreground" />
+          <p className="text-[13px] text-muted-foreground">Carregando seus ciclos de estudo…</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col min-h-full bg-background">
-      <div className="flex-1 px-3 sm:px-4 md:px-5 py-2.5 md:py-3 space-y-2.5 max-w-[1600px] mx-auto w-full pb-12">
-        {/* CABEÇALHO COMPACTO */}
-        <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
-              <Layers className="h-3.5 w-3.5" />
-            </div>
-            <h1 className="text-base sm:text-lg font-black text-foreground tracking-tight whitespace-nowrap">
-              Ciclos de Estudo
-            </h1>
-            <span className="truncate text-[11px] font-medium text-muted-foreground hidden lg:inline">
-              Organize suas matérias em uma sequência contínua
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
+      <PageHeader
+        icon={CircleDot}
+        title="Ciclos de estudo"
+        description="Suas matérias em uma sequência contínua, sem dias fixos"
+        actions={
+          <>
             <Button
               variant="outline"
-              size="icon"
+              size="icon-sm"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="h-8 w-8 shrink-0"
               title="Atualizar ciclos"
+              aria-label="Atualizar ciclos"
             >
-              <RefreshCcw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+              <RefreshCcw aria-hidden className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
             </Button>
-
-            <Button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-8 px-2.5 shadow-sm gap-1"
-            >
-              <Plus className="h-3.5 w-3.5" />
+            <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
+              <Plus aria-hidden className="h-4 w-4" />
               Criar ciclo
             </Button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
+      <div className="flex-1 page-container py-5 space-y-5">
         {/* VISUALIZAÇÃO: MODO DETALHE DE CICLO SELECIONADO OU MODO GERAL */}
         {selectedCycleId && selectedCycleOverview ? (
           <div className="space-y-4 animate-in fade-in duration-200">
@@ -183,7 +229,7 @@ export function StudyCyclesView() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedCycleId(null)}
-                className="text-xs font-bold gap-1 text-muted-foreground hover:text-foreground"
+                className="gap-1 -ml-2 text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Voltar para todos os ciclos
@@ -193,28 +239,27 @@ export function StudyCyclesView() {
                 <Button
                   size="sm"
                   onClick={() => handleActivate(selectedCycleOverview.cycle.id)}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-black"
                 >
-                  Ativar este ciclo como principal
+                  Ativar como ciclo principal
                 </Button>
               )}
             </div>
 
             <ActiveCyclePanel
               overview={selectedCycleOverview}
-              onRefresh={loadData}
+              onRefresh={refreshCycles}
               onSelectAnotherCycle={() => setSelectedCycleId(null)}
               onEditCycle={() => setEditingOverview(selectedCycleOverview)}
             />
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-6">
             {/* 1. DESTAQUE DO CICLO ATIVO */}
             {activeCycle && (
               <div>
                 <ActiveCyclePanel
                   overview={activeCycle}
-                  onRefresh={loadData}
+                  onRefresh={refreshCycles}
                   onSelectAnotherCycle={cycles.length > 1 ? () => {} : undefined}
                   onEditCycle={() => setEditingOverview(activeCycle)}
                 />
@@ -222,35 +267,29 @@ export function StudyCyclesView() {
             )}
 
             {/* 2. LISTA DE TODOS OS CICLOS */}
-            <div className="space-y-2 pt-0.5">
-              <div className="flex items-center justify-between border-b pb-1.5">
-                <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
-                  {activeCycle ? "Todos os Ciclos Cadastrados" : "Meus Ciclos de Estudo"}
+            <div className="space-y-2.5">
+              <div className="flex items-end justify-between">
+                <h3 className="type-h3 text-foreground">
+                  {activeCycle ? "Todos os ciclos" : "Meus ciclos de estudo"}
                 </h3>
-                <span className="text-xs font-bold text-muted-foreground">
+                <span className="text-xs text-muted-foreground tabular-nums">
                   {cycles.length} {cycles.length === 1 ? "ciclo" : "ciclos"}
                 </span>
               </div>
 
               {cycles.length === 0 ? (
-                <Card className="p-8 text-center space-y-3 border border-dashed">
-                  <div className="flex justify-center"><Layers className="h-10 w-10 text-muted-foreground" /></div>
-                  <div className="space-y-1 max-w-md mx-auto">
-                    <h3 className="text-base font-black text-foreground">
-                      Nenhum ciclo cadastrado ainda
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Crie seu primeiro ciclo de estudos para organizar suas matérias em uma
-                      sequência rotativa contínua, sem se preocupar em prender disciplinas a dias fixos.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-primary text-primary-foreground font-black text-xs gap-1.5 shadow-xs"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Criar primeiro ciclo
-                  </Button>
+                <Card className="border-dashed">
+                  <EmptyState
+                    icon={Layers}
+                    title="Nenhum ciclo cadastrado"
+                    description="Crie um ciclo para organizar suas matérias em uma sequência rotativa, sem prender disciplinas a dias fixos."
+                    action={
+                      <Button onClick={() => setIsCreateModalOpen(true)} size="sm">
+                        <Plus className="h-4 w-4" />
+                        Criar primeiro ciclo
+                      </Button>
+                    }
+                  />
                 </Card>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -277,7 +316,7 @@ export function StudyCyclesView() {
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
         availableDisciplines={availableDisciplines}
-        onComplete={loadData}
+        onComplete={reloadWithDisciplines}
       />
 
       {/* MODAL DE EDIÇÃO */}
@@ -288,14 +327,14 @@ export function StudyCyclesView() {
         }}
         overview={editingOverview}
         availableDisciplines={availableDisciplines}
-        onComplete={loadData}
+        onComplete={reloadWithDisciplines}
       />
 
       {/* DIÁLOGO DE CONFIRMAÇÃO DE EXCLUSÃO */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <Card className="max-w-sm w-full p-4 space-y-4 border shadow-xs">
-            <h3 className="text-base font-black text-foreground">Excluir ciclo de estudos?</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="max-w-sm w-full p-5 space-y-3 shadow-xl">
+            <h3 className="text-base font-semibold text-foreground">Excluir ciclo de estudos?</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Esta ação removerá a fila de matérias deste ciclo. O histórico de sessões já estudadas
               permanecerá preservado no seu relatório geral de horas e estatísticas.
@@ -308,7 +347,7 @@ export function StudyCyclesView() {
                 variant="destructive"
                 size="sm"
                 onClick={() => handleDelete(deleteConfirmId)}
-                className="font-black text-xs"
+                className="font-semibold text-xs"
               >
                 Excluir ciclo
               </Button>

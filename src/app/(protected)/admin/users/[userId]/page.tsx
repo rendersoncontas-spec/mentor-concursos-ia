@@ -4,7 +4,7 @@ import { getUserRole } from "@/application/admin/auth-guard"
 import { AdminUserDetailsView } from "@/features/admin/components/admin-user-details-view"
 
 export const metadata = {
-  title: "Diagnóstico do Estudante | Mentor Concursos IA",
+  title: "Diagnóstico do Estudante",
 }
 
 interface UserDetailPageProps {

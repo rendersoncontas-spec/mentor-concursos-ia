@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
@@ -563,8 +564,8 @@ export async function importHistoryChunkAction(
     // Usa a mesma lista completa que a exclusão de importação já usava
     // (IMPORT_REVALIDATE_PATHS) — antes desta correção, o COMMIT de um
     // import (este fluxo) revalidava só 3 rotas, enquanto excluir um import
-    // já revalidava 7 (incluindo /estatisticas, /dashboard/analytics,
-    // /planejamento, /ranking). Ou seja, importar um arquivo do Aprovado
+    // já revalidava 7 (incluindo /estatisticas, /planejamento, /ranking; a
+    // antiga /dashboard/analytics saiu da lista na Fase G.1). Ou seja, importar um arquivo do Aprovado
     // podia deixar Estatísticas desatualizada, mas apagar a importação
     // corrigia — o caminho mais comum (importar) era o menos revalidado.
     for (const path of IMPORT_REVALIDATE_PATHS) revalidatePath(path)
@@ -627,12 +628,19 @@ export async function listImportsAction(): Promise<{
     const batchIds = (batches ?? []).map((batch) => batch.id)
     const countByBatch = new Map<string, number>()
     if (batchIds.length > 0) {
-      const { data: historyRows } = await supabase
-        .from("study_history")
-        .select("import_batch_id")
-        .eq("user_id", user.id)
-        .in("import_batch_id", batchIds)
-      for (const row of historyRows ?? []) {
+      // Fase F.1: paginado (antes 1 requisição cortada em 1.000 linhas → a
+      // contagem de sessões por lote saía menor, e de forma arbitrária).
+      // Erro → contagens zeradas, como antes.
+      const { data: historyRows, error: countError } = await fetchAllRowsPaged<{ import_batch_id: string }>(
+        (withCount) =>
+          supabase
+            .from("study_history")
+            .select("import_batch_id", countOption(withCount))
+            .eq("user_id", user.id)
+            .in("import_batch_id", batchIds),
+        [{ column: "id", ascending: true }],
+      )
+      for (const row of countError ? [] : historyRows) {
         const key = String(row.import_batch_id)
         countByBatch.set(key, (countByBatch.get(key) ?? 0) + 1)
       }
@@ -653,10 +661,10 @@ export async function listImportsAction(): Promise<{
   }
 }
 
+// Fase G.1: sem "/dashboard/analytics" (redireciona para /estatisticas).
 const IMPORT_REVALIDATE_PATHS = [
   "/dashboard/history",
   "/dashboard",
-  "/dashboard/analytics",
   "/estatisticas",
   "/ranking",
   "/planejamento",

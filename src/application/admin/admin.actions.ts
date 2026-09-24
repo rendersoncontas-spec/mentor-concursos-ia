@@ -1,6 +1,7 @@
 "use server"
 
 import { cookies } from "next/headers"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { revalidatePath } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 import crypto from "crypto"
@@ -11,7 +12,6 @@ import {
   SUPPORT_SESSION_COOKIE_NAME,
   SUPPORT_SESSION_MAX_AGE_SECONDS,
   canOperatorAccessTarget,
-  getActiveSupportSession,
   getUserRole,
   requireAdmin,
   requireModeratorOrAdmin,
@@ -183,34 +183,42 @@ export async function getUserDetailsAdminAction(
 
     const role = await getUserRole(supabase, targetUserId)
 
-    // Estatísticas básicas de estudo
-    const { data: historyData } = await supabase
-      .from("study_history")
-      .select("duration_minutes")
-      .eq("user_id", targetUserId)
+    // Fase F.1: sessões e questões paginadas (antes 1 requisição cada, cortada
+    // em 1.000 linhas → total de sessões travava em 1.000 e minutos
+    // subcontados) e as três leituras independentes em paralelo (antes em
+    // sequência). Erro → lista vazia, como antes.
+    const [historyResult, attemptsResult, { data: planData }] = await Promise.all([
+      // Estatísticas básicas de estudo
+      fetchAllRowsPaged<{ duration_minutes: number | null }>(
+        (withCount) =>
+          supabase.from("study_history").select("duration_minutes", countOption(withCount)).eq("user_id", targetUserId),
+        [{ column: "id", ascending: true }],
+      ),
+      // Questões
+      fetchAllRowsPaged<{ correct: boolean }>(
+        (withCount) =>
+          supabase.from("question_attempts").select("correct", countOption(withCount)).eq("user_id", targetUserId),
+        [{ column: "id", ascending: true }],
+      ),
+      // Plano ativo
+      supabase
+        .from("study_plans")
+        .select("id, version, generated_reason, created_at")
+        .eq("user_id", targetUserId)
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+    const historyData = historyResult.error ? [] : historyResult.data
+    const attemptsData = attemptsResult.error ? [] : attemptsResult.data
 
-    const totalSessions = historyData?.length ?? 0
-    const totalMinutes = (historyData ?? []).reduce((acc, h) => acc + (h.duration_minutes || 0), 0)
+    const totalSessions = historyData.length
+    const totalMinutes = historyData.reduce((acc, h) => acc + (h.duration_minutes || 0), 0)
 
-    // Questões
-    const { data: attemptsData } = await supabase
-      .from("question_attempts")
-      .select("correct")
-      .eq("user_id", targetUserId)
-
-    const totalQuestions = attemptsData?.length ?? 0
-    const questionsCorrect = (attemptsData ?? []).filter((a) => a.correct).length
+    const totalQuestions = attemptsData.length
+    const questionsCorrect = attemptsData.filter((a) => a.correct).length
     const accuracyPercentage = totalQuestions > 0 ? Math.round((questionsCorrect / totalQuestions) * 100) : 0
-
-    // Plano ativo
-    const { data: planData } = await supabase
-      .from("study_plans")
-      .select("id, version, generated_reason, created_at")
-      .eq("user_id", targetUserId)
-      .eq("active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
 
     return {
       data: {

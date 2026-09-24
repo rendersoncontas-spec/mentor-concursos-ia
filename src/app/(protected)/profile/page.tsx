@@ -1,3 +1,6 @@
+import { UserRound } from "lucide-react"
+
+import { PageHeader } from "@/components/ui/page-header"
 import { LogoutButton } from "@/features/auth/components/logout-button"
 import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { createClient } from "@/infrastructure/supabase/server"
@@ -7,31 +10,38 @@ export default async function ProfilePage() {
 
   const effectiveUser = await getEffectiveSessionUser(supabase)
 
+  const ROLE_LABELS: Record<string, string> = { admin: "Administrador", moderator: "Moderador" }
+  const roleLabel = ROLE_LABELS[effectiveUser?.role ?? ""] ?? "Estudante"
+
+  // Fase E — mesmo cabeçalho e container das outras páginas (antes: caixa de
+  // 672px presa à esquerda, com H1 próprio e textos em 18px).
   return (
-    <div className="container py-10 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Meu Perfil</h1>
+    <div className="flex flex-col min-h-full">
+      <PageHeader icon={UserRound} title="Perfil" description="Dados da sua conta" />
 
-      <div className="border rounded-lg p-6 space-y-4 shadow-sm bg-card">
-        <div>
-          <p className="text-sm text-muted-foreground font-medium">Nome</p>
-          <p className="text-lg">{effectiveUser?.name}</p>
-        </div>
-
-        <div>
-          <p className="text-sm text-muted-foreground font-medium">E-mail</p>
-          <p className="text-lg">{effectiveUser?.email}</p>
-        </div>
-
-        <div>
-          <p className="text-sm text-muted-foreground font-medium">Status</p>
-          <p className="text-md capitalize">
-            {effectiveUser?.role === "admin" ? "Administrador" : effectiveUser?.role === "moderator" ? "Moderador" : "Estudante"}
-          </p>
-        </div>
-
-        <div className="pt-4 border-t">
-          <LogoutButton />
-        </div>
+      <div className="flex-1 page-container py-5">
+        <section aria-label="Dados da conta" className="rounded-lg border border-border bg-card">
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-4 p-5 sm:grid-cols-3">
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">Nome</dt>
+              <dd className="mt-0.5 truncate text-sm font-medium text-foreground">{effectiveUser?.name}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">E-mail</dt>
+              <dd className="mt-0.5 truncate text-sm text-foreground">{effectiveUser?.email}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">Perfil de acesso</dt>
+              <dd className="mt-0.5 text-sm text-foreground">{roleLabel}</dd>
+            </div>
+          </dl>
+          <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[13px] text-muted-foreground">
+              Preferências, metas e dados pessoais ficam em “Minha conta”, no menu do avatar.
+            </p>
+            <LogoutButton />
+          </div>
+        </section>
       </div>
     </div>
   )

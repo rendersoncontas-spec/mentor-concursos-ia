@@ -154,11 +154,11 @@ export function StudyHeaderControl() {
               type="button"
               onClick={handleOpenCentral}
               className="flex min-w-0 items-center gap-1.5 text-left"
-              aria-label="Central Inteligente — sessão ativa (clique para restaurar)"
+              aria-label="Sessão de estudo ativa — clique para restaurar"
             >
               <span className="relative flex h-2 w-2 shrink-0">
                 {isStudying && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-success/30" />
                 )}
                 <span
                   className={cn(
@@ -167,7 +167,7 @@ export function StudyHeaderControl() {
                   )}
                 />
               </span>
-              <span className="font-mono font-black text-sm text-foreground tabular-nums whitespace-nowrap">
+              <span className="tabular-nums font-semibold text-sm text-foreground whitespace-nowrap">
                 {formatTimerClock(displayTime)}
               </span>
               <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap hidden sm:inline">

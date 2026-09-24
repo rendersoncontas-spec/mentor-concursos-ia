@@ -1,28 +1,32 @@
 import { Library } from "lucide-react"
 
+import { listLibraryMaterialsAction } from "@/application/library/library.action"
 import { BibliotecaView } from "@/features/biblioteca/components/biblioteca-view"
+import { PageHeader } from "@/components/ui/page-header"
 
 export const metadata = {
   title: "Biblioteca",
   description: "Organize seus materiais de estudo, PDFs, resumos e links no NomeIA.",
 }
 
-export default function BibliotecaPage() {
+export const dynamic = "force-dynamic"
+
+export default async function BibliotecaPage() {
+  // Fase F (performance): a lista sai com a página. Em erro, a tela busca
+  // sozinha no navegador como antes (e mostra a mensagem de erro).
+  const result = await listLibraryMaterialsAction()
+  const initialMaterials = result.success && result.data ? result.data : null
+
   return (
     <div className="flex flex-col min-h-full">
-      {/* Page Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-3">
-        <Library className="h-5 w-5 text-emerald-500" />
-        <div>
-          <h1 className="text-lg font-bold leading-none">Biblioteca</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Central de materiais de apoio e resumos
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={Library}
+        title="Biblioteca"
+        description="Central de materiais de apoio e resumos"
+      />
 
-      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full">
-        <BibliotecaView />
+      <div className="flex-1 page-container py-5">
+        <BibliotecaView initialMaterials={initialMaterials} />
       </div>
     </div>
   )

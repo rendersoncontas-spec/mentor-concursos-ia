@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation"
 import {
   ShieldAlert,
   Search,
-  UserCheck,
   LifeBuoy,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
   Eye,
   Sliders,
-  CheckCircle,
   AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -25,6 +23,7 @@ import {
 } from "@/application/admin/admin.actions"
 import type { UserRole } from "@/application/admin/auth-guard"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/page-header"
 import {
   Dialog,
   DialogContent,
@@ -142,19 +141,19 @@ export function AdminDashboardView({
     switch (role) {
       case "admin":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-primary/10 text-primary">
             Administrador
           </span>
         )
       case "moderator":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-warning/15 text-foreground">
             Moderador
           </span>
         )
       default:
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-muted text-muted-foreground">
             Estudante
           </span>
         )
@@ -162,36 +161,31 @@ export function AdminDashboardView({
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header do Painel */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-2xl font-black text-foreground flex items-center gap-2.5">
-            <ShieldAlert className="w-6 h-6 text-primary" />
-            Painel de Administração e Suporte
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Localize estudantes, acerte pendências e acesse temporariamente em modo de suporte seguro.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {getRoleBadge(currentOperatorRole)}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void loadUsers()}
-            disabled={loading}
-            className="text-xs font-bold rounded-xl cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-            Atualizar
-          </Button>
-        </div>
-      </div>
-
+    <div className="flex flex-col min-h-full">
+      {/* Fase E — cabeçalho e container iguais aos das demais páginas (antes:
+          max-w-7xl centralizado, com faixas vazias em telas largas). */}
+      <PageHeader
+        icon={ShieldAlert}
+        title="Administração e suporte"
+        description="Localize estudantes, resolva pendências e acesse em modo de suporte"
+        actions={
+          <>
+            <span className="hidden sm:inline-flex">{getRoleBadge(currentOperatorRole)}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void loadUsers()}
+              disabled={loading}
+            >
+              <RefreshCw aria-hidden className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+          </>
+        }
+      />
+    <div className="flex-1 page-container py-5 space-y-5">
       {/* Barra de Filtros e Busca */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-card p-3.5 rounded-2xl border shadow-xs">
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -199,7 +193,8 @@ export function AdminDashboardView({
             placeholder="Buscar por nome, email ou ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 text-xs font-medium bg-background"
+            aria-label="Buscar usuário"
+            className="pl-9 h-9 text-xs"
           />
         </div>
 
@@ -215,7 +210,7 @@ export function AdminDashboardView({
               setRoleFilter(e.target.value)
               setPage(1)
             }}
-            className="h-9 px-3 text-xs font-bold bg-background border rounded-xl focus:outline-none cursor-pointer"
+            className="h-9 px-3 text-xs bg-card border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           >
             <option value="all">Todos os papéis ({totalUsers})</option>
             <option value="user">Apenas Estudantes</option>
@@ -226,22 +221,22 @@ export function AdminDashboardView({
       </div>
 
       {/* Lista / Tabela de Usuários */}
-      <div className="bg-card rounded-2xl border shadow-xs overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         {loading && users.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-muted-foreground space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-xs font-medium">Carregando usuários...</p>
+            <RefreshCw aria-hidden className="w-5 h-5 animate-spin" />
+            <p className="text-[13px]">Carregando usuários…</p>
           </div>
         ) : users.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-muted-foreground space-y-2 text-center">
-            <AlertTriangle className="w-8 h-8 text-amber-500" />
-            <p className="text-sm font-bold text-foreground">Nenhum usuário encontrado</p>
+            <AlertTriangle aria-hidden className="w-5 h-5 text-muted-foreground" />
+            <p className="text-sm font-semibold text-foreground">Nenhum usuário encontrado</p>
             <p className="text-xs">Tente ajustar o termo de pesquisa ou os filtros aplicados.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-muted/50 text-muted-foreground font-extrabold uppercase tracking-wider text-[10px] border-b">
+              <thead className="type-label bg-muted/50 border-b">
                 <tr>
                   <th className="px-4 py-3">Estudante</th>
                   <th className="px-4 py-3">Papel</th>
@@ -261,13 +256,13 @@ export function AdminDashboardView({
                   return (
                     <tr key={u.id} className="hover:bg-muted/25 transition-colors">
                       <td className="px-4 py-3.5">
-                        <div className="font-bold text-foreground text-xs">{u.name}</div>
+                        <div className="font-semibold text-foreground text-xs">{u.name}</div>
                         <div className="text-[11px] text-muted-foreground font-mono">{u.email}</div>
                       </td>
 
                       <td className="px-4 py-3.5">{getRoleBadge(u.role)}</td>
 
-                      <td className="px-4 py-3.5 font-bold font-mono">
+                      <td className="px-4 py-3.5 font-semibold font-mono">
                         {u.weeklyStudyHours}h / semana
                       </td>
 
@@ -280,7 +275,7 @@ export function AdminDashboardView({
                           variant="ghost"
                           size="sm"
                           onClick={() => router.push(`/admin/users/${u.id}`)}
-                          className="h-7 px-2.5 text-[11px] font-bold rounded-lg cursor-pointer text-muted-foreground hover:text-foreground"
+                          className="h-7 px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
                         >
                           <Eye className="w-3.5 h-3.5 mr-1" /> Diagnóstico
                         </Button>
@@ -289,7 +284,7 @@ export function AdminDashboardView({
                           <Button
                             size="sm"
                             onClick={() => setTargetForSupport(u)}
-                            className="h-7 px-2.5 text-[11px] font-bold bg-primary text-white hover:bg-primary/90 rounded-lg cursor-pointer shadow-xs"
+                            className="h-7 px-2.5 text-[11px]"
                           >
                             <LifeBuoy className="w-3.5 h-3.5 mr-1" /> Entrar como usuário
                           </Button>
@@ -352,7 +347,7 @@ export function AdminDashboardView({
       <Dialog open={targetForSupport !== null} onOpenChange={(open) => !open && setTargetForSupport(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black text-foreground">
+            <DialogTitle className="flex items-center gap-2 font-semibold text-foreground">
               <LifeBuoy className="w-5 h-5 text-primary" />
               Iniciar Modo de Suporte
             </DialogTitle>
@@ -375,7 +370,7 @@ export function AdminDashboardView({
               size="sm"
               onClick={() => setTargetForSupport(null)}
               disabled={startingSupport}
-              className="text-xs font-bold rounded-xl cursor-pointer"
+              className="text-xs"
             >
               Cancelar
             </Button>
@@ -383,7 +378,7 @@ export function AdminDashboardView({
               size="sm"
               onClick={() => void handleStartSupport()}
               disabled={startingSupport}
-              className="text-xs font-bold bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer"
+              className="cursor-pointer"
             >
               {startingSupport ? (
                 <>
@@ -402,8 +397,8 @@ export function AdminDashboardView({
       <Dialog open={targetForRole !== null} onOpenChange={(open) => !open && setTargetForRole(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black text-foreground">
-              <Sliders className="w-5 h-5 text-purple-600" />
+            <DialogTitle className="flex items-center gap-2 font-semibold text-foreground">
+              <Sliders aria-hidden className="w-4 h-4 text-muted-foreground" />
               Alterar Papel de Acesso
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground pt-1.5">
@@ -432,7 +427,7 @@ export function AdminDashboardView({
               <label
                 key={opt.id}
                 onClick={() => setSelectedNewRole(opt.id)}
-                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
                   selectedNewRole === opt.id
                     ? "bg-primary/5 border-primary text-foreground"
                     : "bg-card border-border hover:bg-muted/40 text-muted-foreground"
@@ -446,7 +441,7 @@ export function AdminDashboardView({
                   className="mt-0.5 accent-primary cursor-pointer"
                 />
                 <div>
-                  <div className="text-xs font-bold text-foreground">{opt.label}</div>
+                  <div className="text-xs font-semibold text-foreground">{opt.label}</div>
                   <div className="text-[11px] text-muted-foreground">{opt.desc}</div>
                 </div>
               </label>
@@ -459,7 +454,7 @@ export function AdminDashboardView({
               size="sm"
               onClick={() => setTargetForRole(null)}
               disabled={updatingRole}
-              className="text-xs font-bold rounded-xl cursor-pointer"
+              className="text-xs"
             >
               Cancelar
             </Button>
@@ -467,13 +462,14 @@ export function AdminDashboardView({
               size="sm"
               onClick={() => void handleUpdateRole()}
               disabled={updatingRole}
-              className="text-xs font-bold bg-purple-600 text-white hover:bg-purple-700 rounded-xl cursor-pointer"
+              className="text-xs"
             >
               {updatingRole ? "Salvando..." : "Salvar Permissão"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   )
 }

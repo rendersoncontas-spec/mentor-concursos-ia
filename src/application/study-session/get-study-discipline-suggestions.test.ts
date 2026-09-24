@@ -69,6 +69,10 @@ function createMockSupabase(state: MockDatabaseState): SupabaseClient {
       let filterCycleId: string | null = null
       let filterPlanId: string | null = null
       let filterGteStartedAt: string | null = null
+      // Fase F.1: study_cycle_sessions/study_history agora são lidos em páginas
+      // (.range). O mock aplica o intervalo como o PostgREST.
+      let rangeFrom: number | null = null
+      let rangeTo: number | null = null
 
       const builder = {
         select: (_cols?: string) => builder,
@@ -86,6 +90,11 @@ function createMockSupabase(state: MockDatabaseState): SupabaseClient {
         },
         order: (_col: string, _opts?: unknown) => builder,
         limit: (_n: number) => builder,
+        range: (from: number, to: number) => {
+          rangeFrom = from
+          rangeTo = to
+          return builder
+        },
         maybeSingle: async () => {
           const res = await builder.then()
           return { data: res.data?.[0] ?? null, error: null }
@@ -140,6 +149,7 @@ function createMockSupabase(state: MockDatabaseState): SupabaseClient {
               })
           }
 
+          if (rangeFrom !== null && rangeTo !== null) data = data.slice(rangeFrom, rangeTo + 1)
           const result = { data, error: null }
           if (resolve) resolve(result)
           return result

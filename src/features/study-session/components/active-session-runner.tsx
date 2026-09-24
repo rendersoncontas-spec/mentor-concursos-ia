@@ -276,11 +276,20 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       }
 
       setFinalStats(stats)
-      if (res.session) {
-        dispatchStudySessionSaved(res.session as SavedStudySession)
+      if (res.pending) {
+        toast.success("Estudo salvo offline. Será sincronizado quando a conexão voltar.")
+      } else {
+        if (res.session) {
+          // Fase F.2: a resposta da Server Action (que chamou revalidatePath)
+          // já traz a página atual re-renderizada com dados novos.
+          dispatchStudySessionSaved(res.session as SavedStudySession, { serverRefresh: true })
+        }
+        toast.success("Estudo salvo com sucesso!")
       }
-      toast.success("Estudo salvo com sucesso!")
-      router.refresh()
+      // Fase F.2: salvamento confirmado no servidor → a resposta da Server
+      // Action (que chamou revalidatePath) já trouxe a página atual
+      // re-renderizada; router.refresh() só no caminho offline, como antes.
+      if (res.pending) router.refresh()
       setPhase("SUMMARY")
     } catch (error: unknown) {
       console.error("[CRONOGRAMA_SAVE] Erro ao salvar:", error)
@@ -303,15 +312,15 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   if (!hasPlanContext && !(session && session.isActive)) {
     return (
       <div className="max-w-md mx-auto text-center space-y-6">
-        <div className="bg-muted/50 border rounded-2xl p-5 space-y-4">
-          <Minimize2 className="w-10 h-10 mx-auto text-muted-foreground" />
-          <h2 className="text-xl font-black">Nenhum estudo iniciado</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Selecione uma matéria no Cronograma do Dia e clique em{" "}
-            <span className="font-bold">Iniciar Estudo</span> para usar o cronômetro.
+        <div className="py-10 space-y-2">
+          <Minimize2 aria-hidden className="w-5 h-5 mx-auto text-muted-foreground/70" />
+          <h2 className="text-sm font-medium text-foreground">Nenhum estudo iniciado</h2>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">
+            Selecione uma matéria no cronograma do dia e clique em{" "}
+            <span className="font-medium text-foreground">Iniciar</span> para usar o cronômetro.
           </p>
-          <Button onClick={() => router.push("/dashboard")} className="font-bold">
-            Voltar ao Dashboard
+          <Button onClick={() => router.push("/dashboard")} variant="outline" size="sm" className="mt-2">
+            Voltar ao início
           </Button>
         </div>
       </div>
@@ -328,17 +337,15 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
               className="w-3 h-3 rounded-full shrink-0"
               style={{ backgroundColor: planColor }}
             />
-            <h2 className="text-xl font-bold text-foreground">{disciplineName}</h2>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-              Cronograma
-            </span>
+            <h2 className="type-h2 text-foreground">{disciplineName}</h2>
+            <span className="text-xs text-muted-foreground">· Cronograma</span>
           </div>
 
           <div className="space-y-3">
-            <div className="text-7xl md:text-8xl font-black tracking-tighter tabular-nums text-muted-foreground/40">
+            <div className="text-5xl md:text-6xl font-medium tracking-tight tabular-nums text-muted-foreground/50">
               00:00:00
             </div>
-            <div className="text-sm font-semibold text-muted-foreground">
+            <div className="text-[13px] text-muted-foreground tabular-nums">
               Aguardando início · Planejado: {plannedTime} min
             </div>
           </div>
@@ -367,64 +374,136 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     session.plannedSeconds > 0 ? Math.round(session.plannedSeconds / 60) : plannedTime
 
   /* ─── CRONÔMETRO ─── */
+  // Redesign 2.0 — hierarquia: disciplina → modo → tempo → ações →
+  // informações secundárias. O estado ativo é indicado por texto + ponto de
+  // cor (teal estudando / âmbar pausado), sem glow nem número gigante.
   if (phase === "ACTIVE") {
     return (
-      <div className="max-w-2xl mx-auto text-center space-y-6">
-        {/* Barra superior com botão Minimizar e Voltar */}
-        <div className="flex items-center justify-between w-full max-w-xl mx-auto">
+      <div className="max-w-xl mx-auto space-y-8">
+        {/* Barra superior: voltar/minimizar */}
+        <div className="flex items-center justify-between w-full">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={handleMinimize}
-            className="gap-1.5 text-muted-foreground hover:text-foreground text-xs font-semibold cursor-pointer"
+            className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer"
             title="Minimizar cronômetro e voltar"
           >
             <ArrowLeft className="w-4 h-4" /> Minimizar e voltar
           </Button>
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/80 bg-muted/50 px-2.5 py-1 rounded-full border border-border/40">
-            Modo Estudo
-          </span>
+          <span className="text-xs text-muted-foreground">Modo estudo</span>
         </div>
 
-        <div className="flex items-center justify-center gap-3">
-          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
-          <h2 className="text-xl font-bold text-foreground">{session.disciplineName}</h2>
-          {session.source === "PLAN" && (
-            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-              Cronograma
-            </span>
-          )}
-        </div>
+        <section aria-label="Cronômetro" className="text-center space-y-5">
+          {/* 1. Disciplina */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-center gap-2">
+              <span aria-hidden className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+              <h2 className="type-h2 text-foreground">{session.disciplineName}</h2>
+            </div>
+            {/* 2. Modo / estado */}
+            <p className="flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
+              <span
+                aria-hidden
+                className={`w-1.5 h-1.5 rounded-full ${isStudying ? "bg-primary" : "bg-warning"}`}
+              />
+              <span className="text-foreground font-medium">
+                {isStudying ? "Estudando" : "Pausado"}
+              </span>
+              {session.source === "PLAN" && <span>· Cronograma</span>}
+              <span className="tabular-nums">· Planejado: {displayPlannedMin} min</span>
+            </p>
+          </div>
 
-        <div className="space-y-3">
-          <div className="text-7xl md:text-8xl font-black tracking-tighter tabular-nums text-foreground">
+          {/* 3. Tempo */}
+          <div
+            className={`text-5xl md:text-6xl font-medium tracking-tight tabular-nums ${
+              isStudying ? "text-foreground" : "text-muted-foreground"
+            }`}
+            aria-live="off"
+          >
             {formatTime(session.activeSeconds)}
           </div>
-          <div className="text-sm font-semibold text-muted-foreground">
-            {isStudying ? "Estudando" : "Pausado"} · Planejado: {displayPlannedMin} min
-          </div>
-        </div>
 
-        {session.plannedSeconds > 0 && (
-          <div className="space-y-1 px-8">
-            <Progress value={progress} className="h-3 bg-muted" />
-            <div className="flex justify-between text-[11px] font-bold text-muted-foreground px-1">
-              <span>Tempo decorrido: {formatDurationShort(session.activeSeconds)}</span>
-              <span>Planejado: {formatDurationShort(session.plannedSeconds)}</span>
+          {session.plannedSeconds > 0 && (
+            <div className="space-y-1.5 max-w-sm mx-auto">
+              <Progress value={progress} className="h-1" />
+              <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
+                <span>Decorrido: {formatDurationShort(session.activeSeconds)}</span>
+                <span>Planejado: {formatDurationShort(session.plannedSeconds)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Ações — uma primária, demais neutras */}
+          <div className="flex flex-col items-center gap-3 pt-1">
+            <div className="flex flex-wrap justify-center gap-2">
+              {isStudying ? (
+                <Button
+                  size="lg"
+                  className="gap-2 w-36 cursor-pointer"
+                  onClick={pauseSession}
+                  aria-label="Pausar estudo"
+                >
+                  <Pause className="w-4 h-4" /> Pausar
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  className="gap-2 w-36 cursor-pointer"
+                  onClick={resumeSession}
+                  aria-label="Retomar estudo"
+                >
+                  <Play className="w-4 h-4" /> Retomar
+                </Button>
+              )}
+
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 w-36 cursor-pointer"
+                onClick={handleFinish}
+                aria-label="Encerrar estudo"
+              >
+                <Square className="w-4 h-4" /> Encerrar
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-muted-foreground cursor-pointer"
+                onClick={handleMinimize}
+                aria-label="Minimizar cronômetro"
+              >
+                <Minimize2 className="w-4 h-4" /> Minimizar
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-muted-foreground hover:text-destructive cursor-pointer"
+                onClick={resetSession}
+                disabled={session.activeSeconds + session.pausedSeconds === 0}
+                aria-label="Resetar cronômetro"
+              >
+                <RefreshCcw className="w-4 h-4" /> Resetar
+              </Button>
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Controle de Som de Foco */}
-        <div className="max-w-md mx-auto w-full bg-card/80 backdrop-blur-xs border border-border/70 rounded-2xl p-3.5 shadow-xs text-left">
-          <div className="flex items-center justify-between pb-2 border-b border-border/50 mb-2">
-            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <Volume2 className="h-3.5 w-3.5 text-primary" /> Som Ambiente de Foco
+        {/* 5. Informações secundárias: som de foco */}
+        <section aria-label="Som ambiente de foco" className="border-t border-border pt-4 text-left">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[13px] font-medium text-foreground flex items-center gap-1.5">
+              <Volume2 className="h-3.5 w-3.5 text-muted-foreground" /> Som ambiente de foco
             </span>
             {focusSound !== "off" && focusSoundIsPlaying && (
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Tocando
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-primary" /> Tocando
               </span>
             )}
           </div>
@@ -435,63 +514,9 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
             onSelectSound={selectFocusSound}
             onVolumeChange={changeFocusSoundVolume}
           />
-        </div>
+        </section>
 
-        <div className="flex flex-wrap justify-center gap-3 pt-2">
-          {isStudying ? (
-            <Button
-              size="lg"
-              variant="secondary"
-              className="gap-2 w-36 cursor-pointer"
-              onClick={pauseSession}
-              aria-label="Pausar estudo"
-            >
-              <Pause className="w-5 h-5" /> Pausar
-            </Button>
-          ) : (
-            <Button
-              size="lg"
-              className="gap-2 w-36 cursor-pointer"
-              onClick={resumeSession}
-              aria-label="Retomar estudo"
-            >
-              <Play className="w-5 h-5" /> Retomar
-            </Button>
-          )}
-
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 w-36 cursor-pointer"
-            onClick={handleMinimize}
-            aria-label="Minimizar cronômetro"
-          >
-            <Minimize2 className="w-5 h-5" /> Minimizar
-          </Button>
-
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 w-36 text-muted-foreground hover:text-rose-500 cursor-pointer"
-            onClick={resetSession}
-            disabled={session.activeSeconds + session.pausedSeconds === 0}
-            aria-label="Resetar cronômetro"
-          >
-            <RefreshCcw className="w-5 h-5" /> Resetar
-          </Button>
-
-          <Button
-            size="lg"
-            variant="destructive"
-            className="gap-2 w-36 cursor-pointer"
-            onClick={handleFinish}
-            aria-label="Encerrar estudo"
-          >
-            <Square className="w-5 h-5" /> Encerrar
-          </Button>
-        </div>
-
-        <p className="text-xs text-muted-foreground font-medium">
+        <p className="text-xs text-muted-foreground text-center">
           O cronômetro continua em segundo plano e aparece na guia do navegador.
         </p>
       </div>
@@ -503,10 +528,10 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     if (isSubmitting) {
       return (
         <div className="max-w-md mx-auto text-center space-y-6 py-6">
-          <RefreshCw className="w-12 h-12 animate-spin text-primary mx-auto" />
-          <h2 className="text-2xl font-bold">Salvando Sessão</h2>
-          <p className="text-muted-foreground font-medium animate-pulse">
-            Calculando tempo líquido e foco...
+          <RefreshCw className="w-5 h-5 animate-spin text-muted-foreground mx-auto" />
+          <h2 className="type-h3">Salvando sessão</h2>
+          <p className="text-[13px] text-muted-foreground">
+            Calculando tempo líquido e foco…
           </p>
         </div>
       )
@@ -517,11 +542,11 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       totalSeconds > 0 ? Math.round((session.activeSeconds / totalSeconds) * 100) : null
 
     return (
-      <div className="max-w-xl mx-auto space-y-6 animate-in slide-in-from-bottom-8 duration-500">
-        <h2 className="text-xl font-bold tracking-tight">Avaliação Rápida</h2>
-        <p className="text-muted-foreground">
+      <div className="max-w-xl mx-auto space-y-6">
+        <h2 className="type-h2">Avaliação rápida</h2>
+        <p className="text-sm text-muted-foreground">
           Registre sua produção em{" "}
-          <span className="font-bold">{formatDurationShort(session.activeSeconds)}</span> de estudo
+          <span className="font-semibold">{formatDurationShort(session.activeSeconds)}</span> de estudo
           para treinar o Mentor.
         </p>
 
@@ -529,23 +554,23 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
           <CardContent className="space-y-6 pt-6">
             <div className="flex items-center gap-3 pb-2">
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
-              <span className="font-bold text-foreground">{session.disciplineName}</span>
+              <span className="font-semibold text-foreground">{session.disciplineName}</span>
             </div>
 
-            <div className="grid grid-cols-2 divide-x divide-border rounded-xl border border-border/50">
+            <div className="grid grid-cols-2 divide-x divide-border border-y border-border">
               <div className="p-3 text-center">
-                <div className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   Tempo estudado
                 </div>
-                <div className="font-black text-xl tabular-nums">
+                <div className="font-semibold text-xl tabular-nums">
                   {formatDurationShort(session.activeSeconds)}
                 </div>
               </div>
               <div className="p-3 text-center">
-                <div className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
+                <div className="text-xs text-muted-foreground">
                   Foco calculado
                 </div>
-                <div className="font-black text-xl tabular-nums text-primary">
+                <div className="font-semibold text-xl tabular-nums text-primary">
                   {focusPercent !== null ? `${focusPercent}%` : "—"}
                 </div>
               </div>
@@ -553,7 +578,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="questions-answered">Questões Respondidas</Label>
+                <Label htmlFor="questions-answered">Questões respondidas</Label>
                 <Input
                   id="questions-answered"
                   type="number"
@@ -575,7 +600,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reviews-completed">Revisões Concluídas (Tópicos)</Label>
+              <Label htmlFor="reviews-completed">Revisões concluídas (tópicos)</Label>
               <Input
                 id="reviews-completed"
                 type="number"
@@ -590,7 +615,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="font-medium">Energia Final</span>
-                <span className="font-bold">{energyFin}/5</span>
+                <span className="font-semibold">{energyFin}/5</span>
               </div>
               <Slider
                 value={[energyFin]}
@@ -623,7 +648,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
             onClick={handleSubmitEvaluation}
             disabled={isSubmitting}
           >
-            <CheckCircle className="w-5 h-5" /> Salvar Sessão
+            <CheckCircle className="w-4 h-4" /> Salvar sessão
           </Button>
         </div>
       </div>
@@ -633,44 +658,44 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   /* ─── SESSÃO SALVA ─── */
   if (phase === "SUMMARY" && finalStats) {
     return (
-      <div className="max-w-xl mx-auto space-y-6 animate-in zoom-in-95 duration-500">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 p-6 rounded-full w-24 h-24 mx-auto flex items-center justify-center">
-          <CheckCircle className="w-12 h-12" />
+      <div className="max-w-xl mx-auto space-y-6">
+        <div className="text-center space-y-1.5">
+          <CheckCircle aria-hidden className="w-6 h-6 text-success mx-auto" />
+          <h2 className="type-h2">Sessão concluída</h2>
         </div>
-        <h2 className="text-xl font-black tracking-tight text-center">Sessão Concluída!</h2>
 
         <Card>
           <CardContent className="pt-6 space-y-4">
-            <div className="flex items-center justify-center gap-2 text-lg font-bold">
+            <div className="flex items-center justify-center gap-2 text-[15px] font-semibold">
               <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
               {finalStats.disciplineName}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-border rounded-xl border border-border/50">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-border border-y border-border">
               <div className="p-3 text-center">
-                <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   Tempo
                 </div>
-                <div className="font-black text-lg tabular-nums">
+                <div className="font-semibold text-lg tabular-nums">
                   {formatDurationShort(finalStats.durationSeconds)}
                 </div>
               </div>
               <div className="p-3 text-center">
-                <div className="text-[10px] font-extrabold uppercase text-primary">Foco</div>
-                <div className="font-black text-lg tabular-nums text-primary">
+                <div className="text-xs text-muted-foreground">Foco</div>
+                <div className="font-semibold text-lg tabular-nums text-primary">
                   {finalStats.focusPercent !== null ? `${finalStats.focusPercent}%` : "—"}
                 </div>
               </div>
               <div className="p-3 text-center">
-                <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   Questões
                 </div>
-                <div className="font-black text-lg tabular-nums">{finalStats.questions}</div>
+                <div className="font-semibold text-lg tabular-nums">{finalStats.questions}</div>
               </div>
               <div className="p-3 text-center">
-                <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   Acertos
                 </div>
-                <div className="font-black text-lg tabular-nums">{finalStats.correct}</div>
+                <div className="font-semibold text-lg tabular-nums">{finalStats.correct}</div>
               </div>
             </div>
           </CardContent>
@@ -683,10 +708,10 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
             className="flex-1"
             onClick={() => router.push("/dashboard/history")}
           >
-            Ver Histórico
+            Ver histórico
           </Button>
           <Button size="lg" className="flex-1" onClick={() => router.push("/dashboard")}>
-            Voltar ao Dashboard
+            Voltar ao início
           </Button>
         </div>
       </div>

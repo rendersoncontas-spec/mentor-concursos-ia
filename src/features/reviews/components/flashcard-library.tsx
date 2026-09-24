@@ -269,7 +269,7 @@ export function FlashcardLibrary() {
           Novo cartão
         </Button>
         <Button variant="outline" onClick={() => setIaOpen(true)}>
-          <Sparkles className="h-4 w-4 text-violet-500" />
+          <Sparkles className="h-4 w-4 text-muted-foreground" />
           Gerar com IA
         </Button>
         <Button variant="outline" onClick={() => setImportOpen(true)}>
@@ -756,7 +756,6 @@ function IaGenerateDialog({ open, onOpenChange, options, onSaved }: { open: bool
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-violet-500" />
             Gerar cartões com IA
           </DialogTitle>
           <DialogDescription>
@@ -863,7 +862,7 @@ function ImportDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpenCh
             Cole uma linha por cartão no formato: <code className="text-xs bg-muted px-1 rounded">pergunta|resposta|disciplina|tags</code>. Linhas sem disciplina usam a primeira do app.
           </DialogDescription>
         </DialogHeader>
-        <Textarea className="min-h-40 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)} placeholder={"O que é o CRFB/88?\nConstituição Federal de 1988|Constituição Federal|CF,1988"} />
+        <Textarea className="min-h-40 tabular-nums text-xs" value={text} onChange={(e) => setText(e.target.value)} placeholder={"O que é o CRFB/88?\nConstituição Federal de 1988|Constituição Federal|CF,1988"} />
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar

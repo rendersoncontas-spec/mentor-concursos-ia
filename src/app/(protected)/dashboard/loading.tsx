@@ -1,43 +1,36 @@
-import { PendingReviewsWidgetSkeleton } from "@/features/dashboard/components/pending-reviews-widget"
-import { RecentActivitiesListSkeleton } from "@/features/dashboard/components/recent-activities-list"
-import { CycleNextCardSkeleton } from "@/features/dashboard/components/cycle-next-card"
+import { Skeleton } from "@/components/ui/skeleton"
 
+// Fase E — o esqueleto segue a composição real do Dashboard (cabeçalho,
+// "Foco de hoje" e a grade de três colunas) no mesmo container das páginas.
 export default function DashboardLoading() {
   return (
-    <div className="flex-1 p-4 sm:p-5 md:p-6 space-y-6 w-full max-w-full animate-pulse">
-      {/* Header Skeleton */}
-      <div className="flex justify-between items-center pb-2 border-b">
+    <div className="flex-1 page-container pt-5 pb-8 space-y-5" role="status" aria-label="Carregando o painel">
+      <div className="flex flex-col gap-4 border-b border-border pb-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
-          <div className="h-7 w-48 bg-muted rounded" />
-          <div className="h-3 w-32 bg-muted rounded" />
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-3 w-80 max-w-full" />
         </div>
-        <div className="h-9 w-36 bg-muted rounded" />
-      </div>
-
-      {/* KPI Skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-24 bg-muted rounded-xl" />
-        ))}
-      </div>
-
-      {/* Main Grid Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="md:col-span-2">
-          <CycleNextCardSkeleton />
-        </div>
-        <div className="md:col-span-1">
-          <PendingReviewsWidgetSkeleton />
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-60" />
+          <Skeleton className="h-9 w-36" />
         </div>
       </div>
 
-      {/* Secondary Grid Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-1">
-          <RecentActivitiesListSkeleton />
-        </div>
-        <div className="lg:col-span-2">
-          <div className="h-48 bg-muted rounded-xl" />
+      <div className="space-y-2.5">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-36 w-full rounded-lg" />
+      </div>
+
+      <div className="space-y-2.5">
+        <Skeleton className="h-4 w-24" />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((col) => (
+            <div key={col} className="space-y-3">
+              <Skeleton className="h-52 w-full rounded-lg" />
+              <Skeleton className="h-40 w-full rounded-lg" />
+            </div>
+          ))}
         </div>
       </div>
     </div>

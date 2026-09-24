@@ -1,4 +1,5 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 import { getTodayStudyItems, getCycleOverviewData } from "@/application/study-plan/study-plan.service"
 import { getUserDisciplines } from "@/application/disciplines/disciplines.service"
@@ -6,8 +7,11 @@ import { getStudyHistoryForAnalytics, AnalyticsEngine } from "@/application/stud
 import { getPendingReviewsSummary } from "@/application/review-engine/review-engine.service"
 import { getRecentActivities } from "@/application/study-history/study-history.service"
 import { getDayInSaoPaulo, startOfDayInSaoPauloMs } from "@/lib/sao-paulo"
-import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
+import { getSaoPauloWeekRange, resolveWeekStartDay } from "@/lib/study-time-calculator"
 import { formatDurationMinutes } from "@/lib/format-duration"
+
+/** Fase F.2: únicas chaves do metadata das sessões que o Dashboard usa. */
+export const DASHBOARD_METADATA_KEYS = ["questions_answered", "questions_correct"] as const
 
 export async function getDashboardData(supabase: SupabaseClient, userId: string): Promise<DashboardSnapshot> {
   try {
@@ -37,7 +41,9 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
       getCycleOverviewData(supabase, userId).catch(() => null),
       getTodayStudyItems(supabase, userId).catch(() => []),
-      getStudyHistoryForAnalytics(supabase, userId, 0).catch(() => []),
+      // Fase F.2: o Dashboard só lê questions_answered/questions_correct do
+      // metadata (acertos por período e por disciplina) — pede só essas chaves.
+      getStudyHistoryForAnalytics(supabase, userId, 0, { metadataKeys: DASHBOARD_METADATA_KEYS }).catch(() => []),
       getPendingReviewsSummary(supabase, userId).catch(() => ({
         count: 0,
         overdue: 0,
@@ -46,10 +52,24 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         nextReview: null
       })),
       getRecentActivities(supabase, userId, 5).catch(() => []),
-      supabase
-        .from("question_attempts")
-        .select("id, correct, question_id, created_at, answered_at, questions!inner ( discipline_id )")
-        .eq("user_id", userId)
+      // Fase F.1: paginado (question_attempts cresce 1 linha por questão
+      // respondida; 1 requisição era cortada em 1.000). Mesmo formato
+      // { data } de antes; erro → data null, como antes.
+      fetchAllRowsPaged<{
+        id: string
+        correct: boolean
+        question_id: string
+        created_at: string
+        answered_at: string
+        questions?: { discipline_id?: string } | Array<{ discipline_id?: string }>
+      }>(
+        (withCount) =>
+          supabase
+            .from("question_attempts")
+            .select("id, correct, question_id, created_at, answered_at, questions!inner ( discipline_id )", countOption(withCount))
+            .eq("user_id", userId),
+        [{ column: "id", ascending: true }],
+      ).then(({ data, error }) => ({ data: error ? null : data })),
     ])
 
     const profile = profileResult?.data || null;
@@ -110,12 +130,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
     // Determinar primeiro dia da semana do perfil (0 = Domingo, 1 = Segunda)
     const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
-    const weekStartDay =
-      prefsFirstDay === "Domingo"
-        ? 0
-        : prefsFirstDay === "Segunda-feira"
-          ? 1
-          : (profile?.week_start_day ?? 0)
+    const weekStartDay = resolveWeekStartDay(prefsFirstDay, profile?.week_start_day)
 
     // Calcular desempenho por período (Hoje, Semana, Mês, Ano, Total)
     // Fase 5 da auditoria: os limites eram calculados com Date local do

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { StudyCycle, StudyCycleItem, StudyCycleSession } from "@/domain/study-cycle/study-cycle.types"
 import type { StudyPlan, StudyPlanItem } from "@/domain/study-plan/study-plan.types"
 import type { CycleMigrationRepository } from "./cycle-migration.service"
+import { fetchAllCycleSessions } from "../cycle-sessions.reader"
 
 /**
  * Implementação do CycleMigrationRepository sobre Supabase.
@@ -66,18 +67,17 @@ export function createSupabaseMigrationRepository(
 
     async fetchLegacySessions(cycleIds: string[]) {
       if (cycleIds.length === 0) return []
-      const { data, error } = await supabase
-        .from("study_cycle_sessions")
-        .select("*")
-        .in("cycle_id", cycleIds)
-      if (error || !data) {
+      // Fase F.1: leitura paginada (antes: 1 requisição, cortada em 1.000 linhas).
+      const { data, error } = await fetchAllCycleSessions<Record<string, unknown>>(supabase, { cycleIds })
+      if (error) {
         // Fallback defensivo: colunas V2 podem não existir (schema legado básico)
         if (error.message.includes("column") || error.message.includes("schema cache")) {
-          const { data: basic, error: basicErr } = await supabase
-            .from("study_cycle_sessions")
-            .select("id, cycle_id, cycle_item_id, study_history_id, created_at")
-            .in("cycle_id", cycleIds)
-          if (basicErr || !basic) return []
+          const { data: basic, error: basicErr } = await fetchAllCycleSessions<Record<string, unknown>>(
+            supabase,
+            { cycleIds },
+            "id, cycle_id, cycle_item_id, study_history_id, created_at",
+          )
+          if (basicErr) return []
           // Sem minutes_contributed no schema legado → considera 0 (mensurável via study_history)
           return (basic as unknown as StudyCycleSession[]).map((s) => ({
             ...s,

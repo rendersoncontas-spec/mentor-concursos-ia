@@ -160,11 +160,11 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "relative flex h-screen flex-col shrink-0 border-r border-border bg-card transition-[width,transform] duration-300 ease-in-out",
+          "relative flex h-screen flex-col shrink-0 border-r border-border bg-[hsl(var(--sidebar-background))] transition-[width,transform] duration-200 ease-out",
           effectiveCollapsed ? "w-[var(--sidebar-width-collapsed)]" : "w-[280px] max-w-[85vw] md:w-[var(--sidebar-width)]",
           // Mobile/tablet: drawer fixo com overlay. Desktop: estático.
           "fixed inset-y-0 left-0 z-50 md:relative",
-          isOpen ? "translate-x-0 shadow-2xl md:shadow-none" : "-translate-x-full md:translate-x-0",
+          isOpen ? "translate-x-0 shadow-xl md:shadow-none" : "-translate-x-full md:translate-x-0",
           className,
         )}
       >
@@ -172,7 +172,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
         {isOpen && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-xl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors md:hidden flex items-center justify-center"
+            className="absolute top-3.5 right-3 z-10 h-9 w-9 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors md:hidden flex items-center justify-center"
             aria-label="Fechar menu"
           >
             <X className="w-5 h-5" />
@@ -188,7 +188,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                 onClick={toggleCollapsed}
                 aria-label="Abrir menu"
                 className={cn(
-                  "group relative flex items-center justify-center h-16 w-full shrink-0 border-b border-border px-0 transition-colors duration-150",
+                  "group relative flex items-center justify-center h-14 w-full shrink-0 border-b border-border px-0 transition-colors duration-150",
                   "cursor-pointer hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                 )}
               >
@@ -196,9 +196,9 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                   <Image
                     src="/branding/nomeia-icon.png"
                     alt="NomeIA"
-                    width={38}
-                    height={38}
-                    className="w-[38px] h-[38px] object-contain rounded-xl"
+                    width={30}
+                    height={30}
+                    className="w-[30px] h-[30px] object-contain rounded-md"
                     priority
                   />
                 </div>
@@ -216,7 +216,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                 onClick={isDesktop ? toggleCollapsed : onClose}
                 aria-label="Fechar menu"
                 className={cn(
-                  "group relative flex items-center h-16 w-full shrink-0 border-b border-border px-4 gap-3 transition-colors duration-150 text-left",
+                  "group relative flex items-center h-14 w-full shrink-0 border-b border-border px-4 gap-2.5 transition-colors duration-150 text-left",
                   "cursor-pointer hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                 )}
               >
@@ -224,21 +224,18 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                   <Image
                     src="/branding/nomeia-icon.png"
                     alt="NomeIA"
-                    width={38}
-                    height={38}
-                    className="w-[38px] h-[38px] object-contain rounded-xl"
+                    width={30}
+                    height={30}
+                    className="w-[30px] h-[30px] object-contain rounded-md"
                     priority
                   />
                 </div>
                 <div className="min-w-0 flex-1 leading-tight pr-6 md:pr-0">
-                  <p className="text-[16px] font-extrabold tracking-tight text-foreground flex items-center">
+                  <p className="text-[15px] font-semibold tracking-tight text-foreground flex items-center">
                     <span>Nome</span>
                     <span className="text-primary">
                       IA
                     </span>
-                  </p>
-                  <p className="hidden md:block text-[10.5px] font-medium text-muted-foreground leading-snug mt-0.5 whitespace-normal">
-                    Sua preparação rumo à nomeação.
                   </p>
                 </div>
               </button>
@@ -252,16 +249,16 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
         {/* ── Navegação agrupada ─────────────────────────────────────────── */}
         <nav
           aria-label="Menu principal"
-          className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-6"
+          className="relative flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3 space-y-4"
         >
           {navGroups.map((group, groupIndex) => (
-            <div key={group.label} className="space-y-1">
+            <div key={group.label} className="space-y-0.5">
               {effectiveCollapsed ? (
                 groupIndex > 0 && (
                   <div aria-hidden className="mx-3 my-3 h-px bg-border" />
                 )
               ) : (
-                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                <p className="type-label px-2.5 pb-1">
                   {group.label}
                 </p>
               )}
@@ -276,10 +273,10 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                     onClick={onClose as MouseEventHandler<HTMLAnchorElement>}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "group relative flex items-center gap-3 h-11 rounded-lg px-3 text-[13px] font-medium transition-colors duration-150 outline-none",
+                      "group relative flex items-center gap-2.5 h-10 md:h-9 rounded-md px-2.5 text-[13px] font-medium transition-colors duration-150 outline-none",
                       effectiveCollapsed ? "justify-center px-0" : "",
                       active
-                        ? "bg-primary/10 text-primary font-semibold"
+                        ? "bg-primary/[0.08] text-foreground"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card",
                     )}
@@ -300,7 +297,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                           ? "text-primary"
                           : "text-muted-foreground/70 group-hover:text-foreground",
                       )}
-                      style={{ width: 18, height: 18 }}
+                      style={{ width: 16, height: 16 }}
                     />
                     {!effectiveCollapsed && <span className="truncate">{item.label}</span>}
                   </Link>

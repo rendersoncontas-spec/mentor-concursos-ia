@@ -160,10 +160,12 @@ export async function switchActiveTargetAction(targetId: string): Promise<{ succ
     revalidatePath("/dashboard")
     revalidatePath("/planejamento")
     revalidatePath("/edital")
-    revalidatePath("/ciclo")
-    revalidatePath("/analytics")
-    revalidatePath("/revisoes")
-    revalidatePath("/questoes")
+    // Fase G.1: saíram "/ciclo", "/analytics", "/revisoes" e "/questoes" —
+    // nenhuma dessas rotas existe no app (os nomes reais são /ciclos,
+    // /estatisticas e /dashboard/reviews; não há tela de questões), então as
+    // chamadas não revalidavam nada. Passar a revalidar as rotas reais aqui
+    // mudaria o comportamento da troca de concurso: ficou para decisão
+    // (registrado no relatório da Fase G.1).
 
     return { success: true }
   } catch (err) {

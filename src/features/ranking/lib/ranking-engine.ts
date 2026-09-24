@@ -289,7 +289,7 @@ export function getPositionMessage(
   distanceSeconds: number,
   isTied: boolean,
   aheadName: string | null,
-  metric: RankingMetric,
+  _metric: RankingMetric,
 ): string {
   if (rank <= 0) return "Estude para entrar no ranking."
 
@@ -318,7 +318,7 @@ export function getProximoAdversarioMessage(
   rank: number,
   distanceSeconds: number,
   isTied: boolean,
-  metric: RankingMetric,
+  _metric: RankingMetric,
 ): string {
   if (rank <= 1) return ""
   if (isTied) return "Empatado com o usuário à frente."
@@ -333,7 +333,7 @@ export function getProximoAdversarioMessage(
  */
 export function getLeaderDefenseMessage(
   secondPlaceDistanceSeconds: number,
-  metric: RankingMetric,
+  _metric: RankingMetric,
 ): string {
   if (secondPlaceDistanceSeconds <= 0) {
     return "Você está no topo! Mantenha o ritmo."

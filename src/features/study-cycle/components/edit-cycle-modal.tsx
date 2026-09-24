@@ -5,20 +5,17 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ArrowDown,
   ArrowUp,
-  Clock,
   Layers,
   Minus,
   Plus,
   Save,
   Search,
   Trash2,
-  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { updateFullCycleAction } from "@/application/study-cycle/study-cycle.actions"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
@@ -81,7 +78,6 @@ export function EditCycleModal({
       setContestName(overview.cycle.contest_name || "")
       setEditalName(overview.cycle.edital_name || "")
 
-      const currentIds = items.map((i) => i.id).filter((id): id is string => id !== undefined)
       const currentDifficulties = new Map<string, CycleItemDifficulty>()
       items.forEach((item) => {
         if (item.id !== undefined) {
@@ -277,7 +273,7 @@ export function EditCycleModal({
         {/* CABEÇALHO */}
         <div className="p-5 border-b bg-muted/20">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+            <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <Layers className="h-5 w-5 text-primary" />
               Editar Ciclo de Estudos
             </DialogTitle>
@@ -292,7 +288,7 @@ export function EditCycleModal({
           {/* INFORMAÇÕES BÁSICAS */}
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-bold text-foreground">Nome do Ciclo *</label>
+              <label className="text-xs font-semibold text-foreground">Nome do Ciclo *</label>
               <Input
                 value={cycleName}
                 onChange={(e) => setCycleName(e.target.value)}
@@ -303,7 +299,7 @@ export function EditCycleModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-foreground">Concurso Alvo (Opcional)</label>
+                <label className="text-xs font-semibold text-foreground">Concurso Alvo (Opcional)</label>
                 <Input
                   value={contestName}
                   onChange={(e) => setContestName(e.target.value)}
@@ -312,7 +308,7 @@ export function EditCycleModal({
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-foreground">Edital / Cargo (Opcional)</label>
+                <label className="text-xs font-semibold text-foreground">Edital / Cargo (Opcional)</label>
                 <Input
                   value={editalName}
                   onChange={(e) => setEditalName(e.target.value)}
@@ -325,7 +321,7 @@ export function EditCycleModal({
 
           {/* ADICIONAR MATÉRIA */}
           <div className="space-y-2 pt-2 border-t">
-            <label className="text-xs font-bold text-foreground">Adicionar Matéria à Fila</label>
+            <label className="text-xs font-semibold text-foreground">Adicionar Matéria à Fila</label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -340,7 +336,7 @@ export function EditCycleModal({
                 <Button
                   size="sm"
                   onClick={handleAddCustom}
-                  className="text-xs font-bold bg-primary text-primary-foreground"
+                  className="text-xs font-semibold bg-primary text-primary-foreground"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Adicionar
@@ -369,10 +365,10 @@ export function EditCycleModal({
           {/* LISTA DE MATÉRIAS CONFIGURADAS */}
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-foreground">
+              <span className="text-[13px] font-semibold text-foreground">
                 Fila de Matérias ({items.length})
               </span>
-              <span className="text-xs font-bold text-primary">
+              <span className="text-xs font-semibold text-primary">
                 Total: {formatDurationMinutes(totalMinutes)} por volta
               </span>
             </div>
@@ -384,11 +380,11 @@ export function EditCycleModal({
                   className="p-3 rounded-xl border bg-card/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-xs font-black text-muted-foreground w-6 text-center">
+                    <span className="text-xs font-semibold text-muted-foreground w-6 text-center">
                       #{index + 1}
                     </span>
                     <div className="min-w-0">
-                      <p className="text-xs font-black text-foreground truncate">
+                      <p className="text-xs font-semibold text-foreground truncate">
                         {item.disciplineName}
                       </p>
                       <p className="text-[10px] text-muted-foreground">{item.disciplineArea || "Geral"}</p>
@@ -397,7 +393,7 @@ export function EditCycleModal({
 
                   <div className="flex flex-wrap items-center gap-2">
                     {/* SELETOR DE DIFICULDADE */}
-                    <div className="flex items-center rounded-lg border bg-muted/40 p-0.5 text-[11px] font-bold gap-0.5">
+                    <div className="flex items-center rounded-lg border bg-muted/40 p-0.5 text-[11px] font-semibold gap-0.5">
                       {DIFFICULTY_OPTIONS.map((opt) => {
                         const isSelected = normalizeDifficulty(item.difficulty) === opt.value
                         return (
@@ -407,9 +403,9 @@ export function EditCycleModal({
                             onClick={() => handleDifficultyChange(index, opt.value)}
                             className={cn(
                               "px-2.5 py-1 rounded-md transition-all font-bold cursor-pointer select-none",
-                              isSelected && opt.value === "FACIL" && "bg-emerald-500 text-white font-black shadow-xs ring-1 ring-emerald-600/30",
-                              isSelected && opt.value === "MEDIA" && "bg-amber-500 text-white font-black shadow-xs ring-1 ring-amber-600/30",
-                              isSelected && opt.value === "DIFICIL" && "bg-rose-500 text-white font-black shadow-xs ring-1 ring-rose-600/30",
+                              isSelected && opt.value === "FACIL" && "bg-emerald-500 text-white font-semibold shadow-xs ring-1 ring-emerald-600/30",
+                              isSelected && opt.value === "MEDIA" && "bg-amber-500 text-white font-semibold shadow-xs ring-1 ring-amber-600/30",
+                              isSelected && opt.value === "DIFICIL" && "bg-rose-500 text-white font-semibold shadow-xs ring-1 ring-rose-600/30",
                               !isSelected && opt.value === "FACIL" && "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20",
                               !isSelected && opt.value === "MEDIA" && "text-muted-foreground hover:text-amber-600 hover:bg-amber-50/60 dark:hover:bg-amber-950/20",
                               !isSelected && opt.value === "DIFICIL" && "text-muted-foreground hover:text-rose-600 hover:bg-rose-50/60 dark:hover:bg-rose-950/20"
@@ -433,7 +429,7 @@ export function EditCycleModal({
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
-<span className="text-xs font-black w-14 text-center">
+<span className="text-xs font-semibold w-14 text-center">
                           {formatMinutesDigitalLocal(item.plannedMinutes)}
                         </span>
                       <Button
@@ -499,7 +495,7 @@ export function EditCycleModal({
             size="sm"
             onClick={handleSave}
             disabled={isSubmitting}
-            className="bg-primary text-primary-foreground font-black text-xs gap-1.5 shadow-sm"
+            className="bg-primary text-primary-foreground font-semibold text-xs gap-1.5 shadow-sm"
           >
             <Save className="h-3.5 w-3.5" />
             {isSubmitting ? "Salvando..." : "Salvar alterações"}

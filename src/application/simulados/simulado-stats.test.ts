@@ -20,6 +20,7 @@ import {
   wrongsOf,
 } from "./simulado-stats.service"
 import type { SimuladoRecord } from "@/domain/simulados/types"
+import { must } from "@/lib/testing/must"
 
 function makeRecord(overrides: Partial<SimuladoRecord>): SimuladoRecord {
   return {
@@ -170,6 +171,26 @@ test("computePanelStats: tendência UP quando recente > antigo", () => {
   assert.equal(stats.trendMessage, "Seu desempenho está evoluindo")
 })
 
+test("computePanelStats: tendência DOWN/STABLE (limiar de 2 p.p.) e ramo curto (≤ 3 simulados)", () => {
+  const series = (accs: number[]) =>
+    accs.map((accuracy, i) => makeRecord({ id: `t${i}`, simuladoDate: `2026-08-${String(i + 10)}`, accuracy }))
+  const trendOf = (accs: number[]) => {
+    const s = computePanelStats(series(accs))
+    return [s.trend, s.trendMessage]
+  }
+  // ramo com histórico anterior: delta = média(3 recentes) − média(anteriores)
+  assert.deepEqual(trendOf([70, 70, 60, 60, 60]), ["DOWN", "Seu desempenho caiu nos últimos simulados"])
+  assert.deepEqual(trendOf([60, 60, 62, 62, 62]), ["STABLE", "Seu desempenho está estável"]) // +2 não passa do limiar
+  assert.deepEqual(trendOf([60, 60, 58, 58, 58]), ["STABLE", "Seu desempenho está estável"]) // −2 também não
+  assert.deepEqual(trendOf([60, 60, 62.5, 62.5, 62.5]), ["UP", "Seu desempenho está evoluindo"])
+  // ramo curto: compara o último com o primeiro dos recentes, sem limiar
+  assert.deepEqual(trendOf([60, 61]), ["UP", "Seu desempenho está evoluindo"])
+  assert.deepEqual(trendOf([61, 60]), ["DOWN", "Seu desempenho caiu nos últimos simulados"])
+  assert.deepEqual(trendOf([60, 70, 60]), ["STABLE", "Seu desempenho está estável"])
+  // um único simulado não tem tendência
+  assert.deepEqual(trendOf([60]), [null, null])
+})
+
 test("computePanelStats: lista vazia retorna tudo null/0", () => {
   const stats = computePanelStats([])
   assert.equal(stats.totalSimulados, 0)
@@ -191,7 +212,7 @@ test("buildSubjectAnalysis: agrega matéria entre simulados com evolução", () 
   ]
   const analysis = buildSubjectAnalysis(records)
   assert.equal(analysis.length, 1)
-  const subject = analysis[0]!
+  const subject = must(analysis[0])
   assert.equal(subject.disciplineName, "Constitucional")
   assert.equal(subject.totalQuestions, 40)
   assert.equal(subject.totalCorrect, 26)
@@ -207,7 +228,7 @@ test("findWeakSubjects: retorna matérias em FRACO/ATENCAO", () => {
   ]
   const weak = findWeakSubjects(analysis)
   assert.equal(weak.length, 2)
-  assert.equal(weak[0]!.disciplineName, "A") // pior primeiro
+  assert.equal(must(weak[0]).disciplineName, "A") // pior primeiro
 })
 
 test("findDecliningSubjects: detecta queda nos últimos 3", () => {
@@ -229,7 +250,7 @@ test("findDecliningSubjects: detecta queda nos últimos 3", () => {
   ]
   const declining = findDecliningSubjects(analysis, 3)
   assert.equal(declining.length, 1)
-  assert.equal(declining[0]!.disciplineName, "Contabilidade")
+  assert.equal(must(declining[0]).disciplineName, "Contabilidade")
 })
 
 // ── Comparação entre simulados ─────────────────────────────────────────────
@@ -252,9 +273,9 @@ test("compareSimulados: delta geral e por matéria", () => {
   })
   const cmp = compareSimulados(first, second)
   assert.equal(cmp.accuracyDeltaPp, 8)
-  const trib = cmp.subjects.find((s) => s.disciplineName === "Tributário")!
+  const trib = must(cmp.subjects.find((s) => s.disciplineName === "Tributário"))
   assert.equal(trib.deltaPp, 15)
-  const port = cmp.subjects.find((s) => s.disciplineName === "Português")!
+  const port = must(cmp.subjects.find((s) => s.disciplineName === "Português"))
   assert.equal(port.deltaPp, 5)
 })
 

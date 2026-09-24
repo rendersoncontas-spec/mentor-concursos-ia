@@ -18,8 +18,11 @@ import path from "node:path"
  * que o app confiasse no valor errado — mas o app nao deveria depender so
  * da RLS aqui, e sim seguir o mesmo padrao de todo o resto do codigo.
  *
- * Corrigido: a funcao agora recebe so (userDisciplineId, status) e deriva
- * o usuario com getEffectiveUserId(supabase).
+ * Corrigido: a funcao passou a receber so (userDisciplineId, status) e a
+ * derivar o usuario com getEffectiveUserId(supabase). Fase G (limpeza): como
+ * continuava sem nenhum chamador, o arquivo update-status.action.ts foi
+ * removido — e o teste especifico dele junto; a regra geral abaixo continua
+ * valendo para todas as Server Actions de mutacao que existem.
  *
  * Este arquivo tambem guarda, por amostragem, que outras Server Actions
  * de mutacao (delete/update) continuam derivando o usuario no servidor em
@@ -31,29 +34,6 @@ function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf-8")
 }
 
-describe("updateDisciplineStatusAction nao aceita mais userId do cliente", () => {
-  const source = readSource("src/application/disciplines/update-status.action.ts")
-
-  it("a assinatura da funcao não recebe mais um parametro userId", () => {
-    const sigMatch = source.match(/export async function updateDisciplineStatusAction\(([^)]*)\)/)
-    assert.ok(sigMatch, "assinatura de updateDisciplineStatusAction nao encontrada")
-    const params = sigMatch[1] ?? ""
-    assert.doesNotMatch(params, /userId/, `a assinatura ainda aceita um parametro de userId: "${params}"`)
-    assert.match(params, /userDisciplineId/)
-    assert.match(params, /status/)
-  })
-
-  it("deriva o usuario autenticado no servidor via getEffectiveUserId", () => {
-    assert.match(source, /import \{ getEffectiveUserId \} from "@\/application\/admin\/auth-guard"/)
-    assert.match(source, /const effectiveUserId = await getEffectiveUserId\(supabase\)/)
-    assert.match(source, /updateUserDisciplineStatus\(supabase, effectiveUserId, userDisciplineId, status\)/)
-  })
-
-  it("recusa quando nao ha usuario autenticado, em vez de prosseguir com um id vazio/indefinido", () => {
-    assert.match(source, /if \(!effectiveUserId\) return \{ success: false/)
-  })
-})
-
 describe("regressao: Server Actions de mutacao nao devem aceitar um userId cru do cliente", () => {
   const actionFiles = [
     "src/application/study-history/study-history.actions.ts",
@@ -61,7 +41,6 @@ describe("regressao: Server Actions de mutacao nao devem aceitar um userId cru d
     "src/application/simulados/simulados.actions.ts",
     "src/application/simulados/simulado-records.actions.ts",
     "src/application/disciplines/discipline-actions.ts",
-    "src/application/disciplines/update-status.action.ts",
     "src/application/study-plan/list-plans.action.ts",
   ]
 

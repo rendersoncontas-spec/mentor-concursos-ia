@@ -4,6 +4,7 @@
 // ============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { revalidatePath } from "next/cache"
 
 import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
@@ -128,10 +129,22 @@ export interface ItemsBundle {
 }
 
 export async function loadItemsBundle(supabase: Supabase, userId: string, limit = 20000): Promise<ItemsBundle> {
+  // Fase F.1: `.limit(20000)` / `.limit(10000)` NÃO passavam de 1.000 — o
+  // PostgREST corta cada resposta em 1.000 linhas. Agora as leituras são
+  // paginadas até o mesmo teto pretendido (limit). Mesmo formato { data };
+  // erro → data null, como antes.
   const [itemsRes, discRes, topicRes] = await Promise.all([
-    supabase.from("review_items").select("*").eq("user_id", userId).limit(limit),
+    fetchAllRowsPaged<Record<string, unknown>>(
+      (withCount) => supabase.from("review_items").select("*", countOption(withCount)).eq("user_id", userId),
+      [{ column: "id", ascending: true }],
+      { maxRows: limit },
+    ).then(({ data, error }) => ({ data: error ? null : data })),
     supabase.from("disciplines").select("id, name"),
-    supabase.from("question_topics").select("id, discipline_id, name").limit(10000),
+    fetchAllRowsPaged<Record<string, unknown>>(
+      (withCount) => supabase.from("question_topics").select("id, discipline_id, name", countOption(withCount)),
+      [{ column: "id", ascending: true }],
+      { maxRows: 10000 },
+    ).then(({ data, error }) => ({ data: error ? null : data })),
   ])
   const discNames = new Map<string, string>()
   ;(discRes.data ?? []).forEach((d) => discNames.set(String(d["id"]), String(d["name"] ?? "Disciplina")))
@@ -168,7 +181,20 @@ export async function getReviewDashboardSummary(supabase: Supabase, userId: stri
   const { items, discNames, topicNames } = bundle
 
   const [historyRes, sessionsRes] = await Promise.all([
-    supabase.from("review_history").select("grade, review_date").eq("user_id", userId).gte("review_date", new Date(now.getTime() - 365 * DAY_MS).toISOString()).order("review_date", { ascending: false }).limit(100000),
+    // Fase F.1: paginado até o teto pretendido (100.000); antes cortado em 1.000.
+    fetchAllRowsPaged<Record<string, unknown>>(
+      (withCount) =>
+        supabase
+          .from("review_history")
+          .select("grade, review_date", countOption(withCount))
+          .eq("user_id", userId)
+          .gte("review_date", new Date(now.getTime() - 365 * DAY_MS).toISOString()),
+      [
+        { column: "review_date", ascending: false },
+        { column: "id", ascending: false },
+      ],
+      { maxRows: 100000 },
+    ).then(({ data, error }) => ({ data: error ? null : data })),
     supabase.from("review_sessions").select("id").eq("user_id", userId).eq("status", "ACTIVE").limit(1),
   ])
   const allHistory = historyRes.data ?? []
@@ -720,9 +746,17 @@ export async function discardReviewSession(supabase: Supabase, userId: string, s
 
 /** Atualiza o cache review_statistics com números reais. */
 export async function refreshStatisticsCache(supabase: Supabase, userId: string) {
+  // Fase F.1: paginados (antes 1 requisição cada, cortada em 1.000 linhas →
+  // total_reviews/retention_rate/mastered_items gravados errados).
   const [historyRes, itemsRes] = await Promise.all([
-    supabase.from("review_history").select("grade").eq("user_id", userId),
-    supabase.from("review_items").select("review_stage").eq("user_id", userId),
+    fetchAllRowsPaged<Record<string, unknown>>(
+      (withCount) => supabase.from("review_history").select("grade", countOption(withCount)).eq("user_id", userId),
+      [{ column: "id", ascending: true }],
+    ).then(({ data, error }) => ({ data: error ? null : data })),
+    fetchAllRowsPaged<Record<string, unknown>>(
+      (withCount) => supabase.from("review_items").select("review_stage", countOption(withCount)).eq("user_id", userId),
+      [{ column: "id", ascending: true }],
+    ).then(({ data, error }) => ({ data: error ? null : data })),
   ])
   const grades = (historyRes.data ?? []).map((h) => Number(h["grade"]))
   const { retention } = retentionFromGrades(grades)
@@ -1031,7 +1065,18 @@ export async function importFlashcards(supabase: Supabase, userId: string, rows:
 export async function exportFlashcards(supabase: Supabase, userId: string): Promise<{ data: ImportCardRow[] | null; error: string | null }> {
   try {
     const [rowsRes, discRes] = await Promise.all([
-      supabase.from("review_items").select("card_front, card_back, tags, card_type, discipline_id").eq("user_id", userId).eq("source_type", "FLASHCARD").is("deleted_at", null).limit(10000),
+      // Fase F.1: `.limit(10000)` era cortado em 1.000; paginado até o mesmo teto.
+      fetchAllRowsPaged<Record<string, unknown>>(
+        (withCount) =>
+          supabase
+            .from("review_items")
+            .select("card_front, card_back, tags, card_type, discipline_id", countOption(withCount))
+            .eq("user_id", userId)
+            .eq("source_type", "FLASHCARD")
+            .is("deleted_at", null),
+        [{ column: "id", ascending: true }],
+        { maxRows: 10000 },
+      ).then(({ data, error }) => ({ data: error ? null : data })),
       supabase.from("disciplines").select("id, name"),
     ])
     const names = new Map<string, string>()

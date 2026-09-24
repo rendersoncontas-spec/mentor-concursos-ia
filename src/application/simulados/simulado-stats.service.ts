@@ -123,6 +123,21 @@ export function computeSubjects(
   })
 }
 
+type PanelTrend = NonNullable<SimuladoPanelStats["trend"]>
+
+const TREND_MESSAGES: Record<PanelTrend, string> = {
+  UP: "Seu desempenho está evoluindo",
+  DOWN: "Seu desempenho caiu nos últimos simulados",
+  STABLE: "Seu desempenho está estável",
+}
+
+/** Acima de +threshold sobe, abaixo de -threshold cai; no meio, estável. */
+function trendFromDelta(delta: number, threshold: number): PanelTrend {
+  if (delta > threshold) return "UP"
+  if (delta < -threshold) return "DOWN"
+  return "STABLE"
+}
+
 /** Estatísticas agregadas do painel a partir dos registros (já ordenados por data asc). */
 export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats {
   const totalSimulados = records.length
@@ -179,19 +194,14 @@ export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats
       if (earlier.length > 0) {
         const earlierAvg = earlier.reduce((a, b) => a + b, 0) / earlier.length
         const delta = recentAvg - earlierAvg
-        trend = delta > 2 ? "UP" : delta < -2 ? "DOWN" : "STABLE"
+        trend = trendFromDelta(delta, 2)
       } else {
-        trend = recent[recent.length - 1]! > recent[0]! ? "UP" : recent[recent.length - 1]! < recent[0]! ? "DOWN" : "STABLE"
+        const first = recent[0] ?? 0
+        const last = recent[recent.length - 1] ?? 0
+        trend = trendFromDelta(last - first, 0)
       }
     }
-    trendMessage =
-      trend === "UP"
-        ? "Seu desempenho está evoluindo"
-        : trend === "DOWN"
-          ? "Seu desempenho caiu nos últimos simulados"
-          : trend === "STABLE"
-            ? "Seu desempenho está estável"
-            : null
+    trendMessage = trend === null ? null : TREND_MESSAGES[trend]
   }
 
   return {

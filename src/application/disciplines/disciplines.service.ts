@@ -1,4 +1,5 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
 import {
@@ -145,27 +146,6 @@ export async function getUserDisciplines(
     created_at: row.created_at,
     discipline: row.disciplines,
   }))
-}
-
-// Atualiza o status de uma disciplina do usuário
-export async function updateUserDisciplineStatus(
-  supabase: SupabaseClient,
-  userId: string,
-  userDisciplineId: string,
-  status: DisciplineStatus,
-): Promise<boolean> {
-  const { error } = await supabase
-    .from("user_disciplines")
-    .update({ status })
-    .eq("id", userDisciplineId)
-    .eq("user_id", userId) // RLS extra no client
-
-  if (error) {
-    console.error("Error updating user discipline status:", error)
-    return false
-  }
-
-  return true
 }
 
 // Seed automático de user_disciplines ao finalizar onboarding
@@ -359,15 +339,37 @@ export async function getDisciplinesPageData(
     }
   }
 
+  // Fase F.1: leituras paginadas (antes: 1 requisição cada, cortada em 1.000
+  // linhas pelo PostgREST — o histórico do usuário principal já passa de
+  // 2.700 sessões, então minutos e totais por disciplina saíam subcontados).
+  // Erro → lista vazia, como antes (nunca um conjunto parcial).
   const [questionAttemptsResult, studyHistoryResult] = await Promise.all([
-    supabase
-      .from("question_attempts")
-      .select("id, correct, questions!inner ( discipline_id )")
-      .eq("user_id", userId),
-    supabase
-      .from("study_history")
-      .select("id, discipline_id, duration_minutes, completed, metadata")
-      .eq("user_id", userId),
+    fetchAllRowsPaged<{
+      id: string
+      correct: boolean
+      questions?: { discipline_id?: string } | Array<{ discipline_id?: string }>
+    }>(
+      (withCount) =>
+        supabase
+          .from("question_attempts")
+          .select("id, correct, questions!inner ( discipline_id )", countOption(withCount))
+          .eq("user_id", userId),
+      [{ column: "id", ascending: true }],
+    ).then(({ data, error }) => ({ data: error ? [] : data })),
+    fetchAllRowsPaged<{
+      id: string
+      discipline_id: string | null
+      duration_minutes: number | null
+      completed: boolean | null
+      metadata: Record<string, unknown> | null
+    }>(
+      (withCount) =>
+        supabase
+          .from("study_history")
+          .select("id, discipline_id, duration_minutes, completed, metadata", countOption(withCount))
+          .eq("user_id", userId),
+      [{ column: "id", ascending: true }],
+    ).then(({ data, error }) => ({ data: error ? [] : data })),
   ])
 
   const attempts = (questionAttemptsResult?.data || []).map(

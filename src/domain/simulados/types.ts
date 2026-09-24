@@ -247,7 +247,7 @@ export const CEBRASPE_DEFAULT_PENALTY = 1
 /** Faixas de desempenho configuradas centralizadas. */
 export const PERFORMANCE_BANDS = {
   EXCELENTE: { min: 85, label: "Excelente", color: "text-emerald-600", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
-  BOM: { min: 75, label: "Bom", color: "text-sky-600", bg: "bg-sky-500/10", border: "border-sky-500/30" },
+  BOM: { min: 75, label: "Bom", color: "text-primary", bg: "bg-primary/10", border: "border-primary/30" },
   ATENCAO: { min: 60, label: "Atenção", color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/30" },
   FRACO: { min: 0, label: "Fraco", color: "text-rose-600", bg: "bg-rose-500/10", border: "border-rose-500/30" },
 } as const

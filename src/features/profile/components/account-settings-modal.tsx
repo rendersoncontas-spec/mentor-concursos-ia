@@ -43,23 +43,6 @@ interface AccountSettingsModalProps {
 
 type Preferences = Record<string, unknown>
 
-const DEFAULT_PREFERENCES: Preferences = {
-  studyDays: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
-  firstDayOfWeek: "Domingo",
-  timerSound: "Melodia 1",
-  timezone: "(UTC-03:00) Brasília",
-  publicProfile: true,
-  avatarType: "foto",
-  nameType: "nome",
-  notifyConstancia: true,
-  notifyRevisao: true,
-  notifyFeedback: true,
-  notifyResumoSemanal: true,
-  notifyImportacoes: true,
-  notifyRanking: false,
-  customCategories: [],
-}
-
 function prefsValue<T>(prefs: Preferences | null, key: string, fallback: T): T {
   const value = prefs?.[key]
   return value === undefined || value === null ? fallback : (value as T)
@@ -190,7 +173,7 @@ export function AccountSettingsModal({
             try {
               localStorage.setItem(avatarKey, profile.avatar_url)
               localStorage.setItem("mentor_user_avatar", profile.avatar_url)
-            } catch {}
+            } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
           } else {
             const saved = localStorage.getItem(avatarKey) || localStorage.getItem("mentor_user_avatar")
             if (saved) {
@@ -383,7 +366,7 @@ export function AccountSettingsModal({
             localStorage.removeItem(avatarKey)
             localStorage.removeItem("mentor_user_avatar")
           }
-        } catch {}
+        } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
         setAvatarDirty(false)
         window.dispatchEvent(new Event("avatarUpdated"))
       }
@@ -422,13 +405,13 @@ export function AccountSettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border shadow-xl">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-xl border shadow-xl">
         <div className="flex flex-col sm:flex-row min-h-[520px] bg-card text-foreground">
           {/* Painel Esquerdo (Sidebar de Configurações) */}
           <div className="w-full sm:w-64 bg-muted/40 p-5 border-r flex flex-col justify-between space-y-6">
             <div className="space-y-6">
               {/* Header Minha Conta */}
-              <h2 className="text-xl font-bold tracking-tight text-foreground">Minha Conta</h2>
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">Minha Conta</h2>
 
               {/* Avatar + Carregar Foto */}
               <div className="flex items-center gap-3">
@@ -447,7 +430,7 @@ export function AccountSettingsModal({
                   )}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground block">
+                  <span className="type-label block">
                     FOTO DE PERFIL
                   </span>
                   <input
@@ -464,7 +447,7 @@ export function AccountSettingsModal({
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploadingAvatar}
-                      className="px-3 py-1 bg-slate-700 hover:bg-slate-800 text-white font-bold text-[11px] rounded-md transition-colors disabled:opacity-50"
+                      className="px-3 py-1 bg-slate-700 hover:bg-slate-800 text-white font-semibold text-[11px] rounded-md transition-colors disabled:opacity-50"
                     >
                       {isUploadingAvatar ? "Processando..." : "Carregar Foto"}
                     </button>
@@ -485,7 +468,7 @@ export function AccountSettingsModal({
               <nav className="space-y-1 pt-2">
                 <button
                   onClick={() => setActiveTab("DADOS")}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
                     activeTab === "DADOS"
                       ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -497,7 +480,7 @@ export function AccountSettingsModal({
 
                 <button
                   onClick={() => setActiveTab("PREFERENCIAS")}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
                     activeTab === "PREFERENCIAS"
                       ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -509,7 +492,7 @@ export function AccountSettingsModal({
 
                 <button
                   onClick={() => setActiveTab("RANKING")}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
                     activeTab === "RANKING"
                       ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -521,7 +504,7 @@ export function AccountSettingsModal({
 
                 <button
                   onClick={() => setActiveTab("CATEGORIAS")}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
                     activeTab === "CATEGORIAS"
                       ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -533,7 +516,7 @@ export function AccountSettingsModal({
 
                 <button
                   onClick={() => setActiveTab("NOTIFICACOES")}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
                     activeTab === "NOTIFICACOES"
                       ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -545,7 +528,7 @@ export function AccountSettingsModal({
 
                 <button
                   onClick={() => setActiveTab("SEGURANCA")}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
                     activeTab === "SEGURANCA"
                       ? "bg-primary text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -564,7 +547,7 @@ export function AccountSettingsModal({
                 await logoutAction()
                 window.location.replace("/login")
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-muted-foreground hover:text-rose-600 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-rose-600 transition-colors"
             >
               <LogOut className="h-4 w-4" />
               <span>Sair</span>
@@ -584,14 +567,14 @@ export function AccountSettingsModal({
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           NOME
                         </label>
                         <Input value={nome} onChange={(e) => setNome(e.target.value)} />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           SOBRENOME
                         </label>
                         <Input value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} />
@@ -600,14 +583,14 @@ export function AccountSettingsModal({
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           APELIDO
                         </label>
                         <Input value={apelido} onChange={(e) => setApelido(e.target.value)} />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           ANIVERSÁRIO
                         </label>
                         <Input
@@ -620,7 +603,7 @@ export function AccountSettingsModal({
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1 col-span-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           GÊNERO
                         </label>
                         <select
@@ -635,7 +618,7 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1 col-span-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           CIDADE
                         </label>
                         <Input
@@ -646,7 +629,7 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1 col-span-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           UF
                         </label>
                         <select
@@ -665,7 +648,7 @@ export function AccountSettingsModal({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                      <label className="type-label">
                         E-MAIL
                       </label>
                       <Input
@@ -686,7 +669,7 @@ export function AccountSettingsModal({
                     {/* Classificação de Desempenho (Ativada e Configurável) */}
                     <div className="space-y-2.5 bg-muted/20 p-3.5 rounded-xl border">
                       <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                        <label className="type-label block">
                           CLASSIFICAÇÃO DE DESEMPENHO
                         </label>
                         <span className="text-[10px] text-muted-foreground font-semibold">
@@ -695,7 +678,7 @@ export function AccountSettingsModal({
                       </div>
 
                       {/* Espectro Visual Dinâmico */}
-                      <div className="flex h-6 rounded-md overflow-hidden font-bold text-[10px] text-white text-center shadow-xs transition-all">
+                      <div className="flex h-6 rounded-md overflow-hidden font-semibold text-[10px] text-white text-center shadow-xs transition-all">
                         <div
                           style={{ width: `${ruimThreshold}%` }}
                           className="bg-rose-500 flex items-center justify-center transition-all min-w-[36px]"
@@ -722,7 +705,7 @@ export function AccountSettingsModal({
                       {/* Controles de Porcentagem */}
                       <div className="grid grid-cols-2 gap-3 pt-1">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                          <label className="text-[10px] font-semibold text-rose-600 dark:text-rose-400">
                             Limite Ruim (até %)
                           </label>
                           <div className="flex items-center gap-1.5">
@@ -735,14 +718,14 @@ export function AccountSettingsModal({
                                 const v = Math.max(5, Math.min(regularThreshold - 1, Number(e.target.value) || 0))
                                 setRuimThreshold(v)
                               }}
-                              className="w-full h-8 px-2.5 rounded-lg border text-xs font-mono font-bold bg-background text-foreground"
+                              className="w-full h-8 px-2.5 rounded-lg border text-xs tabular-nums font-semibold bg-background text-foreground"
                             />
-                            <span className="text-xs font-bold text-muted-foreground">%</span>
+                            <span className="text-xs font-semibold text-muted-foreground">%</span>
                           </div>
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                          <label className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                             Limite Regular (até %)
                           </label>
                           <div className="flex items-center gap-1.5">
@@ -755,9 +738,9 @@ export function AccountSettingsModal({
                                 const v = Math.max(ruimThreshold + 1, Math.min(99, Number(e.target.value) || 0))
                                 setRegularThreshold(v)
                               }}
-                              className="w-full h-8 px-2.5 rounded-lg border text-xs font-mono font-bold bg-background text-foreground"
+                              className="w-full h-8 px-2.5 rounded-lg border text-xs tabular-nums font-semibold bg-background text-foreground"
                             />
-                            <span className="text-xs font-bold text-muted-foreground">%</span>
+                            <span className="text-xs font-semibold text-muted-foreground">%</span>
                           </div>
                         </div>
                       </div>
@@ -765,19 +748,19 @@ export function AccountSettingsModal({
 
                     {/* Período das Revisões */}
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      <label className="type-label block">
                         PERÍODO DAS REVISÕES
                       </label>
                       <div className="flex items-center gap-2">
                         {["1d", "7d", "30d", "60d", "120d"].map((r) => (
                           <span
                             key={r}
-                            className="px-3 py-1 rounded-md border text-xs font-bold text-muted-foreground bg-muted/20"
+                            className="px-3 py-1 rounded-md border text-xs font-semibold text-muted-foreground bg-muted/20"
                           >
                             {r}
                           </span>
                         ))}
-                        <button className="p-1 rounded-md border text-xs font-bold hover:text-primary">
+                        <button className="p-1 rounded-md border text-xs font-semibold hover:text-primary">
                           +
                         </button>
                       </div>
@@ -786,7 +769,7 @@ export function AccountSettingsModal({
                     {/* Primeiro dia da semana & Som do Timer */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           PRIMEIRO DIA DA SEMANA
                         </label>
                         <select
@@ -800,7 +783,7 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <label className="type-label">
                           SOM DO TIMER
                         </label>
                         <div className="flex items-center gap-2">
@@ -822,7 +805,7 @@ export function AccountSettingsModal({
 
                     {/* Fuso Horário */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                      <label className="type-label">
                         FUSO HORÁRIO
                       </label>
                       <select
@@ -841,7 +824,7 @@ export function AccountSettingsModal({
                 {activeTab === "RANKING" && (
                   <div className="space-y-6">
                     <div className="space-y-3">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      <label className="type-label block">
                         PRIVACIDADE DO PERFIL DE DESEMPENHO
                       </label>
                       <p className="text-xs text-muted-foreground">
@@ -864,7 +847,7 @@ export function AccountSettingsModal({
                             className="mt-0.5 text-primary"
                           />
                           <div>
-                            <span className="text-xs font-bold text-foreground block">
+                            <span className="text-xs font-semibold text-foreground block">
                               Público (Recomendado)
                             </span>
                             <span className="text-[11px] text-muted-foreground leading-tight block mt-0.5">
@@ -889,7 +872,7 @@ export function AccountSettingsModal({
                             className="mt-0.5 text-primary"
                           />
                           <div>
-                            <span className="text-xs font-bold text-foreground block">Privado</span>
+                            <span className="text-xs font-semibold text-foreground block">Privado</span>
                             <span className="text-[11px] text-muted-foreground leading-tight block mt-0.5">
                               Outros usuários verão apenas seu nome e posição, mantendo suas
                               métricas ocultas.
@@ -901,7 +884,7 @@ export function AccountSettingsModal({
 
                     {/* Minha Foto */}
                     <div className="space-y-3">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      <label className="type-label block">
                         MINHA FOTO
                       </label>
                       <div className="space-y-2 text-xs font-semibold">
@@ -927,7 +910,7 @@ export function AccountSettingsModal({
                             onChange={() => setTipoFoto("iniciais")}
                             className="text-primary"
                           />
-                          <div className="w-7 h-7 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full bg-primary text-white font-semibold text-xs flex items-center justify-center">
                             {nome?.[0] || "?"}
                             {sobrenome?.[0] || ""}
                           </div>
@@ -938,7 +921,7 @@ export function AccountSettingsModal({
 
                     {/* Meu Nome */}
                     <div className="space-y-3">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      <label className="type-label block">
                         MEU NOME
                       </label>
                       <div className="space-y-2 text-xs font-semibold">
@@ -979,27 +962,27 @@ export function AccountSettingsModal({
                 {activeTab === "CATEGORIAS" && (
                   <div className="space-y-6">
                     <div className="space-y-3">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      <label className="type-label block">
                         CATEGORIAS FIXAS
                       </label>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className="bg-purple-600 text-white font-bold text-xs px-3 py-1">
+                        <Badge className="bg-purple-600 text-white font-semibold text-xs px-3 py-1">
                           TEORIA
                         </Badge>
-                        <Badge className="bg-rose-500 text-white font-bold text-xs px-3 py-1">
+                        <Badge className="bg-rose-500 text-white font-semibold text-xs px-3 py-1">
                           REVISÃO
                         </Badge>
-                        <Badge className="bg-emerald-500 text-white font-bold text-xs px-3 py-1">
+                        <Badge className="bg-emerald-500 text-white font-semibold text-xs px-3 py-1">
                           QUESTÕES
                         </Badge>
-                        <Badge className="bg-sky-500 text-white font-bold text-xs px-3 py-1">
+                        <Badge className="bg-sky-500 text-white font-semibold text-xs px-3 py-1">
                           SIMULADOS
                         </Badge>
                       </div>
                     </div>
 
                     <div className="space-y-3 pt-2">
-                      <label className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                      <label className="type-label block">
                         CATEGORIAS PERSONALIZADAS
                       </label>
 
@@ -1008,7 +991,7 @@ export function AccountSettingsModal({
                           <Badge
                             key={idx}
                             variant="outline"
-                            className="text-xs font-bold gap-1.5 pl-2.5 pr-1.5 py-1 flex items-center"
+                            className="text-xs font-semibold gap-1.5 pl-2.5 pr-1.5 py-1 flex items-center"
                           >
                             <span>{cat}</span>
                             <button
@@ -1048,7 +1031,7 @@ export function AccountSettingsModal({
                         ) : (
                           <button
                             onClick={() => setShowAddCat(true)}
-                            className="px-3 py-1 border rounded-md text-xs font-bold hover:text-primary transition-colors"
+                            className="px-3 py-1 border rounded-md text-xs font-semibold hover:text-primary transition-colors"
                           >
                             +
                           </button>
@@ -1061,7 +1044,7 @@ export function AccountSettingsModal({
                 {/* CONTEÚDO TAB 5: Notificações */}
                 {activeTab === "NOTIFICACOES" && (
                   <div className="space-y-4">
-                    <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                    <span className="type-label block">
                       PREFERÊNCIAS DE E-MAIL E NOTIFICAÇÕES
                     </span>
 
@@ -1077,7 +1060,7 @@ export function AccountSettingsModal({
                           className="mt-1 rounded text-primary focus:ring-primary"
                         />
                         <div>
-                          <h4 className="font-bold text-xs text-foreground">Resumo Semanal</h4>
+                          <h4 className="font-semibold text-xs text-foreground">Resumo Semanal</h4>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Relatório semanal consolidado com horas estudadas, questões respondidas e
                             taxa de acerto.
@@ -1093,7 +1076,7 @@ export function AccountSettingsModal({
                           className="mt-1 rounded text-primary focus:ring-primary"
                         />
                         <div>
-                          <h4 className="font-bold text-xs text-foreground">
+                          <h4 className="font-semibold text-xs text-foreground">
                             Lembretes de Estudo & Constância
                           </h4>
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1111,7 +1094,7 @@ export function AccountSettingsModal({
                           className="mt-1 rounded text-primary focus:ring-primary"
                         />
                         <div>
-                          <h4 className="font-bold text-xs text-foreground">Alertas de Revisão</h4>
+                          <h4 className="font-semibold text-xs text-foreground">Alertas de Revisão</h4>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Avisos quando houver flashcards e matérias agendadas pelo algoritmo de
                             repetição espaçada.
@@ -1127,7 +1110,7 @@ export function AccountSettingsModal({
                           className="mt-1 rounded text-primary focus:ring-primary"
                         />
                         <div>
-                          <h4 className="font-bold text-xs text-foreground">
+                          <h4 className="font-semibold text-xs text-foreground">
                             Importações de Histórico
                           </h4>
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1145,7 +1128,7 @@ export function AccountSettingsModal({
                           className="mt-1 rounded text-primary focus:ring-primary"
                         />
                         <div>
-                          <h4 className="font-bold text-xs text-foreground">Ranking & Conquistas</h4>
+                          <h4 className="font-semibold text-xs text-foreground">Ranking & Conquistas</h4>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Notificações sobre evolução de posição no ranking geral e novos troféus
                             conquistados.
@@ -1161,9 +1144,9 @@ export function AccountSettingsModal({
                           className="mt-1 rounded text-primary focus:ring-primary"
                         />
                         <div>
-                          <h4 className="font-bold text-xs text-foreground">Feedback & Insights</h4>
+                          <h4 className="font-semibold text-xs text-foreground">Feedback e observações</h4>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Mensagens com insights inteligentes e observações sobre sua evolução.
+                            Mensagens com observações sobre a sua evolução.
                           </p>
                         </div>
                       </div>
@@ -1173,13 +1156,13 @@ export function AccountSettingsModal({
                     <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4 text-primary" />
-                        <h4 className="font-bold text-xs text-foreground">
+                        <h4 className="font-semibold text-xs text-foreground">
                           Teste do Serviço Resend
                         </h4>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Enviaremos um e-mail de teste para:{" "}
-                        <strong className="text-foreground font-bold">
+                        <strong className="text-foreground font-semibold">
                           {email || userEmail || "sua conta"}
                         </strong>
                       </p>
@@ -1203,7 +1186,7 @@ export function AccountSettingsModal({
                             setIsSendingTestEmail(false)
                           }
                         }}
-                        className="border-primary text-primary hover:bg-primary/10 font-bold text-xs gap-2"
+                        className="border-primary text-primary hover:bg-primary/10 font-semibold text-xs gap-2"
                       >
                         {isSendingTestEmail ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1219,7 +1202,7 @@ export function AccountSettingsModal({
                 {/* CONTEÚDO TAB 6: Segurança */}
                 {activeTab === "SEGURANCA" && (
                   <div className="space-y-4">
-                    <span className="text-[10px] font-extrabold uppercase text-muted-foreground block">
+                    <span className="type-label block">
                       ALTERAR SENHA
                     </span>
 
@@ -1260,7 +1243,7 @@ export function AccountSettingsModal({
                       <Button
                         onClick={handleChangePassword}
                         disabled={isChangingPassword}
-                        className="bg-primary hover:bg-primary/90 text-white font-bold text-xs w-full mt-2"
+                        className="w-full mt-2"
                       >
                         {isChangingPassword ? (
                           <>
@@ -1282,7 +1265,7 @@ export function AccountSettingsModal({
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="border-primary text-primary hover:bg-primary/10 font-bold text-xs px-6 h-9"
+                className="border-primary text-primary hover:bg-primary/10 font-semibold text-xs px-6 h-9"
               >
                 Cancelar
               </Button>
@@ -1290,7 +1273,7 @@ export function AccountSettingsModal({
               <Button
                 onClick={handleSave}
                 disabled={isSaving || isLoadingProfile || isUploadingAvatar}
-                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 h-9 shadow-xs gap-1.5"
+                className="gap-1.5"
               >
                 {isSaving ? (
                   <>

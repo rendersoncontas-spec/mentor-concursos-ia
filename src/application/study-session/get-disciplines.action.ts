@@ -5,6 +5,7 @@ import { type SupabaseClient } from "@supabase/supabase-js"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { buildCycleOverview } from "@/application/study-cycle/cycle-progress.service"
+import { fetchAllCycleSessions } from "@/application/study-cycle/cycle-sessions.reader"
 import type {
   StudyCycle,
   StudyCycleItemWithDetails,
@@ -236,15 +237,18 @@ export async function getDisciplinesForAutocomplete(): Promise<{
       return { hasActivePlan: false, planDisciplines: [], allDisciplines: [] }
     }
 
-    // 1. Buscar disciplinas do plano ativo via service puro
-    const planResult = await fetchActivePlanDisciplines(supabase, effectiveUserId)
-
-    // 2. Buscar todas as disciplinas globais do catálogo do banco
-    const { data: allDiscs, error: allDiscsError } = await supabase
-      .from("disciplines")
-      .select("id, name, area, color_hex")
-      .order("name", { ascending: true })
-      .limit(300)
+    // Fase F (performance): as duas leituras são independentes — rodam em
+    // paralelo (antes: plano ativo → catálogo, em sequência).
+    const [planResult, { data: allDiscs, error: allDiscsError }] = await Promise.all([
+      // 1. Disciplinas do plano ativo via service puro
+      fetchActivePlanDisciplines(supabase, effectiveUserId),
+      // 2. Todas as disciplinas globais do catálogo do banco
+      supabase
+        .from("disciplines")
+        .select("id, name, area, color_hex")
+        .order("name", { ascending: true })
+        .limit(300),
+    ])
 
     if (allDiscsError) {
       console.error(
@@ -447,10 +451,8 @@ async function fetchCycleDisciplines(
 
     if (!items || items.length === 0) return []
 
-    const { data: sessions } = await supabase
-      .from("study_cycle_sessions")
-      .select("*")
-      .eq("cycle_id", cycle.id)
+    // Fase F.1: leitura paginada de study_cycle_sessions (antes cortada em 1.000).
+    const { data: sessions } = await fetchAllCycleSessions(supabase, { cycleId: cycle.id })
 
     const { data: skipRows } = await supabase
       .from("study_cycle_item_skips")

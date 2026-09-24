@@ -6,7 +6,7 @@ Transformar todos os registros de estudo, revisões e questões em relatórios g
 ---
 
 ## 🔄 Fluxo do Usuário
-1. O usuário acessa a página de Estatísticas (`/dashboard/analytics`).
+1. O usuário acessa a página de Estatísticas (`/estatisticas`). _(A antiga `/dashboard/analytics` redireciona para ela desde a Fase G.1.)_
 2. Seleciona o período de análise desejado (Últimos 7 dias, 30 dias, Mês Atual, Período Customizado).
 3. Analisa os gráficos:
    - **Evolução de Horas Líquidas** (Gráfico de linha/barra por dia).
@@ -80,15 +80,15 @@ Transformar todos os registros de estudo, revisões e questões em relatórios g
 
 ## 📈 Status Atual no Projeto
 - ✅ Engine analítica completa no backend (`AnalyticsEngine` com 8 submódulos em `application/study-analytics/`).
-- ✅ Gráficos `performance-chart.tsx` e `hours-distribution-chart.tsx` criados.
+- ✅ Gráficos da página de Estatísticas em `features/statistics/` (`statistics-center-view.tsx`, `statistics-charts.tsx`). _(Os antigos `performance-chart.tsx` e `hours-distribution-chart.tsx`, usados só pela rota `/dashboard/analytics`, foram removidos na Fase G.1.)_
 - ✅ Ranking de disciplinas funcional.
-- 🔴 FALTANTE: Tela dedicada `/dashboard/analytics` integrando todos os relatórios em um único dashboard de BI.
+- ✅ Tela dedicada de Estatísticas: `/estatisticas` (a antiga `/dashboard/analytics` redireciona para ela).
 - 🔴 FALTANTE: Gráfico integrado de acertos de questões vs tempo estudado.
 
 ---
 
 ## 🚧 O que falta implementar
-1. Montar a página completa de estatísticas em `/dashboard/analytics`.
+1. Completar a página de estatísticas em `/estatisticas` (a rota `/dashboard/analytics` foi desativada na Fase G.1).
 2. Adicionar o gráfico comparativo de % de acerto de questões por matéria.
 3. Adicionar botão para exportar relatório analítico.
 
@@ -110,6 +110,6 @@ Transformar todos os registros de estudo, revisões e questões em relatórios g
 - [x] Engine analítica backend com agregações
 - [x] Gráfico de Linhas de Evolução Temporal (`Recharts`)
 - [x] Gráfico Donut de Distribuição por Matéria
-- [ ] Página dedicada `/dashboard/analytics` no App Router
+- [x] Página dedicada no App Router: `/estatisticas` (a antiga `/dashboard/analytics` redireciona)
 - [ ] Gráfico de taxa de acerto em questões por matéria
 - [ ] Filtro por intervalo de datas personalizado

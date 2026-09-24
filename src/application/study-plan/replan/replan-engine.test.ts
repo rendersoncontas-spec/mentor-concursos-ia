@@ -22,6 +22,7 @@ import {
   priorityScoreOf,
   shouldReplan,
 } from "./replan-engine.ts"
+import { must } from "@/lib/testing/must"
 
 const TODAY = "2026-08-14"
 const YESTERDAY = "2026-08-13"
@@ -1064,7 +1065,7 @@ test("ESPEC 16.2: Pendência mantida no planejamento não infla hoje acima da ca
 
   const pendings = computePendingBlocks(pastBlocks, sessions)
   assert.equal(pendings.length, 1)
-  assert.equal(pendings[0]!.pendingMinutes, 22) // 60 - 37 - 1 (tolerância) = 22min
+  assert.equal(must(pendings[0]).pendingMinutes, 22) // 60 - 37 - 1 (tolerância) = 22min
 
   // Distribuição automática nos próximos dias
   const days: ReplanCapacityDay[] = [

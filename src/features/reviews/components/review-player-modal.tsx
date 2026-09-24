@@ -176,7 +176,7 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
         {!starting && !error && session?.isFinished && (
           <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
             <CheckCircle2 className="h-10 w-10 text-green-500" />
-            <p className="text-sm font-bold">Revisão concluída!</p>
+            <p className="text-sm font-semibold">Revisão concluída!</p>
             <p className="text-xs text-muted-foreground">
               Você revisou {session.cardsTotal} cartão{session.cardsTotal === 1 ? "" : "ões"}. A memória foi atualizada com
               os intervalos do FSRS.
@@ -196,7 +196,7 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
                   {front.topicName ? ` · ${front.topicName}` : ""}
                 </span>
                 {front.flag && (
-                  <span className="text-[11px] font-bold text-red-500 uppercase">{front.flag.replace("_", " ")}</span>
+                  <span className="text-[11px] font-semibold text-red-500">{front.flag.replace("_", " ")}</span>
                 )}
               </div>
               <p className="text-base font-medium whitespace-pre-wrap flex-1">{front.front}</p>
@@ -209,7 +209,7 @@ export function ReviewPlayerModal({ open, onOpenChange, mode = "ALL", onFinished
             {revealed ? (
               <div className="space-y-4">
                 <div className="rounded-xl border bg-emerald-500/5 p-5">
-                  <p className="text-xs font-bold text-emerald-600 mb-2 uppercase">Resposta</p>
+                  <p className="text-xs font-semibold text-emerald-600 mb-2">Resposta</p>
                   <p className="text-sm whitespace-pre-wrap">{revealed.back || "Sem resposta registrada."}</p>
                 </div>
 

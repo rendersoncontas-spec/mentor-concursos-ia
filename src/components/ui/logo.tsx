@@ -61,7 +61,7 @@ export function Logo({
       <Link
         href={href}
         className={cn(
-          "inline-flex items-center justify-center transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl",
+          "inline-flex items-center justify-center transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md",
           className,
         )}
         aria-label="NomeIA"
@@ -72,7 +72,7 @@ export function Logo({
           alt="NomeIA"
           width={size}
           height={size}
-          className="object-contain rounded-xl shadow-xs"
+          className="object-contain rounded-md"
           style={{ width: `${size}px`, height: `${size}px` }}
           priority={priority}
         />
@@ -97,7 +97,7 @@ export function Logo({
           alt="NomeIA"
           width={size}
           height={size}
-          className="object-contain rounded-xl shadow-xs"
+          className="object-contain rounded-md"
           style={{ width: `${size}px`, height: `${size}px` }}
           priority={priority}
         />
@@ -105,7 +105,7 @@ export function Logo({
 
       {showText && (
         <div className="flex flex-col min-w-0 leading-none">
-          <span className="font-extrabold tracking-tight text-foreground text-lg sm:text-xl flex items-center">
+          <span className="font-semibold tracking-tight text-foreground text-lg sm:text-xl flex items-center">
             <span>Nome</span>
             <span className="text-primary">
               IA

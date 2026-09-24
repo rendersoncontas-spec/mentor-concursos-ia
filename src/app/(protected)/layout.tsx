@@ -1,14 +1,10 @@
-import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { createClient } from "@/infrastructure/supabase/server"
 import { logoutAction } from "@/application/auth/logout.action"
 import {
   type ActiveSupportSession,
   type UserRole,
-  SUPPORT_SESSION_COOKIE_NAME,
-  getActiveSupportSession,
   getEffectiveSessionUser,
-  getUserRole,
 } from "@/application/admin/auth-guard"
 
 import { ProtectedLayoutClient } from "@/components/layout/protected-layout-client"

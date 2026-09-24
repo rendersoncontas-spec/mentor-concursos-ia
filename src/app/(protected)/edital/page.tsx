@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { ArrowRight, FileText, GraduationCap } from "lucide-react"
+import { FileText, GraduationCap } from "lucide-react"
 
 import { getUserDisciplines } from "@/application/disciplines/disciplines.service"
 import {
@@ -8,6 +8,9 @@ import {
   EditalAccordion,
   type TopicItem,
 } from "@/features/edital/components/edital-accordion"
+import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
+import { PageHeader } from "@/components/ui/page-header"
 import { EditalImporter } from "@/features/edital-importer/components/edital-importer"
 import { createClient } from "@/infrastructure/supabase/server"
 
@@ -562,60 +565,47 @@ export default async function EditalPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Page Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-primary" />
-          <div>
-            <h1 className="text-lg font-bold leading-none">Edital Verticalizado</h1>
-            {active ? (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                <span className="font-semibold text-primary">{active.name}</span>
-                {active.role && <span className="text-muted-foreground"> · {active.role}</span>}
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Progresso por disciplina e tópico
-              </p>
+      <PageHeader
+        icon={FileText}
+        title="Edital verticalizado"
+        description={
+          active ? (
+            <>
+              <span className="font-medium text-foreground">{active.name}</span>
+              {active.role && <span> · {active.role}</span>}
+            </>
+          ) : (
+            "Progresso por disciplina e tópico"
+          )
+        }
+        actions={
+          <>
+            {!active && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/concursos">
+                  <GraduationCap aria-hidden className="h-3.5 w-3.5" />
+                  Adicionar concurso
+                </Link>
+              </Button>
             )}
-          </div>
-        </div>
+            {active?.id && <EditalImporter targetId={active.id} />}
+          </>
+        }
+      />
 
-        {/* Link para Concursos */}
-        {!active && (
-          <Link
-            href="/concursos"
-            className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
-          >
-            <GraduationCap className="h-3.5 w-3.5" />
-            Adicionar concurso
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        )}
-
-        {active?.id && <EditalImporter targetId={active.id} />}
-      </div>
-
-      <div className="flex-1 p-4 md:p-6">
+      <div className="flex-1 page-container py-5">
         {!active || !active.disciplines || active.disciplines.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <FileText className="h-8 w-8 text-primary/60" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-black text-foreground">Nenhuma disciplina cadastrada</h2>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                Adicione disciplinas ou gere seu planejamento inteligente para visualizar o edital
-                verticalizado.
-              </p>
-            </div>
-            <Link
-              href="/planejamento"
-              className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
-            >
-              <GraduationCap className="h-4 w-4" />
-              Criar Planejamento
-            </Link>
+          <div className="rounded-lg border border-border bg-card">
+            <EmptyState
+              icon={FileText}
+              title="Nenhuma disciplina cadastrada"
+              description="Adicione disciplinas ou crie um planejamento para visualizar o edital verticalizado."
+              action={
+                <Button asChild size="sm">
+                  <Link href="/planejamento">Criar planejamento</Link>
+                </Button>
+              }
+            />
           </div>
         ) : (
           <EditalAccordion

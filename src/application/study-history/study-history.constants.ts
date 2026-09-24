@@ -17,12 +17,9 @@
 export const HISTORY_PATHS = [
   "/dashboard",
   "/dashboard/history",
-  // Consultado por getDashboardData (ver dashboard.service.ts), a mesma
-  // função usada por /dashboard/analytics — sem essa linha, editar/excluir
-  // uma sessão manual deixava essa página com dados desatualizados até
-  // alguma outra navegação revalidá-la por acaso (o fluxo de importação em
-  // massa já revalidava essa rota corretamente; faltava aqui).
-  "/dashboard/analytics",
+  // Fase G.1: /dashboard/analytics saiu desta lista — a rota agora
+  // redireciona para /estatisticas (src/config/legacy-routes.ts), que já
+  // está aqui. Revalidar um redirect não atualiza nada.
   "/estatisticas",
   "/disciplines",
   "/planejamento",

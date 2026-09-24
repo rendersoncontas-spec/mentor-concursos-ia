@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     default: "NomeIA",
   },
   description:
-    "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",
+    "Sua preparação rumo à nomeação. Plataforma de gestão de estudos para concursos.",
   keywords: [
     "concursos públicos",
     "nomeia",
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     url: "https://nomeia.concursos",
     title: "NomeIA — Sua preparação rumo à nomeação",
     description:
-      "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos públicos.",
+      "Sua preparação rumo à nomeação. Plataforma de gestão de estudos para concursos públicos.",
     siteName: "NomeIA",
     images: [
       {
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "NomeIA — Sua preparação rumo à nomeação",
     description:
-      "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos públicos.",
+      "Sua preparação rumo à nomeação. Plataforma de gestão de estudos para concursos públicos.",
     images: ["/og-image.png"],
   },
 }

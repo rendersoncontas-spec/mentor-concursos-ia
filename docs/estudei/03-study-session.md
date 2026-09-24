@@ -22,7 +22,7 @@ Fornecer um temporizador de horas líquidas de alta precisão com suporte a paus
 - `SmartTimerDisplay`: Exibição do tempo líquido decorrido em dígitos grandes (`HH:MM:SS`).
 - `InactivityWarningBanner`: Alerta sonoro/visual quando detectada inatividade.
 - `PostSessionEvaluationModal`: Formulário de fechamento da sessão.
-- `ActiveSessionManager` (FAB): Botão flutuante global que persiste o estado do timer na navegação.
+- `StudyProvider` + botão flutuante global (`FloatingActionButton`): persistem o estado do timer na navegação. _(O antigo `ActiveSessionManager` foi removido na Fase G.)_
 
 ---
 
@@ -60,7 +60,7 @@ Fornecer um temporizador de horas líquidas de alta precisão com suporte a paus
 ## ⚙️ Regras de Negócio
 - Tempo mínimo para validar uma sessão no histórico: 5 minutos. Sessões com menos de 5 minutos podem ser descartadas sem salvar.
 - A detecção de inatividade dispara após 10 minutos sem interação do usuário (configurável).
-- Se a página for atualizada ou o navegador fechado acidentalmente, o estado do timer DEVE ser recuperado através do `localStorage` / `ActiveSessionManager`.
+- Se a página for atualizada ou o navegador fechado acidentalmente, o estado do timer DEVE ser recuperado através do `localStorage` / `StudyProvider`.
 - Ao finalizar uma sessão vinculada a um item do ciclo, esse item é marcado como concluído e o ciclo avança.
 
 ---
@@ -69,7 +69,7 @@ Fornecer um temporizador de horas líquidas de alta precisão com suporte a paus
 - Módulo de Disciplinas (`disciplines`)
 - Módulo de Histórico de Estudos (`study_history`)
 - Hook de Timer (`use-smart-timer.ts`)
-- Server Actions (`study-history.actions.ts`, `study-session.actions.ts`)
+- Server Actions (`study-history.actions.ts`, `study-session.action.ts`)
 
 ---
 
@@ -82,7 +82,7 @@ Fornecer um temporizador de horas líquidas de alta precisão com suporte a paus
 
 ## 🌐 APIs Utilizadas
 - `startStudySessionAction()` -> Cria o registro inicial na tabela `study_history`.
-- `finalizeSmartSessionAction()` -> Atualiza o registro com tempo final, foco, energia e questões.
+- `saveStudySessionAction()` (`study-session.action.ts`) -> Salva a sessão finalizada com tempo, foco, energia e questões. _(A antiga `finalizeSmartSessionAction`, sem chamadores, foi removida na Fase G.)_
 
 ---
 

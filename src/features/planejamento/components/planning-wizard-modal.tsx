@@ -12,7 +12,6 @@ import {
   Plus,
   RotateCcw,
   Search,
-  Sparkles,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -179,7 +178,7 @@ export function PlanningWizardModal({
   })
   const [customWorkDays, setCustomWorkDays] = useState(3)
   const [customOffDays, setCustomOffDays] = useState(2)
-  const [firstShiftDay, setFirstShiftDay] = useState<number>(() => {
+  const [firstShiftDay] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(LS_FIRST_SHIFT)
       if (saved) return parseInt(saved)
@@ -578,10 +577,12 @@ export function PlanningWizardModal({
   }
 
   const presetColors: Record<SessionStyle, string> = {
-    curtas: "border-sky-300 bg-sky-500/10 text-sky-700",
-    equilibradas: "border-primary/40 bg-primary/8 text-primary",
-    longas: "border-violet-300 bg-violet-500/10 text-violet-700",
-    personalizado: "border-amber-300 bg-amber-500/10 text-amber-700",
+    // Fase E — seleção com a mesma cor de estado em todas as opções
+    // (antes cada preset tinha uma cor decorativa: azul, roxo, âmbar).
+    curtas: "border-primary bg-primary/8 text-primary",
+    equilibradas: "border-primary bg-primary/8 text-primary",
+    longas: "border-primary bg-primary/8 text-primary",
+    personalizado: "border-primary bg-primary/8 text-primary",
   }
 
   return (
@@ -592,7 +593,7 @@ export function PlanningWizardModal({
         className={cn(
           "flex flex-col gap-0 p-0 border-0 max-w-none max-w-[100vw]",
           "fixed inset-0 h-[100dvh] w-full overflow-y-auto sm:overflow-hidden",
-          "rounded-none sm:rounded-2xl sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:right-auto",
+          "rounded-none sm:rounded-xl sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:right-auto",
           "translate-x-0 translate-y-0 sm:translate-x-[-50%] sm:translate-y-[-50%]",
           "sm:w-[min(900px,94vw)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:border",
         )}
@@ -601,7 +602,7 @@ export function PlanningWizardModal({
         <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b bg-card">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground">
+              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground">
                 {modalTitle}
               </h2>
               <p className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-0.5">
@@ -626,7 +627,7 @@ export function PlanningWizardModal({
                 <div key={label} className="flex flex-col items-center gap-1 relative z-10">
                   <div
                     className={cn(
-                      "w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-extrabold transition-all",
+                      "w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-semibold transition-all",
                       done || active
                         ? "bg-primary border-primary text-white"
                         : "bg-card border-muted text-muted-foreground",
@@ -637,7 +638,7 @@ export function PlanningWizardModal({
                   </div>
                   <span
                     className={cn(
-                      "text-[10px] font-extrabold uppercase tracking-wide",
+                      "text-[11px] font-semibold",
                       active ? "text-primary" : "text-muted-foreground",
                     )}
                   >
@@ -650,7 +651,7 @@ export function PlanningWizardModal({
 
           {/* Stepper Mobile */}
           <div className="sm:hidden flex items-center gap-3 mt-3">
-            <span className="text-[11px] font-extrabold uppercase text-muted-foreground shrink-0">
+            <span className="type-label shrink-0">
               Etapa {currentStep} de 4
             </span>
             <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
@@ -676,7 +677,7 @@ export function PlanningWizardModal({
                   <div className="md:col-span-3 space-y-3.5">
                     {/* Modo */}
                     <div>
-                      <label className="text-xs font-extrabold text-foreground block">
+                      <label className="text-xs font-semibold text-foreground block">
                         Como você prefere visualizar seu planejamento?
                       </label>
                       <div className="grid grid-cols-2 gap-2.5 mt-2">
@@ -717,7 +718,7 @@ export function PlanningWizardModal({
                               <opt.icon className="w-4 h-4" />
                             </div>
                             <div>
-                              <h3 className="font-extrabold text-xs text-foreground">
+                              <h3 className="font-semibold text-xs text-foreground">
                                 {opt.title}
                               </h3>
                               <p className="text-[10px] text-muted-foreground font-medium mt-0.5 hidden sm:block">
@@ -732,7 +733,7 @@ export function PlanningWizardModal({
                     {/* Carga semanal */}
                     <div className="rounded-xl border bg-card p-3 space-y-3">
                       <div>
-                        <label className="text-xs font-extrabold text-foreground block">
+                        <label className="text-xs font-semibold text-foreground block">
                           Quanto tempo você consegue estudar por semana?
                         </label>
                         <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
@@ -756,11 +757,11 @@ export function PlanningWizardModal({
                           <Minus className="w-3.5 h-3.5" />
                         </Button>
                         <div className="text-center min-w-[80px] shrink-0">
-                          <div className="text-2xl font-black font-mono text-primary tabular-nums leading-none">
+                          <div className="text-2xl font-semibold tabular-nums text-primary leading-none">
                             {weeklyHoursNum}
                             <span className="text-base text-muted-foreground">h</span>
                           </div>
-                          <div className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground mt-0.5">
+                          <div className="type-label mt-0.5">
                             / semana
                           </div>
                         </div>
@@ -791,7 +792,7 @@ export function PlanningWizardModal({
                             aria-label="Horas semanais"
                           />
                           <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[10px] font-bold text-muted-foreground">
+                            <span className="text-[10px] font-semibold text-muted-foreground">
                               {MIN_WEEKLY_HOURS}h
                             </span>
                             <Input
@@ -805,10 +806,10 @@ export function PlanningWizardModal({
                                 setWeeklyHoursInput(v)
                               }}
                               onBlur={() => setWeeklyHoursInput(String(weeklyHoursNum))}
-                              className="w-16 h-7 text-center font-mono font-black text-xs rounded-lg"
+                              className="w-16 h-7 text-center tabular-nums font-semibold text-xs rounded-lg"
                               aria-label="Horas semanais (valor numérico)"
                             />
-                            <span className="text-[10px] font-bold text-muted-foreground">
+                            <span className="text-[10px] font-semibold text-muted-foreground">
                               {MAX_WEEKLY_HOURS}h
                             </span>
                           </div>
@@ -827,12 +828,12 @@ export function PlanningWizardModal({
                     )}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                      <span className="type-label">
                         Carga semanal
                       </span>
                       <span
                         className={cn(
-                          "flex items-center gap-1 text-[11px] font-extrabold",
+                          "flex items-center gap-1 text-[11px] font-semibold",
                           loadOk ? "text-emerald-600" : "text-amber-600",
                         )}
                       >
@@ -847,24 +848,24 @@ export function PlanningWizardModal({
 
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>
-                        <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <div className="type-label">
                           Desejada
                         </div>
-                        <div className="text-base font-black tabular-nums">{weeklyHoursNum}h</div>
+                        <div className="text-base font-semibold tabular-nums">{weeklyHoursNum}h</div>
                       </div>
                       <div>
-                        <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <div className="type-label">
                           Disponível
                         </div>
-                        <div className="text-base font-black tabular-nums text-primary">
+                        <div className="text-base font-semibold tabular-nums text-primary">
                           {capacityHours}h
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                        <div className="type-label">
                           Dias/semana
                         </div>
-                        <div className="text-base font-black tabular-nums">{daysPerWeek}</div>
+                        <div className="text-base font-semibold tabular-nums">{daysPerWeek}</div>
                       </div>
                     </div>
 
@@ -884,7 +885,7 @@ export function PlanningWizardModal({
                             onClick={() =>
                               setWeeklyHoursInput(String(Math.max(MIN_WEEKLY_HOURS, capacityHours)))
                             }
-                            className="border-amber-300 text-amber-700 hover:bg-amber-500/10 font-bold text-[11px] h-8 rounded-lg cursor-pointer"
+                            className="border-amber-300 text-amber-700 hover:bg-amber-500/10 font-semibold text-[11px] h-8 rounded-lg cursor-pointer"
                           >
                             Reduzir para {Math.max(MIN_WEEKLY_HOURS, capacityHours)}h
                           </Button>
@@ -898,7 +899,7 @@ export function PlanningWizardModal({
                 <div className="rounded-xl border bg-card p-3 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div>
-                      <label className="text-xs font-extrabold text-foreground block">
+                      <label className="text-xs font-semibold text-foreground block">
                         Como você organiza seus dias de estudo?
                       </label>
                       <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
@@ -910,7 +911,7 @@ export function PlanningWizardModal({
                         type="button"
                         onClick={() => setDayConfigMode("semana")}
                         className={cn(
-                          "px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer",
+                          "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                           dayConfigMode === "semana"
                             ? "bg-primary text-white shadow-xs"
                             : "text-muted-foreground hover:text-foreground",
@@ -922,7 +923,7 @@ export function PlanningWizardModal({
                         type="button"
                         onClick={() => setDayConfigMode("escala")}
                         className={cn(
-                          "px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer",
+                          "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                           dayConfigMode === "escala"
                             ? "bg-primary text-white shadow-xs"
                             : "text-muted-foreground hover:text-foreground",
@@ -944,7 +945,7 @@ export function PlanningWizardModal({
                             onClick={() => toggleDaySelection(day)}
                             aria-pressed={isSelected}
                             className={cn(
-                              "px-3.5 py-2 rounded-lg border-2 text-xs font-extrabold transition-all cursor-pointer",
+                              "px-3.5 py-2 rounded-lg border-2 text-xs font-semibold transition-all cursor-pointer",
                               isSelected
                                 ? "border-primary bg-primary text-white shadow-xs"
                                 : "border-muted bg-card text-muted-foreground hover:border-primary/60",
@@ -978,7 +979,7 @@ export function PlanningWizardModal({
                                   <Check className="w-2.5 h-2.5" />
                                 </span>
                               )}
-                              <div className="font-extrabold text-xs text-foreground">
+                              <div className="font-semibold text-xs text-foreground">
                                 {esc.label}
                               </div>
                               <div className="text-[10px] text-muted-foreground font-medium mt-0.5">
@@ -1007,7 +1008,7 @@ export function PlanningWizardModal({
                               <Check className="w-2.5 h-2.5" />
                             </span>
                           )}
-                          <div className="font-extrabold text-xs text-foreground">
+                          <div className="font-semibold text-xs text-foreground">
                             Personalizada
                           </div>
                           <div className="text-[10px] text-muted-foreground font-medium mt-0.5">
@@ -1020,7 +1021,7 @@ export function PlanningWizardModal({
                         <div className="rounded-lg border border-amber-300/40 bg-amber-500/5 p-2.5 space-y-2">
                           <div className="grid grid-cols-2 gap-2.5">
                             <div className="space-y-1">
-                              <label className="text-[10px] font-extrabold text-muted-foreground">
+                              <label className="text-[10px] font-semibold text-muted-foreground">
                                 Trabalha (dias)
                               </label>
                               <Input
@@ -1033,12 +1034,12 @@ export function PlanningWizardModal({
                                   setCustomWorkDays(v)
                                   setEscalaTrabalho(`custom_${v}x${customOffDays}`)
                                 }}
-                                className="h-8 text-center font-mono font-black rounded-lg"
+                                className="h-8 text-center tabular-nums font-semibold rounded-lg"
                                 aria-label="Dias trabalhados por ciclo"
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-extrabold text-muted-foreground">
+                              <label className="text-[10px] font-semibold text-muted-foreground">
                                 Folga (dias)
                               </label>
                               <Input
@@ -1051,7 +1052,7 @@ export function PlanningWizardModal({
                                   setCustomOffDays(v)
                                   setEscalaTrabalho(`custom_${customWorkDays}x${v}`)
                                 }}
-                                className="h-8 text-center font-mono font-black rounded-lg"
+                                className="h-8 text-center tabular-nums font-semibold rounded-lg"
                                 aria-label="Dias de folga por ciclo"
                               />
                             </div>
@@ -1066,7 +1067,7 @@ export function PlanningWizardModal({
                       {/* Data de referência do plantão */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/40 rounded-xl border">
                         <div>
-                          <label className="text-[11px] font-extrabold text-foreground block">
+                          <label className="text-[11px] font-semibold text-foreground block">
                             Data de um plantão de referência
                           </label>
                           <span className="text-[10px] text-muted-foreground font-medium">
@@ -1082,7 +1083,7 @@ export function PlanningWizardModal({
                               localStorage.setItem(LS_SHIFT_ANCHOR_DATE, e.target.value)
                             }
                           }}
-                          className="w-auto h-8 text-xs font-bold font-mono bg-card"
+                          className="w-auto h-8 text-xs font-semibold tabular-nums bg-card"
                         />
                       </div>
                     </div>
@@ -1106,8 +1107,8 @@ export function PlanningWizardModal({
                 </div>
 
                 <div className="p-3 rounded-xl border border-primary/25 bg-card space-y-2 shadow-2xs">
-                  <label className="text-[10px] font-extrabold text-primary tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5" />
+                  <label className="text-[10px] font-semibold text-primary tracking-wider flex items-center gap-1.5">
+                    <Plus className="h-3.5 w-3.5" />
                     Adicionar nova matéria personalizada
                   </label>
 
@@ -1154,7 +1155,7 @@ export function PlanningWizardModal({
                       <Button
                         type="button"
                         size="sm"
-                        className="bg-primary hover:bg-primary/90 text-white font-bold text-xs shrink-0 px-4 h-9 gap-1 rounded-xl shadow-xs cursor-pointer"
+                        className="shrink-0 px-4 gap-1 cursor-pointer"
                         onClick={() => {
                           if (searchTerm.trim()) {
                             handleAddCustomDiscipline(searchTerm)
@@ -1171,7 +1172,7 @@ export function PlanningWizardModal({
 
                     {showAutocomplete && searchTerm.trim().length > 0 && (
                       <div className="absolute left-0 right-0 top-full mt-1.5 bg-popover border border-border rounded-xl shadow-2xl z-50 overflow-hidden max-h-48 overflow-y-auto divide-y divide-border/30 animate-in fade-in slide-in-from-top-1 duration-150">
-                        <div className="px-3 py-1.5 bg-muted/50 border-b border-border flex items-center justify-between text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">
+                        <div className="type-label px-3 py-1.5 bg-muted/50 border-b border-border flex items-center justify-between">
                           <span>Resultado da busca ({filteredDbDisciplines.length})</span>
                         </div>
 
@@ -1192,7 +1193,7 @@ export function PlanningWizardModal({
                                   setSearchTerm("")
                                   setShowAutocomplete(false)
                                 }}
-                                className={`w-full px-3 text-left text-xs font-bold transition-colors flex items-center justify-between py-2 cursor-pointer ${
+                                className={`font-semibold w-full px-3 text-left text-xs transition-colors flex items-center justify-between py-2 cursor-pointer ${
                                   isAlreadySelected
                                     ? "bg-primary/10 text-primary"
                                     : "hover:bg-muted/80 text-foreground"
@@ -1200,11 +1201,11 @@ export function PlanningWizardModal({
                               >
                                 <span className="truncate">{item}</span>
                                 {isAlreadySelected ? (
-                                  <span className="text-[10px] font-extrabold uppercase text-primary bg-primary/15 px-2 py-0.5 rounded-full">
+                                  <span className="text-[11px] font-semibold text-primary bg-primary/15 px-2 py-0.5 rounded-full">
                                     Já Adicionada
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] font-extrabold text-primary">
+                                  <span className="text-[10px] font-semibold text-primary">
                                     + Selecionar
                                   </span>
                                 )}
@@ -1227,7 +1228,7 @@ export function PlanningWizardModal({
                           type="button"
                           onClick={() => toggleDisciplineSelection(disc)}
                           aria-pressed={isSelected}
-                          className={`p-2.5 rounded-lg border text-xs font-bold transition-all text-center ${
+                          className={`font-semibold p-2.5 rounded-lg border text-xs transition-all text-center ${
                             isSelected
                               ? "border-primary bg-primary/30 text-primary shadow-xs"
                               : "border-muted bg-card text-muted-foreground hover:border-primary"
@@ -1257,18 +1258,18 @@ export function PlanningWizardModal({
                     return (
                       <div key={disc} className="rounded-lg border p-2.5 space-y-2 bg-card">
                         <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-extrabold text-xs text-foreground truncate">
+                          <h4 className="font-semibold text-xs text-foreground truncate">
                             {disc}
                           </h4>
-                          <span className="shrink-0 text-[10px] font-black font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-md">
+                          <span className="shrink-0 text-[10px] font-semibold tabular-nums text-primary bg-primary/10 px-1.5 py-0.5 rounded-md">
                             {pct}%
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-3 text-[10px] font-bold">
+                        <div className="grid grid-cols-2 gap-3 text-[10px] font-semibold">
                           <div className="space-y-1">
                             <div className="flex justify-between text-muted-foreground">
-                              <span>IMPORTÂNCIA</span>
-                              <span className="text-foreground font-black">
+                              <span>Importância</span>
+                              <span className="text-foreground font-semibold">
                                 {importanceMap[disc] ?? 2.5}
                               </span>
                             </div>
@@ -1290,8 +1291,8 @@ export function PlanningWizardModal({
 
                           <div className="space-y-1">
                             <div className="flex justify-between text-muted-foreground">
-                              <span>CONHECIMENTO</span>
-                              <span className="text-foreground font-black">
+                              <span>Conhecimento</span>
+                              <span className="text-foreground font-semibold">
                                 {knowledgeMap[disc] ?? 2.5}
                               </span>
                             </div>
@@ -1323,7 +1324,7 @@ export function PlanningWizardModal({
               <>
                 {/* Presets de duração */}
                 <div>
-                  <label className="text-xs font-extrabold text-foreground block">
+                  <label className="text-xs font-semibold text-foreground block">
                     Como você prefere estudar?
                   </label>
                   <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
@@ -1354,8 +1355,8 @@ export function PlanningWizardModal({
                               : "border-muted bg-card text-muted-foreground hover:border-primary/50",
                           )}
                         >
-                          <div className="text-xs font-extrabold">{preset.label}</div>
-                          <div className="text-[10px] font-mono font-bold mt-0.5 opacity-80">
+                          <div className="text-xs font-semibold">{preset.label}</div>
+                          <div className="text-[10px] tabular-nums font-semibold mt-0.5 opacity-80">
                             {preset.range}
                           </div>
                         </button>
@@ -1368,7 +1369,7 @@ export function PlanningWizardModal({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   <div className="rounded-xl border bg-card p-3 space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-extrabold text-foreground block">
+                      <label className="text-xs font-semibold text-foreground block">
                         Duração de cada sessão
                       </label>
                       <Clock className="w-4 h-4 text-primary" />
@@ -1376,7 +1377,7 @@ export function PlanningWizardModal({
 
                     <div className="flex items-center gap-2.5">
                       <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-extrabold text-muted-foreground">
+                        <label className="text-[10px] font-semibold text-muted-foreground">
                           Duração mínima
                         </label>
                         <Select
@@ -1387,14 +1388,14 @@ export function PlanningWizardModal({
                           }}
                         >
                           <SelectTrigger
-                            className="h-10 rounded-xl font-bold text-xs bg-card border-border"
+                            className="h-10 rounded-xl font-semibold text-xs bg-card border-border"
                             aria-label="Duração mínima"
                           >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {DURATION_OPTIONS.map((o) => (
-                              <SelectItem key={o} value={String(o)} className="font-bold text-xs">
+                              <SelectItem key={o} value={String(o)} className="font-semibold text-xs">
                                 {formatMinutesLabel(o)}
                               </SelectItem>
                             ))}
@@ -1402,10 +1403,10 @@ export function PlanningWizardModal({
                         </Select>
                       </div>
 
-                      <span className="text-muted-foreground font-black text-sm mt-6">—</span>
+                      <span className="text-muted-foreground font-semibold text-sm mt-6">—</span>
 
                       <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-extrabold text-muted-foreground">
+                        <label className="text-[10px] font-semibold text-muted-foreground">
                           Duração máxima
                         </label>
                         <Select
@@ -1416,14 +1417,14 @@ export function PlanningWizardModal({
                           }}
                         >
                           <SelectTrigger
-                            className="h-10 rounded-xl font-bold text-xs bg-card border-border"
+                            className="h-10 rounded-xl font-semibold text-xs bg-card border-border"
                             aria-label="Duração máxima"
                           >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {DURATION_OPTIONS.map((o) => (
-                              <SelectItem key={o} value={String(o)} className="font-bold text-xs">
+                              <SelectItem key={o} value={String(o)} className="font-semibold text-xs">
                                 {formatMinutesLabel(o)}
                               </SelectItem>
                             ))}
@@ -1433,7 +1434,7 @@ export function PlanningWizardModal({
                     </div>
 
                     {durationInvalid && (
-                      <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1.5">
+                      <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5" />A duração mínima não pode ser maior
                         que a máxima.
                       </p>
@@ -1449,10 +1450,9 @@ export function PlanningWizardModal({
                   {/* Previsão da semana */}
                   <div className="rounded-xl border bg-card p-3 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                      <span className="type-label">
                         O Nomeia distribuirá aproximadamente
                       </span>
-                      <Sparkles className="w-4 h-4 text-primary" />
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {preview.map((p) => (
@@ -1463,12 +1463,12 @@ export function PlanningWizardModal({
                             p.available ? "bg-primary/8" : "bg-muted/40",
                           )}
                         >
-                          <div className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                          <div className="type-label">
                             {p.label}
                           </div>
                           <div
                             className={cn(
-                              "text-sm font-black font-mono tabular-nums",
+                              "text-sm font-semibold tabular-nums",
                               p.available ? "text-primary" : "text-muted-foreground/50",
                             )}
                           >
@@ -1485,34 +1485,34 @@ export function PlanningWizardModal({
 
                 {/* Resumo */}
                 <div className="rounded-xl border border-primary/25 bg-card p-3 space-y-2.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
+                  <span className="text-[11px] font-semibold text-primary">
                     Seu planejamento
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1.5 text-xs">
                     <div className="flex items-center justify-between sm:flex-col sm:items-start sm:justify-start gap-0.5">
                       <span className="text-muted-foreground font-medium">Carga</span>
-                      <span className="font-black tabular-nums">{weeklyHoursNum}h / semana</span>
+                      <span className="font-semibold tabular-nums">{weeklyHoursNum}h / semana</span>
                     </div>
                     <div className="flex items-center justify-between sm:flex-col sm:items-start sm:justify-start gap-0.5">
                       <span className="text-muted-foreground font-medium">Escala</span>
-                      <span className="font-black">{escalaLabel}</span>
+                      <span className="font-semibold">{escalaLabel}</span>
                     </div>
                     <div className="flex items-center justify-between sm:flex-col sm:items-start sm:justify-start gap-0.5">
                       <span className="text-muted-foreground font-medium">Dias disponíveis</span>
-                      <span className="font-black tabular-nums">{daysPerWeek}</span>
+                      <span className="font-semibold tabular-nums">{daysPerWeek}</span>
                     </div>
                     <div className="flex items-center justify-between sm:flex-col sm:items-start sm:justify-start gap-0.5">
                       <span className="text-muted-foreground font-medium">Disciplinas</span>
-                      <span className="font-black tabular-nums">{selectedDisciplines.length}</span>
+                      <span className="font-semibold tabular-nums">{selectedDisciplines.length}</span>
                     </div>
                     <div className="flex items-center justify-between sm:flex-col sm:items-start sm:justify-start gap-0.5">
                       <span className="text-muted-foreground font-medium">Sessões</span>
-                      <span className="font-black">
+                      <span className="font-semibold">
                         {formatMinutesLabel(minMinutes)} – {formatMinutesLabel(maxMinutes)}
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-600 border-t border-primary/15 pt-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 border-t border-primary/15 pt-2">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Configuração válida
                   </div>
                 </div>
@@ -1527,12 +1527,12 @@ export function PlanningWizardModal({
             <Button
               variant="outline"
               onClick={handlePrevStep}
-              className="border-primary text-primary font-bold text-xs px-4 h-9 rounded-xl cursor-pointer w-full sm:w-auto"
+              className="border-primary text-primary font-semibold text-xs px-4 h-9 rounded-xl cursor-pointer w-full sm:w-auto"
             >
               Voltar
             </Button>
           ) : (
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground text-center sm:text-left py-2 sm:py-0">
+            <span className="type-label text-center sm:text-left py-2 sm:py-0">
               Etapa 1 de 4
             </span>
           )}
@@ -1540,7 +1540,7 @@ export function PlanningWizardModal({
           <Button
             onClick={() => void handleNextStep()}
             disabled={!canProceed}
-            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 h-10 rounded-xl shadow-xs cursor-pointer w-full sm:w-auto whitespace-normal"
+            className="cursor-pointer w-full sm:w-auto whitespace-normal"
           >
             {currentStep === 4 ? "Salvar planejamento" : "Próximo"}
           </Button>

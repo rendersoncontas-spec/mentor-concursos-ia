@@ -15,11 +15,12 @@ import {
   RotateCcw,
   Square,
 } from "lucide-react"
-import { Bot, BrainCircuit, Calendar, Settings2, Sparkles, Target } from "lucide-react"
+import { Calendar, Target } from "lucide-react"
 import { toast } from "sonner"
 
 import { deactivateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
@@ -249,73 +250,20 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   if (!hasPlanning && !isManualCreation) {
     return (
       <div className="space-y-4">
-        <div className="border-b pb-3">
-          <h1 className="text-2xl font-black text-foreground">Planejamento</h1>
-        </div>
-
-        <div className="flex flex-col items-center justify-center text-center p-5 sm:p-8 bg-card rounded-2xl border shadow-xs space-y-6 my-2">
-          <div className="space-y-2 max-w-lg">
-            <div className="flex items-center justify-center gap-2.5 text-primary">
-              <BrainCircuit className="w-7 h-7" />
-              <h2 className="text-xl font-black">Criar Planejamento Inteligente</h2>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Vamos montar um planejamento completo para você. Escolha uma opção abaixo.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 w-full max-w-2xl">
-            {/* AI Option */}
-            <div
-              onClick={openCreateWizard}
-              className="bg-card border border-primary/20 hover:border-primary rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-xs group"
-            >
-              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Bot className="w-6 h-6 text-primary" />
-              </div>
-              <div className="space-y-2 flex-1">
-                <h3 className="text-base font-bold text-foreground flex items-center justify-center gap-1.5">
-                  Nomeia Inteligente <Sparkles className="w-4 h-4 text-primary" />
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  O Nomeia monta todo o seu planejamento automaticamente com base no seu perfil,
-                  escala de trabalho e carga horária.
-                </p>
-                <div className="inline-flex items-center text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Tempo: ~2 minutos
-                </div>
-              </div>
-              <Button className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-10 rounded-xl">
-                Começar com IA
+        {/* Redesign 2.0: antes havia dois "cards de escolha" ("Nomeia
+            Inteligente" / "Criar manualmente") que abriam exatamente o mesmo
+            assistente. Agora é um estado vazio com uma única ação. */}
+        <div className="rounded-lg border border-border bg-card">
+          <EmptyState
+            icon={Calendar}
+            title="Nenhum planejamento criado"
+            description="O assistente monta a distribuição semanal a partir do seu perfil, escala de trabalho e carga horária. Leva cerca de 2 minutos, e tudo pode ser ajustado depois."
+            action={
+              <Button onClick={openCreateWizard}>
+                Criar planejamento
               </Button>
-            </div>
-
-            {/* Manual Option */}
-            <div
-              onClick={openCreateWizard}
-              className="bg-card border border-muted hover:border-foreground/30 rounded-2xl p-5 sm:p-6 flex flex-col items-center text-center space-y-4 cursor-pointer transition-all hover:shadow-xs group"
-            >
-              <div className="w-12 h-12 bg-muted/50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Settings2 className="w-6 h-6 text-foreground/70" />
-              </div>
-              <div className="space-y-2 flex-1">
-                <h3 className="text-base font-bold text-foreground">Criar Manualmente</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Monte disciplina por disciplina, configurando sua escala e relevâncias em 4
-                  passos.
-                </p>
-                <div className="inline-flex items-center text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Para Usuários Avançados
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="w-full border h-10 font-bold rounded-xl text-foreground hover:bg-muted"
-              >
-                Criar Manualmente
-              </Button>
-            </div>
-          </div>
+            }
+          />
         </div>
 
         {/* Modal Assistente 4 Passos Criar Planejamento */}
@@ -337,37 +285,102 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   return (
     <div className="space-y-6">
       {/* Top Header Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-foreground">Planejamento</h1>
-          <p className="text-xs text-muted-foreground font-semibold">
-            Gerencie e acompanhe seu cronograma de estudos diário, semanal e mensal.
-          </p>
-        </div>
+      {/* Redesign 2.0: o título da página já está no cabeçalho fixo
+          (app/(protected)/planejamento/page.tsx); aqui fica só a barra de
+          visões + ações, sem um segundo H1. */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 border-b border-border pb-3">
+        <div role="tablist" aria-label="Visões do planejamento" className="flex items-center gap-0.5 p-0.5 bg-muted rounded-md w-fit flex-wrap">
+        <button
+          onClick={() => setPlanningType("ciclo")}
+          role="tab"
+          aria-selected={planningType === "ciclo"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+            planningType === "ciclo"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Ciclo
+        </button>
+
+        <button
+          onClick={() => setPlanningType("diario")}
+          role="tab"
+          aria-selected={planningType === "diario"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+            planningType === "diario"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          Dia
+        </button>
+
+        <button
+          onClick={() => setPlanningType("semanal")}
+          role="tab"
+          aria-selected={planningType === "semanal"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+            planningType === "semanal"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <CalendarDays className="w-3.5 h-3.5" />
+          Semana
+        </button>
+
+        <button
+          onClick={() => setPlanningType("mensal")}
+          role="tab"
+          aria-selected={planningType === "mensal"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+            planningType === "mensal"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Calendar className="w-3.5 h-3.5" />
+          Mês
+        </button>
+
+        <button
+          onClick={() => setPlanningType("metas")}
+          role="tab"
+          aria-selected={planningType === "metas"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+            planningType === "metas"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Target className="w-3.5 h-3.5" />
+          Metas e horas
+        </button>
+              </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {isManualCreation || blocks.length === 0 ? (
             <Button
               onClick={handleSaveChanges}
-              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-6 h-9 rounded-xl shadow-xs"
             >
-              Salvar Planejamento
+              Salvar planejamento
             </Button>
           ) : (
             <>
               <Button
                 variant="outline"
                 onClick={handleResetCycle}
-                className="border-primary text-primary hover:bg-primary/10 font-bold text-xs px-4 h-9"
               >
-                Recomeçar Ciclo
+                Recomeçar ciclo
               </Button>
 
               <Button
                 onClick={openEditWizard}
-                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 h-9 shadow-xs"
               >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                <RefreshCw className="h-3.5 w-3.5" />
                 Replanejar
               </Button>
 
@@ -375,76 +388,13 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                 variant="outline"
                 onClick={handleRemovePlan}
                 disabled={isRemovingPlan}
-                className="border-rose-400 text-rose-500 hover:bg-rose-50 font-bold text-xs px-4 h-9"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 {isRemovingPlan ? "Removendo..." : "Remover"}
               </Button>
             </>
           )}
         </div>
-      </div>
-
-      {/* View Switcher Tabs (Ciclo, Diário, Semanal, Calendário Mensal) */}
-      <div className="flex items-center gap-1.5 p-1 bg-muted/50 rounded-xl border w-fit flex-wrap">
-        <button
-          onClick={() => setPlanningType("ciclo")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-            planningType === "ciclo"
-              ? "bg-card text-primary shadow-xs border"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Ciclo Rotativo
-        </button>
-
-        <button
-          onClick={() => setPlanningType("diario")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-            planningType === "diario"
-              ? "bg-card text-primary shadow-xs border"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          Visão Diária
-        </button>
-
-        <button
-          onClick={() => setPlanningType("semanal")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-            planningType === "semanal"
-              ? "bg-card text-primary shadow-xs border"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <CalendarDays className="w-3.5 h-3.5" />
-          Agenda Semanal
-        </button>
-
-        <button
-          onClick={() => setPlanningType("mensal")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-            planningType === "mensal"
-              ? "bg-card text-primary shadow-xs border"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Calendar className="w-3.5 h-3.5" />
-          Calendário Mensal
-        </button>
-
-        <button
-          onClick={() => setPlanningType("metas")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-            planningType === "metas"
-              ? "bg-card text-primary shadow-xs border"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Target className="w-3.5 h-3.5" />
-          Metas & Horas
-        </button>
       </div>
 
       {/* Render selected view */}
@@ -481,32 +431,29 @@ export function PlanningView({ initialData }: PlanningViewProps) {
       {planningType === "ciclo" && (
         <div className="space-y-6">
           {/* Top Metrics Cards: Ciclos Completos + Progresso */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between">
-              <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
-                CICLOS COMPLETOS
+          <div className="grid grid-cols-1 sm:grid-cols-[180px_minmax(0,1fr)] border-y border-border sm:divide-x divide-border">
+            <div className="px-4 py-3">
+              <span className="text-xs text-muted-foreground">
+                Ciclos completos
               </span>
-
-              <div className="py-2 flex items-center justify-center">
-                <div className="w-16 h-16 rounded-full border-4 border-primary flex items-center justify-center text-xl font-black text-primary">
-                  {completedCyclesCount}
-                </div>
-              </div>
+              <p className="text-xl font-semibold text-foreground tabular-nums mt-0.5">
+                {completedCyclesCount}
+              </p>
             </div>
 
-            <div className="sm:col-span-2 rounded-xl border bg-card p-5 shadow-xs flex flex-col justify-between space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
-                  PROGRESSO (RODADA {completedCyclesCount + 1})
+            <div className="px-4 py-3 flex flex-col justify-center space-y-2 border-t sm:border-t-0 border-border">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  Progresso da rodada {completedCyclesCount + 1}
                 </span>
-                <span className="text-xs font-bold text-foreground">
+                <span className="text-xs font-medium text-foreground tabular-nums">
                   {formatHoursMinutes(currentRoundStudiedMinutes)} / {formatHoursMinutes(totalMinutes)} ({progressPercentage}%)
                 </span>
               </div>
 
-              <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all duration-700"
+                  className="h-full bg-primary rounded-full transition-all duration-500"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
@@ -515,11 +462,11 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
           {/* Layout de Duas Colunas: Sequência dos Estudos (Esq) + Donut (Dir) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 rounded-xl border bg-card p-6 shadow-xs flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between border-b pb-3">
-                <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider">
-                  SEQUÊNCIA DOS ESTUDOS
-                </span>
+            <div className="lg:col-span-2 rounded-lg border border-border bg-card p-4 flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between border-b border-border pb-2.5">
+                <h2 className="text-[13px] font-semibold text-foreground">
+                  Sequência dos estudos
+                </h2>
 
                 <button
                   onClick={() => setShowCompletedOnly(!showCompletedOnly)}
@@ -530,7 +477,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                   ) : (
                     <Square className="h-4 w-4" />
                   )}
-                  <span>VER FINALIZADOS</span>
+                  <span>Ver finalizados</span>
                 </button>
               </div>
 
@@ -538,14 +485,14 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                 if (blocks.length === 0) {
                   return (
                     <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
-                      <p className="text-sm font-semibold text-muted-foreground">
-                        Nenhuma disciplina cadastrada neste planejamento.
+                      <p className="text-sm text-muted-foreground">
+                        Nenhuma disciplina neste planejamento.
                       </p>
                       <Button
                         onClick={handleAddDisciplineRow}
-                        className="bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-xl shadow-xs"
+                        size="sm"
                       >
-                        Adicionar Matéria
+                        Adicionar matéria
                       </Button>
                     </div>
                   )
@@ -553,7 +500,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
 
                 return (
                   /* VISTA DE LEITURA (Modo Padrão) */
-                  <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-10">
+                  <div className="divide-y divide-border max-h-[420px] overflow-y-auto pr-1">
                     {visibleBlocks.map((block) => {
                       const isSelected = activeBlockId === block.id
                       const blockCycleTarget = block.durationMinutes
@@ -573,49 +520,49 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                         <div
                           key={block.id}
                           onMouseEnter={() => setActiveBlockId(block.id)}
-                          className={`rounded-xl border transition-all ${
+                          className={`border-l-2 transition-colors ${
                             isSelected
-                              ? "bg-primary/[0.03] border-primary"
-                              : "bg-card border-border hover:border-primary/50"
+                              ? "bg-primary/[0.04] border-l-primary"
+                              : "border-l-transparent hover:bg-muted/30"
                           }`}
                         >
-                          <div className="p-4 cursor-pointer space-y-3">
+                          <div className="px-3 py-3 cursor-pointer space-y-2">
                             <div className="flex items-start justify-between gap-4">
                               <div className="space-y-1">
-                                <h4 className="font-black text-sm text-foreground">
+                                <h4 className="font-semibold text-sm text-foreground">
                                   {block.disciplineName}
                                 </h4>
-                                <div className="flex items-center gap-2 text-[11px] font-bold">
+                                <div className="flex items-center gap-2 text-xs tabular-nums">
                                   {isOver ? (
-                                    <span className="text-emerald-500">
+                                    <span className="text-foreground">
                                       Extra: {formatHoursMinutes(Math.abs(remaining))}
                                     </span>
                                   ) : remaining === 0 ? (
-                                    <span className="text-emerald-600 inline-flex items-center gap-1">
+                                    <span className="text-success inline-flex items-center gap-1">
                                       <Check className="h-3.5 w-3.5" /> Concluído nesta rodada
                                     </span>
                                   ) : (
-                                    <span className="text-orange-500">
+                                    <span className="text-muted-foreground">
                                       Falta: {formatHoursMinutes(remaining)}
                                     </span>
                                   )}
                                   <span className="text-muted-foreground">
-                                    - Meta: {formatHoursMinutes(block.durationMinutes)}
+                                    · Meta: {formatHoursMinutes(block.durationMinutes)}
                                   </span>
                                 </div>
                               </div>
                               <div className="text-right shrink-0">
                                 <span
-                                  className={`text-sm font-black ${isCompleted ? "text-emerald-500" : "text-primary"}`}
+                                  className={`text-[13px] font-medium tabular-nums ${isCompleted ? "text-success" : "text-foreground"}`}
                                 >
                                   {Math.min(100, progressPct).toFixed(1)}%
                                 </span>
                               </div>
                             </div>
 
-                            <div className="w-full bg-muted rounded-full h-3 overflow-hidden relative">
+                            <div className="w-full bg-muted rounded-full h-1 overflow-hidden relative">
                               <div
-                                className={`h-full rounded-full transition-all duration-700 ${isCompleted ? "bg-emerald-500" : "bg-primary"}`}
+                                className={`h-full rounded-full transition-all duration-500 ${isCompleted ? "bg-success" : "bg-primary"}`}
                                 style={{
                                   width: `${Math.min(progressPct, 100)}%`,
                                   backgroundColor: isCompleted ? undefined : block.color,
@@ -625,21 +572,21 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                           </div>
 
                           {isSelected && (
-                            <div className="flex items-center gap-4 px-4 py-2.5 bg-muted/40 border-t text-[11px] font-bold text-muted-foreground">
+                            <div className="flex items-center gap-4 px-3 pb-3 text-xs text-muted-foreground">
                               <button
                                 onClick={() => handleStartStudy(block)}
-                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-primary transition-colors"
+                                className="flex items-center gap-1 font-medium text-foreground hover:text-primary transition-colors"
                               >
                                 <PlayCircle className="h-3.5 w-3.5 text-primary" />
-                                <span>Iniciar Estudo</span>
+                                <span>Iniciar estudo</span>
                               </button>
 
                               <button
                                 onClick={() => setIsRegisterModalOpen(true)}
-                                className="flex items-center gap-1 text-slate-800 dark:text-slate-200 hover:text-primary transition-colors"
+                                className="flex items-center gap-1 font-medium text-foreground hover:text-primary transition-colors"
                               >
                                 <PlusCircle className="h-3.5 w-3.5 text-primary" />
-                                <span>Adicionar Estudo Manualmente</span>
+                                <span>Registrar manualmente</span>
                               </button>
                             </div>
                           )}
@@ -654,18 +601,18 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                 <div className="flex justify-end pt-2">
                   <Button
                     onClick={openEditWizard}
-                    className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 h-9 rounded-xl shadow-xs"
+                    variant="outline"
                   >
-                    Editar Ciclo
+                    Editar ciclo
                   </Button>
                 </div>
               )}
             </div>
 
             {/* Coluna Direita: CICLO */}
-            <div className="rounded-xl border bg-card p-6 shadow-xs flex flex-col justify-between items-center text-center space-y-6">
-              <span className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider block border-b pb-3 w-full text-left">
-                CICLO
+            <div className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between items-center text-center space-y-4">
+              <span className="text-[13px] font-semibold text-foreground block border-b border-border pb-2.5 w-full text-left">
+                Distribuição do ciclo
               </span>
 
               {blocks.length === 0 ? (
@@ -688,7 +635,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
                     </svg>
 
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-black text-foreground tracking-tight">
+                      <span className="text-2xl font-semibold text-foreground tracking-tight">
                         {formatHoursMinutes(totalMinutes)}
                       </span>
                     </div>

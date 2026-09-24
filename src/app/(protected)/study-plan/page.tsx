@@ -6,6 +6,7 @@ import {
   getActiveStudyPlan,
   getStudyPlanDisciplineSummary,
 } from "@/application/study-plan/study-plan.service"
+import { PageHeader } from "@/components/ui/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { GeneratePlanButton } from "@/features/study-plan/components/generate-plan-button"
@@ -38,20 +39,18 @@ export default async function StudyPlanPage() {
   const hasPlan = planWeek !== null
 
   return (
-    <div className="w-full max-w-full py-6 sm:py-8 px-4 sm:px-6 space-y-8">
-      {/* Cabeçalho */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Cronograma de Estudos</h1>
-          <p className="text-muted-foreground mt-1">
-            {hasPlan
-              ? `Versão ${planWeek.plan.version} · Gerado em ${new Date(planWeek.plan.generated_at).toLocaleDateString("pt-BR")} · ${formatPlanMinutes(planWeek.totalWeeklyMinutes)}/semana`
-              : "Gere seu cronograma personalizado baseado no seu concurso e disponibilidade."}
-          </p>
-        </div>
-        <GeneratePlanButton hasPlan={hasPlan} />
-      </div>
-
+    <div className="flex flex-col min-h-full">
+      <PageHeader
+        icon={CalendarDays}
+        title="Cronograma de estudos"
+        description={
+          hasPlan
+            ? `Versão ${planWeek.plan.version} · Gerado em ${new Date(planWeek.plan.generated_at).toLocaleDateString("pt-BR")} · ${formatPlanMinutes(planWeek.totalWeeklyMinutes)}/semana`
+            : "Gere seu cronograma a partir do seu concurso e da sua disponibilidade"
+        }
+        actions={<GeneratePlanButton hasPlan={hasPlan} />}
+      />
+    <div className="flex-1 page-container py-5 space-y-6">
       {hasPlan ? (
         <>
           {/* Grade Semanal */}
@@ -89,6 +88,7 @@ export default async function StudyPlanPage() {
       ) : (
         <StudyPlanEmptyState />
       )}
+    </div>
     </div>
   )
 }

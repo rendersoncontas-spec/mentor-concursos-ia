@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import {
-  AlertTriangle,
   Calculator,
   CheckCircle2,
   ClipboardList,
   Loader2,
-  Plus,
   Timer,
   Trash2,
   X,
@@ -372,7 +370,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
         {/* CABEÇALHO */}
         <div className="p-5 border-b bg-muted/20">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+            <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <ClipboardList className="h-5 w-5 text-primary" />
               {editing ? "Editar Simulado" : "Registrar Simulado"}
             </DialogTitle>
@@ -386,11 +384,11 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* ── DADOS DO SIMULADO ─────────────────────────────────────── */}
           <div className="space-y-3">
-            <span className="text-xs font-black uppercase tracking-wider text-foreground block">
+            <span className="text-[13px] font-semibold text-foreground block">
               Dados do Simulado
             </span>
             <div>
-              <Label htmlFor="sim-name" className="text-xs font-bold">
+              <Label htmlFor="sim-name" className="text-xs font-semibold">
                 Nome do Simulado *
               </Label>
               <Input
@@ -403,7 +401,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <Label htmlFor="sim-exam" className="text-xs font-bold">
+                <Label htmlFor="sim-exam" className="text-xs font-semibold">
                   Concurso
                 </Label>
                 <Input
@@ -415,7 +413,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                 />
               </div>
               <div>
-                <Label htmlFor="sim-role" className="text-xs font-bold">
+                <Label htmlFor="sim-role" className="text-xs font-semibold">
                   Cargo
                 </Label>
                 <Input
@@ -427,7 +425,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                 />
               </div>
               <div>
-                <Label htmlFor="sim-date" className="text-xs font-bold">
+                <Label htmlFor="sim-date" className="text-xs font-semibold">
                   Data *
                 </Label>
                 <Input
@@ -441,7 +439,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-bold">Fonte</Label>
+                <Label className="text-xs font-semibold">Fonte</Label>
                 <Select value={source} onValueChange={(v) => setSource(v as SimuladoRecordSource)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Selecione a fonte" />
@@ -457,7 +455,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
               </div>
 {source === "OUTRO" && (
                 <div>
-                  <Label htmlFor="sim-source-custom" className="text-xs font-bold">
+                  <Label htmlFor="sim-source-custom" className="text-xs font-semibold">
                     Qual fonte?
                   </Label>
                   <Input
@@ -470,7 +468,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                 </div>
               )}
               <div>
-                <Label htmlFor="sim-banca" className="text-xs font-bold">Banca</Label>
+                <Label htmlFor="sim-banca" className="text-xs font-semibold">Banca</Label>
                 <Select value={examBoard} onValueChange={(v) => setExamBoard(v as string)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Selecione a banca" />
@@ -498,7 +496,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
               </div>
               {examBoard === "OUTRO" && (
                 <div>
-                  <Label htmlFor="sim-banca-custom" className="text-xs font-bold">
+                  <Label htmlFor="sim-banca-custom" className="text-xs font-semibold">
                     Qual banca?
                   </Label>
                   <Input
@@ -513,7 +511,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="sim-time" className="text-xs font-bold">
+                <Label htmlFor="sim-time" className="text-xs font-semibold">
                   Tempo gasto (opcional)
                 </Label>
                 <div className="relative mt-1">
@@ -523,7 +521,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                     value={timeText}
                     onChange={(e) => setTimeText(e.target.value)}
                     placeholder="HH:MM:SS — ex: 02:15:30"
-                    className="pl-9 font-mono"
+                    className="pl-9 tabular-nums"
                   />
                 </div>
               </div>
@@ -532,7 +530,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
 
           {/* ── RESULTADO ─────────────────────────────────────────────── */}
           <div className="space-y-4 pt-3 border-t">
-            <span className="text-xs font-black uppercase tracking-wider text-foreground block">
+            <span className="text-[13px] font-semibold text-foreground block">
               Resultado
             </span>
 
@@ -548,7 +546,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                     : "border-input hover:border-primary/40"
                 )}
               >
-                <span className="text-xs font-black flex items-center gap-1.5">
+                <span className="text-xs font-semibold flex items-center gap-1.5">
                   <Calculator className="h-3.5 w-3.5" /> Resultado geral
                 </span>
                 <span className="text-[10px] text-muted-foreground block mt-0.5">
@@ -565,7 +563,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                     : "border-input hover:border-primary/40"
                 )}
               >
-                <span className="text-xs font-black flex items-center gap-1.5">
+                <span className="text-xs font-semibold flex items-center gap-1.5">
                   <ClipboardList className="h-3.5 w-3.5" /> Detalhar por matéria
                 </span>
                 <span className="text-[10px] text-muted-foreground block mt-0.5">
@@ -579,7 +577,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
               <div className="space-y-3">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <Label htmlFor="sim-questions" className="text-xs font-bold">
+                    <Label htmlFor="sim-questions" className="text-xs font-semibold">
                       Questões *
                     </Label>
                     <Input
@@ -588,11 +586,11 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                       min={1}
                       value={totalQuestions || ""}
                       onChange={(e) => setTotalQuestions(Number(e.target.value) || 0)}
-                      className="mt-1 font-mono"
+                      className="mt-1 tabular-nums"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="sim-correct" className="text-xs font-bold">
+                    <Label htmlFor="sim-correct" className="text-xs font-semibold">
                       Acertos
                     </Label>
                     <Input
@@ -604,11 +602,11 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                         const correct = Number(e.target.value) || 0
                         setTotalCorrect(correct)
                       }}
-                      className="mt-1 font-mono"
+                      className="mt-1 tabular-nums"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="sim-blank" className="text-xs font-bold">
+                    <Label htmlFor="sim-blank" className="text-xs font-semibold">
                       Em branco
                     </Label>
                     <Input
@@ -617,12 +615,12 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                       min={0}
                       value={totalBlank || ""}
                       onChange={(e) => setTotalBlank(Number(e.target.value) || 0)}
-                      className="mt-1 font-mono"
+                      className="mt-1 tabular-nums"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-bold text-muted-foreground">Erros (auto)</Label>
-                    <div className="mt-1 h-9 flex items-center px-3 rounded-lg border bg-muted/40 font-mono text-sm font-black">
+                    <Label className="text-xs font-semibold text-muted-foreground">Erros (auto)</Label>
+                    <div className="mt-1 h-9 flex items-center px-3 rounded-lg border bg-muted/40 tabular-nums text-sm font-semibold">
                       {computed.totalWrong}
                     </div>
                   </div>
@@ -651,7 +649,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    <div className="hidden sm:grid grid-cols-[1fr_repeat(3,90px)_40px] gap-2 px-2 text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+                    <div className="type-label hidden sm:grid grid-cols-[1fr_repeat(3,90px)_40px] gap-2 px-2">
                       <span>Matéria</span>
                       <span className="text-center">Questões</span>
                       <span className="text-center">Acertos</span>
@@ -668,13 +666,13 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                             className="grid grid-cols-2 sm:grid-cols-[1fr_repeat(3,90px)_40px] gap-2 items-center p-2 rounded-lg border bg-card/60"
                           >
                             <div className="col-span-2 sm:col-span-1 min-w-0 flex items-center gap-2">
-                              <span className="text-xs font-bold truncate">{s.disciplineName}</span>
+                              <span className="text-xs font-semibold truncate">{s.disciplineName}</span>
                               {!s.disciplineId && (
-                                <span className="text-[9px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full shrink-0">
+                                <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full shrink-0">
                                   Personalizada
                                 </span>
                               )}
-                              <span className="text-[10px] font-black text-muted-foreground ml-auto shrink-0 hidden sm:block">
+                              <span className="text-[10px] font-semibold text-muted-foreground ml-auto shrink-0 hidden sm:block">
                                 {subAcc === null ? "—" : `${subAcc}% · ${subWrong} erros`}
                               </span>
                             </div>
@@ -685,7 +683,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                               onChange={(e) =>
                                 updateSubject(s.key, { questionsCount: Number(e.target.value) || 0 })
                               }
-                              className="h-8 text-xs font-mono text-center"
+                              className="h-8 text-xs tabular-nums text-center"
                               placeholder="Qtd"
                             />
                             <Input
@@ -695,7 +693,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                               onChange={(e) =>
                                 updateSubject(s.key, { correctCount: Number(e.target.value) || 0 })
                               }
-                              className="h-8 text-xs font-mono text-center"
+                              className="h-8 text-xs tabular-nums text-center"
                               placeholder="Acert"
                             />
                             <Input
@@ -705,7 +703,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                               onChange={(e) =>
                                 updateSubject(s.key, { blankCount: Number(e.target.value) || 0 })
                               }
-                              className="h-8 text-xs font-mono text-center"
+                              className="h-8 text-xs tabular-nums text-center"
                               placeholder="Bran"
                             />
                             <Button
@@ -731,11 +729,11 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
             <div className="rounded-xl border-2 border-primary/30 bg-card p-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block">
+                  <span className="text-[11px] font-semibold text-primary block">
                     Resultado Atual
                   </span>
                   {computed.totalQuestions > 0 ? (
-                    <span className="text-3xl font-black font-mono text-foreground">
+                    <span className="text-3xl font-semibold tabular-nums text-foreground">
                       {computed.accuracy === null ? "—" : `${Math.round(computed.accuracy)}%`}
                     </span>
                   ) : (
@@ -745,22 +743,22 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                   )}
                 </div>
                 {computed.totalQuestions > 0 && (
-                  <div className="flex gap-4 text-xs font-mono font-bold text-right">
+                  <div className="flex gap-4 text-xs tabular-nums font-semibold text-right">
                     <div>
-                      <span className="block text-[9px] uppercase text-muted-foreground">Questões</span>
-                      <span className="text-foreground text-sm font-black">{computed.totalQuestions}</span>
+                      <span className="type-label block">Questões</span>
+                      <span className="text-foreground text-sm font-semibold">{computed.totalQuestions}</span>
                     </div>
                     <div>
-                      <span className="block text-[9px] uppercase text-emerald-600">Acertos</span>
-                      <span className="text-emerald-600 text-sm font-black">{computed.totalCorrect}</span>
+                      <span className="block text-[11px] text-emerald-600">Acertos</span>
+                      <span className="text-emerald-600 text-sm font-semibold">{computed.totalCorrect}</span>
                     </div>
                     <div>
-                      <span className="block text-[9px] uppercase text-rose-600">Erros</span>
-                      <span className="text-rose-600 text-sm font-black">{computed.totalWrong}</span>
+                      <span className="block text-[11px] text-rose-600">Erros</span>
+                      <span className="text-rose-600 text-sm font-semibold">{computed.totalWrong}</span>
                     </div>
                     <div>
-                      <span className="block text-[9px] uppercase text-sky-600">Brancos</span>
-                      <span className="text-sky-600 text-sm font-black">{computed.totalBlank}</span>
+                      <span className="type-label block">Brancos</span>
+                      <span className="text-muted-foreground text-sm font-semibold">{computed.totalBlank}</span>
                     </div>
                   </div>
                 )}
@@ -769,7 +767,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
 
             {/* REGRA DE PONTUAÇÃO */}
             <div className="space-y-2">
-              <Label className="text-xs font-bold">Regra de pontuação</Label>
+              <Label className="text-xs font-semibold">Regra de pontuação</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { value: "PERCENTUAL", label: "Apenas percentual de acertos", hint: "Bruto: acertos ÷ questões" },
@@ -788,7 +786,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                         : "border-input text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <span className="text-xs font-black block">{opt.label}</span>
+                    <span className="text-xs font-semibold block">{opt.label}</span>
                     <span className={cn(
                       "text-[10px] block",
                       scoringRule === opt.value ? "text-primary-foreground/80" : "text-muted-foreground"
@@ -806,11 +804,11 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                     Questões erradas descontam pontos das questões certas. Em branco não alteram a pontuação.
                   </p>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="sim-penalty-wrong" className="text-xs font-bold shrink-0">
+                    <Label htmlFor="sim-penalty-wrong" className="text-xs font-semibold shrink-0">
                       Cada erro desconta:
                     </Label>
                     <Select value={penaltyPerWrong} onValueChange={setPenaltyPerWrong}>
-                      <SelectTrigger className="w-[140px] h-8 text-xs font-mono">
+                      <SelectTrigger className="w-[140px] h-8 text-xs tabular-nums">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -821,7 +819,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                     </Select>
                   </div>
                   {computed.totalQuestions > 0 && (
-                    <div className="text-xs font-mono font-bold pt-1 flex flex-wrap gap-x-6 gap-y-1">
+                    <div className="text-xs tabular-nums font-semibold pt-1 flex flex-wrap gap-x-6 gap-y-1">
                       <span className="text-muted-foreground">
                         Acerto bruto:{" "}
                         <span className="text-foreground">
@@ -846,7 +844,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
               {/* PENALIZACAO/PERSONALIZADO: percentual manual */}
               {(scoringRule === "PENALIZACAO" || scoringRule === "PERSONALIZADO") && (
                 <div>
-                  <Label htmlFor="sim-penalty" className="text-xs font-bold">
+                  <Label htmlFor="sim-penalty" className="text-xs font-semibold">
                     Percentual final considerando a regra (%)
                   </Label>
                   <Input
@@ -857,7 +855,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                     value={penaltyScore}
                     onChange={(e) => setPenaltyScore(e.target.value)}
                     placeholder="Ex: 72.5"
-                    className="mt-1 font-mono max-w-[200px]"
+                    className="mt-1 tabular-nums max-w-[200px]"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
                     O percentual bruto de acertos ({computed.accuracy === null ? "—" : `${Math.round(computed.accuracy)}%`}) continua salvo.
@@ -869,7 +867,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
 
           {/* ── OBSERVAÇÕES ────────────────────────────────────────────── */}
           <div className="pt-3 border-t">
-            <Label htmlFor="sim-notes" className="text-xs font-bold">
+            <Label htmlFor="sim-notes" className="text-xs font-semibold">
               Observações (opcional)
             </Label>
             <Textarea
@@ -892,14 +890,14 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                 : "Nenhum resultado informado"}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="font-bold text-xs">
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="font-semibold text-xs">
               <X className="h-3.5 w-3.5" /> Cancelar
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
               disabled={submitting}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs gap-1.5"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs gap-1.5"
             >
               {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
               {submitting ? "Salvando..." : editing ? "Salvar alterações" : "Salvar simulado"}

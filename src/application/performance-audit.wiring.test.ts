@@ -57,7 +57,10 @@ describe("Auditoria de performance (queries redundantes / N+1)", () => {
   it("getReviewDashboardSummary não duplica a query de review_history (era buscada duas vezes de forma idêntica)", () => {
     const source = readSource("src/application/review-engine/review.service.ts")
     const fnBody = extractTopLevelExport(source, "export async function getReviewDashboardSummary")
-    const reviewHistoryQueryPattern = /supabase\.from\("review_history"\)\.select\("grade, review_date"\)/g
+    // Fase F.1: a leitura passou a ser paginada (fetchAllRowsPaged), então a
+    // consulta não está mais numa linha só; o que se verifica continua sendo
+    // UMA leitura de review_history na função.
+    const reviewHistoryQueryPattern = /\.from\("review_history"\)/g
     const matches = fnBody.match(reviewHistoryQueryPattern) ?? []
     assert.equal(
       matches.length,
@@ -88,17 +91,18 @@ describe("Auditoria de performance (queries redundantes / N+1)", () => {
     )
   })
 
-  it("HISTORY_PATHS (revalidação após mutações do Histórico manual) inclui /dashboard/analytics, assim como IMPORT_REVALIDATE_PATHS já fazia", () => {
+  it("HISTORY_PATHS (revalidação após mutações do Histórico manual) revalida /estatisticas — a antiga /dashboard/analytics agora só redireciona", () => {
     const source = readSource("src/application/study-history/study-history.constants.ts")
     const start = source.indexOf("const HISTORY_PATHS = [")
     assert.notEqual(start, -1, "HISTORY_PATHS deve existir")
     const end = source.indexOf("]", start)
     const block = source.slice(start, end)
-    // Sem isso, editar/excluir uma sessão manual de estudo deixava
-    // /dashboard/analytics (que usa a mesma getDashboardData de /dashboard)
-    // com dados desatualizados até alguma navegação revalidá-la por acaso —
-    // enquanto a importação em massa já revalidava essa rota corretamente.
-    assert.ok(block.includes('"/dashboard/analytics"'), "HISTORY_PATHS deve incluir /dashboard/analytics")
+    // Até a Fase G.1 esta lista incluía /dashboard/analytics (que lia a mesma
+    // getDashboardData de /dashboard). A rota virou um redirect para
+    // /estatisticas (src/config/legacy-routes.ts); a tela que mostra esses
+    // dados é /estatisticas, que continua na lista, junto com /dashboard.
+    assert.equal(block.includes('"/dashboard/analytics"'), false, "HISTORY_PATHS não deve revalidar um redirect")
     assert.ok(block.includes('"/estatisticas"'), "HISTORY_PATHS deve continuar incluindo /estatisticas")
+    assert.ok(block.includes('"/dashboard"'), "HISTORY_PATHS deve continuar incluindo /dashboard")
   })
 })

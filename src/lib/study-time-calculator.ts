@@ -24,6 +24,20 @@ export interface WeekRangeInfo {
 }
 
 /**
+ * Primeiro dia da semana do aluno (0 = Domingo, 1 = Segunda).
+ * A preferência `firstDayOfWeek` (texto salvo em `profiles.preferences`) tem
+ * prioridade; sem ela, vale a coluna `profiles.week_start_day`; sem nenhuma, Domingo.
+ */
+export function resolveWeekStartDay(
+  prefsFirstDay: unknown,
+  profileWeekStartDay: number | null | undefined
+): number {
+  if (prefsFirstDay === "Domingo") return 0
+  if (prefsFirstDay === "Segunda-feira") return 1
+  return profileWeekStartDay ?? 0
+}
+
+/**
  * Retorna os limites da semana (definida pelo aluno via weekStartDay: 0 = Domingo, 1 = Segunda)
  * e chaves dos dias no fuso de São Paulo.
  * Ex.: para 27/08/2026 (Quinta):

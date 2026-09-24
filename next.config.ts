@@ -2,10 +2,17 @@ import type { NextConfig } from "next"
 
 import { withSentryConfig } from "@sentry/nextjs"
 
+import { LEGACY_ROUTE_REDIRECTS } from "./src/config/legacy-routes"
+
 const nextConfig: NextConfig = {
   // Explicitly set the Turbopack root to avoid issues with non‑ASCII characters in the workspace path
   turbopack: {
     root: "./",
+  },
+  // Fase G.1: rotas antigas do Dashboard substituídas por /estatisticas
+  // (ver src/config/legacy-routes.ts).
+  async redirects() {
+    return LEGACY_ROUTE_REDIRECTS.map((r) => ({ ...r }))
   },
   // other Next.js config options can be added here
 }

@@ -122,9 +122,9 @@ function revalidateAll() {
   revalidatePath("/concursos")
   revalidatePath("/disciplines")
   revalidatePath("/dashboard/reviews")
-  revalidatePath("/dashboard/analytics")
   revalidatePath("/dashboard/history")
-  revalidatePath("/dashboard/questions")
+  // Fase G.1: /dashboard/analytics e /dashboard/questions saíram — as duas
+  // agora redirecionam para /estatisticas (src/config/legacy-routes.ts).
 }
 
 // ────────────────────────────────────────────────────────────

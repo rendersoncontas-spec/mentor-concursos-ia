@@ -56,7 +56,7 @@ Definir o plano de ação cronológico, dividido em Sprints focadas e incrementa
 ### 🟣 Sprint 5: Analytics Completo & Calendário (P1)
 **Foco:** Visibilidade total da evolução do estudante.
 
-- [ ] **Página `/dashboard/analytics`:** Integrar todos os componentes da `AnalyticsEngine` em uma página completa de BI.
+- [ ] **Página `/estatisticas`** (planejada originalmente como `/dashboard/analytics`, que hoje redireciona para ela — Fase G.1)**:** Integrar todos os componentes da `AnalyticsEngine` em uma página completa de BI.
 - [ ] **Página `/dashboard/calendar`:** Desenvolver a visualização de calendário mensal com marcadores de estudo, revisões e provas.
 - [ ] **Tabela `user_events`:** Criar o gerenciamento de datas de exames e contagem regressiva (countdown).
 

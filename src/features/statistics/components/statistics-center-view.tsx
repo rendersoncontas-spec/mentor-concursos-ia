@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState, type ElementType, type React
 
 import {
   AlertTriangle,
-  BarChart3,
   BookOpen,
   Brain,
   CheckCircle2,
@@ -15,7 +14,7 @@ import {
   Loader2,
   Printer,
   RefreshCw,
-  Sparkles,
+  Clock3,
   XCircle,
 } from "lucide-react"
 import {
@@ -148,17 +147,40 @@ function daysSinceLastStudyLabel(days: number | null): string {
 
 const INSIGHT_STYLES: Record<Insight["severity"], { icon: typeof Info; cls: string }> = {
   positive: { icon: CheckCircle2, cls: "border-emerald-500/30 bg-emerald-500/5" },
-  info: { icon: Info, cls: "border-sky-500/30 bg-sky-500/5" },
+  info: { icon: Info, cls: "border-border bg-muted/40" },
   warning: { icon: AlertTriangle, cls: "border-amber-500/30 bg-amber-500/5" },
   danger: { icon: XCircle, cls: "border-rose-500/30 bg-rose-500/5" },
 }
 
-export function StatisticsCenterView() {
+export interface StatisticsCenterInitialData {
+  payload: StatisticsCenterPayload
+  /** Momento (ISO) em que o servidor montou a página. */
+  loadedAt: string
+}
+
+export function StatisticsCenterView({ initialData }: { initialData?: StatisticsCenterInitialData | null } = {}) {
   // ── Estado bruto ──────────────────────────────────────────────────────────
-  const [payload, setPayload] = useState<StatisticsCenterPayload | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Fase F (performance): quando a página já trouxe os dados do servidor, a
+  // tela nasce pronta — sem esperar o JavaScript carregar, hidratar e só
+  // então disparar a Server Action (que ainda entrava na fila de actions).
+  const [payload, setPayload] = useState<StatisticsCenterPayload | null>(initialData?.payload ?? null)
+  const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(() =>
+    initialData ? new Date(initialData.loadedAt) : null,
+  )
+
+  // Fase F.2: se a página for re-renderizada no servidor (ex.: um estudo salvo
+  // nesta aba — a Server Action revalida /estatisticas), os dados novos chegam
+  // como um NOVO `initialData`; antes eram ignorados depois da montagem.
+  // Padrão "valor da renderização anterior" do React (sem efeito).
+  const [seenInitialData, setSeenInitialData] = useState(initialData)
+  if (initialData && initialData !== seenInitialData) {
+    setSeenInitialData(initialData)
+    setPayload(initialData.payload)
+    setError(null)
+    setLastRefresh(new Date(initialData.loadedAt))
+  }
 
   // ── Filtros ───────────────────────────────────────────────────────────────
   const [range, setRange] = useState<RangeId>("90")
@@ -167,7 +189,9 @@ export function StatisticsCenterView() {
   const [disciplineId, setDisciplineId] = useState<string>("all")
   const [studyType, setStudyType] = useState<string>("all")
 
-  const [now] = useState(() => new Date())
+  // Com dados do servidor, usa o mesmo "agora" do servidor para o HTML do
+  // servidor e o do navegador serem idênticos (sem divergência de hidratação).
+  const [now] = useState(() => (initialData ? new Date(initialData.loadedAt) : new Date()))
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -183,12 +207,14 @@ export function StatisticsCenterView() {
     if (!silent) setLoading(false)
   }, [])
 
+  const hasInitialData = Boolean(initialData)
   useEffect(() => {
+    if (hasInitialData) return
     const timer = window.setTimeout(() => {
       void load()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [load])
+  }, [load, hasInitialData])
 
   // ── Filtros derivados ─────────────────────────────────────────────────────
   const days = rangeDays(range, customStart, customEnd)
@@ -520,134 +546,124 @@ export function StatisticsCenterView() {
 
   return (
     <div className="space-y-4 pb-8 print:space-y-4">
-      {/* ===================== HEADER ===================== */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 print:hidden">
-        <div>
-          <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" />
-            Estatísticas
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Análise real dos seus estudos — tempo, desempenho, consistência e prioridades
-            {lastRefresh && (
-              <>
-                {" "}
-                · atualizado{" "}
-                {lastRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => load(true)} className="text-xs">
-            <RefreshCw className="h-3.5 w-3.5" /> Atualizar
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportCSV} className="text-xs">
-            <Download className="h-3.5 w-3.5" /> CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()} className="text-xs">
-            <Printer className="h-3.5 w-3.5" /> PDF
-          </Button>
-        </div>
-      </div>
-
-      {/* ===================== FILTROS ===================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print:hidden">
-        <div>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Período</p>
-          <div className="flex gap-1 bg-muted/50 p-1 rounded-lg flex-wrap">
-            {RANGES.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setRange(r.id)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  range === r.id
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
+      {/* ===================== FILTROS (toolbar) ===================== */}
+      {/* Fase E — o título da página fica no cabeçalho fixo; aqui ficam só os
+          filtros e as ações, numa única barra que quebra de forma previsível. */}
+      <div className="flex flex-col gap-3 border-b border-border pb-4 2xl:flex-row 2xl:items-end 2xl:justify-between print:hidden">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+          <div className="space-y-1">
+            <p id="stats-range-label" className="text-xs text-muted-foreground">Período</p>
+            <div
+              role="group"
+              aria-labelledby="stats-range-label"
+              className="inline-flex items-center rounded-md bg-muted p-0.5"
+            >
+              {RANGES.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setRange(r.id)}
+                  aria-pressed={range === r.id}
+                  className={`whitespace-nowrap rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    range === r.id
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
           </div>
+
           {range === "custom" && (
-            <div className="flex gap-2 mt-2">
+            <div className="flex items-center gap-2">
               <input
                 type="date"
                 value={customStart}
                 max={customEnd || undefined}
+                aria-label="Data inicial"
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="w-full rounded-md border bg-card px-2 py-1 text-xs text-foreground"
+                className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground"
               />
               <input
                 type="date"
                 value={customEnd}
                 min={customStart || undefined}
+                aria-label="Data final"
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="w-full rounded-md border bg-card px-2 py-1 text-xs text-foreground"
+                className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground"
               />
             </div>
           )}
+
+          <label className="space-y-1">
+            <span className="block text-xs text-muted-foreground">Disciplina</span>
+            <select
+              value={disciplineId}
+              onChange={(e) => setDisciplineId(e.target.value)}
+              className="h-8 w-48 rounded-md border border-input bg-card px-2 text-xs text-foreground"
+            >
+              <option value="all">Todas</option>
+              {disciplineOptions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="block text-xs text-muted-foreground">Tipo de estudo</span>
+            <select
+              value={studyType}
+              onChange={(e) => setStudyType(e.target.value)}
+              className="h-8 w-40 rounded-md border border-input bg-card px-2 text-xs text-foreground"
+            >
+              <option value="all">Todos</option>
+              {typeOptions.map((t) => (
+                <option key={t} value={t}>
+                  {typeLabel(t)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        <div>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Disciplina</p>
-          <select
-            value={disciplineId}
-            onChange={(e) => setDisciplineId(e.target.value)}
-            className="w-full rounded-lg border bg-card px-2.5 py-2 text-xs text-foreground"
-          >
-            <option value="all">Todas</option>
-            {disciplineOptions.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
-            Tipo de estudo
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="mr-1 text-xs text-muted-foreground tabular-nums">
+            {filteredSessions.length} {filteredSessions.length === 1 ? "sessão" : "sessões"} no período
+            {lastRefresh && (
+              <>
+                {" "}
+                · atualizado às{" "}
+                {lastRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TIMEZONE })}
+              </>
+            )}
           </p>
-          <select
-            value={studyType}
-            onChange={(e) => setStudyType(e.target.value)}
-            className="w-full rounded-lg border bg-card px-2.5 py-2 text-xs text-foreground"
-          >
-            <option value="all">Todos</option>
-            {typeOptions.map((t) => (
-              <option key={t} value={t}>
-                {typeLabel(t)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="sm:col-span-2 lg:col-span-1">
-          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
-            Resumo do período
-          </p>
-          <div className="rounded-lg border bg-card px-3 py-2 text-xs flex items-center justify-between">
-            <span className="text-muted-foreground">Sessões analisadas</span>
-            <span className="font-black text-foreground font-mono text-base">
-              {filteredSessions.length}
-            </span>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => load(true)}>
+            <RefreshCw aria-hidden className="h-3.5 w-3.5" /> Atualizar
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download aria-hidden className="h-3.5 w-3.5" /> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer aria-hidden className="h-3.5 w-3.5" /> PDF
+          </Button>
         </div>
       </div>
 
       {!hasAnyData && (
-        <div className="rounded-xl border border-dashed p-6 text-center">
-          <p className="text-sm font-semibold text-foreground mb-1">
+        <div className="rounded-lg border border-dashed border-border p-6 text-center">
+          <p className="text-sm font-medium text-foreground mb-1">
             Nenhum estudo registrado no período
           </p>
-          <p className="text-xs text-muted-foreground mb-4">
+          <p className="text-[13px] text-muted-foreground mb-4">
             Registre uma sessão de estudo para começar a ver suas estatísticas reais.
           </p>
-          <a href="/dashboard/history">
-            <Button size="sm">Registrar sessão</Button>
-          </a>
+          <Button asChild size="sm">
+            <a href="/dashboard/history">Registrar sessão</a>
+          </Button>
         </div>
       )}
 
@@ -727,23 +743,23 @@ export function StatisticsCenterView() {
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Total</span>
-              <span className="font-black">{sessionStats.total}</span>
+              <span className="font-semibold">{sessionStats.total}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Média de duração</span>
-              <span className="font-bold">{formatDurationRaw(sessionStats.averageMinutes)}</span>
+              <span className="font-semibold">{formatDurationRaw(sessionStats.averageMinutes)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Mais longa</span>
-              <span className="font-bold">{formatDurationRaw(sessionStats.longestMinutes)}</span>
+              <span className="font-semibold">{formatDurationRaw(sessionStats.longestMinutes)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Concluídas</span>
-              <span className="font-bold text-emerald-600">{sessionStats.completed}</span>
+              <span className="font-semibold text-emerald-600">{sessionStats.completed}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Interrompidas</span>
-              <span className="font-bold text-amber-600">{sessionStats.interrupted}</span>
+              <span className="font-semibold text-amber-600">{sessionStats.interrupted}</span>
             </div>
           </div>
         </SectionCard>
@@ -754,15 +770,15 @@ export function StatisticsCenterView() {
             <div className="space-y-1 text-sm flex-1">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Acertos</span>
-                <span className="font-black text-emerald-600">{questionStats.correct}</span>
+                <span className="font-semibold text-emerald-600">{questionStats.correct}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Erros</span>
-                <span className="font-black text-rose-600">{questionStats.wrong}</span>
+                <span className="font-semibold text-rose-600">{questionStats.wrong}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Acurácia</span>
-                <span className="font-black">
+                <span className="font-semibold">
                   {questionStats.accuracy === null ? "—" : `${Math.round(questionStats.accuracy)}%`}
                 </span>
               </div>
@@ -777,7 +793,7 @@ export function StatisticsCenterView() {
 
         <SectionCard title="Qualidade" subtitle="Foco e pausas">
           <div className="text-sm">
-            <div className="font-black text-3xl mb-1">
+            <div className="font-semibold text-3xl mb-1">
               {focusStats.average === null ? "—" : `${Math.round(focusStats.average)}%`}
             </div>
             <p className="text-xs text-muted-foreground mb-3">foco médio das sessões</p>
@@ -803,25 +819,25 @@ export function StatisticsCenterView() {
           <div className="text-sm space-y-1.5">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Sequência atual</span>
-              <span className="font-black text-lg">
+              <span className="font-semibold text-lg">
                 {streaks.current} {streaks.current === 1 ? "dia" : "dias"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Maior sequência</span>
-              <span className="font-bold">{streaks.longest} dias</span>
+              <span className="font-semibold">{streaks.longest} dias</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Últimos 7 dias</span>
-              <span className="font-bold">{frequency.last7Days} de 7</span>
+              <span className="font-semibold">{frequency.last7Days} de 7</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Últimos 30 dias</span>
-              <span className="font-bold">{frequency.last30Days} de 30</span>
+              <span className="font-semibold">{frequency.last30Days} de 30</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Média semanal</span>
-              <span className="font-bold">{frequency.weeklyAvgDays.toFixed(1)} dias</span>
+              <span className="font-semibold">{frequency.weeklyAvgDays.toFixed(1)} dias</span>
             </div>
             {frequency.daysSinceLastStudy !== null && frequency.daysSinceLastStudy > 0 && (
               <p className="text-[11px] text-amber-600 font-semibold">
@@ -876,13 +892,13 @@ export function StatisticsCenterView() {
           <div className="max-h-96 overflow-auto">
             <table className="w-full text-xs min-w-[520px]">
               <thead>
-                <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2.5 px-3 text-left font-bold">Tópico</th>
-                  <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
-                  <th className="py-2.5 px-3 text-right font-bold">Tempo</th>
-                  <th className="py-2.5 px-3 text-right font-bold">Questões</th>
-                  <th className="py-2.5 px-3 text-right font-bold">Acurácia</th>
-                  <th className="py-2.5 px-3 text-right font-bold">Status</th>
+                <tr className="type-label border-b">
+                  <th className="py-2.5 px-3 text-left font-semibold">Tópico</th>
+                  <th className="py-2.5 px-3 text-left font-semibold">Disciplina</th>
+                  <th className="py-2.5 px-3 text-right font-semibold">Tempo</th>
+                  <th className="py-2.5 px-3 text-right font-semibold">Questões</th>
+                  <th className="py-2.5 px-3 text-right font-semibold">Acurácia</th>
+                  <th className="py-2.5 px-3 text-right font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -893,11 +909,11 @@ export function StatisticsCenterView() {
                   >
                     <td className="py-2.5 px-3 font-semibold">{t.topicName}</td>
                     <td className="py-2.5 px-3 text-muted-foreground">{t.disciplineName}</td>
-                    <td className="py-2.5 px-3 text-right font-mono">
+                    <td className="py-2.5 px-3 text-right tabular-nums">
                       {formatDurationRaw(t.minutes)}
                     </td>
                     <td className="py-2.5 px-3 text-right">{t.questions}</td>
-                    <td className="py-2.5 px-3 text-right font-bold">
+                    <td className="py-2.5 px-3 text-right font-semibold">
                       {t.accuracy === null ? "—" : `${Math.round(t.accuracy)}%`}
                     </td>
                     <td className="py-2.5 px-3 text-right">
@@ -999,7 +1015,7 @@ export function StatisticsCenterView() {
         subtitle="Índice 0-100 com fórmula documentada abaixo"
         action={
           productivity.score !== null ? (
-            <span className="text-3xl font-black text-primary font-mono">
+            <span className="text-3xl font-semibold text-primary tabular-nums">
               {productivity.score}
             </span>
           ) : null
@@ -1037,13 +1053,12 @@ export function StatisticsCenterView() {
 
       {/* ===================== ANÁLISE INTELIGENTE ===================== */}
       <SectionCard
-        title="Análise inteligente"
-        subtitle="Insights gerados por regras determinísticas sobre os seus dados (sem IA de terceiros)"
-        action={<Sparkles className="h-4 w-4 text-primary" />}
+        title="Observações sobre seus dados"
+        subtitle="Padrões calculados a partir dos seus registros de estudo"
       >
         <BestTimeOfDaySection analysis={timeOfDayAnalysis} />
         {insights.length === 0 ? (
-          <EmptyState title="Sem insights" message="Sem sinais suficientes ainda — registre mais sessões." />
+          <EmptyState title="Ainda sem observações" message="Registre mais sessões para que padrões possam ser calculados." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {insights.map((ins) => {
@@ -1053,7 +1068,7 @@ export function StatisticsCenterView() {
                 <div key={ins.id} className={`rounded-xl border p-3.5 flex gap-3 ${style.cls}`}>
                   <Icon className="h-4 w-4 mt-0.5 shrink-0 text-foreground/70" />
                   <div>
-                    <p className="text-xs font-bold text-foreground">{ins.title}</p>
+                    <p className="text-xs font-semibold text-foreground">{ins.title}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
                       {ins.message}
                     </p>
@@ -1080,13 +1095,13 @@ export function StatisticsCenterView() {
                 key={p.disciplineId}
                 className="flex items-start gap-3 rounded-lg border bg-card p-3"
               >
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-black flex items-center justify-center shrink-0">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">
                   {i + 1}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-xs font-bold">{p.name}</p>
-                    <span className="text-xs font-black font-mono text-primary">
+                    <p className="text-xs font-semibold">{p.name}</p>
+                    <span className="text-xs font-semibold tabular-nums text-primary">
                       {p.score}
                       <span className="text-muted-foreground font-semibold">/100</span>
                     </span>
@@ -1117,7 +1132,7 @@ export function StatisticsCenterView() {
         }
         action={
           planning.hasPlan && planning.adherencePct !== null ? (
-            <span className={`text-xs font-black ${adherenceClass(planning.adherencePct)}`}>
+            <span className={`text-xs font-semibold ${adherenceClass(planning.adherencePct)}`}>
               {Math.round(planning.adherencePct)}% da meta semanal
             </span>
           ) : null
@@ -1212,7 +1227,7 @@ export function StatisticsCenterView() {
         subtitle="Status das disciplinas do seu concurso e cobertura geral"
         action={
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-black text-primary font-mono">
+            <span className="text-2xl font-semibold text-primary tabular-nums">
               {edital.percentage}%
             </span>
             <div className="w-28">
@@ -1234,12 +1249,12 @@ export function StatisticsCenterView() {
             <div className="max-h-72 overflow-auto">
               <table className="w-full text-xs min-w-[480px]">
                 <thead>
-                  <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
-                    <th className="py-2.5 px-3 text-left font-bold">Área</th>
-                    <th className="py-2.5 px-3 text-right font-bold">Estudado</th>
-                    <th className="py-2.5 px-3 text-right font-bold">Última sessão</th>
-                    <th className="py-2.5 px-3 text-right font-bold">Status</th>
+                  <tr className="type-label border-b">
+                    <th className="py-2.5 px-3 text-left font-semibold">Disciplina</th>
+                    <th className="py-2.5 px-3 text-left font-semibold">Área</th>
+                    <th className="py-2.5 px-3 text-right font-semibold">Estudado</th>
+                    <th className="py-2.5 px-3 text-right font-semibold">Última sessão</th>
+                    <th className="py-2.5 px-3 text-right font-semibold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1247,7 +1262,7 @@ export function StatisticsCenterView() {
                     <tr key={d.disciplineId} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
                       <td className="py-2.5 px-3 font-semibold">{d.name}</td>
                       <td className="py-2.5 px-3 text-muted-foreground">{d.area ?? "—"}</td>
-                      <td className="py-2.5 px-3 text-right font-mono">
+                      <td className="py-2.5 px-3 text-right tabular-nums">
                         {formatDurationRaw(d.studiedMinutes)}
                       </td>
                       <td className="py-2.5 px-3 text-right">
@@ -1486,7 +1501,7 @@ function Donut({ value, size }: { value: number | null; size: number }) {
         />
       </svg>
       <div
-        className="absolute inset-0 flex items-center justify-center font-black font-mono"
+        className="absolute inset-0 flex items-center justify-center font-semibold tabular-nums"
         style={{ fontSize: size / 4.6 }}
       >
         {value === null ? "—" : `${v}%`}
@@ -1649,7 +1664,7 @@ function EvoTooltip({ active, payload, label, metric }: ChartTooltipProps & { me
         <span className="text-muted-foreground">
           {EVO_METRICS.find((m) => m.id === metric)?.label}:{" "}
         </span>
-        <span className="font-bold">{formatEvolutionValue(metric, v ?? 0)}</span>
+        <span className="font-semibold">{formatEvolutionValue(metric, v ?? 0)}</span>
       </p>
       {(full?.sessoes ?? 0) > 0 && <p className="text-muted-foreground">{full?.sessoes} sessões</p>}
       {(full?.questoes ?? 0) > 0 && (
@@ -1668,13 +1683,13 @@ function QTooltip({ active, payload, label }: ChartTooltipProps) {
       {(p?.questions ?? 0) > 0 && (
         <p>
           <span className="text-muted-foreground">Questões: </span>
-          <span className="font-bold">{p?.questions}</span>
+          <span className="font-semibold">{p?.questions}</span>
         </p>
       )}
       {p?.accuracy !== null && p?.accuracy !== undefined && (
         <p>
           <span className="text-muted-foreground">Acurácia: </span>
-          <span className="font-bold">{Math.round(p.accuracy)}%</span>
+          <span className="font-semibold">{Math.round(p.accuracy)}%</span>
         </p>
       )}
     </div>
@@ -1689,11 +1704,11 @@ function PlanTooltip({ active, payload, label }: ChartTooltipProps) {
       <p className="font-semibold mb-1">{label}</p>
       <p>
         <span className="text-muted-foreground">Realizado: </span>
-        <span className="font-bold">{formatDurationRaw(p?.actualMinutes ?? 0)}</span>
+        <span className="font-semibold">{formatDurationRaw(p?.actualMinutes ?? 0)}</span>
       </p>
       <p>
         <span className="text-muted-foreground">Planejado: </span>
-        <span className="font-bold">{formatDurationRaw(p?.plannedMinutes ?? 0)}</span>
+        <span className="font-semibold">{formatDurationRaw(p?.plannedMinutes ?? 0)}</span>
       </p>
       {(p?.actualSessions ?? 0) > 0 && (
         <p className="text-muted-foreground">{p?.actualSessions} sessões</p>
@@ -1764,7 +1779,7 @@ function DisciplinasSection({
               <div key={d.disciplineId} className="rounded-lg border bg-card p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0">
-                    <p className="text-xs font-bold truncate">{d.name}</p>
+                    <p className="text-xs font-semibold truncate">{d.name}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {d.area ?? "Geral"} · {d.sessions} sessões
                     </p>
@@ -1773,7 +1788,7 @@ function DisciplinasSection({
                     <ClassificationChip classification={d.classification} />
                     {d.daysSinceLastStudy !== null && (
                       <span
-                        className={`text-[10px] font-bold ${d.daysSinceLastStudy > 30 ? "text-rose-600" : "text-muted-foreground"}`}
+                        className={`font-semibold text-[10px] ${d.daysSinceLastStudy > 30 ? "text-rose-600" : "text-muted-foreground"}`}
                       >
                         {d.daysSinceLastStudy === 0 ? "hoje" : `${d.daysSinceLastStudy}d`}
                       </span>
@@ -1785,7 +1800,7 @@ function DisciplinasSection({
                   <div className="flex-1">
                     <ProgressBar pct={pct} height="h-2.5" />
                   </div>
-                  <span className="text-xs font-black font-mono whitespace-nowrap">
+                  <span className="text-xs font-semibold tabular-nums whitespace-nowrap">
                     {formatDurationRaw(d.minutes)}
                   </span>
                 </div>
@@ -1793,27 +1808,27 @@ function DisciplinasSection({
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 text-[11px]">
                   <div>
                     <p className="text-muted-foreground">Questões</p>
-                    <p className="font-bold">{d.questions}</p>
+                    <p className="font-semibold">{d.questions}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Acurácia</p>
-                    <p className="font-bold">
+                    <p className="font-semibold">
                       {d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Erros</p>
-                    <p className="font-bold text-rose-600">{d.wrong}</p>
+                    <p className="font-semibold text-rose-600">{d.wrong}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Foco</p>
-                    <p className="font-bold">
+                    <p className="font-semibold">
                       {d.focusAvg === null ? "—" : `${Math.round(d.focusAvg)}%`}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Tendência</p>
-                    <p className="font-bold">
+                    <p className="font-semibold">
                       <TendenciaChip trend={d.trendDirection} delta={d.accuracyTrend} />
                     </p>
                   </div>
@@ -1882,7 +1897,7 @@ function ErrorMap({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2">Por disciplina</p>
+        <p className="type-label mb-2">Por disciplina</p>
         <div className="space-y-2">
           {byDiscipline.slice(0, 5).map((d) => (
             <div key={d.disciplineId} className="flex items-center gap-2 text-xs">
@@ -1893,14 +1908,14 @@ function ErrorMap({
                   style={{ width: `${(d.wrong / maxErr) * 100}%` }}
                 />
               </div>
-              <span className="font-black text-rose-600 w-6 text-right">{d.wrong}</span>
+              <span className="font-semibold text-rose-600 w-6 text-right">{d.wrong}</span>
             </div>
           ))}
         </div>
       </div>
       {byTopic.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2">Por tópico</p>
+          <p className="type-label mb-2">Por tópico</p>
           <div className="space-y-1.5">
             {byTopic.map((t) => (
               <div
@@ -1910,7 +1925,7 @@ function ErrorMap({
                 <span className="truncate font-medium">
                   {t.topicName} <span className="text-muted-foreground">· {t.disciplineName}</span>
                 </span>
-                <span className="font-black text-rose-600">{t.wrong} erros</span>
+                <span className="font-semibold text-rose-600">{t.wrong} erros</span>
               </div>
             ))}
           </div>
@@ -1955,11 +1970,11 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
             <div className="max-h-56 overflow-auto">
               <table className="w-full text-xs min-w-[380px]">
                 <thead>
-                  <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2.5 px-3 text-left font-bold">Disciplina</th>
-                    <th className="py-2.5 px-3 text-right font-bold">Atrasadas</th>
-                    <th className="py-2.5 px-3 text-right font-bold">Próximas</th>
-                    <th className="py-2.5 px-3 text-right font-bold">Total</th>
+                  <tr className="type-label border-b">
+                    <th className="py-2.5 px-3 text-left font-semibold">Disciplina</th>
+                    <th className="py-2.5 px-3 text-right font-semibold">Atrasadas</th>
+                    <th className="py-2.5 px-3 text-right font-semibold">Próximas</th>
+                    <th className="py-2.5 px-3 text-right font-semibold">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1967,7 +1982,7 @@ function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevi
                     <tr key={d.disciplineId} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
                       <td className="py-2.5 px-3 font-semibold">{d.name}</td>
                       <td
-                        className={`py-2.5 px-3 text-right font-bold ${d.overdue > 0 ? "text-rose-600" : ""}`}
+                        className={`font-semibold py-2.5 px-3 text-right ${d.overdue > 0 ? "text-rose-600" : ""}`}
                       >
                         {d.overdue}
                       </td>
@@ -2002,10 +2017,10 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            <th className="py-2.5 px-3 text-left font-bold">Comparação</th>
+          <tr className="type-label border-b">
+            <th className="py-2.5 px-3 text-left font-semibold">Comparação</th>
             {CMP_COLUMNS.map((c) => (
-              <th key={c.key} className="py-2.5 px-3 text-right font-bold min-w-16">
+              <th key={c.key} className="py-2.5 px-3 text-right font-semibold min-w-16">
                 {c.label}
               </th>
             ))}
@@ -2015,7 +2030,7 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
           {rows.map((r) => (
             <tr key={r.id} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
               <td className="py-2.5 px-3">
-                <p className="font-bold">{r.label}</p>
+                <p className="font-semibold">{r.label}</p>
                 <p className="text-[10px] text-muted-foreground">{r.detail}</p>
               </td>
               {CMP_COLUMNS.map((c) => {
@@ -2023,7 +2038,7 @@ function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
                 const isPp = c.key === "accuracy" || c.key === "focus"
                 return (
                   <td key={c.key} className="py-2.5 px-1.5 text-right">
-                    <p className="font-bold">{metricCmpValue(m, c.key)}</p>
+                    <p className="font-semibold">{metricCmpValue(m, c.key)}</p>
                     <p>
                       <DeltaBadge delta={m?.delta ?? null} suffix={isPp ? "pp" : ""} />
                     </p>
@@ -2045,8 +2060,8 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
     return (
       <div className="rounded-xl border border-border/60 bg-muted/5 p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <p className="text-xs font-bold">Análise de melhor horário</p>
+          <Clock3 aria-hidden className="h-4 w-4 text-muted-foreground" />
+          <p className="text-xs font-semibold">Análise de melhor horário</p>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
           {analysis.notEnoughDataMessage ??
@@ -2065,45 +2080,45 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
       {/* === DESTAQUE: MELHOR HORÁRIO === */}
       <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <p className="text-xs font-bold text-foreground">Melhor horário para você</p>
+          <Clock3 aria-hidden className="h-4 w-4 text-primary" />
+          <p className="text-xs font-semibold text-foreground">Melhor horário para você</p>
         </div>
 
         <div className="flex flex-wrap items-baseline gap-2 mb-3">
-          <p className="text-lg font-black text-primary uppercase tracking-tight">{ob.label}</p>
-          <span className="text-sm font-mono text-muted-foreground">{ob.range}</span>
+          <p className="text-lg font-semibold text-primary">{ob.label}</p>
+          <span className="text-sm tabular-nums text-muted-foreground">{ob.range}</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <p className="type-label">
               Foco médio
             </p>
-            <p className="text-lg font-black text-foreground">
+            <p className="text-lg font-semibold text-foreground">
               {ob.focusAvg !== null ? `${Math.round(ob.focusAvg)}%` : "—"}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <p className="type-label">
               Acerto
             </p>
-            <p className="text-lg font-black text-foreground">
+            <p className="text-lg font-semibold text-foreground">
               {ob.accuracy !== null ? `${Math.round(ob.accuracy)}%` : "—"}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <p className="type-label">
               Tempo estudado
             </p>
-            <p className="text-lg font-black text-foreground">
+            <p className="text-lg font-semibold text-foreground">
               {formatDurationRaw(ob.totalMinutes)}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <p className="type-label">
               Questões
             </p>
-            <p className="text-lg font-black text-foreground">{ob.questions}</p>
+            <p className="text-lg font-semibold text-foreground">{ob.questions}</p>
           </div>
         </div>
 
@@ -2117,24 +2132,24 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
           {bf && (
             <div className="pt-3 sm:pt-0 sm:pr-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="type-label">
                 Melhor foco
               </p>
-              <p className="text-sm font-bold text-foreground mt-0.5">{bf.label}</p>
-              <p className="text-xs font-mono text-muted-foreground">{bf.range}</p>
-              <p className="text-lg font-black text-primary mt-1">
+              <p className="text-sm font-semibold text-foreground mt-0.5">{bf.label}</p>
+              <p className="text-xs tabular-nums text-muted-foreground">{bf.range}</p>
+              <p className="text-lg font-semibold text-primary mt-1">
                 {bf.focusAvg !== null ? `${Math.round(bf.focusAvg)}%` : "—"}
               </p>
             </div>
           )}
           {ba && (
             <div className="pt-3 sm:pt-0 sm:pl-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="type-label">
                 Melhor acerto
               </p>
-              <p className="text-sm font-bold text-foreground mt-0.5">{ba.label}</p>
-              <p className="text-xs font-mono text-muted-foreground">{ba.range}</p>
-              <p className="text-lg font-black text-primary mt-1">
+              <p className="text-sm font-semibold text-foreground mt-0.5">{ba.label}</p>
+              <p className="text-xs tabular-nums text-muted-foreground">{ba.range}</p>
+              <p className="text-lg font-semibold text-primary mt-1">
                 {ba.accuracy !== null ? `${Math.round(ba.accuracy)}%` : "—"}
               </p>
             </div>
@@ -2145,18 +2160,18 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
       {/* === TABELA COMPARATIVA === */}
       <div className="rounded-xl border border-border/60 overflow-hidden">
         <div className="px-3 py-2 border-b border-border/40 bg-muted/5">
-          <p className="text-xs font-bold text-foreground">Desempenho por horário</p>
+          <p className="text-xs font-semibold text-foreground">Desempenho por horário</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                <th className="py-2.5 px-3 text-left font-bold">Horário</th>
-                <th className="py-2.5 px-3 text-left font-bold">Período</th>
-                <th className="py-2.5 px-3 text-right font-bold">Foco</th>
-                <th className="py-2.5 px-3 text-right font-bold">Acerto</th>
-                <th className="py-2.5 px-3 text-right font-bold">Tempo</th>
-                <th className="py-2.5 px-3 text-right font-bold">Sessões</th>
+              <tr className="type-label border-b">
+                <th className="py-2.5 px-3 text-left font-semibold">Horário</th>
+                <th className="py-2.5 px-3 text-left font-semibold">Período</th>
+                <th className="py-2.5 px-3 text-right font-semibold">Foco</th>
+                <th className="py-2.5 px-3 text-right font-semibold">Acerto</th>
+                <th className="py-2.5 px-3 text-right font-semibold">Tempo</th>
+                <th className="py-2.5 px-3 text-right font-semibold">Sessões</th>
               </tr>
             </thead>
             <tbody>
@@ -2167,33 +2182,33 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
                     key={b.period}
                     className={`border-b border-border/20 transition-colors ${isBest ? "bg-primary/5" : "hover:bg-muted/20"}`}
                   >
-                    <td className="py-2.5 px-3 font-mono font-bold">{b.range}</td>
+                    <td className="py-2.5 px-3 tabular-nums font-semibold">{b.range}</td>
                     <td className="py-2.5 px-3">
                       <span className="font-semibold">{b.label}</span>
                       {isBest && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full border border-primary/20">
-                          <Sparkles className="h-2.5 w-2.5" /> MELHOR
+                        <span className="ml-2 inline-flex items-center text-[11px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm">
+                          Melhor
                         </span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-right">
                       <span
-                        className={`font-bold ${b.focusAvg !== null ? "text-foreground" : "text-muted-foreground"}`}
+                        className={`font-semibold ${b.focusAvg !== null ? "text-foreground" : "text-muted-foreground"}`}
                       >
                         {b.focusAvg !== null ? `${Math.round(b.focusAvg)}%` : "—"}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-right">
                       <span
-                        className={`font-bold ${b.accuracy !== null ? "text-foreground" : "text-muted-foreground"}`}
+                        className={`font-semibold ${b.accuracy !== null ? "text-foreground" : "text-muted-foreground"}`}
                       >
                         {b.accuracy !== null ? `${Math.round(b.accuracy)}%` : "—"}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold">
+                    <td className="py-2.5 px-3 text-right tabular-nums font-semibold">
                       {formatDurationRaw(b.totalMinutes)}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-bold">{b.sessions}</td>
+                    <td className="py-2.5 px-3 text-right font-semibold">{b.sessions}</td>
                   </tr>
                 )
               })}
@@ -2210,7 +2225,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
                 key={b.period}
                 className={`text-[10px] ${isBest ? "text-primary font-semibold" : "text-muted-foreground"}`}
               >
-                <span className="font-mono">{b.range}</span>
+                <span className="tabular-nums">{b.range}</span>
                 {" — "}
                 <span>Tempo: {formatDurationRaw(b.totalMinutes)}</span>
                 {" · "}
@@ -2245,9 +2260,9 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
           className={`rounded-lg border p-3 ${h.best ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/60"}`}
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold">{h.label}</p>
+            <p className="text-xs font-semibold">{h.label}</p>
             {h.best && (
-              <span className="text-[10px] font-black text-emerald-600">MELHOR RENDIMENTO</span>
+              <span className="text-[11px] font-medium text-success">Melhor rendimento</span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-2">
@@ -2257,20 +2272,20 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
                 style={{ width: `${(h.minutes / maxMinutes) * 100}%` }}
               />
             </div>
-            <span className="text-xs font-black font-mono">{formatDurationRaw(h.minutes)}</span>
+            <span className="text-xs font-semibold tabular-nums">{formatDurationRaw(h.minutes)}</span>
           </div>
           <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
             <div>
               <p className="text-muted-foreground">Sessões</p>
-              <p className="font-bold">{h.sessions}</p>
+              <p className="font-semibold">{h.sessions}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Questões</p>
-              <p className="font-bold">{h.questions}</p>
+              <p className="font-semibold">{h.questions}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Acurácia</p>
-              <p className="font-bold">
+              <p className="font-semibold">
                 {h.accuracy === null ? "—" : `${Math.round(h.accuracy)}%`}
               </p>
             </div>
@@ -2305,21 +2320,21 @@ function ReportTable({
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            <th className="py-2.5 px-3 text-left font-bold">Métrica</th>
-            <th className="py-2.5 px-3 text-right font-bold">Atual</th>
-            <th className="py-2.5 px-3 text-right font-bold">Anterior</th>
-            <th className="py-2.5 px-3 text-right font-bold">Δ</th>
+          <tr className="type-label border-b">
+            <th className="py-2.5 px-3 text-left font-semibold">Métrica</th>
+            <th className="py-2.5 px-3 text-right font-semibold">Atual</th>
+            <th className="py-2.5 px-3 text-right font-semibold">Anterior</th>
+            <th className="py-2.5 px-3 text-right font-semibold">Δ</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
               <td className="py-2.5 px-3 font-semibold">{r.label}</td>
-              <td className="py-2.5 px-3 text-right font-bold">{r.current}</td>
+              <td className="py-2.5 px-3 text-right font-semibold">{r.current}</td>
               <td className="py-2.5 px-3 text-right text-muted-foreground">{r.previous}</td>
               <td
-                className={`py-2.5 px-3 text-right font-black ${r.positive ? "text-emerald-600" : "text-rose-600"}`}
+                className={`py-2.5 px-3 text-right font-semibold ${r.positive ? "text-emerald-600" : "text-rose-600"}`}
               >
                 {r.deltaLabel}
               </td>

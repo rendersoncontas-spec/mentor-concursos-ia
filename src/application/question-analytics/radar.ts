@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 export type RadarMetric = {
   subject: string
@@ -19,16 +20,26 @@ export async function getPerformanceRadar(
   d.setDate(d.getDate() - periodDays)
 
   // Trazemos as tentativas com a disciplina
-  const { data, error } = await supabase
-    .from("question_attempts")
-    .select(`
+  // Fase F.1: paginado (question_attempts pode passar de 1.000 linhas em 30
+  // dias para quem resolve muitas questões; antes 1 requisição cortada em
+  // 1.000). Mesmo formato { data, error } de antes.
+  const { data, error } = await fetchAllRowsPaged<{
+    correct: boolean
+    questions: { disciplines: { name: string } | { name: string }[] | null } | { disciplines: { name: string } | { name: string }[] | null }[] | null
+  }>(
+    (withCount) =>
+      supabase
+        .from("question_attempts")
+        .select(`
       correct,
       questions!inner (
         disciplines ( name )
       )
-    `)
-    .eq("user_id", userId)
-    .gte("answered_at", d.toISOString())
+    `, countOption(withCount))
+        .eq("user_id", userId)
+        .gte("answered_at", d.toISOString()),
+    [{ column: "id", ascending: true }],
+  )
 
   if (error || !data) {
     console.error("Radar Fetch Error:", error)

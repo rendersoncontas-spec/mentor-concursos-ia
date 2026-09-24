@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { useRouter, useSearchParams } from "next/navigation"
 
-import { Folder, Plus, ShieldCheck, SquarePen, Target, Trash2, Trophy } from "lucide-react"
+import { Folder, Plus, Search, ShieldCheck, SquarePen, Target, Trash2, Trophy } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -24,6 +24,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Metric, MetricStrip } from "@/components/ui/metric"
+import { Progress } from "@/components/ui/progress"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
 import { DisciplineDetailView } from "@/features/disciplines/components/discipline-detail-view"
 import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
@@ -60,17 +63,18 @@ function getClassification(
 }
 
 function StatusBadge({ status }: { status: "DOMINIO" | "ATENCAO" | "PRIORIDADE" | "SEM_DADOS" }) {
+  // Fase E — situação como ponto + texto (antes: pílula sólida colorida em
+  // caixa alta, que competia com o nome da disciplina).
   const configs = {
-    DOMINIO: { color: "bg-emerald-500", label: "DOMÍNIO" },
-    ATENCAO: { color: "bg-amber-500", label: "ATENÇÃO" },
-    PRIORIDADE: { color: "bg-rose-500", label: "PRIORIDADE" },
-    SEM_DADOS: { color: "bg-slate-400", label: "SEM DADOS" },
+    DOMINIO: { color: "bg-success", label: "Domínio" },
+    ATENCAO: { color: "bg-warning", label: "Atenção" },
+    PRIORIDADE: { color: "bg-destructive", label: "Prioridade" },
+    SEM_DADOS: { color: "bg-muted-foreground/40", label: "Sem dados" },
   }
   const c = configs[status]
   return (
-    <span
-      className={`${c.color} text-white font-black text-[9px] px-2 py-0.5 rounded-full tracking-widest`}
-    >
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-foreground">
+      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${c.color}`} />
       {c.label}
     </span>
   )
@@ -316,25 +320,30 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
   }
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* HEADER PROFISSIONAL */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/5 dark:bg-slate-100/5 p-4 sm:p-5 rounded-2xl border">
-        <div className="space-y-0.5">
-          <h1 className="text-2xl font-black text-foreground tracking-tight">Disciplinas</h1>
-          <p className="text-xs text-muted-foreground font-medium max-w-lg">
-            Visão geral do seu progresso por matéria.
+    <div className="space-y-5 pb-8">
+      {/* BARRA DE CONTEXTO + AÇÕES — Fase E: o título está no cabeçalho fixo;
+          aqui ficam o concurso atual, a busca e a ação principal numa só linha
+          (antes: banner com H1 repetido + cartão só para o concurso). */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <ShieldCheck aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <p className="min-w-0 truncate text-[13px] text-muted-foreground">
+            <span className="font-medium text-foreground">{targetInfo.name}</span>
+            <span> · Cargo: {targetInfo.role}</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full md:w-auto">
-          <div className="relative hidden md:block">
+        <div className="flex w-full items-center gap-2 md:w-auto">
+          <div className="relative flex-1 md:w-64 md:flex-none">
+            <Search aria-hidden className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar disciplina..."
+              type="search"
+              aria-label="Buscar disciplina"
+              placeholder="Buscar disciplina…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 w-64 text-xs rounded-xl bg-card"
+              className="h-9 pl-8 text-xs"
             />
-            <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
           <Button
             onClick={() => {
@@ -342,352 +351,272 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
               setDisciplineNameInput("")
               setIsModalOpen(true)
             }}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-4 h-9 rounded-xl shadow-xs flex items-center gap-2 w-full md:w-auto justify-center"
+            className="shrink-0"
           >
-            <Plus className="h-4 w-4" />
-            Nova Disciplina
+            <Plus aria-hidden className="h-4 w-4" />
+            Nova disciplina
           </Button>
         </div>
       </div>
 
-      {/* CONTEXTO ATUAL (CONCURSO/EDITAL) */}
-      <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-slate-900 border flex items-center justify-center text-white shrink-0 shadow-xs">
-            <ShieldCheck className="h-6 w-6 text-emerald-400" />
+      {/* RESUMO GERAL — uma faixa de métricas; o progresso do edital fica na
+          própria faixa (antes era um terceiro bloco separado). */}
+      <MetricStrip>
+        <Metric label="Tempo de estudo" value={totalStats.studyTimeFormatted} />
+        <Metric label="Questões" value={totalStats.totalQuestions} />
+        <Metric label="Acerto" value={`${totalStats.accuracyPercentage}%`} />
+        <Metric label="Disciplinas" value={disciplines.length} />
+        <div className="col-span-2 min-w-0 space-y-1.5 lg:col-span-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs text-muted-foreground">Progresso do edital</span>
+            <span className="text-lg font-semibold tabular-nums text-foreground">{totalProgress}%</span>
           </div>
-          <div className="space-y-0.5 min-w-0">
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Concurso / Edital Atual
-            </span>
-            <h2 className="text-lg font-bold text-foreground tracking-tight truncate">
-              {targetInfo.name}
-            </h2>
-            <p className="text-xs text-muted-foreground font-medium truncate">
-              Edital Próprio · Cargo: {targetInfo.role}
-            </p>
-          </div>
+          <Progress value={totalProgress} aria-label="Progresso do edital" />
+          <p className="text-[11px] tabular-nums text-muted-foreground">
+            {totalStudied} de {totalTopics} tópicos
+          </p>
         </div>
-      </div>
-
-      {/* RESUMO GERAL: uma única superfície com divisórias (não 5 cards repetidos) */}
-      <div className="bg-card border rounded-2xl shadow-xs grid grid-cols-2 md:grid-cols-5 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-border">
-        <div className="p-4 space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Tempo de Estudo
-          </span>
-          <span className="text-base font-black text-foreground block">
-            {totalStats.studyTimeFormatted}
-          </span>
-        </div>
-        <div className="p-4 space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Questões
-          </span>
-          <span className="text-base font-black text-primary block">
-            {totalStats.totalQuestions}
-          </span>
-        </div>
-        <div className="p-4 space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Acerto
-          </span>
-          <span className="text-base font-black text-emerald-500 block">
-            {totalStats.accuracyPercentage}%
-          </span>
-        </div>
-        <div className="p-4 space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Disciplinas
-          </span>
-          <span className="text-base font-black text-foreground block">{disciplines.length}</span>
-        </div>
-        <div className="p-4 space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Progresso Edital
-          </span>
-          <span className="text-base font-black text-amber-500 block">{totalProgress}%</span>
-        </div>
-      </div>
-
-      {/* BARRA DE PROGRESSO DA PREPARAÇÃO */}
-      <div className="bg-slate-900 dark:bg-slate-100 text-slate-100 dark:text-slate-900 rounded-2xl p-6 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-black uppercase tracking-widest opacity-80">
-            Progresso da Preparação
-          </span>
-          <span className="text-xs font-black">
-            {totalStudied} / {totalTopics} tópicos
-          </span>
-        </div>
-        <div className="w-full h-2 bg-slate-800 dark:bg-slate-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-emerald-500 transition-all duration-500"
-            style={{ width: `${totalProgress}%` }}
-          />
-        </div>
-        <p className="text-xs font-bold opacity-90">{totalProgress}% do conteúdo concluído</p>
-      </div>
+      </MetricStrip>
 
       {/* PAINÉIS DE PRIORIDADE E DESEMPENHO */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <Target className="h-4 w-4 text-rose-500" />
-              Próxima Prioridade
+            <span className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+              <Target aria-hidden className="h-4 w-4 text-muted-foreground" />
+              Próxima prioridade
             </span>
             {nextPriority && <StatusBadge status={nextPriority.classification} />}
           </div>
           {nextPriority ? (
             <div className="space-y-3">
-              <h3 className="font-bold text-lg text-foreground truncate" title={nextPriority.name}>
+              <h3 className="type-h2 text-foreground truncate" title={nextPriority.name}>
                 {nextPriority.name}
               </h3>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-bold">
+                <div className="flex items-center justify-between text-xs font-semibold">
                   <span className="text-muted-foreground">Progresso</span>
                   <span className="text-foreground">{Math.round(nextPriority.progress)}%</span>
                 </div>
-                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-rose-500 transition-all"
-                    style={{ width: `${nextPriority.progress}%` }}
-                  />
-                </div>
-                <p className="text-[10px] font-bold text-muted-foreground">
+                <Progress value={nextPriority.progress} aria-label={`Progresso em ${nextPriority.name}`} />
+                <p className="text-[11px] tabular-nums text-muted-foreground">
                   {nextPriority.topicsStudied} / {nextPriority.topicsTotal} tópicos ·{" "}
                   {nextPriority.questionsSolved} questões ·{" "}
                   {formatHours(nextPriority.totalMinutes || 0)} estudados
                 </p>
               </div>
-              <Button
-                onClick={() => openDiscipline(nextPriority)}
-                variant="outline"
-                className="w-full h-9 text-xs font-bold rounded-xl"
-              >
-                Ver Disciplina
+              <Button onClick={() => openDiscipline(nextPriority)} variant="outline" size="sm">
+                Ver disciplina
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground font-medium">
+            <p className="text-[13px] text-muted-foreground">
               Nenhuma disciplina com prioridade no momento. Bons estudos!
             </p>
           )}
         </div>
 
-        <div className="rounded-2xl border bg-card p-5 shadow-xs space-y-4">
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-amber-500" />
-            Melhor Desempenho
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <span className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+            <Trophy aria-hidden className="h-4 w-4 text-muted-foreground" />
+            Melhor desempenho
           </span>
           {bestDiscipline ? (
             <div className="space-y-3">
               <h3
-                className="font-bold text-lg text-foreground truncate"
+                className="type-h2 text-foreground truncate"
                 title={bestDiscipline.name}
               >
                 {bestDiscipline.name}
               </h3>
               <div className="flex items-end gap-6">
                 <div>
-                  <span className="text-3xl font-black text-emerald-500 block leading-none">
+                  <span className="text-2xl font-semibold tabular-nums text-foreground block leading-none">
                     {bestDiscipline.accuracy ?? 0}%
                   </span>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                  <span className="type-label">
                     Acerto
                   </span>
                 </div>
                 <div>
-                  <span className="text-3xl font-black text-foreground block leading-none">
+                  <span className="text-2xl font-semibold tabular-nums text-foreground block leading-none">
                     {bestDiscipline.questionsSolved}
                   </span>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                  <span className="type-label">
                     Questões
                   </span>
                 </div>
               </div>
-              <Button
-                onClick={() => openDiscipline(bestDiscipline)}
-                variant="outline"
-                className="w-full h-9 text-xs font-bold rounded-xl"
-              >
-                Ver Disciplina
+              <Button onClick={() => openDiscipline(bestDiscipline)} variant="outline" size="sm">
+                Ver disciplina
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground font-medium">
+            <p className="text-[13px] text-muted-foreground">
               Responda pelo menos 5 questões em uma disciplina para revelar seu melhor desempenho.
             </p>
           )}
         </div>
       </div>
 
-      {/* FILTROS E BUSCA MOBILE */}
-      <div className="relative md:hidden">
-        <Input
-          placeholder="Buscar disciplina..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 h-10 text-xs rounded-xl bg-card"
-        />
-        <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      </div>
-
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {(
-          [
-            ["todas", "Todas"],
-            ["dominio", "Domínio"],
-            ["atencao", "Atenção"],
-            ["prioridade", "Prioridade"],
-            ["sem_dados", "Sem Dados"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => setFilterStatus(value)}
-            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all ${
-              filterStatus === value
-                ? "bg-foreground text-background"
-                : "bg-muted/40 text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-        <div className="flex-1" />
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="text-[11px] font-bold uppercase tracking-wider bg-card border rounded-full px-3 py-1.5 h-8"
-        >
-          <option value="prioridade">Prioridade</option>
-          <option value="progresso">Progresso</option>
-          <option value="desempenho">Desempenho</option>
-          <option value="tempo">Tempo</option>
-          <option value="nome">Nome</option>
-        </select>
-      </div>
-
-      {/* GRADE DE CARDS DE DISCIPLINAS REFORMULADA */}
-      {processedDisciplines.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 rounded-xl border border-dashed bg-card/50">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-            <Folder className="h-8 w-8 text-emerald-500/60" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-bold text-lg text-foreground">Nenhuma disciplina encontrada</h3>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              Adicione ou ajuste os filtros para visualizar as matérias do seu edital.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5">
-          {processedDisciplines.map((disc) => (
+      {/* FILTROS — Fase E: segmented control + ordenação (a busca foi para a
+          barra do topo e vale para todas as larguras de tela). */}
+      <section aria-labelledby="lista-disciplinas" className="space-y-2.5">
+        {/* Mobile: título + ordenação na 1ª linha e o filtro ocupando a 2ª
+            linha inteira; desktop: tudo numa linha. */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="lista-disciplinas" className="type-h3 mr-auto text-foreground">
+            Todas as disciplinas
+          </h2>
+          <div className="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
             <div
-              key={disc.id}
-              onClick={() => openDiscipline(disc)}
-              className="group rounded-2xl border bg-card p-5 hover:shadow-xs hover:border-emerald-500/50 cursor-pointer transition-all relative overflow-hidden"
+              role="group"
+              aria-label="Filtrar por situação"
+              className="no-scrollbar flex w-full items-center overflow-x-auto rounded-md bg-muted p-0.5 sm:inline-flex sm:w-auto"
             >
-              {/* Top Status Line */}
-              <div
-                className="absolute top-0 left-0 right-0 h-1 transition-colors"
-                style={{ backgroundColor: disc.color }}
-              />
+              {(
+                [
+                  ["todas", "Todas"],
+                  ["dominio", "Domínio"],
+                  ["atencao", "Atenção"],
+                  ["prioridade", "Prioridade"],
+                  ["sem_dados", "Sem dados"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilterStatus(value)}
+                  aria-pressed={filterStatus === value}
+                  className={`flex-1 whitespace-nowrap rounded-[5px] px-2 py-1 text-xs sm:flex-none sm:px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    filterStatus === value
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              aria-label="Ordenar disciplinas"
+              className="h-8 shrink-0 rounded-md border border-input bg-card px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="prioridade">Prioridade</option>
+              <option value="progresso">Progresso</option>
+              <option value="desempenho">Desempenho</option>
+              <option value="tempo">Tempo</option>
+              <option value="nome">Nome</option>
+            </select>
+        </div>
 
-              <div className="space-y-4 pt-1">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold text-base text-foreground truncate" title={disc.name}>
-                    {disc.name}
-                  </h3>
-                  <StatusBadge status={disc.classification} />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-muted-foreground">Progresso</span>
-                    <span className="text-foreground">{Math.round(disc.progress)}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-foreground transition-all"
-                      style={{ width: `${disc.progress}%` }}
+        {/* LISTA — tabela no desktop, linhas compactas no mobile (antes: grade
+            de cards com ações que só apareciam no hover). */}
+        {processedDisciplines.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border">
+            <EmptyState
+              icon={Folder}
+              title="Nenhuma disciplina encontrada"
+              description="Adicione uma disciplina ou ajuste os filtros para ver as matérias do seu edital."
+            />
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="type-label hidden grid-cols-[minmax(0,2.2fr)_110px_minmax(140px,1.2fr)_90px_90px_80px_120px_76px] gap-4 border-b border-border bg-muted/40 px-4 py-2 lg:grid">
+              <span>Disciplina</span>
+              <span>Situação</span>
+              <span>Progresso</span>
+              <span className="text-right">Questões</span>
+              <span className="text-right">Acerto</span>
+              <span className="text-right">Tempo</span>
+              <span>Área</span>
+              <span className="text-right">Ações</span>
+            </div>
+            <ul className="divide-y divide-border">
+              {processedDisciplines.map((disc) => (
+                <li
+                  key={disc.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 hover:bg-muted/30 lg:grid-cols-[minmax(0,2.2fr)_110px_minmax(140px,1.2fr)_90px_90px_80px_120px_76px]"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: disc.color }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => openDiscipline(disc)}
+                      className="min-w-0 truncate text-left text-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                      title={disc.name}
+                    >
+                      {disc.name}
+                    </button>
                   </div>
-                  <p className="text-[10px] font-bold text-muted-foreground text-right">
-                    {disc.topicsStudied} / {disc.topicsTotal} tópicos
+                  <div className="justify-self-end lg:justify-self-start">
+                    <StatusBadge status={disc.classification} />
+                  </div>
+                  <div className="col-span-2 flex min-w-0 items-center gap-2.5 lg:col-span-1">
+                    <Progress value={disc.progress} className="flex-1" aria-label={`Progresso em ${disc.name}`} />
+                    <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground lg:w-auto">
+                      {Math.round(disc.progress)}% · {disc.topicsStudied}/{disc.topicsTotal}
+                    </span>
+                  </div>
+                  <p className="min-w-0 text-xs tabular-nums text-muted-foreground lg:hidden">
+                    {disc.questionsSolved} questões ·{" "}
+                    {disc.accuracy !== null && disc.accuracy !== undefined ? `${disc.accuracy}% de acerto` : "sem acerto"} ·{" "}
+                    {formatHours(disc.totalMinutes || 0)}
                   </p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 pt-3 border-t">
-                  <div>
-                    <span className="text-sm font-black text-foreground block">
-                      {disc.questionsSolved}
-                    </span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                      Questões
-                    </span>
-                  </div>
-                  <div className="border-l pl-3">
-                    <span className="text-sm font-black text-foreground block">
-                      {disc.accuracy !== null && disc.accuracy !== undefined
-                        ? `${disc.accuracy}%`
-                        : "—"}
-                    </span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                      Desempenho
-                    </span>
-                  </div>
-                  <div className="border-l pl-3">
-                    <span className="text-sm font-black text-foreground block">
-                      {formatHours(disc.totalMinutes || 0)}
-                    </span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                      Tempo
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase truncate">
+                  <span className="hidden text-right text-sm tabular-nums text-foreground lg:block">
+                    {disc.questionsSolved}
+                  </span>
+                  <span className="hidden text-right text-sm tabular-nums text-foreground lg:block">
+                    {disc.accuracy !== null && disc.accuracy !== undefined ? `${disc.accuracy}%` : "—"}
+                  </span>
+                  <span className="hidden text-right text-sm tabular-nums text-foreground lg:block">
+                    {formatHours(disc.totalMinutes || 0)}
+                  </span>
+                  <span className="hidden truncate text-xs text-muted-foreground lg:block">
                     {disc.area || "Geral"}
                   </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleOpenEdit(disc)
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  <div className="flex items-center justify-end gap-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleOpenEdit(disc)}
                       title="Editar disciplina"
+                      aria-label={`Editar ${disc.name}`}
                     >
-                      <SquarePen className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRemoveDiscipline(disc.id, disc.name)
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"
+                      <SquarePen aria-hidden className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleRemoveDiscipline(disc.id, disc.name)}
+                      className="text-muted-foreground hover:text-destructive"
                       title="Remover disciplina"
+                      aria-label={`Remover ${disc.name}`}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                      <Trash2 aria-hidden className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
 
       {/* Modal Criar / Editar Disciplina */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-emerald-600">
+            <DialogTitle className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               {editingDisc ? "Editar Disciplina" : "Adicionar Nova Disciplina"}
             </DialogTitle>

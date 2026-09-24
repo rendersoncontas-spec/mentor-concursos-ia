@@ -6,6 +6,7 @@
 // ============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 export interface PendingReviewsSummary {
   count: number
@@ -19,12 +20,23 @@ export async function getPendingReviewsSummary(supabase: SupabaseClient, userId:
   const nowStr = new Date().toISOString()
   const todayStr = nowStr.slice(0, 10)
 
-  const { data: rows } = await supabase
-    .from("review_items")
-    .select("next_review_at, lapses_count, difficulty")
-    .eq("user_id", userId)
-    .is("deleted_at", null)
-    .eq("is_suspended", false)
+  // Fase F.1: paginado (review_items cresce com flashcards/simulados; 1
+  // requisição era cortada em 1.000). Erro → sem itens, como antes.
+  const { data: pagedRows, error } = await fetchAllRowsPaged<{
+    next_review_at: string | null
+    lapses_count: number | null
+    difficulty: number | null
+  }>(
+    (withCount) =>
+      supabase
+        .from("review_items")
+        .select("next_review_at, lapses_count, difficulty", countOption(withCount))
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .eq("is_suspended", false),
+    [{ column: "id", ascending: true }],
+  )
+  const rows = error ? null : pagedRows
 
   let count = 0
   let overdue = 0

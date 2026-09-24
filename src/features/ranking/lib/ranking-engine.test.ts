@@ -16,6 +16,7 @@ import {
   formatDistance,
   type RankingUserInput,
 } from "./ranking-engine"
+import { must } from "@/lib/testing/must"
 
 /* ─────────────────────────────────────────────────────────────────────────────
    FIXTURES
@@ -172,10 +173,10 @@ describe("getStudyRanking", () => {
     )
 
     assert.equal(ranking.entries.length, 2)
-    assert.equal(ranking.entries[0]!.rank, 1)
-    assert.equal(ranking.entries[0]!.name, "Alice")
-    assert.equal(ranking.entries[1]!.rank, 2)
-    assert.equal(ranking.entries[1]!.name, "Bob")
+    assert.equal(must(ranking.entries[0]).rank, 1)
+    assert.equal(must(ranking.entries[0]).name, "Alice")
+    assert.equal(must(ranking.entries[1]).rank, 2)
+    assert.equal(must(ranking.entries[1]).name, "Bob")
   })
 
   it("CASO 4: grande diferença de tempo", () => {
@@ -187,9 +188,9 @@ describe("getStudyRanking", () => {
       "TEMPO",
     )
 
-    assert.equal(ranking.entries[0]!.rank, 1)
-    assert.equal(ranking.entries[1]!.rank, 2)
-    assert.equal(ranking.entries[1]!.distanceAheadSeconds, 1350 * 60) // 22h30 = 1350 min
+    assert.equal(must(ranking.entries[0]).rank, 1)
+    assert.equal(must(ranking.entries[1]).rank, 2)
+    assert.equal(must(ranking.entries[1]).distanceAheadSeconds, 1350 * 60) // 22h30 = 1350 min
   })
 
   it("não inclui usuários sem atividade", () => {
@@ -202,7 +203,7 @@ describe("getStudyRanking", () => {
     )
 
     assert.equal(ranking.entries.length, 1)
-    assert.equal(ranking.entries[0]!.name, "Alice")
+    assert.equal(must(ranking.entries[0]).name, "Alice")
   })
 
   it("ordena por QUESTOES", () => {
@@ -214,8 +215,8 @@ describe("getStudyRanking", () => {
       "QUESTOES",
     )
 
-    assert.equal(ranking.entries[0]!.name, "Bob")
-    assert.equal(ranking.entries[1]!.name, "Alice")
+    assert.equal(must(ranking.entries[0]).name, "Bob")
+    assert.equal(must(ranking.entries[1]).name, "Alice")
   })
 
   it("ordena por PAGINAS", () => {
@@ -227,8 +228,8 @@ describe("getStudyRanking", () => {
       "PAGINAS",
     )
 
-    assert.equal(ranking.entries[0]!.name, "Alice")
-    assert.equal(ranking.entries[1]!.name, "Bob")
+    assert.equal(must(ranking.entries[0]).name, "Alice")
+    assert.equal(must(ranking.entries[1]).name, "Bob")
   })
 })
 
@@ -246,10 +247,10 @@ describe("getStudyRanking — empates", () => {
       "TEMPO",
     )
 
-    assert.equal(ranking.entries[0]!.rank, 1)
-    assert.equal(ranking.entries[1]!.rank, 1) // Empatados
-    assert.equal(ranking.entries[1]!.tiedWithAbove, true)
-    assert.equal(ranking.entries[1]!.distanceAheadSeconds, 0)
+    assert.equal(must(ranking.entries[0]).rank, 1)
+    assert.equal(must(ranking.entries[1]).rank, 1) // Empatados
+    assert.equal(must(ranking.entries[1]).tiedWithAbove, true)
+    assert.equal(must(ranking.entries[1]).distanceAheadSeconds, 0)
   })
 
   it("desempate por QUESTOES quando TEMPO é igual", () => {
@@ -262,11 +263,11 @@ describe("getStudyRanking — empates", () => {
     )
 
     // Mesmo tempo → empatados (mesma posição), mas Bob ordering primeiro por questões
-    assert.equal(ranking.entries[0]!.name, "Bob")
-    assert.equal(ranking.entries[0]!.rank, 1)
-    assert.equal(ranking.entries[1]!.name, "Alice")
-    assert.equal(ranking.entries[1]!.rank, 1) // Empatados
-    assert.equal(ranking.entries[1]!.tiedWithAbove, true)
+    assert.equal(must(ranking.entries[0]).name, "Bob")
+    assert.equal(must(ranking.entries[0]).rank, 1)
+    assert.equal(must(ranking.entries[1]).name, "Alice")
+    assert.equal(must(ranking.entries[1]).rank, 1) // Empatados
+    assert.equal(must(ranking.entries[1]).tiedWithAbove, true)
   })
 
   it("desempate por nome quando tudo é igual", () => {
@@ -279,8 +280,8 @@ describe("getStudyRanking — empates", () => {
     )
 
     // Alice vem antes de Zebra (ordem alfabética)
-    assert.equal(ranking.entries[0]!.name, "Alice")
-    assert.equal(ranking.entries[1]!.name, "Zebra")
+    assert.equal(must(ranking.entries[0]).name, "Alice")
+    assert.equal(must(ranking.entries[1]).name, "Zebra")
   })
 
   it("três usuários, dois empatados", () => {
@@ -293,10 +294,10 @@ describe("getStudyRanking — empates", () => {
       "TEMPO",
     )
 
-    assert.equal(ranking.entries[0]!.rank, 1)
-    assert.equal(ranking.entries[1]!.rank, 1) // Empatado com Alice
-    assert.equal(ranking.entries[2]!.rank, 3) // Terceira posição
-    assert.equal(ranking.entries[2]!.tiedWithAbove, false)
+    assert.equal(must(ranking.entries[0]).rank, 1)
+    assert.equal(must(ranking.entries[1]).rank, 1) // Empatado com Alice
+    assert.equal(must(ranking.entries[2]).rank, 3) // Terceira posição
+    assert.equal(must(ranking.entries[2]).tiedWithAbove, false)
   })
 })
 
@@ -314,7 +315,7 @@ describe("getStudyRanking — distâncias", () => {
       "TEMPO",
     )
 
-    const me = ranking.byId.get("b")!
+    const me = must(ranking.byId.get("b"))
     assert.equal(me.rank, 2)
     // 13h02 - 11h05 = 1h57 = 117 min = 7020 segundos
     assert.equal(me.distanceAheadSeconds, 7020)
@@ -329,7 +330,7 @@ describe("getStudyRanking — distâncias", () => {
       "TEMPO",
     )
 
-    const me = ranking.byId.get("b")!
+    const me = must(ranking.byId.get("b"))
     assert.equal(me.rank, 2)
     // 780 - 779.5 = 0.5 min = 30 segundos
     assert.equal(me.distanceAheadSeconds, 30)
@@ -344,7 +345,7 @@ describe("getStudyRanking — distâncias", () => {
       "TEMPO",
     )
 
-    const leader = ranking.byId.get("a")!
+    const leader = must(ranking.byId.get("a"))
     assert.equal(leader.rank, 1)
     assert.equal(leader.distanceAheadSeconds, 0)
   })
@@ -394,8 +395,8 @@ describe("getDistanceToUserAhead", () => {
     const result = getDistanceToUserAhead(me, ranking, "TEMPO")
 
     assert.notEqual(result, null)
-    assert.equal(result!.user.name, "Lays")
-    assert.equal(result!.distanceSeconds, 7020) // 1h57min
+    assert.equal(must(result).user.name, "Lays")
+    assert.equal(must(result).distanceSeconds, 7020) // 1h57min
   })
 
   it("líder retorna null", () => {
@@ -614,7 +615,7 @@ describe("Ranking 3 usuários — distâncias para o adversário à frente", () 
       "TEMPO",
     )
 
-    const renderson = ranking.byId.get("render")!
+    const renderson = must(ranking.byId.get("render"))
     assert.equal(renderson.rank, 2)
     // Distância para Lays: 782 - 692 = 90 min = 5400s
     assert.equal(renderson.distanceAheadSeconds, 5400)
@@ -631,7 +632,7 @@ describe("Ranking 3 usuários — distâncias para o adversário à frente", () 
       "TEMPO",
     )
 
-    const joao = ranking.byId.get("joao")!
+    const joao = must(ranking.byId.get("joao"))
     assert.equal(joao.rank, 3)
     // Distância para Renderson: 692 - 540 = 152 min = 9120s
     assert.equal(joao.distanceAheadSeconds, 9120)
@@ -648,7 +649,7 @@ describe("Ranking 3 usuários — distâncias para o adversário à frente", () 
       "TEMPO",
     )
 
-    const lays = ranking.byId.get("lays")!
+    const lays = must(ranking.byId.get("lays"))
     assert.equal(lays.rank, 1)
     assert.equal(lays.distanceAheadSeconds, 0)
   })
@@ -663,8 +664,8 @@ describe("Ranking 3 usuários — distâncias para o adversário à frente", () 
       "TEMPO",
     )
 
-    const renderson = ranking.byId.get("render")!
-    const joao = ranking.byId.get("joao")!
+    const renderson = must(ranking.byId.get("render"))
+    const joao = must(ranking.byId.get("joao"))
 
     // calculateDistanceAhead deve produzir o mesmo resultado que distanceAheadSeconds
     assert.equal(

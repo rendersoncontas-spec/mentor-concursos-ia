@@ -70,7 +70,7 @@ export function DashboardCustomizationModal({
               return (
                 <div key={item.widget_id} className="flex items-center justify-between p-3 border rounded-xl bg-muted/10 mb-3">
                   <div className="flex-1">
-                    <h4 className="font-bold text-sm text-foreground">{widgetInfo.name}</h4>
+                    <h4 className="font-semibold text-sm text-foreground">{widgetInfo.name}</h4>
                     <p className="text-xs text-muted-foreground">{widgetInfo.description}</p>
                   </div>
                   
@@ -79,19 +79,19 @@ export function DashboardCustomizationModal({
                     <div className="hidden sm:flex items-center gap-1 bg-muted p-1 rounded-lg">
                       <button
                         onClick={() => handleColSpanChange(item.widget_id, 1)}
-                        className={`px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${item.col_span === 1 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`font-semibold px-2 py-1 text-[10px] rounded-md transition-colors ${item.col_span === 1 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                       >
                         P
                       </button>
                       <button
                         onClick={() => handleColSpanChange(item.widget_id, 2)}
-                        className={`px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${item.col_span === 2 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`font-semibold px-2 py-1 text-[10px] rounded-md transition-colors ${item.col_span === 2 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                       >
                         M
                       </button>
                       <button
                         onClick={() => handleColSpanChange(item.widget_id, 3)}
-                        className={`px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${item.col_span === 3 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`font-semibold px-2 py-1 text-[10px] rounded-md transition-colors ${item.col_span === 3 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                       >
                         G
                       </button>
@@ -115,7 +115,7 @@ export function DashboardCustomizationModal({
           </Button>
           <div className="flex gap-2 w-full sm:w-auto">
             <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Cancelar</Button>
-            <Button onClick={handleSave} className="bg-primary text-white hover:bg-primary/90 w-full sm:w-auto">Salvar Alterações</Button>
+            <Button onClick={handleSave} className="w-full sm:w-auto">Salvar Alterações</Button>
           </div>
         </div>
       </DialogContent>

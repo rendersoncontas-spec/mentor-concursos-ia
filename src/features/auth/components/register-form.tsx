@@ -81,7 +81,7 @@ export function RegisterForm() {
         <div className="rounded-full bg-primary/10 p-4">
           <MailCheck className="h-10 w-10 text-primary" />
         </div>
-        <h3 className="text-xl font-bold">Verifique seu E-mail</h3>
+        <h3 className="text-xl font-semibold">Verifique seu E-mail</h3>
         <p className="text-sm text-muted-foreground">
           Enviamos um link de confirmação para <br/>
           <span className="font-semibold text-foreground">{registeredEmail}</span>
@@ -171,7 +171,7 @@ export function RegisterForm() {
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t border-border/60" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
+        <div className="relative flex justify-center text-xs">
           <span className="bg-background px-2 text-muted-foreground">
             Ou continue com
           </span>

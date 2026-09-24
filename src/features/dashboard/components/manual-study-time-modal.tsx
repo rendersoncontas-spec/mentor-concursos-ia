@@ -167,11 +167,11 @@ export function ManualStudyTimeModal({
                       const v = e.target.value
                       if (v === "" || (Number(v) >= 0 && Number(v) <= 24)) setHours(v)
                     }}
-                    className="h-9 text-center text-sm font-mono"
+                    className="h-9 text-center text-sm tabular-nums"
                   />
                   <p className="text-[10px] text-muted-foreground text-center mt-0.5">horas</p>
                 </div>
-                <span className="text-lg font-bold text-muted-foreground mt-[-14px]">:</span>
+                <span className="text-lg font-semibold text-muted-foreground mt-[-14px]">:</span>
                 <div className="flex-1">
                   <Input
                     type="number"
@@ -183,7 +183,7 @@ export function ManualStudyTimeModal({
                       const v = e.target.value
                       if (v === "" || (Number(v) >= 0 && Number(v) <= 59)) setMinutes(v)
                     }}
-                    className="h-9 text-center text-sm font-mono"
+                    className="h-9 text-center text-sm tabular-nums"
                   />
                   <p className="text-[10px] text-muted-foreground text-center mt-0.5">minutos</p>
                 </div>
@@ -235,7 +235,7 @@ export function ManualStudyTimeModal({
             variant="outline"
             size="sm"
             onClick={() => onOpenChange(false)}
-            className="h-8 px-3 text-[11px] font-bold"
+            className="h-8 px-3 text-[11px] font-semibold"
           >
             Cancelar
           </Button>
@@ -243,7 +243,7 @@ export function ManualStudyTimeModal({
             size="sm"
             onClick={handleSave}
             disabled={!canSave}
-            className="h-8 px-3 text-[11px] font-bold"
+            className="h-8 px-3 text-[11px] font-semibold"
           >
             {loading ? "Salvando..." : "Salvar"}
           </Button>

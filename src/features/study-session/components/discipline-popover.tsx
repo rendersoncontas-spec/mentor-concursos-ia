@@ -8,7 +8,6 @@ import {
   type DisciplineOption,
   type DisciplineSuggestion,
 } from "@/application/study-session/get-disciplines.action"
-import { Button } from "@/components/ui/button"
 import {
   Command,
   CommandEmpty,
@@ -46,7 +45,7 @@ export function DisciplinePopover({
 }: DisciplinePopoverProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
-  const { data: disciplineData, loading } = useDisciplineData()
+  const { data: disciplineData } = useDisciplineData()
 
   const planDisciplines = disciplineData?.planDisciplines ?? []
   const allDisciplines = disciplineData?.allDisciplines ?? []
@@ -189,7 +188,7 @@ export function DisciplinePopover({
                         )}
                         <span className="truncate">{sug.name}</span>
                       </span>
-                      {sug.from === "CYCLE" && sug.metadata?.plannedMinutes != null && (
+                      {sug.from === "CYCLE" && sug.metadata?.plannedMinutes !== null && sug.metadata?.plannedMinutes !== undefined && (
                         <span
                           className={cn(
                             "text-[10px] shrink-0 tabular-nums font-bold",

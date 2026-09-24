@@ -10,6 +10,7 @@ import {
   saveDashboardLayoutAction,
 } from "@/application/dashboard/dashboard-layout.action"
 import { Button } from "@/components/ui/button"
+import { SectionHeader } from "@/components/ui/section-header"
 import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
 import { getDailyMessage } from "@/features/dashboard/components/daily-message-banner"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
@@ -36,11 +37,17 @@ const HERO_WIDGET_IDS = new Set(["ciclo_estudo", "estudos_hoje"])
 
 export function DashboardLayout({ snapshot, initialLayout, serverDate }: DashboardLayoutProps) {
   const [layout, setLayout] = useState<WidgetConfigItem[]>(() => {
+    // Fase F (performance): o layout salvo no servidor tem prioridade (o
+    // efeito abaixo já o aplicava logo após montar). Começar direto com ele
+    // evita um segundo render do Dashboard inteiro logo após a hidratação — e
+    // a divergência entre o HTML do servidor e o primeiro render do cliente.
+    // O localStorage continua como fallback quando o servidor não tem layout.
+    if (initialLayout && initialLayout.length > 0) return initialLayout
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("mentor_dashboard_layout")
         if (saved) return JSON.parse(saved) as WidgetConfigItem[]
-      } catch {}
+      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
     }
     return initialLayout
   })
@@ -54,7 +61,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
       setLayout(initialLayout)
       try {
         localStorage.setItem("mentor_dashboard_layout", JSON.stringify(initialLayout))
-      } catch {}
+      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
     }
   }, [initialLayout])
 
@@ -91,7 +98,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
     setLayout(merged)
     try {
       localStorage.setItem("mentor_dashboard_layout", JSON.stringify(merged))
-    } catch {}
+    } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
     const result = await saveDashboardLayoutAction(merged)
     if (!result.success) {
       toast.error("Erro ao salvar ordem dos widgets.")
@@ -102,7 +109,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
     setLayout(newLayout)
     try {
       localStorage.setItem("mentor_dashboard_layout", JSON.stringify(newLayout))
-    } catch {}
+    } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
     const result = await saveDashboardLayoutAction(newLayout)
     if (result.success) {
       toast.success("Home personalizada com sucesso!")
@@ -117,7 +124,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
       setLayout(result.data)
       try {
         localStorage.removeItem("mentor_dashboard_layout")
-      } catch {}
+      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
       toast.success("Layout restaurado para o padrão.")
     }
   }
@@ -146,53 +153,49 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
     })) || []
 
   return (
-    <div className="flex flex-col min-h-full bg-background/50">
-      <div className="flex-1 px-4 sm:px-5 pt-4 pb-20 space-y-3 sm:space-y-3.5 w-full max-w-full">
+    <div className="flex flex-col min-h-full bg-background">
+      {/* Fase E: mesmo container de todas as páginas (antes: 1440px fixos,
+          que deixavam faixas vazias nas laterais em monitores de 1600–1920px). */}
+      <div className="flex-1 page-container pt-5 pb-8 space-y-5">
         {/* 1. Header: Saudação + Frase Motivacional */}
 {(() => {
             const msg = getDailyMessage(date)
           return (
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 min-w-0 pb-1">
-              <div className="flex-1 min-w-0 space-y-0.5">
-                <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight leading-snug">
-                  Olá, <span className="text-primary font-extrabold">{snapshot?.user?.name || "Estudante"}</span>!
+            // Redesign 2.0 — cabeçalho editorial: data como contexto, saudação
+            // em grafite (sem destaque colorido), mensagem do dia como linha
+            // secundária discreta e ações à direita.
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 min-w-0 border-b border-border pb-4">
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-[13px] text-muted-foreground">{capitalizedDate}</p>
+                <h1 className="type-h1 text-foreground">
+                  Olá, {snapshot?.user?.name || "Estudante"}
                 </h1>
-                <p className="text-xs sm:text-[13px] font-medium text-muted-foreground leading-relaxed">
-                  Hoje é {capitalizedDate}. Bem-vindo de volta.
-                </p>
                 <p
-                  className="text-xs sm:text-[14px] font-medium italic text-foreground/85 leading-relaxed pt-0.5"
+                  className="text-[13px] text-muted-foreground leading-relaxed max-w-3xl"
                   style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
                 >
                   &ldquo;{msg.text}&rdquo;
-                  <span className="text-[11px] font-semibold text-muted-foreground/60 not-italic ml-1.5">
-                    — {msg.author}
-                  </span>
+                  <span className="text-muted-foreground/70 ml-1.5">— {msg.author}</span>
                 </p>
               </div>
-              <div className="flex items-center gap-2 sm:gap-2.5 w-full md:w-auto shrink-0 pt-1 md:pt-0">
+              <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                <TargetSelectorDropdown initialActiveTargetName={examName} className="flex-1 md:flex-initial md:w-[240px] lg:w-[270px] min-w-0" />
                 <Button
                   onClick={() => setIsRegisterModalOpen(true)}
-                  className="flex-1 md:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm px-3.5 sm:px-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer rounded-xl h-9 sm:h-10 shrink-0 whitespace-nowrap min-w-0"
+                  className="shrink-0 whitespace-nowrap"
                 >
-                  <Plus className="w-4 h-4 mr-1.5 shrink-0 stroke-[2.5]" />
-                  <span>Adicionar Estudo</span>
+                  <Plus aria-hidden className="w-4 h-4" />
+                  <span>Adicionar estudo</span>
                 </Button>
-                <TargetSelectorDropdown initialActiveTargetName={examName} className="flex-1 md:flex-initial md:w-[260px] lg:w-[290px] min-w-0" />
               </div>
-            </div>
+            </header>
           )
         })()}
 
         {/* 2. Área de destaque: foco de hoje (fora da grade arrastável) */}
         {heroWidgets.length > 0 && (
-          <section aria-label="Foco de hoje" className="space-y-3 sm:space-y-3.5">
-            <div className="flex items-center gap-2.5 px-0.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground shrink-0">
-                Foco de hoje
-              </span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
+          <section aria-labelledby="foco-de-hoje" className="space-y-2.5">
+            <SectionHeader id="foco-de-hoje" title="Foco de hoje" />
             {heroWidgets.map((item) => {
               const widgetInfo = WIDGET_REGISTRY[item.widget_id]
               if (!widgetInfo) return null
@@ -200,7 +203,7 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
               return (
                 <div
                   key={item.widget_id}
-                  className="rounded-2xl border border-primary/15 bg-card shadow-xs overflow-hidden"
+                  className="rounded-lg border border-border bg-card overflow-hidden"
                 >
                   <WidgetComponent
                     snapshot={snapshot}
@@ -216,6 +219,9 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
         )}
 
         {/* 3. Grade personalizável (arrastar-e-soltar, redimensionar, ocultar) */}
+        {gridWidgets.length > 0 && (
+          <SectionHeader title="Visão geral" className="pt-1" />
+        )}
         <DashboardDndContext items={gridWidgets} onReorder={handleReorder}>
           {gridWidgets.map((item) => {
             const widgetInfo = WIDGET_REGISTRY[item.widget_id]

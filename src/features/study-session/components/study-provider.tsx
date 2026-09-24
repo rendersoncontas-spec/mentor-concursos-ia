@@ -12,11 +12,36 @@ import React, {
 
 import * as Sentry from "@sentry/nextjs"
 
-import { saveStudySessionAction } from "@/application/study-session/study-session.action"
 import type { StudyTechnique } from "@/domain/study-history/study-history.types"
+import {
+  getClientUserId,
+  migrateLegacyActiveSession,
+  offlineStore,
+  saveStudySessionWithOfflineSupport,
+  syncPendingStudySessions,
+} from "@/infrastructure/offline"
+
+import { dispatchStudySessionQueued, type SavedStudySession } from "../lib/study-session-events"
+import {
+  createStudySessionSyncTriggersInstaller,
+  createTriggerStudySessionSync,
+} from "../lib/study-session-sync-bridge"
 
 import { type FocusSoundId, useFocusSound } from "../hooks/use-focus-sound"
 import { ResetTimerDialog } from "./reset-timer-dialog"
+
+/**
+ * Fase C, itens 7-8 — wiring de produção do worker de sincronização.
+ * Fica AQUI (e não em `study-session-sync-bridge.ts`) porque
+ * `syncPendingStudySessions` vem do barrel `@/infrastructure/offline`, que
+ * importa a Server Action real `saveStudySessionAction` ("use server") — um
+ * módulo que trava a suíte de testes fora do runtime do Next quando
+ * importado estaticamente (ver comentário no topo de `study-session-sync-
+ * bridge.ts`). Os testes da ponte usam só as fábricas `create*`, nunca este
+ * módulo (StudyProvider), então nunca disparam esse import perigoso.
+ */
+const triggerStudySessionSync = createTriggerStudySessionSync(syncPendingStudySessions)
+const initStudySessionSyncTriggers = createStudySessionSyncTriggersInstaller(triggerStudySessionSync)
 
 type TimerPhase = "IDLE" | "STUDYING" | "PAUSED" | "SHORT_BREAK" | "LONG_BREAK"
 
@@ -29,7 +54,6 @@ const TECHNIQUE_DURATIONS: Record<StudyTechnique, number> = {
   PERSONALIZADO: 0,
 } as const
 
-const STORAGE_KEY = "mentor_active_study_session"
 const FLOATING_TIMER_PREF_KEY = "mentor-floating-timer-enabled"
 const DEFAULT_TITLE = "Nomeia — Sua preparação rumo à nomeação"
 
@@ -63,8 +87,8 @@ interface StudySessionState {
   /** Origem da sessão: "PLAN" (Cronograma), "CYCLE" (Ciclo) ou "FREE" (Central/Livre). */
   source: "PLAN" | "FREE" | "CYCLE" | null
   /** Vínculo com o ciclo de estudo ativo. */
-  cycleId?: string | null
-  cycleItemId?: string | null
+  cycleId?: string | null | undefined
+  cycleItemId?: string | null | undefined
 }
 
 interface StudyContextType {
@@ -99,9 +123,11 @@ interface StudyContextType {
   toggleFloatingTimer: () => void
   finalizeAndSaveSession: (formData?: Record<string, unknown>) => Promise<{
     success: boolean
-    error?: string
-    historyId?: string
-    session?: Record<string, unknown>
+    error?: string | undefined
+    historyId?: string | undefined
+    session?: Record<string, unknown> | undefined
+    /** true quando o estudo foi salvo localmente e está aguardando conexão para sincronizar (Fase C). */
+    pending?: true | undefined
   }>
   isCentralOpen: boolean
   setIsCentralOpen: (open: boolean) => void
@@ -124,7 +150,7 @@ interface StudyContextType {
  *    relevante muda de fato (início/pausa/fim/minimizar/restaurar/trocar
  *    disciplina ou ciclo) — nunca a cada tick do cronômetro.
  * Componentes que só precisam de ações/flags (ex.: FloatingActionButton,
- * StudyQuickAccess, os widgets de ciclo) devem usar useStudyActions() em
+ * os widgets de ciclo) devem usar useStudyActions() em
  * vez de useGlobalStudy(), para não re-renderizar a cada segundo durante
  * uma sessão ativa.
  */
@@ -174,7 +200,10 @@ export interface StudyActionsContextType {
 const StudyLiveContext = createContext<StudyLiveContextType | null>(null)
 const StudyActionsContext = createContext<StudyActionsContextType | null>(null)
 
-function totalPausedMsAt(state: StudySessionState, now: number): number {
+/** Campos de tempo usados pelos cálculos — comuns à sessão em memória e ao snapshot do IndexedDB. */
+type SessionTiming = Pick<StudySessionState, "startTime" | "totalPausedMs" | "lastPauseStartTime">
+
+function totalPausedMsAt(state: SessionTiming, now: number): number {
   let pausedMs = state.totalPausedMs
   if (state.lastPauseStartTime !== null) {
     pausedMs += now - state.lastPauseStartTime
@@ -196,7 +225,7 @@ export function getActiveElapsedSeconds(state: StudySessionState): number {
   return Math.max(0, Math.floor((now - state.startTime - pausedMs) / 1000))
 }
 
-function calculateTimes(state: StudySessionState): {
+function calculateTimes(state: SessionTiming): {
   activeSeconds: number
   pausedSeconds: number
 } {
@@ -217,30 +246,73 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Fase B (offline-first): userId do cliente, usado para namespacear a
+  // sessão ativa no IndexedDB (nunca via rede — ver getClientUserId). `userId`
+  // (estado) dispara o efeito de inscrição entre abas quando resolve;
+  // `userIdRef` dá leitura síncrona dentro de callbacks (mesmo padrão de
+  // `sessionRef` logo abaixo).
+  const [userId, setUserId] = useState<string | null>(null)
+  const userIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    userIdRef.current = userId
+  }, [userId])
+
   const focusSound = useFocusSound()
 
   // Restaurar sessão e preferências do localStorage SOMENTE após a hidratação,
   // para o servidor e o cliente renderizarem o mesmo HTML (evita hydration mismatch).
   useEffect(() => {
+    let cancelled = false
     const timer = setTimeout(() => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY)
-        if (saved) {
-          const parsed = JSON.parse(saved) as StudySessionState
-          if (parsed.isActive && parsed.startTime) {
-            const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
-            setSession({ ...parsed, activeSeconds, pausedSeconds, isMinimized: true })
+      void (async () => {
+        try {
+          const resolvedUserId = await getClientUserId()
+          if (cancelled) return
+          setUserId(resolvedUserId)
+          if (resolvedUserId) {
+            // Migração única do snapshot legado (localStorage -> IndexedDB).
+            // Se não houver nada a migrar (caso comum), é um no-op barato.
+            await migrateLegacyActiveSession(resolvedUserId)
+            const stored = await offlineStore.session.get(resolvedUserId)
+            if (!cancelled && stored?.isActive && stored.startTime) {
+              const { activeSeconds, pausedSeconds } = calculateTimes(stored)
+              setSession({
+                isActive: stored.isActive,
+                isMinimized: true,
+                phase: stored.phase,
+                disciplineName: stored.disciplineName,
+                disciplineId: stored.disciplineId,
+                topicName: stored.topicName,
+                studyType: stored.studyType,
+                technique: stored.technique as StudyTechnique,
+                notes: stored.notes,
+                startTime: stored.startTime,
+                totalPausedMs: stored.totalPausedMs,
+                lastPauseStartTime: stored.lastPauseStartTime,
+                plannedSeconds: stored.plannedSeconds,
+                activeSeconds,
+                pausedSeconds,
+                planItemId: stored.planItemId,
+                source: stored.source,
+                cycleId: stored.cycleId,
+                cycleItemId: stored.cycleItemId,
+              })
+            }
           }
+        } catch (error) {
+          console.error("[STUDY_PROVIDER] Falha ao restaurar sessão do IndexedDB:", error)
         }
-      } catch (error) {
-        console.error("[STUDY_PROVIDER] Parse error:", error)
-        localStorage.removeItem(STORAGE_KEY)
-      }
 
-      const savedPref = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
-      setFloatingTimerEnabled(savedPref === null ? true : (JSON.parse(savedPref) as boolean))
+        if (!cancelled) {
+          const savedPref = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
+          setFloatingTimerEnabled(savedPref === null ? true : (JSON.parse(savedPref) as boolean))
+        }
+      })()
     }, 0)
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [])
 
   // Escutar eventos globais para abrir/fechar a Central
@@ -288,18 +360,21 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   }, [session?.isActive, session?.phase])
 
   useEffect(() => {
+    const currentUserId = userIdRef.current
+    if (!currentUserId) return
     if (session && session.isActive) {
       const { activeSeconds, pausedSeconds, ...rest } = session
       void activeSeconds
       void pausedSeconds
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ ...rest, activeSeconds: 0, pausedSeconds: 0 }),
-      )
+      void offlineStore.session
+        .set(currentUserId, { ...rest, activeSeconds: 0, pausedSeconds: 0 })
+        .catch((error) => {
+          console.error("[STUDY_PROVIDER] Falha ao persistir sessão no IndexedDB:", error)
+        })
     } else {
-      localStorage.removeItem(STORAGE_KEY)
+      void offlineStore.session.clear(currentUserId).catch(() => {})
     }
-  }, [session])
+  }, [session, userId])
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -332,6 +407,11 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     sessionRef.current = session
   }, [session])
+
+  // Fase C (offline-first): instala os gatilhos de sincronização (evento
+  // `online`, app voltar ao foreground) uma única vez — StudyProvider é o
+  // ponto central de integração desta fase (item 1 do pedido).
+  useEffect(() => initStudySessionSyncTriggers(), [])
 
   useEffect(() => {
     let wasTimerTitle = false
@@ -493,7 +573,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
 
   const endSession = useCallback(() => {
     setSession(null)
-    localStorage.removeItem(STORAGE_KEY)
+    if (userIdRef.current) void offlineStore.session.clear(userIdRef.current).catch(() => {})
     focusSound.stopSound()
   }, [focusSound])
 
@@ -509,7 +589,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   const confirmReset = useCallback(() => {
     setResetDialogOpen(false)
     setSession(null)
-    localStorage.removeItem(STORAGE_KEY)
+    if (userIdRef.current) void offlineStore.session.clear(userIdRef.current).catch(() => {})
     focusSound.stopSound()
   }, [focusSound])
 
@@ -591,19 +671,34 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const res = await saveStudySessionAction(snapshot)
+        const res = await saveStudySessionWithOfflineSupport(snapshot)
 
         if (!res.success) {
           console.error("[FINALIZE] Falha ao salvar:", res.error)
           return { success: false, error: res.error || "Erro ao salvar sessão" }
         }
 
-        // Parar o som e limpar sessão APÓS sucesso confirmado
+        // Parar o som e limpar sessão: o estudo do usuário terminou aqui dos
+        // dois jeitos (salvo no servidor OU enfileirado localmente) — item 4
+        // do pedido de Fase C: o cronômetro sempre encerra, mesmo offline.
         focusSound.stopSound()
         setSession(null)
-        localStorage.removeItem(STORAGE_KEY)
+        if (userIdRef.current) void offlineStore.session.clear(userIdRef.current).catch(() => {})
 
-        return { success: true, historyId: res.historyId, session: res.session }
+        if (res.pending) {
+          if (res.pendingSession) {
+            dispatchStudySessionQueued(
+              res.pendingSession as SavedStudySession & { _offlinePending: true; _operationId: string },
+            )
+          }
+          return { success: true, pending: true as const }
+        }
+
+        return {
+          success: true,
+          historyId: res.historyId ?? undefined,
+          session: res.session as Record<string, unknown> | undefined,
+        }
       } finally {
         isFinalizingRef.current = false
       }
@@ -626,28 +721,45 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
   }, [])
 
-  // Sync entre abas: quando outra aba salva/encerra a sessão,
-  // recarrega o estado local para não ressuscitar sessão obsoleta.
+  // Sync entre abas: quando outra aba salva/encerra a sessão no IndexedDB,
+  // recarrega o estado local para não ressuscitar sessão obsoleta. Antes
+  // (localStorage) isso vinha de graça pelo evento nativo `storage`;
+  // IndexedDB não tem equivalente, então usamos o BroadcastChannel exposto
+  // por offlineStore.session.subscribe (ver src/infrastructure/offline/session-store.ts).
   useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) return
-      try {
-        if (!event.newValue) {
+    if (!userId) return
+    const unsubscribe = offlineStore.session.subscribe(userId, () => {
+      void offlineStore.session.get(userId).then((stored) => {
+        if (!stored || !stored.isActive || !stored.startTime) {
           setSession(null)
           return
         }
-        const parsed = JSON.parse(event.newValue) as StudySessionState
-        if (parsed.isActive && parsed.startTime) {
-          const { activeSeconds, pausedSeconds } = calculateTimes(parsed)
-          setSession({ ...parsed, activeSeconds, pausedSeconds })
-        }
-      } catch {
-        // ignora payload inválido de outra aba
-      }
-    }
-    window.addEventListener("storage", handleStorage)
-    return () => window.removeEventListener("storage", handleStorage)
-  }, [])
+        const { activeSeconds, pausedSeconds } = calculateTimes(stored)
+        setSession({
+          isActive: stored.isActive,
+          isMinimized: stored.isMinimized,
+          phase: stored.phase,
+          disciplineName: stored.disciplineName,
+          disciplineId: stored.disciplineId,
+          topicName: stored.topicName,
+          studyType: stored.studyType,
+          technique: stored.technique as StudyTechnique,
+          notes: stored.notes,
+          startTime: stored.startTime,
+          totalPausedMs: stored.totalPausedMs,
+          lastPauseStartTime: stored.lastPauseStartTime,
+          plannedSeconds: stored.plannedSeconds,
+          activeSeconds,
+          pausedSeconds,
+          planItemId: stored.planItemId,
+          source: stored.source,
+          cycleId: stored.cycleId,
+          cycleItemId: stored.cycleItemId,
+        })
+      })
+    })
+    return unsubscribe
+  }, [userId])
 
   // Resumo estável da sessão: só muda de referência quando um campo que NÃO
   // é atualizado a cada segundo realmente muda (início, pausa, fim,
@@ -689,8 +801,8 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   // Valor do contexto de ações/flags estáveis: memoizado para NÃO trocar de
   // referência a cada tick do cronômetro (que só afeta `session`/`formatTime`,
   // expostos pelo StudyLiveContext). Isso evita que consumidores que só
-  // precisam de ações/flags (ex.: FloatingActionButton, StudyQuickAccess, os
-  // widgets de ciclo) re-renderizem a cada segundo durante uma sessão ativa.
+  // precisam de ações/flags (ex.: FloatingActionButton, os widgets de ciclo)
+  // re-renderizem a cada segundo durante uma sessão ativa.
   const actionsValue = useMemo<StudyActionsContextType>(
     () => ({
       hasActiveSession,

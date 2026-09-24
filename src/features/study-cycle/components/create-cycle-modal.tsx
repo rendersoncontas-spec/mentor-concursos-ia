@@ -8,12 +8,10 @@ import {
   ArrowRight,
   ArrowUp,
   Check,
-  Clock,
   Layers,
   Minus,
   Plus,
   Search,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react"
@@ -21,7 +19,6 @@ import { toast } from "sonner"
 
 import { createCycleAction } from "@/application/study-cycle/study-cycle.actions"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
@@ -322,7 +319,7 @@ export function CreateCycleModal({
         {/* CABEÇALHO DO MODAL */}
         <div className="p-5 border-b bg-muted/20">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+            <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <Layers className="h-5 w-5 text-primary" />
               Criar Ciclo de Estudos
             </DialogTitle>
@@ -356,7 +353,7 @@ export function CreateCycleModal({
           {step === "identification" && (
             <div className="space-y-4 max-w-md mx-auto py-2">
               <div>
-                <label className="text-xs font-bold text-foreground">Nome do Ciclo *</label>
+                <label className="text-xs font-semibold text-foreground">Nome do Ciclo *</label>
                 <Input
                   value={cycleName}
                   onChange={(e) => setCycleName(e.target.value)}
@@ -370,7 +367,7 @@ export function CreateCycleModal({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground">Concurso Alvo (Opcional)</label>
+                <label className="text-xs font-semibold text-foreground">Concurso Alvo (Opcional)</label>
                 <Input
                   value={contestName}
                   onChange={(e) => setContestName(e.target.value)}
@@ -380,7 +377,7 @@ export function CreateCycleModal({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground">Edital / Cargo (Opcional)</label>
+                <label className="text-xs font-semibold text-foreground">Edital / Cargo (Opcional)</label>
                 <Input
                   value={editalName}
                   onChange={(e) => setEditalName(e.target.value)}
@@ -408,7 +405,7 @@ export function CreateCycleModal({
                   <Button
                     size="sm"
                     onClick={handleAddCustomDiscipline}
-                    className="text-xs font-bold bg-primary text-primary-foreground"
+                    className="text-xs font-semibold bg-primary text-primary-foreground"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     Adicionar
@@ -418,7 +415,7 @@ export function CreateCycleModal({
 
               {/* LISTA DE MATÉRIAS SUGERIDAS */}
               <div className="space-y-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <p className="type-label">
                   Catálogo de disciplinas para concurso (clique para incluir)
                 </p>
                 <div className="max-h-48 overflow-y-auto border rounded-xl p-1 bg-background divide-y">
@@ -429,7 +426,7 @@ export function CreateCycleModal({
                       onClick={() => handleAddDiscipline(d)}
                       className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-muted/80 font-medium flex items-center justify-between transition-colors"
                     >
-                      <span className="font-bold text-foreground">{d.name}</span>
+                      <span className="font-semibold text-foreground">{d.name}</span>
                       <span className="text-[10px] text-muted-foreground">{d.area || "Geral"}</span>
                     </button>
                   ))}
@@ -439,7 +436,7 @@ export function CreateCycleModal({
               {/* MATÉRIAS JÁ SELECIONADAS */}
               <div className="space-y-2 pt-2 border-t">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-foreground">
+                  <span className="text-[13px] font-semibold text-foreground">
                     Matérias no Ciclo ({selectedItems.length})
                   </span>
                   <span className="text-xs text-muted-foreground">
@@ -456,7 +453,7 @@ export function CreateCycleModal({
                     {selectedItems.map((item, index) => (
                       <span
                         key={item.disciplineName}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 border border-primary/20 text-foreground"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 border border-primary/20 text-foreground"
                       >
                         <span>{item.disciplineName}</span>
                         <button
@@ -480,10 +477,10 @@ export function CreateCycleModal({
               {/* RESUMO DO CICLO */}
               <div className="p-4 rounded-xl bg-muted/30 border space-y-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-black text-foreground">
+                  <span className="text-sm font-semibold text-foreground">
                     Ciclo: {cycleName}
                   </span>
-                  <span className="text-xs font-black text-primary">
+                  <span className="text-xs font-semibold text-primary">
                     Tempo por volta: {formatDurationMinutes(totalMinutesPerRound)}
                   </span>
                 </div>
@@ -494,7 +491,7 @@ export function CreateCycleModal({
 
               {/* SEQUÊNCIA CONFIGURÁVEL */}
               <div className="space-y-2">
-                <span className="text-xs font-black uppercase tracking-wider text-foreground block">
+                <span className="text-[13px] font-semibold text-foreground block">
                   Sequência do Ciclo (Ajuste tempo, dificuldade e ordem)
                 </span>
 
@@ -505,11 +502,11 @@ export function CreateCycleModal({
                       className="p-3 rounded-xl border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-xs font-black text-muted-foreground w-6 text-center">
+                        <span className="text-xs font-semibold text-muted-foreground w-6 text-center">
                           #{index + 1}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-xs font-black text-foreground truncate">
+                          <p className="text-xs font-semibold text-foreground truncate">
                             {item.disciplineName}
                           </p>
                           <p className="text-[10px] text-muted-foreground">{item.disciplineArea || "Geral"}</p>
@@ -518,7 +515,7 @@ export function CreateCycleModal({
 
                       <div className="flex flex-wrap items-center gap-2">
                         {/* SELETOR DE DIFICULDADE */}
-                        <div className="flex items-center rounded-lg border bg-muted/40 p-0.5 text-[11px] font-bold gap-0.5">
+                        <div className="flex items-center rounded-lg border bg-muted/40 p-0.5 text-[11px] font-semibold gap-0.5">
                           {DIFFICULTY_OPTIONS.map((opt) => {
                             const isSelected = normalizeDifficulty(item.difficulty) === opt.value
                             return (
@@ -528,9 +525,9 @@ export function CreateCycleModal({
                                 onClick={() => handleDifficultyChange(index, opt.value)}
                                 className={cn(
                                   "px-2.5 py-1 rounded-md transition-all font-bold cursor-pointer select-none",
-                                  isSelected && opt.value === "FACIL" && "bg-emerald-500 text-white font-black shadow-xs ring-1 ring-emerald-600/30",
-                                  isSelected && opt.value === "MEDIA" && "bg-amber-500 text-white font-black shadow-xs ring-1 ring-amber-600/30",
-                                  isSelected && opt.value === "DIFICIL" && "bg-rose-500 text-white font-black shadow-xs ring-1 ring-rose-600/30",
+                                  isSelected && opt.value === "FACIL" && "bg-emerald-500 text-white font-semibold shadow-xs ring-1 ring-emerald-600/30",
+                                  isSelected && opt.value === "MEDIA" && "bg-amber-500 text-white font-semibold shadow-xs ring-1 ring-amber-600/30",
+                                  isSelected && opt.value === "DIFICIL" && "bg-rose-500 text-white font-semibold shadow-xs ring-1 ring-rose-600/30",
                                   !isSelected && opt.value === "FACIL" && "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20",
                                   !isSelected && opt.value === "MEDIA" && "text-muted-foreground hover:text-amber-600 hover:bg-amber-50/60 dark:hover:bg-amber-950/20",
                                   !isSelected && opt.value === "DIFICIL" && "text-muted-foreground hover:text-rose-600 hover:bg-rose-50/60 dark:hover:bg-rose-950/20"
@@ -555,7 +552,7 @@ export function CreateCycleModal({
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-<span className="text-xs font-black w-14 text-center">
+<span className="text-xs font-semibold w-14 text-center">
                             {formatMinutesDigitalLocal(item.plannedMinutes)}
                           </span>
                           <Button
@@ -625,7 +622,7 @@ export function CreateCycleModal({
                 onClick={() =>
                   setStep(step === "configuration" ? "selection" : "identification")
                 }
-                className="text-xs font-bold gap-1"
+                className="text-xs font-semibold gap-1"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Voltar
@@ -648,7 +645,7 @@ export function CreateCycleModal({
                   }
                   setStep("selection")
                 }}
-                className="text-xs font-black bg-primary text-primary-foreground gap-1"
+                className="text-xs font-semibold bg-primary text-primary-foreground gap-1"
               >
                 Próximo: Matérias
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -665,7 +662,7 @@ export function CreateCycleModal({
                   }
                   setStep("configuration")
                 }}
-                className="text-xs font-black bg-primary text-primary-foreground gap-1"
+                className="text-xs font-semibold bg-primary text-primary-foreground gap-1"
               >
                 Próximo: Metas
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -677,7 +674,7 @@ export function CreateCycleModal({
                 size="sm"
                 onClick={handleCreate}
                 disabled={isSubmitting || selectedItems.length === 0}
-                className="text-xs font-black bg-primary text-primary-foreground gap-1.5 shadow-xs"
+                className="text-xs font-semibold bg-primary text-primary-foreground gap-1.5 shadow-xs"
               >
                 <Check className="h-4 w-4" />
                 {isSubmitting ? "Criando ciclo..." : "Criar ciclo"}

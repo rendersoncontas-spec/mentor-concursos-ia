@@ -263,7 +263,7 @@ export function useFocusSound() {
           dropGain.connect(master)
           osc.start()
           osc.stop(ctx.currentTime + 0.09)
-        } catch {}
+        } catch { /* contexto de áudio suspenso/encerrado: este efeito sonoro é só ignorado */ }
       }, 450)
 
       intervals.push(dropInterval)
@@ -388,7 +388,7 @@ export function useFocusSound() {
           clinkGain.connect(master)
           osc.start()
           osc.stop(ctx.currentTime + 0.14)
-        } catch {}
+        } catch { /* contexto de áudio suspenso/encerrado: este efeito sonoro é só ignorado */ }
       }, 3500)
 
       intervals.push(clinkInterval)
@@ -507,7 +507,7 @@ export function useFocusSound() {
           crackleGain.connect(master)
           osc.start()
           osc.stop(ctx.currentTime + 0.05)
-        } catch {}
+        } catch { /* contexto de áudio suspenso/encerrado: este efeito sonoro é só ignorado */ }
       }, 180)
 
       intervals.push(crackleInterval)

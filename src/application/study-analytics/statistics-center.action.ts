@@ -1,8 +1,10 @@
 "use server"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { isMaintenanceMode } from "@/lib/maintenance"
+import { fetchAllPagesInParallel, type PageResult } from "@/lib/parallel-pagination"
 import {
   sanitizeSession,
   sanitizeAttempt,
@@ -137,6 +139,272 @@ async function fetchActivePlan(supabase: Supabase, userId: string): Promise<Acti
   }
 }
 
+// ─── Leituras do payload (Fase F: executadas em paralelo) ───────────────────
+// O corpo de cada função é o bloco que antes ficava em sequência dentro de
+// getStatisticsCenterAction, com o mesmo tratamento de erro.
+
+const SESSION_SELECT = `
+        id, discipline_id, started_at, finished_at, duration_minutes,
+        active_minutes, paused_minutes, planned_minutes,
+        completed, interrupted, energy_level, difficulty, focus_score,
+        study_type, study_source, origin_source, notes, metadata,
+        disciplines ( id, name, area )
+      `
+
+function mapSessionRow(row: Record<string, unknown>): SessionRecord | null {
+  const disc = Array.isArray(row["disciplines"]) ? row["disciplines"][0] : row["disciplines"]
+  return sanitizeSession({
+    id: row["id"] as string,
+    discipline_id: (row["discipline_id"] as string) ?? null,
+    discipline_name: (disc as { name?: string } | null)?.name ?? null,
+    discipline_area: (disc as { area?: string | null } | null)?.area ?? null,
+    started_at: row["started_at"] as string,
+    finished_at: (row["finished_at"] as string | null) ?? null,
+    duration_minutes: row["duration_minutes"] as number | null,
+    active_minutes: row["active_minutes"] as number | null,
+    paused_minutes: row["paused_minutes"] as number | null,
+    planned_minutes: row["planned_minutes"] as number | null,
+    completed: row["completed"] as boolean,
+    interrupted: row["interrupted"] as boolean,
+    energy_level: (row["energy_level"] as number | null) ?? null,
+    difficulty: (row["difficulty"] as number | null) ?? null,
+    focus_score: (row["focus_score"] as number | null) ?? null,
+    study_type: (row["study_type"] as string | null) ?? null,
+    study_source: (row["study_source"] as string | null) ?? null,
+    notes: (row["notes"] as string | null) ?? null,
+    metadata: (row["metadata"] as Record<string, unknown>) ?? {},
+    pages_read: (row["metadata"] as Record<string, unknown> | null)?.["pages_read"],
+    questions_answered: (row["metadata"] as Record<string, unknown> | null)?.["questions_answered"],
+    questions_correct: (row["metadata"] as Record<string, unknown> | null)?.["questions_correct"],
+    flashcards_reviewed: (row["metadata"] as Record<string, unknown> | null)?.["flashcards_reviewed"],
+    topic_name: (row["metadata"] as Record<string, unknown> | null)?.["topic_name"],
+    focus_percentage: (row["metadata"] as Record<string, unknown> | null)?.["focus_percentage"],
+  }, !!row["origin_source"])
+}
+
+// 1. Sessões de estudo (a fonte primária de dados).
+//    Carregamos TODAS as sessões do usuário (sem filtro de data) para
+//    permitir o período "Tudo" nas Estatísticas — o filtro acontecerá no
+//    cliente. Paginamos porque o PostgREST limita ~1000 linhas por
+//    requisição; Fase F: páginas em paralelo após a primeira (que traz a
+//    contagem) e "id" desempatando started_at iguais entre páginas.
+async function loadSessions(supabase: Supabase, userId: string): Promise<SessionRecord[]> {
+  try {
+    const { data: rows, error } = await fetchAllPagesInParallel<Record<string, unknown>>(
+      (from, to, withCount) =>
+        supabase
+          .from("study_history")
+          .select(SESSION_SELECT, withCount ? { count: "exact" } : undefined)
+          .eq("user_id", userId)
+          .order("started_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<PageResult<Record<string, unknown>>>,
+      { pageSize: 1000, maxRows: SESSIONS_LIMIT, perfLabel: "study_history.estatisticas" },
+    )
+    if (error) console.error("[ESTATISTICAS] Erro ao carregar study_history:", error)
+    // Mesmo comportamento de antes em caso de erro: segue com o que já leu.
+    return rows.map(mapSessionRow).filter((s): s is SessionRecord => s !== null)
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha em study_history:", err)
+    return []
+  }
+}
+
+async function loadAttempts(supabase: Supabase, effectiveUserId: string): Promise<QuestionAttemptRecord[]> {
+  // 2. Tentativas de questões (disciplina vem do join com questions).
+  let attempts: QuestionAttemptRecord[] = []
+  try {
+    // Fase F.1: `.limit(ATTEMPTS_LIMIT)` não passava de 1.000 (corte do
+    // PostgREST). Agora paginado até o teto pretendido, mais recentes primeiro.
+    const { data: rawAttempts, error: attemptsError } = await fetchAllRowsPaged<{
+      id: string
+      correct: boolean
+      answered_at: string
+      questions: { discipline_id: string | null } | { discipline_id: string | null }[] | null
+    }>(
+      (withCount) =>
+        supabase
+          .from("question_attempts")
+          .select("id, correct, answered_at, questions ( discipline_id )", countOption(withCount))
+          .eq("user_id", effectiveUserId),
+      [
+        { column: "answered_at", ascending: false },
+        { column: "id", ascending: false },
+      ],
+      { maxRows: ATTEMPTS_LIMIT },
+    )
+
+    if (!attemptsError) {
+      attempts = (rawAttempts ?? [])
+        .map((row) => {
+          const q = Array.isArray(row.questions) ? row.questions[0] : row.questions
+          return sanitizeAttempt({
+            id: row.id,
+            question_id: (row as { question_id?: string | null }).question_id ?? null,
+            discipline_id: q?.discipline_id ?? null,
+            correct: row.correct,
+            answered_at: row.answered_at,
+          })
+        })
+        .filter((a): a is QuestionAttemptRecord => a !== null)
+    } else {
+      console.error("[ESTATISTICAS] Erro ao carregar question_attempts:", attemptsError)
+    }
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha em question_attempts:", err)
+  }
+  return attempts
+}
+
+async function loadDisciplines(
+  supabase: Supabase,
+  effectiveUserId: string,
+): Promise<{ userDisciplines: UserDisciplineInput[]; disciplines: DisciplineMeta[] }> {
+  // 3. Registro de disciplinas + user_disciplines (status do edital).
+  let userDisciplines: UserDisciplineInput[] = []
+  let disciplines: DisciplineMeta[] = []
+  try {
+    // Concurso ativo e user_disciplines são independentes: saem juntos.
+    const loadActiveTargetId = async (): Promise<string | null> => {
+      try {
+        const { data: activeTarget } = await supabase
+          .from("user_targets")
+          .select("id")
+          .eq("user_id", effectiveUserId)
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle()
+        return activeTarget?.id ?? null
+      } catch {
+        return null
+      }
+    }
+
+    const [activeTargetId, { data: userDisciplineRows, error: udError }] = await Promise.all([
+      loadActiveTargetId(),
+      supabase
+        .from("user_disciplines")
+        .select("discipline_id, status, target_id, disciplines ( id, name, area )")
+        .eq("user_id", effectiveUserId),
+    ])
+
+    if (!udError) {
+      const rows = dedupeUserDisciplines(userDisciplineRows ?? [], activeTargetId)
+      userDisciplines = rows
+        .map((row) => sanitizeUserDiscipline({ discipline_id: row.discipline_id, status: row.status }))
+        .filter((u): u is UserDisciplineInput => u !== null)
+
+      disciplines = rows
+        .map((row) => {
+          const disc = Array.isArray(row.disciplines) ? row.disciplines[0] : row.disciplines
+          return sanitizeDisciplineMeta({
+            id: disc?.id ?? row.discipline_id,
+            name: disc?.name,
+            area: disc?.area,
+          })
+        })
+        .filter((d): d is DisciplineMeta => d !== null)
+    } else {
+      console.error("[ESTATISTICAS] Erro ao carregar user_disciplines:", udError)
+    }
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha em user_disciplines:", err)
+  }
+  return { userDisciplines, disciplines }
+}
+
+async function loadReviewItems(supabase: Supabase, effectiveUserId: string): Promise<ReviewItemRow[]> {
+  // 4. Itens de revisão (estágio da memória) e itens concluídos em 30 dias.
+  let reviewItems: ReviewItemRow[] = []
+  try {
+    // Fase F.1: paginado (antes 1 requisição cortada em 1.000 linhas).
+    const { data: reviewRows, error: reviewError } = await fetchAllRowsPaged<{
+      id: string
+      discipline_id: string | null
+      next_review_at: string | null
+    }>(
+      (withCount) =>
+        supabase
+          .from("review_items")
+          .select("id, discipline_id, next_review_at", countOption(withCount))
+          .eq("user_id", effectiveUserId),
+      [{ column: "id", ascending: true }],
+    )
+
+    if (!reviewError) {
+      reviewItems = (reviewRows ?? [])
+        .map((row) =>
+          sanitizeReviewItem({
+            id: row.id,
+            discipline_id: row.discipline_id,
+            next_review_at: row.next_review_at,
+          })
+        )
+        .filter((r): r is ReviewItemRow => r !== null)
+    } else {
+      console.error("[ESTATISTICAS] Erro ao carregar review_items:", reviewError)
+    }
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha em review_items:", err)
+  }
+  return reviewItems
+}
+
+async function loadReviewsCompletedLast30(supabase: Supabase, effectiveUserId: string): Promise<number> {
+  const last30 = new Date()
+  last30.setDate(last30.getDate() - 30)
+  let reviewsCompletedLast30 = 0
+  try {
+    const { count } = await supabase
+      .from("review_history")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", effectiveUserId)
+      .gte("review_date", last30.toISOString())
+    reviewsCompletedLast30 = count ?? 0
+  } catch {
+    reviewsCompletedLast30 = 0
+  }
+  return reviewsCompletedLast30
+}
+
+async function loadActivePlan(supabase: Supabase, effectiveUserId: string): Promise<ActivePlan | null> {
+  // 5. Plano de estudo ativo e preferências do perfil.
+  let activePlan: ActivePlan | null = null
+  try {
+    activePlan = await fetchActivePlan(supabase, effectiveUserId)
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha no plano de estudo:", err)
+  }
+  return activePlan
+}
+
+async function loadWeekStartDay(supabase: Supabase, effectiveUserId: string): Promise<number> {
+  let weekStartDay = 0
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("week_start_day, preferences")
+      .eq("id", effectiveUserId)
+      .maybeSingle()
+
+    const prefs = profile?.preferences as Record<string, unknown> | null
+    const firstDayPref = (prefs?.["firstDayOfWeek"] ?? prefs?.["primeiroDia"]) as string | undefined
+
+    if (firstDayPref === "Segunda-feira") {
+      weekStartDay = 1
+    } else if (firstDayPref === "Domingo") {
+      weekStartDay = 0
+    } else if (typeof profile?.["week_start_day"] === "number") {
+      weekStartDay = profile["week_start_day"]
+    } else {
+      weekStartDay = 0
+    }
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha ao carregar perfil:", err)
+  }
+  return weekStartDay
+}
+
 export async function getStatisticsCenterAction(): Promise<{
   data: StatisticsCenterPayload | null
   error: string | null
@@ -160,228 +428,23 @@ export async function getStatisticsCenterAction(): Promise<{
       return { data: cached.payload, error: null, cached: true }
     }
 
-    // 1. Sessões de estudo (a fonte primária de dados).
-    //    Carregamos TODAS as sessões do usuário (sem filtro de data) para
-    //    permitir o período "Tudo" nas Estatísticas — o filtro acontecerá no
-    //    cliente. Paginamos porque o PostgREST limita ~1000 linhas por
-    //    requisição.
-    const sessions: SessionRecord[] = []
-    const SESSION_SELECT = `
-        id, discipline_id, started_at, finished_at, duration_minutes,
-        active_minutes, paused_minutes, planned_minutes,
-        completed, interrupted, energy_level, difficulty, focus_score,
-        study_type, study_source, origin_source, notes, metadata,
-        disciplines ( id, name, area )
-      `
-    try {
-      const PAGE = 1000
-      let offset = 0
-      let fetched = 0
-      let totalLoaded = 0
-      while (totalLoaded < SESSIONS_LIMIT) {
-        const { data: pageData, error: pageError } = await supabase
-          .from("study_history")
-          .select(SESSION_SELECT)
-          .eq("user_id", effectiveUserId)
-          .order("started_at", { ascending: true })
-          .range(offset, offset + PAGE - 1)
-
-        if (pageError) {
-          console.error("[ESTATISTICAS] Erro ao carregar study_history:", pageError)
-          break
-        }
-        if (!pageData || pageData.length === 0) break
-
-        const pageSessions = (pageData as Record<string, unknown>[])
-          .map((row) => {
-            const disc = Array.isArray(row["disciplines"]) ? row["disciplines"][0] : row["disciplines"]
-            return sanitizeSession({
-              id: row["id"] as string,
-              discipline_id: (row["discipline_id"] as string) ?? null,
-              discipline_name: (disc as { name?: string } | null)?.name ?? null,
-              discipline_area: (disc as { area?: string | null } | null)?.area ?? null,
-              started_at: row["started_at"] as string,
-              finished_at: (row["finished_at"] as string | null) ?? null,
-              duration_minutes: row["duration_minutes"] as number | null,
-              active_minutes: row["active_minutes"] as number | null,
-              paused_minutes: row["paused_minutes"] as number | null,
-              planned_minutes: row["planned_minutes"] as number | null,
-              completed: row["completed"] as boolean,
-              interrupted: row["interrupted"] as boolean,
-              energy_level: (row["energy_level"] as number | null) ?? null,
-              difficulty: (row["difficulty"] as number | null) ?? null,
-              focus_score: (row["focus_score"] as number | null) ?? null,
-              study_type: (row["study_type"] as string | null) ?? null,
-              study_source: (row["study_source"] as string | null) ?? null,
-              notes: (row["notes"] as string | null) ?? null,
-              metadata: (row["metadata"] as Record<string, unknown>) ?? {},
-              pages_read: (row["metadata"] as Record<string, unknown> | null)?.["pages_read"],
-              questions_answered: (row["metadata"] as Record<string, unknown> | null)?.["questions_answered"],
-              questions_correct: (row["metadata"] as Record<string, unknown> | null)?.["questions_correct"],
-              flashcards_reviewed: (row["metadata"] as Record<string, unknown> | null)?.["flashcards_reviewed"],
-              topic_name: (row["metadata"] as Record<string, unknown> | null)?.["topic_name"],
-              focus_percentage: (row["metadata"] as Record<string, unknown> | null)?.["focus_percentage"],
-            }, !!row["origin_source"])
-          })
-          .filter((s): s is SessionRecord => s !== null)
-
-        sessions.push(...pageSessions)
-        totalLoaded += pageData.length
-        if (pageData.length < PAGE) break
-        offset += PAGE
-        fetched++
-        if (fetched > 100) break // safety: max 100 pages = 100k rows
-      }
-    } catch (err) {
-      console.error("[ESTATISTICAS] Falha em study_history:", err)
-    }
-
-    // 2. Tentativas de questões (disciplina vem do join com questions).
-    let attempts: QuestionAttemptRecord[] = []
-    try {
-      const { data: rawAttempts, error: attemptsError } = await supabase
-        .from("question_attempts")
-        .select("id, correct, answered_at, questions ( discipline_id )")
-        .eq("user_id", effectiveUserId)
-        .order("answered_at", { ascending: false })
-        .limit(ATTEMPTS_LIMIT)
-
-      if (!attemptsError) {
-        attempts = (rawAttempts ?? [])
-          .map((row) => {
-            const q = Array.isArray(row.questions) ? row.questions[0] : row.questions
-            return sanitizeAttempt({
-              id: row.id,
-              question_id: (row as { question_id?: string | null }).question_id ?? null,
-              discipline_id: q?.discipline_id ?? null,
-              correct: row.correct,
-              answered_at: row.answered_at,
-            })
-          })
-          .filter((a): a is QuestionAttemptRecord => a !== null)
-      } else {
-        console.error("[ESTATISTICAS] Erro ao carregar question_attempts:", attemptsError)
-      }
-    } catch (err) {
-      console.error("[ESTATISTICAS] Falha em question_attempts:", err)
-    }
-
-    // 3. Registro de disciplinas + user_disciplines (status do edital).
-    let userDisciplines: UserDisciplineInput[] = []
-    let disciplines: DisciplineMeta[] = []
-    try {
-      let activeTargetId: string | null = null
-      try {
-        const { data: activeTarget } = await supabase
-          .from("user_targets")
-          .select("id")
-          .eq("user_id", effectiveUserId)
-          .eq("is_active", true)
-          .limit(1)
-          .maybeSingle()
-        activeTargetId = activeTarget?.id ?? null
-      } catch {
-        activeTargetId = null
-      }
-
-      const { data: userDisciplineRows, error: udError } = await supabase
-        .from("user_disciplines")
-        .select("discipline_id, status, target_id, disciplines ( id, name, area )")
-        .eq("user_id", effectiveUserId)
-
-      if (!udError) {
-        const rows = dedupeUserDisciplines(userDisciplineRows ?? [], activeTargetId)
-        userDisciplines = rows
-          .map((row) => sanitizeUserDiscipline({ discipline_id: row.discipline_id, status: row.status }))
-          .filter((u): u is UserDisciplineInput => u !== null)
-
-        disciplines = rows
-          .map((row) => {
-            const disc = Array.isArray(row.disciplines) ? row.disciplines[0] : row.disciplines
-            return sanitizeDisciplineMeta({
-              id: disc?.id ?? row.discipline_id,
-              name: disc?.name,
-              area: disc?.area,
-            })
-          })
-          .filter((d): d is DisciplineMeta => d !== null)
-      } else {
-        console.error("[ESTATISTICAS] Erro ao carregar user_disciplines:", udError)
-      }
-    } catch (err) {
-      console.error("[ESTATISTICAS] Falha em user_disciplines:", err)
-    }
-
-    // 4. Itens de revisão (estágio da memória) e itens concluídos em 30 dias.
-    let reviewItems: ReviewItemRow[] = []
-    try {
-      const { data: reviewRows, error: reviewError } = await supabase
-        .from("review_items")
-        .select("id, discipline_id, next_review_at")
-        .eq("user_id", effectiveUserId)
-
-      if (!reviewError) {
-        reviewItems = (reviewRows ?? [])
-          .map((row) =>
-            sanitizeReviewItem({
-              id: row.id,
-              discipline_id: row.discipline_id,
-              next_review_at: row.next_review_at,
-            })
-          )
-          .filter((r): r is ReviewItemRow => r !== null)
-      } else {
-        console.error("[ESTATISTICAS] Erro ao carregar review_items:", reviewError)
-      }
-    } catch (err) {
-      console.error("[ESTATISTICAS] Falha em review_items:", err)
-    }
-
-    const last30 = new Date()
-    last30.setDate(last30.getDate() - 30)
-    let reviewsCompletedLast30 = 0
-    try {
-      const { count } = await supabase
-        .from("review_history")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", effectiveUserId)
-        .gte("review_date", last30.toISOString())
-      reviewsCompletedLast30 = count ?? 0
-    } catch {
-      reviewsCompletedLast30 = 0
-    }
-
-    // 5. Plano de estudo ativo e preferências do perfil.
-    let activePlan: ActivePlan | null = null
-    try {
-      activePlan = await fetchActivePlan(supabase, effectiveUserId)
-    } catch (err) {
-      console.error("[ESTATISTICAS] Falha no plano de estudo:", err)
-    }
-
-    let weekStartDay = 0
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("week_start_day, preferences")
-        .eq("id", effectiveUserId)
-        .maybeSingle()
-
-      const prefs = profile?.preferences as Record<string, unknown> | null
-      const firstDayPref = (prefs?.["firstDayOfWeek"] ?? prefs?.["primeiroDia"]) as string | undefined
-
-      if (firstDayPref === "Segunda-feira") {
-        weekStartDay = 1
-      } else if (firstDayPref === "Domingo") {
-        weekStartDay = 0
-      } else if (typeof profile?.["week_start_day"] === "number") {
-        weekStartDay = profile["week_start_day"]
-      } else {
-        weekStartDay = 0
-      }
-    } catch (err) {
-      console.error("[ESTATISTICAS] Falha ao carregar perfil:", err)
-    }
+    // Fase F (performance): as 5 leituras abaixo são independentes entre si e
+    // rodavam uma depois da outra (≈11 idas e voltas ao banco em fila: 3
+    // páginas de sessões → tentativas → concurso ativo → disciplinas →
+    // revisões → contagem de revisões → plano (2–3) → perfil). Agora saem
+    // todas juntas. Cada bloco mantém exatamente o mesmo tratamento de erro de
+    // antes (registra e segue com o valor padrão), então o payload é o mesmo.
+    const [sessions, attempts, disciplineData, reviewItems, reviewsCompletedLast30, activePlan, weekStartDay] =
+      await Promise.all([
+        loadSessions(supabase, effectiveUserId),
+        loadAttempts(supabase, effectiveUserId),
+        loadDisciplines(supabase, effectiveUserId),
+        loadReviewItems(supabase, effectiveUserId),
+        loadReviewsCompletedLast30(supabase, effectiveUserId),
+        loadActivePlan(supabase, effectiveUserId),
+        loadWeekStartDay(supabase, effectiveUserId),
+      ])
+    const { userDisciplines, disciplines } = disciplineData
 
     const payload: StatisticsCenterPayload = {
       sessions,

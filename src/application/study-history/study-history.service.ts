@@ -1,6 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import type { StudyHistory, StudyHistoryInsert } from "@/domain/study-history/study-history.types"
+import { fetchAllPagesInParallel, type PageResult } from "@/lib/parallel-pagination"
+
+import {
+  HISTORY_LIST_SELECT,
+  packHistoryList,
+  type HistoryListDbRow,
+  type HistoryListPayload,
+} from "./history-list-payload"
 
 type MonthlyHistoryRow = StudyHistory & {
   disciplines?: {
@@ -207,25 +215,25 @@ async function fetchAllRows<T>(
   filters: { column: string; op: "eq" | "not.is"; value: unknown }[],
   pageSize = 1000,
 ): Promise<T[]> {
-  const all: T[] = []
-  let offset = 0
-  while (true) {
-    let query = supabase
-      .from(table)
-      .select(select)
-      .range(offset, offset + pageSize - 1)
-    for (const f of filters) {
-      if (f.op === "eq") query = query.eq(f.column, f.value)
-      else if (f.op === "not.is") query = query.not(f.column, "is", f.value)
-    }
-    const { data, error } = await query
-    if (error) break
-    if (!data || data.length === 0) break
-    all.push(...(data as T[]))
-    if (data.length < pageSize) break
-    offset += pageSize
-  }
-  return all
+  // Fase F: páginas em paralelo depois da primeira (que traz a contagem).
+  // Ordenação por id para as páginas serem estáveis entre requisições.
+  // Mesma semântica de antes em caso de erro: devolve o que já foi lido.
+  const { data } = await fetchAllPagesInParallel<T>(
+    (from, to, withCount) => {
+      let query = supabase
+        .from(table)
+        .select(select, withCount ? { count: "exact" } : undefined)
+        .order("id", { ascending: true })
+        .range(from, to)
+      for (const f of filters) {
+        if (f.op === "eq") query = query.eq(f.column, f.value)
+        else if (f.op === "not.is") query = query.not(f.column, "is", f.value)
+      }
+      return query as unknown as PromiseLike<PageResult<T>>
+    },
+    { pageSize },
+  )
+  return data
 }
 
 /**
@@ -238,28 +246,74 @@ export async function getAllUserHistory(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Array<Record<string, unknown>>> {
-  const all: Array<Record<string, unknown>> = []
-  let offset = 0
-  const pageSize = 1000
-  while (true) {
-    const { data, error } = await supabase
+  // Fase F: antes, páginas de 1000 em sequência (≈2.800 sessões = 3 idas e
+  // voltas em fila). Agora a 1ª página traz a contagem e as demais saem juntas.
+  // "id" desempata sessões com o mesmo started_at, para nenhuma linha se
+  // repetir ou sumir na fronteira entre páginas. Erro continua lançando.
+  const { data, error } = await fetchAllPagesInParallel<Record<string, unknown>>((from, to, withCount) =>
+    supabase
       .from("study_history")
       .select(
         `
         *,
         disciplines ( id, name, area )
       `,
+        withCount ? { count: "exact" } : undefined,
       )
       .eq("user_id", userId)
       .order("started_at", { ascending: false })
-      .range(offset, offset + pageSize - 1)
-    if (error) throw new Error("Erro ao buscar histórico completo: " + error.message)
-    if (!data || data.length === 0) break
-    all.push(...(data as Array<Record<string, unknown>>))
-    if (data.length < pageSize) break
-    offset += pageSize
-  }
-  return all
+      .order("id", { ascending: false })
+      .range(from, to) as unknown as PromiseLike<PageResult<Record<string, unknown>>>,
+    { perfLabel: "study_history.historico_completo" },
+  )
+  if (error) throw new Error("Erro ao buscar histórico completo: " + error.message)
+  return data
+}
+
+/**
+ * Fase F.2 — lista do Histórico com payload enxuto (ver history-list-payload.ts).
+ * Mesma paginação, mesmo filtro e mesma ordem de getAllUserHistory
+ * (started_at desc, id desc); erro continua lançando.
+ */
+export async function getUserHistoryList(supabase: SupabaseClient, userId: string): Promise<HistoryListPayload> {
+  const { data, error } = await fetchAllPagesInParallel<HistoryListDbRow>(
+    (from, to, withCount) =>
+      supabase
+        .from("study_history")
+        .select(HISTORY_LIST_SELECT, withCount ? { count: "exact" } : undefined)
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to) as unknown as PromiseLike<PageResult<HistoryListDbRow>>,
+    { perfLabel: "study_history.historico_lista" },
+  )
+  if (error) throw new Error("Erro ao buscar histórico completo: " + error.message)
+  return packHistoryList(data)
+}
+
+/**
+ * Fase F.2 — linha COMPLETA de uma sessão, para o modal de edição (que usa
+ * notes e espalha o metadata inteiro no update). Mesmo formato que a lista
+ * usava antes (`*` + disciplina). Só do próprio usuário.
+ */
+export async function getUserHistorySession(
+  supabase: SupabaseClient,
+  userId: string,
+  sessionId: string,
+): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase
+    .from("study_history")
+    .select(
+      `
+        *,
+        disciplines ( id, name, area )
+      `,
+    )
+    .eq("user_id", userId)
+    .eq("id", sessionId)
+    .maybeSingle()
+  if (error) throw new Error("Erro ao buscar a sessão: " + error.message)
+  return (data as Record<string, unknown> | null) ?? null
 }
 
 /**

@@ -78,16 +78,16 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
     <div
       className={cn(
         "p-3.5 space-y-2.5 flex flex-col h-full w-full",
-        !embedded && "rounded-xl border bg-card shadow-sm",
+        !embedded && "rounded-lg border border-border bg-card",
         className,
       )}
     >
       {/* Card Header */}
       <div className="flex items-center justify-between border-b pb-1.5">
-        <div className="flex items-center gap-2">
-          <BellRing className="h-4 w-4 text-primary" />
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-            LEMBRETES
+        <div className="flex items-center gap-1.5">
+          <BellRing className="h-3.5 w-3.5 text-muted-foreground" />
+          <h3 className="text-[13px] font-semibold text-foreground">
+            Lembretes
           </h3>
         </div>
 
@@ -95,22 +95,20 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
           variant="ghost"
           size="sm"
           onClick={() => setIsModalOpen(true)}
-          className="h-7 text-xs font-semibold gap-1 text-primary hover:text-primary hover:bg-primary/10"
+          className="h-7 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10"
         >
           <Plus className="h-3.5 w-3.5" />
-          <span>Criar Lembrete</span>
+          <span>Criar lembrete</span>
         </Button>
       </div>
 
       {/* Lista ou Estado Vazio */}
       {reminders.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-3 px-2 gap-2 w-full">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs shrink-0">
-            <BellRing className="h-4 w-4 text-primary" />
-          </div>
+          <BellRing aria-hidden className="h-4 w-4 text-muted-foreground/70" />
 
           <div className="space-y-0.5 max-w-[280px]">
-            <h4 className="font-bold text-xs text-foreground leading-snug">
+            <h4 className="font-medium text-[13px] text-foreground leading-snug">
               Nenhum lembrete criado
             </h4>
             <p className="text-[11px] text-muted-foreground leading-snug">
@@ -120,10 +118,12 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
 
           <Button
             onClick={() => setIsModalOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-3 h-7 shadow-xs cursor-pointer gap-1"
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs px-3 cursor-pointer gap-1"
           >
             <Plus className="h-3 w-3" />
-            Criar Lembrete
+            Criar lembrete
           </Button>
         </div>
       ) : (
@@ -140,7 +140,7 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   onClick={() => toggleReminder(item.id)}
-                  className="text-primary hover:scale-110 transition-transform shrink-0"
+                  className="text-primary transition-transform shrink-0"
                 >
                   {item.completed ? (
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -174,7 +174,7 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
               <BellRing className="h-4 w-4 text-primary" />
               Criar Novo Lembrete
             </DialogTitle>
@@ -207,7 +207,6 @@ export function RemindersWidget({ className, embedded = false }: { className?: s
               </Button>
               <Button
                 type="submit"
-                className="bg-primary hover:bg-primary/90 text-white font-bold"
               >
                 Salvar Lembrete
               </Button>

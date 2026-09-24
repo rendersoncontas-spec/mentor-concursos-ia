@@ -4,7 +4,7 @@ import path from 'path'
 
 // Load .env.local manually
 const envPath = path.resolve(process.cwd(), '.env.local')
-let envVars: Record<string, string> = {}
+const envVars: Record<string, string> = {}
 
 if (fs.existsSync(envPath)) {
   const content = fs.readFileSync(envPath, 'utf8')

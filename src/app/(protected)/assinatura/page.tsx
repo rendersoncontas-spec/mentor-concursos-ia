@@ -1,6 +1,7 @@
 import { CreditCard } from "lucide-react"
 
 import { SubscriptionView } from "@/features/subscription/components/subscription-view"
+import { PageHeader } from "@/components/ui/page-header"
 
 export const metadata = {
   title: "Assinatura & Planos",
@@ -10,18 +11,13 @@ export const metadata = {
 export default function AssinaturaPage() {
   return (
     <div className="flex flex-col min-h-full">
-      {/* Page Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-3">
-        <CreditCard className="h-5 w-5 text-emerald-500" />
-        <div>
-          <h1 className="text-lg font-bold leading-none">Assinatura & Planos</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Detalhes da sua conta e histórico de compras
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={CreditCard}
+        title="Assinatura & Planos"
+        description="Detalhes da sua conta e histórico de compras"
+      />
 
-      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full">
+      <div className="flex-1 page-container py-5">
         <SubscriptionView />
       </div>
     </div>

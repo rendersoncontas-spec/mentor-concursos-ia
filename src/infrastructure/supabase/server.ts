@@ -1,10 +1,23 @@
+import { cache } from "react"
+
 import { cookies } from "next/headers"
 
 import { createServerClient } from "@supabase/ssr"
 
 import { env } from "@/config/env"
 
-export async function createClient() {
+/**
+ * Fase F (performance) — um único client Supabase por requisição de render.
+ *
+ * `cache()` do React memoriza por requisição de Server Components: layout,
+ * página e loaders chamados na mesma renderização passam a receber a MESMA
+ * instância. Isso é o que permite a `getEffectiveSessionUser` (também
+ * memorizada, por instância) não repetir `auth.getUser()` + consultas de
+ * papel/perfil várias vezes por navegação. Fora do render de Server
+ * Components (Route Handlers e Server Actions), `cache()` apenas repassa a
+ * chamada — cada chamada continua criando um client novo, como antes.
+ */
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies()
 
   return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
@@ -24,4 +37,4 @@ export async function createClient() {
       },
     },
   })
-}
+})

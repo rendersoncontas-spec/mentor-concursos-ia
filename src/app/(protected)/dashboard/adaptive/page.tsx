@@ -92,23 +92,13 @@ export default async function AdaptiveDashboardPage() {
 
       <main className="flex-1 space-y-6 p-4 md:p-8 pt-6">
         <div className="flex flex-col space-y-4">
-          <h2 className="text-2xl font-bold tracking-tight">Painel de Estudos</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Painel de Estudos</h2>
 
           <nav className="flex space-x-4 border-b pb-2 text-sm overflow-x-auto">
+            {/* Fase G.1: Performance, Questões e Analytics saíram desta barra —
+                as três rotas agora redirecionam para /estatisticas. */}
             <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
               Visão Geral
-            </Link>
-            <Link
-              href="/dashboard/performance"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Performance
-            </Link>
-            <Link
-              href="/dashboard/questions"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Questões
             </Link>
             <Link href="/dashboard/reviews" className="text-muted-foreground hover:text-foreground">
               Revisões
@@ -122,18 +112,15 @@ export default async function AdaptiveDashboardPage() {
             <Link href="/dashboard/history" className="text-muted-foreground hover:text-foreground">
               Histórico
             </Link>
-            <Link
-              href="/dashboard/analytics"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Analytics
+            <Link href="/estatisticas" className="text-muted-foreground hover:text-foreground">
+              Estatísticas
             </Link>
           </nav>
         </div>
 
         {/* Termômetro LHS */}
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="border rounded-lg p-6 bg-card flex flex-col justify-between shadow-xs md:col-span-2 relative overflow-hidden">
+          <div className="border rounded-lg p-6 bg-card flex flex-col justify-between md:col-span-2 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Activity className="h-48 w-48" />
             </div>
@@ -149,7 +136,7 @@ export default async function AdaptiveDashboardPage() {
 
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-baseline gap-3">
-                <p className={`text-6xl font-black ${scoreColor(lhs.score)}`}>{lhs.score}</p>
+                <p className={`text-6xl font-semibold ${scoreColor(lhs.score)}`}>{lhs.score}</p>
                 <p className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full uppercase tracking-wider">
                   {lhs.statusLabel}
                 </p>
@@ -178,13 +165,13 @@ export default async function AdaptiveDashboardPage() {
             </div>
           </div>
 
-          <div className="border rounded-lg p-6 bg-card shadow-xs flex flex-col justify-center gap-4">
+          <div className="border rounded-lg p-6 bg-card flex flex-col justify-center gap-4">
             <h3 className="font-semibold flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-red-500" /> Detecção de Risco
             </h3>
             {lhs.burnoutRisk === "HIGH" ? (
               <div className="bg-red-50 text-red-900 p-4 rounded-md border border-red-100 text-sm">
-                <p className="font-bold mb-1">Risco Crítico de Burnout</p>
+                <p className="font-semibold mb-1">Risco Crítico de Burnout</p>
                 <p>
                   Volume de estudos excede sua capacidade atual de recuperação energética. O motor
                   cortou 20% da carga horária gerada.
@@ -192,7 +179,7 @@ export default async function AdaptiveDashboardPage() {
               </div>
             ) : (
               <div className="bg-green-50 text-green-900 p-4 rounded-md border border-green-100 text-sm">
-                <p className="font-bold mb-1">Risco Baixo</p>
+                <p className="font-semibold mb-1">Risco Baixo</p>
                 <p>Níveis de energia compatíveis com a carga horária atual.</p>
               </div>
             )}
@@ -200,7 +187,7 @@ export default async function AdaptiveDashboardPage() {
         </div>
 
         {/* Histórico e Auditoria */}
-        <div className="border rounded-lg bg-card shadow-xs mt-6">
+        <div className="border rounded-lg bg-card mt-6">
           <div className="p-6 border-b">
             <h3 className="font-semibold text-lg flex items-center gap-2">
               <History className="h-5 w-5 text-muted-foreground" /> Log de Adaptações (Auditoria)
@@ -212,7 +199,7 @@ export default async function AdaptiveDashboardPage() {
           <div className="p-0">
             <div className="overflow-x-auto">
             <table className="w-full text-sm text-left min-w-[500px]">
-              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+              <thead className="bg-muted/50 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-6 py-4 font-medium">Motor</th>
                   <th className="px-6 py-4 font-medium">Ação</th>
@@ -231,7 +218,7 @@ export default async function AdaptiveDashboardPage() {
                 ) : (
                   displayHistory.map((log, i) => (
                     <tr key={i} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-muted-foreground">
+                      <td className="px-6 py-4 whitespace-nowrap tabular-nums text-xs text-muted-foreground">
                         {log.engine}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

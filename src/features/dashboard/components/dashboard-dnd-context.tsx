@@ -18,7 +18,6 @@ import {
   verticalListSortingStrategy
 } from "@dnd-kit/sortable"
 import { type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
-import { cn } from "@/lib/utils"
 
 interface DashboardDndContextProps {
   items: WidgetConfigItem[]

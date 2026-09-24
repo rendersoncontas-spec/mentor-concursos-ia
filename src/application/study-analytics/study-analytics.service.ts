@@ -6,6 +6,7 @@ import { getDisciplineRanking, getAreaRanking } from "./rankings"
 import { getEvolutionTimeSeries } from "./evolution"
 import { getWeeklyGoalProgress, getDailyGoalProgress } from "./goals"
 import { getAiInsights } from "./insights"
+import { fetchAllPagesInParallel } from "@/lib/parallel-pagination"
 
 const ANALYTICS_FETCH_LIMIT = 50_000
 
@@ -32,17 +33,31 @@ export interface AnalyticsHistoryRow {
 export async function getStudyHistoryForAnalytics(
   supabase: SupabaseClient,
   userId: string,
-  periodDays: number = 365
+  periodDays: number = 365,
+  options: { metadataKeys?: readonly string[] } = {},
 ): Promise<AnalyticsHistoryRow[]> {
-  const allData: AnalyticsHistoryRow[] = []
-  const PAGE = 1000
-  let offset = 0
-  let done = false
+  // Fase F.2: quem só usa algumas chaves do `metadata` (o Dashboard usa apenas
+  // questions_answered/questions_correct) pode pedir só elas — o banco devolve
+  // cada chave pelo caminho JSON (`metadata->chave`) em vez do objeto inteiro,
+  // e o `metadata` de cada linha é remontado só com essas chaves. As linhas,
+  // a ordem e os demais campos são os mesmos; sem a opção, nada muda.
+  const metadataKeys = options.metadataKeys
+  const metadataSelect = metadataKeys
+    ? metadataKeys.map((k) => `meta_${k}:metadata->${k}`).join(",\n        ")
+    : "metadata"
+  // Fase F: a leitura era página a página em sequência (≈2.800 sessões = 3
+  // idas e voltas em fila, e o Dashboard lê TODO o histórico). Agora a 1ª
+  // página traz a contagem e as demais saem em paralelo. Mesmo filtro, mesma
+  // ordem (com "id" desempatando started_at iguais), mesmo limite de segurança
+  // e mesma semântica de erro: registra e devolve o que já foi lido.
+  const since = periodDays > 0 ? new Date() : null
+  if (since) since.setDate(since.getDate() - periodDays)
 
-  while (!done && allData.length < ANALYTICS_FETCH_LIMIT) {
-    let query = supabase
-      .from("study_history")
-      .select(`
+  const { data } = await fetchAllPagesInParallel<AnalyticsHistoryRow>(
+    async (from, to, withCount) => {
+      let query = supabase
+        .from("study_history")
+        .select(`
         id,
         discipline_id,
         study_source,
@@ -54,47 +69,46 @@ export async function getStudyHistoryForAnalytics(
         focus_score,
         energy_level,
         difficulty,
-        metadata,
+        ${metadataSelect},
         disciplines!left ( name, area )
-      `)
-      .eq("user_id", userId)
-      .not("duration_minutes", "is", null)
-      .order("started_at", { ascending: true })
+      `, withCount ? { count: "exact" } : undefined)
+        .eq("user_id", userId)
+        .not("duration_minutes", "is", null)
+        .order("started_at", { ascending: true })
+        .order("id", { ascending: true })
 
-    if (periodDays > 0) {
-      const d = new Date()
-      d.setDate(d.getDate() - periodDays)
-      query = query.gte("started_at", d.toISOString())
-    }
+      if (since) {
+        query = query.gte("started_at", since.toISOString())
+      }
 
-    const { data, error } = await query.range(offset, offset + PAGE - 1)
+      const { data, error, count } = await query.range(from, to)
+      if (error) {
+        console.error(JSON.stringify({
+          context: "Analytics Fetch Error",
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        }, null, 2))
+      }
+      const rows = data as Array<Record<string, unknown>> | null
+      if (rows && metadataKeys) {
+        for (const row of rows) {
+          const metadata: Record<string, unknown> = {}
+          for (const k of metadataKeys) {
+            const value = row[`meta_${k}`]
+            if (value !== null && value !== undefined) metadata[k] = value
+            delete row[`meta_${k}`]
+          }
+          row["metadata"] = metadata
+        }
+      }
+      return { data: rows as AnalyticsHistoryRow[] | null, error, count }
+    },
+    { pageSize: 1000, maxRows: ANALYTICS_FETCH_LIMIT, perfLabel: "study_history.analytics_dashboard" },
+  )
 
-    if (error) {
-      console.error(JSON.stringify({
-        context: "Analytics Fetch Error",
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      }, null, 2))
-      break
-    }
-
-    if (!data || data.length === 0) {
-      done = true
-      break
-    }
-
-    allData.push(...(data as AnalyticsHistoryRow[]))
-
-    if (data.length < PAGE) {
-      done = true
-    }
-
-    offset += PAGE
-  }
-
-  return allData
+  return data
 }
 
 // Exportando os domínios especializados para consumo limpo no Dashboard ou outras views

@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
@@ -65,22 +66,34 @@ export async function listPlansAction(): Promise<{ data: PlanCardData[] | null; 
     const rawTyped = rawPlans as Record<string, unknown>[]
 
     // Mapeamos para calcular estudo real (nos últimos 90 dias ou desde generated_at)
-    const { data: history } = await supabase
-      .from("study_history")
-      .select("discipline_id, duration_minutes, started_at")
-      .eq("user_id", effectiveUserId)
-      .not("duration_minutes", "is", null)
+    // Fase F.1: histórico paginado (antes 1 requisição cortada em 1.000
+    // linhas → "estudado" e aderência dos cards subcontados) e em paralelo com
+    // a busca do concurso ativo (antes em sequência). Erro → sem histórico,
+    // como antes.
+    const [historyResult, { data: activeTarget }] = await Promise.all([
+      fetchAllRowsPaged<{ discipline_id: string; duration_minutes: number; started_at: string }>(
+        (withCount) =>
+          supabase
+            .from("study_history")
+            .select("discipline_id, duration_minutes, started_at", countOption(withCount))
+            .eq("user_id", effectiveUserId)
+            .not("duration_minutes", "is", null),
+        [
+          { column: "started_at", ascending: true },
+          { column: "id", ascending: true },
+        ],
+      ),
+      // Buscar o concurso ativo para dar o nome do concurso quando o nome for padrão
+      supabase
+        .from("user_targets")
+        .select("target_exam")
+        .eq("user_id", effectiveUserId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle(),
+    ])
 
-    const historyRows = (history ?? []) as { discipline_id: string; duration_minutes: number; started_at: string }[]
-
-    // Buscar o concurso ativo para dar o nome do concurso quando o nome for padrão
-    const { data: activeTarget } = await supabase
-      .from("user_targets")
-      .select("target_exam")
-      .eq("user_id", effectiveUserId)
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle()
+    const historyRows = historyResult.error ? [] : historyResult.data
 
     const targetExamName = activeTarget?.target_exam ?? "Plano de Estudos"
 

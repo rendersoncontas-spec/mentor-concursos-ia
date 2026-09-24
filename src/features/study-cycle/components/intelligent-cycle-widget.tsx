@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { CycleOverview, CycleItemProgress } from "@/domain/study-cycle/study-cycle.types"
 import { useStudyActions } from "@/features/study-session/components/study-provider"
-import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
+import { STUDY_SESSION_SAVED_EVENT, shouldWidgetRefreshOnSaved } from "@/features/study-session/lib/study-session-events"
 import { useCachedServerAction } from "@/hooks/use-cached-server-action"
 import { cn } from "@/lib/utils"
 
@@ -55,7 +55,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   const [isDeleting, setIsDeleting] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const { data: overview, loading: isLoading, refresh } = useCachedServerAction<CycleOverview | null>(
+  const { data: overview, loading: isLoading, refresh, serverBacked } = useCachedServerAction<CycleOverview | null>(
     "activeCycleOverview",
     () => getActiveCycleAction(),
     2 * 60 * 1000, // 2 min — dados mudam quando usuário estuda
@@ -82,12 +82,16 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   // este widget força o próprio refresh() que já usa nas suas mutações
   // internas (pausar, retomar, pular etapa etc.).
   useEffect(() => {
-    const handleStudySessionSaved = () => {
+    // Fase F.2: se o overview veio da página no servidor e quem salvou vai
+    // chamar router.refresh(), o dado novo chega pelo servidor — não busca 2×.
+    // Na sincronização offline (sem router.refresh) continua atualizando aqui.
+    const handleStudySessionSaved = (event: Event) => {
+      if (!shouldWidgetRefreshOnSaved(event, serverBacked)) return
       refresh()
     }
     window.addEventListener(STUDY_SESSION_SAVED_EVENT, handleStudySessionSaved)
     return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handleStudySessionSaved)
-  }, [refresh])
+  }, [refresh, serverBacked])
 
   const handlePauseCycle = useCallback(async () => {
     if (!overview) return
@@ -216,32 +220,22 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   // No cycle state
   if (!overview) {
     return (
-      <div className="p-5 space-y-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Layers className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-              Ciclo de Estudo
-            </p>
-            <p className="text-sm font-black text-foreground">Nenhum ciclo ativo</p>
-          </div>
+      <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">Nenhum ciclo ativo</p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">
+            Crie um ciclo para organizar suas matérias em uma sequência contínua.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Crie um ciclo de estudos para organizar suas matérias em uma sequência contínua.
-        </p>
-        <Button
-          onClick={handleNavigate}
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-9 shadow-xs"
-        >
+        <Button onClick={handleNavigate} size="sm" className="shrink-0">
+          <Layers aria-hidden className="h-4 w-4" />
           Criar ciclo
         </Button>
       </div>
     )
   }
 
-  const { cycle, items, currentItem, nextItem, currentRound, totalRoundsDone, roundProgressPercentage } = overview
+  const { cycle, items, currentItem, nextItem, currentRound, roundProgressPercentage } = overview
   const isPaused = cycle.status === "PAUSED"
   const isCurrentStudying = Boolean(sessionSummary?.isActive) && sessionSummary?.cycleId === cycle.id
   const isLastStep = isLastSubjectOfRound(currentItem, items)
@@ -265,28 +259,25 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
     buttonIcon = <Play className="h-3.5 w-3.5 mr-1.5 fill-current" />
     buttonAction = handleStartStudy
   } else if (isCurrentStudying) {
-    buttonLabel = "Estudo em andamento..."
-    buttonIcon = <RefreshCcw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+    buttonLabel = "Estudo em andamento"
+    buttonIcon = <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary-foreground mr-1" />
     buttonAction = handleContinueCycle
   }
 
   const content = (
-    <div className="p-2.5 space-y-2">
+    <div className="p-4 space-y-3">
       {/* HEADER */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-            <Layers className="h-3.5 w-3.5" />
-          </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black text-foreground truncate leading-tight">
+            <p className="text-sm font-semibold text-foreground truncate leading-tight">
               Ciclo {cycle.name}
             </p>
-            <p className="text-[11px] font-bold text-muted-foreground truncate leading-tight">
+            <p className="text-xs text-muted-foreground truncate leading-tight mt-0.5 tabular-nums">
               {currentRound}ª volta · {items.length} {items.length === 1 ? "matéria" : "matérias"} · {roundProgressPercentage}%
               {isPaused && (
-                <span className="ml-1.5 text-amber-600 dark:text-amber-400">
-                  PAUSADO
+                <span className="ml-1.5 font-medium text-amber-700 dark:text-amber-400">
+                  · Pausado
                 </span>
               )}
             </p>
@@ -298,16 +289,19 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Opções do ciclo"
+            aria-haspopup="menu"
+            aria-expanded={isMenuOpen}
           >
             <MoreVertical className="h-3.5 w-3.5" />
           </Button>
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-card border border-border rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+            <div role="menu" className="absolute right-0 top-full mt-1 z-50 w-44 bg-popover border border-border rounded-lg shadow-lg overflow-hidden p-1">
               <button
                 onClick={handleNavigate}
-                className="w-full px-3 py-2.5 text-left text-xs font-bold text-foreground hover:bg-muted/50 flex items-center gap-2 transition-colors"
+                className="w-full px-2.5 py-2 text-left text-[13px] text-foreground rounded-md hover:bg-muted flex items-center gap-2 transition-colors"
               >
                 <Edit3 className="h-3.5 w-3.5 text-muted-foreground" />
                 Editar ciclo
@@ -315,26 +309,26 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
               {isPaused ? (
                 <button
                   onClick={handleResumeCycle}
-                  className="w-full px-3 py-2.5 text-left text-xs font-bold text-foreground hover:bg-muted/50 flex items-center gap-2 transition-colors"
+                  className="w-full px-2.5 py-2 text-left text-[13px] text-foreground rounded-md hover:bg-muted flex items-center gap-2 transition-colors"
                 >
-                  <Play className="h-3.5 w-3.5 text-emerald-500" />
+                  <Play className="h-3.5 w-3.5 text-muted-foreground" />
                   Retomar ciclo
                 </button>
               ) : (
                 <button
                   onClick={handlePauseCycle}
                   disabled={isPausing}
-                  className="w-full px-3 py-2.5 text-left text-xs font-bold text-foreground hover:bg-muted/50 flex items-center gap-2 transition-colors disabled:opacity-50"
+                  className="w-full px-2.5 py-2 text-left text-[13px] text-foreground rounded-md hover:bg-muted flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  <Pause className="h-3.5 w-3.5 text-amber-500" />
+                  <Pause className="h-3.5 w-3.5 text-muted-foreground" />
                   Pausar ciclo
                 </button>
               )}
-              <div className="border-t border-border" />
+              <div className="my-1 border-t border-border" />
               <button
                 onClick={handleDeleteCycle}
                 disabled={isDeleting}
-                className="w-full px-3 py-2.5 text-left text-xs font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 transition-colors disabled:opacity-50"
+                className="w-full px-2.5 py-2 text-left text-[13px] text-destructive rounded-md hover:bg-destructive/10 flex items-center gap-2 transition-colors disabled:opacity-50"
               >
                 Excluir ciclo
               </button>
@@ -343,26 +337,24 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
         </div>
       </div>
 
-      {/* CURRENT SUBJECT — FULL WIDTH */}
+      {/* CURRENT SUBJECT — matéria em foco: filete teal à esquerda, sem caixa */}
       <div className={cn(
-        "rounded-lg border px-2.5 py-2 space-y-1",
-        currentItem
-          ? "bg-primary/5 border-primary/30"
-          : "bg-muted/40 border-border/40"
+        "border-l-2 pl-3 py-0.5 space-y-1.5",
+        currentItem ? "border-primary" : "border-border"
       )}>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="text-[10px] font-black uppercase tracking-wider text-primary leading-none">
+          <span className="text-[11px] font-semibold text-primary leading-none">
             Agora
           </span>
           {currentItem && (
             <>
-              <span className="text-[11px] font-bold text-muted-foreground">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 Etapa {(cycle.current_item_index || 0) + 1}/{items.length}
               </span>
-              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                {currentItem.difficulty}
+              <span className="text-xs text-muted-foreground">
+                · {currentItem.difficulty}
               </span>
-              <span className="ml-auto text-[11px] font-black text-foreground whitespace-nowrap">
+              <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                 Meta {currentItem.plannedMinutes} min
               </span>
             </>
@@ -371,10 +363,10 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
         {currentItem ? (
           <>
             <div className="flex items-baseline justify-between gap-2">
-              <p className="truncate text-base font-black text-foreground leading-tight" title={currentItem.disciplineName}>
+              <p className="truncate text-base font-semibold text-foreground leading-tight" title={currentItem.disciplineName}>
                 {currentItem.disciplineName}
               </p>
-              <span className="text-[11px] font-black text-foreground whitespace-nowrap shrink-0">
+              <span className="text-[13px] font-medium text-foreground whitespace-nowrap shrink-0 tabular-nums">
                 {Math.round(currentItem.studiedMinutesInRound)}/{currentItem.plannedMinutes} min
               </span>
             </div>
@@ -387,12 +379,12 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
                   }}
                 />
               </div>
-              <span className="text-[10px] font-black text-primary shrink-0 whitespace-nowrap">
+              <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap tabular-nums">
                 {Math.min(100, Math.round((currentItem.studiedMinutesInRound / Math.max(1, currentItem.plannedMinutes)) * 100))}%
                 {" · "}
                 {currentItem.remainingMinutesInRound > 0
                   ? `Faltam ${Math.round(currentItem.remainingMinutesInRound)} min`
-                  : "Meta atingida!"}
+                  : "Meta atingida"}
               </span>
             </div>
           </>
@@ -401,15 +393,15 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
         )}
       </div>
 
-      {/* NEXT — COMPACT ROW */}
-      <div className="flex items-center gap-2 rounded-lg bg-muted/40 border border-border/40 px-2.5 py-1.5">
-        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">
+      {/* NEXT — linha simples, separada por divisória */}
+      <div className="flex items-center gap-2 border-t border-border pt-2.5">
+        <span className="type-label shrink-0 w-16">
           Próxima
         </span>
         {nextItem ? (
-          <p className="truncate text-xs font-bold text-foreground leading-tight">
+          <p className="truncate text-[13px] font-medium text-foreground leading-tight">
             {nextItem.disciplineName}
-            <span className="font-semibold text-muted-foreground">
+            <span className="font-normal text-muted-foreground">
               {" "}· Meta {nextItem.plannedMinutes} min
               {nextItem.studiedMinutesInRound > 0 && (
                 <span className="text-primary"> · {Math.round(nextItem.studiedMinutesInRound)}/{nextItem.plannedMinutes}</span>
@@ -417,7 +409,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
             </span>
           </p>
         ) : isLastStep && lastSubject ? (
-          <p className="truncate text-xs font-bold text-foreground leading-tight">
+          <p className="truncate text-[13px] font-medium text-foreground leading-tight">
             {lastSubject.disciplineName}
             <span className="text-primary"> · Última etapa da volta</span>
           </p>
@@ -430,10 +422,10 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               Progresso da volta
             </span>
-            <span className="text-[10px] font-black text-primary shrink-0">
+            <span className="text-xs font-medium text-foreground shrink-0 tabular-nums">
               {roundProgressPercentage}%
             </span>
           </div>
@@ -448,9 +440,9 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
           onClick={buttonAction}
           disabled={isDeleting}
           className={cn(
-            "h-8 w-[132px] shrink-0 font-black text-xs whitespace-nowrap shadow-xs px-2",
+            "h-8 min-w-[132px] shrink-0 text-[13px] whitespace-nowrap px-3",
             isPaused
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+              ? "bg-primary hover:bg-primary/90 text-primary-foreground"
               : "bg-primary hover:bg-primary/90 text-primary-foreground"
           )}
         >
@@ -463,5 +455,5 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
 
   if (embedded) return content
 
-  return <Card className="overflow-hidden border shadow-xs">{content}</Card>
+  return <Card className="overflow-hidden">{content}</Card>
 }

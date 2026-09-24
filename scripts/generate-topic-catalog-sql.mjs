@@ -1,6 +1,6 @@
 // Gera docs/topic-catalog.sql a partir de src/application/topic-catalog/catalog.json
 // Uso: node scripts/generate-topic-catalog-sql.mjs
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 

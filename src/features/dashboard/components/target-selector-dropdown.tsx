@@ -189,7 +189,7 @@ export function TargetSelectorDropdown({
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
             </div>
           ) : (
-            <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
+            <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 transition-transform">
               <GraduationCap className="h-3.5 w-3.5 shrink-0" />
             </div>
           )}
@@ -208,14 +208,14 @@ export function TargetSelectorDropdown({
         <div
           ref={dropdownRef}
           style={dropdownStyle}
-          className="rounded-2xl border border-border bg-popover/95 backdrop-blur-md p-3 text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+          className="rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150"
         >
           {/* Cabeçalho do Dropdown */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border px-1">
-            <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider">
+            <span className="type-label">
               MEUS CONCURSOS
             </span>
-            <span className="text-[10px] font-mono font-bold bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+            <span className="text-[10px] tabular-nums font-semibold bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
               {targets.length} {targets.length === 1 ? "cadastrado" : "cadastrados"}
             </span>
           </div>
@@ -284,7 +284,7 @@ export function TargetSelectorDropdown({
                         <p
                           className={cn(
                             "font-bold text-xs truncate",
-                            isActive ? "text-foreground font-black" : "text-foreground/90",
+                            isActive ? "text-foreground font-semibold" : "text-foreground/90",
                           )}
                         >
                           {displayName}
@@ -293,7 +293,7 @@ export function TargetSelectorDropdown({
 
                         <span
                           className={cn(
-                            "px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider shrink-0",
+                            "px-2 py-0.5 text-[11px] font-bold rounded-full shrink-0",
                             isActive
                               ? "bg-primary text-white shadow-2xs"
                               : "bg-muted text-muted-foreground",
@@ -330,7 +330,7 @@ export function TargetSelectorDropdown({
               <Button
                 onClick={handleAddNewExam}
                 size="sm"
-                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs gap-1.5 w-full cursor-pointer"
+                className="gap-1.5 w-full cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 Adicionar Concurso
@@ -345,7 +345,7 @@ export function TargetSelectorDropdown({
               <button
                 type="button"
                 onClick={handleAddNewExam}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-bold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 Adicionar Novo Concurso

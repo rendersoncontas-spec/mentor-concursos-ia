@@ -23,6 +23,24 @@ export function SupportModeBanner({
   const [leaving, setLeaving] = useState(false)
   const [remainingTime, setRemainingTime] = useState<string>("")
 
+  const handleLeave = async () => {
+    setLeaving(true)
+    try {
+      const res = await endSupportSessionAction()
+      if (res.ok) {
+        toast.success("Sessão de suporte encerrada. Você retornou para o painel administrativo.")
+        await router.push("/admin")
+        router.refresh()
+      } else {
+        toast.error(res.error || "Erro ao encerrar suporte.")
+      }
+    } catch {
+      toast.error("Erro ao encerrar modo de suporte.")
+    } finally {
+      setLeaving(false)
+    }
+  }
+
   useEffect(() => {
     const updateCountdown = () => {
       const diff = new Date(expiresAt).getTime() - Date.now()
@@ -42,24 +60,6 @@ export function SupportModeBanner({
     return () => clearInterval(timer)
   }, [expiresAt])
 
-  const handleLeave = async () => {
-    setLeaving(true)
-    try {
-      const res = await endSupportSessionAction()
-      if (res.ok) {
-        toast.success("Sessão de suporte encerrada. Você retornou para o painel administrativo.")
-        await router.push("/admin")
-        router.refresh()
-      } else {
-        toast.error(res.error || "Erro ao encerrar suporte.")
-      }
-    } catch {
-      toast.error("Erro ao encerrar modo de suporte.")
-    } finally {
-      setLeaving(false)
-    }
-  }
-
   return (
     <aside
       aria-label="Aviso de modo suporte ativo"
@@ -71,7 +71,7 @@ export function SupportModeBanner({
             <ShieldAlert className="w-4 h-4 text-white" />
           </div>
           <div>
-            <span className="font-extrabold uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded text-[10px] mr-2">
+            <span className="font-semibold bg-white/25 px-2 py-0.5 rounded text-[11px] mr-2">
               Modo Suporte Ativo
             </span>
             <span>
@@ -82,7 +82,7 @@ export function SupportModeBanner({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-1 font-mono bg-black/20 px-2.5 py-1 rounded-md text-[11px]">
+          <div className="flex items-center gap-1 tabular-nums bg-black/20 px-2.5 py-1 rounded-md text-[11px]">
             <Clock className="w-3.5 h-3.5 text-amber-200" />
             <span>Expira em: {remainingTime || "Calculando..."}</span>
           </div>
@@ -91,7 +91,7 @@ export function SupportModeBanner({
             size="sm"
             onClick={() => void handleLeave()}
             disabled={leaving}
-            className="h-7 px-3 text-xs font-black bg-white text-amber-900 hover:bg-amber-100 rounded-lg cursor-pointer shadow-xs"
+            className="h-7 px-3 text-xs font-semibold bg-white text-amber-900 hover:bg-amber-100 rounded-lg cursor-pointer shadow-xs"
           >
             <LogOut className="w-3.5 h-3.5 mr-1" />
             {leaving ? "Saindo..." : "Sair do Suporte"}

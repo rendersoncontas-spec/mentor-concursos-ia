@@ -28,6 +28,7 @@ if errorlevel 1 (
 
 echo.
 echo [3/6] Verificando TypeScript...
+if exist ".next\types" rmdir /s /q ".next\types" >nul 2>&1
 call npx tsc --noEmit
 if errorlevel 1 (
     echo.
@@ -54,6 +55,12 @@ if errorlevel 1 (
 
 echo.
 echo [5/6] Salvando alteracoes no Git...
+if exist ".git\index.lock" (
+    tasklist /FI "IMAGENAME eq git.exe" 2>NUL | find /I /N "git.exe">NUL
+    if errorlevel 1 (
+        del /f /q ".git\index.lock" >nul 2>&1
+    )
+)
 git status --short
 
 git add .

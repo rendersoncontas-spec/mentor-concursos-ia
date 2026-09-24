@@ -155,7 +155,7 @@ describe("PROTEÇÃO: vínculo do ciclo (source/cycleId/cycleItemId/disciplineId
 
   it("study-provider.tsx: finalizeAndSaveSession preserva cycle_id/cycle_item_id da sessão (nunca converte para MANUAL) e usa disciplineId da sessão como fallback", () => {
     const source = readSource(PROVIDER_PATH)
-    const snapshot = sliceBetween(source, "const finalizeAndSaveSession = useCallback(", "const res = await saveStudySessionAction(snapshot)")
+    const snapshot = sliceBetween(source, "const finalizeAndSaveSession = useCallback(", "const res = await saveStudySessionWithOfflineSupport(snapshot)")
     assert.ok(
       snapshot.includes('discipline_id: (formData?.["discipline_id"] as string) || session.disciplineId,'),
       "discipline_id deve preferir a seleção do formulário mas cair para session.disciplineId quando o formulário não sobrescreveu",

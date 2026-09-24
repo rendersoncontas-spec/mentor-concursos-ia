@@ -4,6 +4,7 @@
 // ============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import type { ReviewStage } from "@/domain/reviews/models"
 import { loadItemsBundle, retentionFromGrades } from "./review.service"
 
@@ -69,12 +70,19 @@ export async function getMemoryStages(supabase: Supabase, userId: string): Promi
 /** Taxa de retenção real (últimos 365 dias) em percentual inteiro 0–100. */
 export async function getAverageRetention(supabase: Supabase, userId: string): Promise<AverageRetention> {
   const now = new Date()
-  const { data } = await supabase
-    .from("review_history")
-    .select("grade")
-    .eq("user_id", userId)
-    .gte("review_date", new Date(now.getTime() - 365 * DAY_MS).toISOString())
-    .limit(100000)
+  // Fase F.1: `.limit(100000)` era cortado em 1.000 pelo PostgREST; agora
+  // paginado até o teto pretendido. Erro → sem notas, como antes.
+  const paged = await fetchAllRowsPaged<Record<string, unknown>>(
+    (withCount) =>
+      supabase
+        .from("review_history")
+        .select("grade", countOption(withCount))
+        .eq("user_id", userId)
+        .gte("review_date", new Date(now.getTime() - 365 * DAY_MS).toISOString()),
+    [{ column: "id", ascending: true }],
+    { maxRows: 100000 },
+  )
+  const data = paged.error ? null : paged.data
 
   const grades = (data ?? []).map((h) => Number(h["grade"]))
   const { retention, reviewed } = retentionFromGrades(grades)

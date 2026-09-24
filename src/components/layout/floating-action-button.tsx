@@ -12,6 +12,37 @@ export function FloatingActionButton() {
   const { sessionSummary, restoreSession, isCentralOpen } = useStudyActions()
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
+  // Fase E — no mobile os botões flutuantes cobriam o conteúdo durante a
+  // rolagem. Agora eles saem de cena ao rolar para baixo e voltam ao rolar
+  // para cima, no topo e no fim da página (o <main> tem espaço inferior
+  // reservado, então no fim nada fica coberto). No desktop ficam sempre.
+  const [isHiddenOnScroll, setIsHiddenOnScroll] = useState(false)
+
+  useEffect(() => {
+    const main = document.getElementById("app-main")
+    if (!main) return
+    const mobile = window.matchMedia("(max-width: 767px)")
+    let lastY = main.scrollTop
+    let frame = 0
+    const onScroll = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        const y = main.scrollTop
+        const delta = y - lastY
+        const atEnd = y + main.clientHeight >= main.scrollHeight - 8
+        if (!mobile.matches || y < 48 || atEnd) setIsHiddenOnScroll(false)
+        else if (delta > 6) setIsHiddenOnScroll(true)
+        else if (delta < -6) setIsHiddenOnScroll(false)
+        lastY = y
+      })
+    }
+    main.addEventListener("scroll", onScroll, { passive: true })
+    return () => {
+      main.removeEventListener("scroll", onScroll)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [])
 
   // Escutar evento de reabrir a central (vem do balão flutuante)
   useEffect(() => {
@@ -57,43 +88,47 @@ export function FloatingActionButton() {
       <StudyRegisterModal open={isRegisterOpen} onOpenChange={setIsRegisterOpen} />
 
       {/* Botões Flutuantes de Ação Rápida */}
-      <div className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-center gap-2.5 sm:gap-3 pb-[env(safe-area-inset-bottom,0px)]">
+      <div
+        onFocus={() => setIsHiddenOnScroll(false)}
+        className={`fixed right-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:right-6 sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] z-50 flex flex-col items-center gap-2.5 sm:gap-3 transition-[transform,opacity] duration-200 ease-out ${
+          isHiddenOnScroll ? "pointer-events-none translate-y-[calc(100%+2rem)] opacity-0" : ""
+        }`}
+      >
         {/* Botão 1 (Superior): Bloco de Notas */}
         <button
           id="fab-sticky-note"
+          type="button"
           onClick={() => setIsNotesOpen((prev) => !prev)}
-          className="w-12 h-12 rounded-full border-2 border-primary bg-card/95 text-primary hover:bg-primary/10 shadow-xs flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 backdrop-blur-sm"
-          title="Bloco de Notas"
-          aria-label="Bloco de Notas"
+          className="w-11 h-11 rounded-full border border-border bg-card text-foreground hover:bg-muted shadow-md flex items-center justify-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          title="Bloco de notas"
+          aria-label="Bloco de notas"
         >
-          <SquarePen className="h-5 w-5 stroke-[2.2]" />
+          <SquarePen aria-hidden className="h-[18px] w-[18px]" />
         </button>
 
         {/* Botão 2 (Inferior): Registrar Estudo / Cronômetro */}
         <button
           id="fab-register-study"
+          type="button"
           onClick={handleOpenCentral}
-          className={`w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer relative ${
-            sessionSummary?.isActive ? "ring-4 ring-primary/40 ring-offset-2 ring-offset-background" : ""
+          className={`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background w-12 h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md flex items-center justify-center transition-colors duration-150 cursor-pointer relative ${
+            sessionSummary?.isActive ? "ring-2 ring-primary/25 ring-offset-2 ring-offset-background" : ""
           }`}
           title={sessionSummary?.isActive && sessionSummary?.isMinimized
-            ? "Reabrir Central Inteligente"
+            ? "Reabrir sessão de estudo"
             : sessionSummary?.isActive
-            ? "Central Inteligente aberta"
-            : "Registrar Estudo / Central Inteligente"}
+            ? "Sessão de estudo aberta"
+            : "Registrar estudo"}
           aria-label={sessionSummary?.isActive && sessionSummary?.isMinimized
-            ? "Reabrir Central Inteligente"
+            ? "Reabrir sessão de estudo"
             : sessionSummary?.isActive
-            ? "Central Inteligente aberta"
+            ? "Sessão de estudo aberta"
             : "Registrar estudo"}
         >
           {sessionSummary?.isActive && (
-            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-background" />
-            </span>
+            <span aria-hidden className="absolute -top-0.5 -right-0.5 inline-flex rounded-full h-3 w-3 bg-success border-2 border-background" />
           )}
-          <Play className="h-6 w-6 fill-current translate-x-0.5" />
+          <Play aria-hidden className="h-5 w-5 fill-current translate-x-0.5" />
         </button>
       </div>
     </>

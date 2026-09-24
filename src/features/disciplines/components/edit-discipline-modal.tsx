@@ -157,17 +157,17 @@ export function EditDisciplineModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl p-6 rounded-2xl">
+      <DialogContent className="sm:max-w-2xl p-6 rounded-xl">
         <div className="space-y-5">
           {/* Header com Título da Disciplina */}
-          <h2 className="text-xl font-black text-foreground tracking-tight">
+          <h2 className="text-xl font-semibold text-foreground tracking-tight">
             {name || "Editar Disciplina"}
           </h2>
 
           {/* Formulário de Nome & Cor */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2 space-y-1">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
+              <label className="type-label block">
                 NOME
               </label>
               <input
@@ -179,7 +179,7 @@ export function EditDisciplineModal({
             </div>
 
             <div className="sm:col-span-1 space-y-1">
-              <label className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
+              <label className="type-label block">
                 COR
               </label>
               <div className="flex items-center gap-2">
@@ -190,7 +190,7 @@ export function EditDisciplineModal({
                 <select
                   value={colorHex ?? ""}
                   onChange={(e) => setColorHex(e.target.value)}
-                  className="w-full h-8 bg-transparent border-b border-primary text-xs font-semibold text-foreground focus:outline-none cursor-pointer"
+                  className="w-full h-8 bg-transparent border-b border-primary text-xs font-semibold text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 >
                   <option value="">Automática</option>
                   {COLOR_OPTIONS.map((c) => (
@@ -206,18 +206,18 @@ export function EditDisciplineModal({
           {/* Cabeçalho da Seção de Tópicos (ORDENAR TÓPICOS + NOVO TÓPICO) */}
           <div className="space-y-2 pt-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider block">
+              <span className="type-label block">
                 TÓPICOS
               </span>
 
-              <div className="flex items-center gap-3 text-xs font-bold">
+              <div className="flex items-center gap-3 text-xs font-semibold">
                 <button
                   type="button"
                   onClick={() => toast.info("Arraste os botões de seta para reordenar os tópicos.")}
                   className="flex items-center gap-1 text-primary hover:underline"
                 >
                   <ArrowUpDown className="h-3.5 w-3.5" />
-                  <span>ORDENAR TÓPICOS</span>
+                  <span>Ordenar tópicos</span>
                 </button>
 
                 <button
@@ -226,7 +226,7 @@ export function EditDisciplineModal({
                   className="flex items-center gap-1 text-primary hover:underline"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>NOVO TÓPICO</span>
+                  <span>Novo tópico</span>
                 </button>
               </div>
             </div>
@@ -244,7 +244,7 @@ export function EditDisciplineModal({
                 <Button
                   size="sm"
                   onClick={handleAddTopic}
-                  className="h-8 bg-primary text-white font-bold text-xs"
+                  className="h-8 bg-primary text-white font-semibold text-xs"
                 >
                   Adicionar
                 </Button>
@@ -271,7 +271,7 @@ export function EditDisciplineModal({
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
                     {(t.badgeText || badgeText) && (
-                      <span className="px-2 py-0.5 rounded-md bg-primary text-white font-extrabold text-[9px] shrink-0">
+                      <span className="px-2 py-0.5 rounded-md bg-primary text-white font-semibold text-[10px] shrink-0">
                         {t.badgeText || badgeText}
                       </span>
                     )}
@@ -349,7 +349,7 @@ export function EditDisciplineModal({
               type="button"
               variant="outline"
               onClick={handleRemoveDiscipline}
-              className="border-primary text-primary hover:bg-primary/10 font-bold text-xs px-6 h-9 rounded-xl"
+              className="border-primary text-primary hover:bg-primary/10 font-semibold text-xs px-6 h-9 rounded-xl"
             >
               Remover
             </Button>
@@ -357,7 +357,6 @@ export function EditDisciplineModal({
             <Button
               type="button"
               onClick={handleSave}
-              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-7 h-9 rounded-xl shadow-xs"
             >
               Salvar
             </Button>

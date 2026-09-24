@@ -7,6 +7,7 @@ import * as Sentry from "@sentry/nextjs"
 import { createClient } from "@/infrastructure/supabase/server"
 import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
 import { buildIsoFromSaoPauloDateTime } from "@/lib/sao-paulo"
+import { saveOrReplayStudyHistory } from "./study-session-idempotency"
 
 export async function saveStudySessionAction(data: Record<string, unknown>) {
   try {
@@ -19,6 +20,15 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     if (authError || !user) {
       return { success: false, error: "Usuário não autenticado. Faça login novamente." }
     }
+
+    // Fase C.1 — idempotência: quando a camada offline (cronômetro/manual,
+    // salvamento direto ou retry via sync worker) já gerou um operationId,
+    // ele viaja neste payload e é gravado como client_operation_id (coluna
+    // nullable, migration 20260923_1). Chamadores que nunca passam por essa
+    // camada (ex.: chamadas diretas antigas, se existirem) continuam
+    // funcionando exatamente como antes: sem operationId, client_operation_id
+    // fica NULL e nenhum comportamento muda.
+    const operationId = data["operationId"] ? String(data["operationId"]) : null
 
     // 1. Busca Disciplina (não cria mais - RLS impede INSERT na tabela disciplines)
     let disciplineId = data["discipline_id"]
@@ -170,6 +180,12 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
           : null,
     }
 
+    // Fase C.1: só grava quando fornecido — nunca inventa um operationId no
+    // servidor (o brief é explícito: "não gerar outro UUID no servidor").
+    if (operationId) {
+      insertPayload["client_operation_id"] = operationId
+    }
+
     // Se for cronômetro, usar timestamps reais
     if (startedAtISO) {
       insertPayload["started_at"] = startedAtISO
@@ -192,45 +208,50 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       insertPayload["finished_at"] = new Date(new Date(now).getTime() + durationMs).toISOString()
     }
 
-    // 6. Salva no study_history e retorna a sessão REAL criada (com disciplina),
-    // para o frontend atualizar o estado local sem precisar de F5.
-    const { data: historyData, error: historyError } = await supabase
-      .from("study_history")
-      .insert(insertPayload)
-      .select("*, disciplines ( id, name, area )")
-      .single()
-
-    if (historyError) {
-      console.error("[STUDY_SAVE] Erro ao inserir study_history:", historyError)
-      Sentry.captureMessage("Falha ao salvar sessão de estudo", {
-        extra: { feature: "study-session", code: historyError.code ?? null },
-      })
-      return {
-        success: false,
-        error: "Erro ao salvar sessão: " + (historyError.message || JSON.stringify(historyError)),
-        code: historyError.code,
-      }
-    }
-
-    // 7. Atualizar o progresso do ciclo para qualquer sessão de estudo válida
-    // Qualquer estudo real registrado no study_history deve contribuir para o ciclo correspondente
-    // quando: usuário é o mesmo, disciplina corresponde a matéria do ciclo, duração é válida
-    const cycleResult = activeMinutesFinal > 0 ? await registerStudyToCycle() : null
-
-    // Revalidar páginas que dependem de dados de sessão
-    revalidatePath("/dashboard")
-    revalidatePath("/dashboard/history")
-    revalidatePath("/estatisticas")
-    revalidatePath("/disciplines")
-    revalidatePath("/home")
-    revalidatePath("/ciclos")
-
-    return {
-      success: true,
-      historyId: historyData.id,
-      session: historyData,
-      cycleSyncError: cycleResult && !cycleResult.success ? cycleResult.error || "O estudo foi salvo, mas o ciclo precisa ser reconciliado." : null,
-    }
+    // 6-7. Salva em study_history (ou resolve como replay idempotente de uma
+    // operação já processada) e, só no caminho de INSERT normal, atualiza o
+    // progresso do ciclo — nunca no replay (item 5 do pedido de Fase C.1).
+    // Ver `saveOrReplayStudyHistory` para a lógica completa e testável.
+    return await saveOrReplayStudyHistory({
+      operationId,
+      insert: () =>
+        supabase
+          .from("study_history")
+          .insert(insertPayload)
+          .select("*, disciplines ( id, name, area )")
+          .single(),
+      lookupByOperationId: () =>
+        supabase
+          .from("study_history")
+          .select("*, disciplines ( id, name, area )")
+          .eq("client_operation_id", operationId as string)
+          .maybeSingle(),
+      shouldRegisterCycle: activeMinutesFinal > 0,
+      registerCycle: () => registerStudyToCycle(),
+      onRevalidate: () => {
+        revalidatePath("/dashboard")
+        revalidatePath("/dashboard/history")
+        revalidatePath("/estatisticas")
+        revalidatePath("/disciplines")
+        revalidatePath("/home")
+        revalidatePath("/ciclos")
+      },
+      onInsertError: (historyError) => {
+        console.error("[STUDY_SAVE] Erro ao inserir study_history:", historyError)
+        Sentry.captureMessage("Falha ao salvar sessão de estudo", {
+          extra: { feature: "study-session", code: historyError.code ?? null },
+        })
+      },
+      onLookupFailed: (lookupError) => {
+        console.error(
+          "[STUDY_SAVE] Conflito de client_operation_id mas registro não encontrado:",
+          lookupError,
+        )
+        Sentry.captureMessage("Idempotência: registro não encontrado após conflito de operationId", {
+          extra: { feature: "study-session", operationId },
+        })
+      },
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro inesperado ao salvar."
     console.error("[saveStudySession] Erro inesperado:", err)

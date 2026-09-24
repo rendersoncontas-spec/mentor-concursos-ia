@@ -26,11 +26,9 @@ import {
   type ScheduleMode,
 } from "@/features/planejamento/lib/planning-form"
 import {
-  getSavedScaleConfig,
   getStudyPlanDay,
   isDutyShiftDate,
   WEEKDAY_KEYS,
-  type SharedPlanConfig,
 } from "@/features/planejamento/lib/study-plan-shared"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
@@ -197,9 +195,9 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
           setReplanInfo(res.data)
           try {
             localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
-          } catch {}
+          } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
         }
-      } catch {}
+      } catch { /* falha de rede ao buscar o replanejamento: mantém o último valor exibido */ }
     }
     load()
     const handleSaved = () => {
@@ -287,13 +285,13 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
   return (
     <div className="space-y-6">
       {/* Calendar Top Controls */}
-      <div className="bg-card border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-card border rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-foreground capitalize">{monthName}</h2>
+            <h2 className="text-lg font-semibold text-foreground capitalize">{monthName}</h2>
             <p className="text-xs text-muted-foreground font-medium">
               Cronograma com Escala de Trabalho & Plantões
             </p>
@@ -309,7 +307,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               onChange={(e) => {
                 if (isScheduleMode(e.target.value)) handleSelectScale(e.target.value)
               }}
-              className="bg-transparent text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs font-semibold text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
             >
               <option value="24x72">Escala 24x72 (Plantão 24h)</option>
               <option value="12x36">Escala 12x36 (Plantão 12h)</option>
@@ -334,7 +332,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               variant="outline"
               size="sm"
               onClick={handleGoToday}
-              className="h-9 rounded-xl text-xs font-bold"
+              className="h-9 rounded-xl text-xs font-semibold"
             >
               Hoje
             </Button>
@@ -352,7 +350,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
 
       {/* Informação da Escala Selecionada */}
       {scheduleMode !== "normal" && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
@@ -360,7 +358,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <span className="text-[11px] font-bold">Plantão de referência:</span>
+            <span className="text-[11px] font-semibold">Plantão de referência:</span>
             <input
               type="date"
               value={
@@ -383,20 +381,20 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                   toast.success("Data de referência do plantão atualizada!")
                 }
               }}
-              className="bg-card border rounded-lg px-2.5 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer font-mono shadow-xs"
+              className="bg-card border rounded-lg px-2.5 py-1 text-xs font-semibold text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer tabular-nums"
             />
           </div>
         </div>
       )}
 
       {/* Grid View */}
-      <div className="bg-card border rounded-2xl p-4 shadow-xs">
+      <div className="bg-card border rounded-xl p-4">
         {/* Days of Week Header */}
         <div className="grid grid-cols-7 gap-1 mb-2 text-center">
           {daysOfWeek.map((day, idx) => (
             <div
               key={day}
-              className={`py-2 text-xs font-extrabold uppercase tracking-wider ${
+              className={`text-[13px] py-2 font-semibold ${
                 idx === 0 ? "text-rose-500" : "text-muted-foreground"
               }`}
             >
@@ -429,18 +427,18 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               scheduleMode === "normal" &&
               !studyDays.includes(WEEKDAY_KEYS[new Date(year, month, dayNum).getDay()] ?? "")
             let dayBadge = (
-              <span className="text-[9px] font-semibold text-muted-foreground">Folga</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">Folga</span>
             )
             if (totalMinutes > 0) {
               dayBadge = (
-                <span className="text-[10px] font-extrabold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
                   {formatHoursClean(totalMinutes)}
                 </span>
               )
             }
             if (onShift && scheduleMode !== "normal") {
               dayBadge = (
-                <span className="text-[9px] font-extrabold text-rose-500 bg-rose-500/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                <span className="text-[10px] font-semibold text-rose-500 bg-rose-500/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
                   Plantão
                 </span>
               )
@@ -456,7 +454,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className={`text-xs font-black w-6 h-6 rounded-full flex items-center justify-center ${getDayNumberClass(isToday, onShift)}`}
+                    className={`text-xs font-semibold w-6 h-6 rounded-full flex items-center justify-center ${getDayNumberClass(isToday, onShift)}`}
                   >
                     {dayNum}
                   </span>
@@ -466,12 +464,12 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
 
                 <div className="space-y-1 overflow-hidden my-1">
                   {onShift && scheduleMode !== "normal" && (
-                    <div className="text-[10px] font-bold text-rose-500/80 bg-rose-500/10 p-1 rounded-md text-center">
+                    <div className="text-[10px] font-semibold text-rose-500/80 bg-rose-500/10 p-1 rounded-md text-center">
                       Sem estudos (Plantão 24h)
                     </div>
                   )}
                   {!onShift && isScheduledBreak && (
-                    <div className="text-[10px] font-bold text-muted-foreground bg-muted p-1 rounded-md text-center">
+                    <div className="text-[10px] font-semibold text-muted-foreground bg-muted p-1 rounded-md text-center">
                       Folga Programada
                     </div>
                   )}
@@ -488,7 +486,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                         </div>
                       ))}
                       {dayDisciplines.length > 2 && (
-                        <span className="text-[9px] text-muted-foreground font-bold">
+                        <span className="text-[10px] text-muted-foreground font-semibold">
                           +{dayDisciplines.length - 2} mais
                         </span>
                       )}
@@ -496,7 +494,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                   )}
                 </div>
 
-                <div className="text-[9px] text-muted-foreground font-medium flex items-center justify-between">
+                <div className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
                   <span>{getDaySummary(onShift, scheduleMode, dayDisciplines.length)}</span>
                 </div>
               </div>
@@ -507,9 +505,9 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
 
       {/* Day Detail Modal */}
       <Dialog open={Boolean(selectedDayDetail)} onOpenChange={() => setSelectedDayDetail(null)}>
-        <DialogContent className="sm:max-w-md p-6 rounded-2xl">
+        <DialogContent className="sm:max-w-md p-6 rounded-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black text-foreground capitalize flex items-center gap-2">
+            <DialogTitle className="text-lg font-semibold text-foreground capitalize flex items-center gap-2">
               <CalendarIcon className="w-5 h-5 text-primary" />
               {selectedDayDetail?.fullDate.toLocaleDateString("pt-BR", {
                 weekday: "long",
@@ -524,14 +522,14 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               <>
                 {/* Botões de Alteração Rápida de Plantão / Folga */}
                 <div className="flex items-center gap-2 bg-muted p-2 rounded-xl">
-                  <span className="text-xs font-bold text-muted-foreground flex-1">
+                  <span className="text-xs font-semibold text-muted-foreground flex-1">
                     Status deste Dia:
                   </span>
                   <Button
                     size="sm"
                     variant={isShiftDay(selectedDayDetail.dayNum) ? "destructive" : "outline"}
                     onClick={() => toggleDayStatus(selectedDayDetail.dayNum, "PLANTAO")}
-                    className="text-xs font-bold rounded-lg h-8"
+                    className="text-xs font-semibold rounded-lg h-8"
                   >
                     Plantão (24h)
                   </Button>
@@ -539,16 +537,16 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                     size="sm"
                     variant={!isShiftDay(selectedDayDetail.dayNum) ? "secondary" : "outline"}
                     onClick={() => toggleDayStatus(selectedDayDetail.dayNum, "FOLGA_ESTUDO")}
-                    className="text-xs font-bold rounded-lg h-8"
+                    className="text-xs font-semibold rounded-lg h-8"
                   >
                     Dia de Estudo
                   </Button>
                 </div>
 
                 {isShiftDay(selectedDayDetail.dayNum) && (
-                  <div className="py-8 text-center space-y-2 bg-rose-500/10 rounded-2xl border border-rose-500/20">
+                  <div className="py-8 text-center space-y-2 bg-rose-500/10 rounded-xl border border-rose-500/20">
                     <Briefcase className="w-8 h-8 text-rose-500 mx-auto" />
-                    <p className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                    <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">
                       Dia de Plantão de 24 horas
                     </p>
                     <p className="text-xs text-muted-foreground max-w-xs mx-auto">
@@ -561,7 +559,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                   getDisciplinesForDay(selectedDayDetail.dayNum).length === 0 && (
                     <div className="py-8 text-center space-y-2">
                       <BookOpen className="w-8 h-8 text-muted-foreground/40 mx-auto" />
-                      <p className="text-sm font-bold text-muted-foreground">
+                      <p className="text-sm font-semibold text-muted-foreground">
                         Dia livre de estudos agendados!
                       </p>
                     </div>
@@ -569,7 +567,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                 {!isShiftDay(selectedDayDetail.dayNum) &&
                   getDisciplinesForDay(selectedDayDetail.dayNum).length > 0 && (
                     <div className="space-y-3">
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                      <span className="text-[13px] font-semibold text-foreground">
                         Disciplinas Programadas
                       </span>
                       {getDisciplinesForDay(selectedDayDetail.dayNum).map((disc) => (
@@ -583,10 +581,10 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                               style={{ backgroundColor: disc.color }}
                             />
                             <div>
-                              <h4 className="font-bold text-sm text-foreground">
+                              <h4 className="font-semibold text-sm text-foreground">
                                 {disc.disciplineName}
                               </h4>
-                              <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                              <span className="text-xs tabular-nums text-muted-foreground flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
                                 {disc.durationMinutes} minutos (
                                 {formatHoursClean(disc.durationMinutes)})
@@ -603,7 +601,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                                 `/dashboard/study-session?planId=${disc.id}&duration=${disc.durationMinutes}`,
                               )
                             }}
-                            className="font-bold text-xs rounded-xl"
+                            className="font-semibold text-xs rounded-xl"
                           >
                             <PlayCircle className="w-4 h-4 mr-1" />
                             Estudar

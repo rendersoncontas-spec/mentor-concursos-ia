@@ -11,11 +11,12 @@
 // Regras: nunca modificar o passado; somente o futuro é reescrito.
 // ============================================================================
 import * as Sentry from "@sentry/nextjs"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { isShiftDayForDate, isShiftDayForScale } from "@/features/planejamento/lib/planning-form"
 import { getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
-import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
+import { getSaoPauloWeekRange, resolveWeekStartDay } from "@/lib/study-time-calculator"
 
 import {
   MAX_DAILY_MINUTES_CAP,
@@ -85,12 +86,10 @@ export async function getPeriodGoalData(
   const weeklyGoalMinutes = weeklyGoalHours * 60
 
   const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
-  const weekStartDay =
-    prefsFirstDay === "Domingo"
-      ? 0
-      : prefsFirstDay === "Segunda-feira"
-        ? 1
-        : ((profile as { week_start_day?: number } | null)?.week_start_day ?? 0)
+  const weekStartDay = resolveWeekStartDay(
+    prefsFirstDay,
+    (profile as { week_start_day?: number } | null)?.week_start_day
+  )
 
   // 2. Calcular range do período
   let periodStart: Date
@@ -147,15 +146,25 @@ export async function getPeriodGoalData(
   }
 
   // 3. Buscar tempo REALMENTE estudado no período (exclusivo do study_history)
-  const { data: historyData } = await supabase
-    .from("study_history")
-    .select("duration_minutes, started_at")
-    .eq("user_id", userId)
-    .gte("started_at", `${periodStartKey}T00:00:00.000Z`)
-    .lte("started_at", `${periodEndKey}T23:59:59.999Z`)
-    .not("duration_minutes", "is", null)
+  // Fase F.1: paginado (antes 1 requisição cortada em 1.000 linhas: as abas
+  // "ano" e "total" do card de metas subcontavam o estudado). Erro → 0, como antes.
+  const historyResult = await fetchAllRowsPaged<{ duration_minutes?: number; started_at?: string }>(
+    (withCount) =>
+      supabase
+        .from("study_history")
+        .select("duration_minutes, started_at", countOption(withCount))
+        .eq("user_id", userId)
+        .gte("started_at", `${periodStartKey}T00:00:00.000Z`)
+        .lte("started_at", `${periodEndKey}T23:59:59.999Z`)
+        .not("duration_minutes", "is", null),
+    [
+      { column: "started_at", ascending: true },
+      { column: "id", ascending: true },
+    ],
+  )
+  const historyData = historyResult.error ? [] : historyResult.data
 
-  const studiedMinutes = (historyData ?? []).reduce((acc, r) => {
+  const studiedMinutes = historyData.reduce((acc, r) => {
     const row = r as { duration_minutes?: number; started_at?: string }
     if (!row.started_at) return acc
     const dateKey = getDayInSaoPaulo(row.started_at)
@@ -407,13 +416,22 @@ async function loadSessions(
   userId: string,
   sinceIso: string,
 ): Promise<ReplanSession[]> {
-  const { data } = await supabase
-    .from("study_history")
-    .select("id, started_at, discipline_id, study_plan_item_id, duration_minutes, metadata")
-    .eq("user_id", userId)
-    .gte("started_at", sinceIso)
+  // Fase F.1: paginado (antes cortado em 1.000 linhas com plano antigo).
+  // Erro → sem sessões, como antes.
+  const { data, error } = await fetchAllRowsPaged<SessionRow>(
+    (withCount) =>
+      supabase
+        .from("study_history")
+        .select("id, started_at, discipline_id, study_plan_item_id, duration_minutes, metadata", countOption(withCount))
+        .eq("user_id", userId)
+        .gte("started_at", sinceIso),
+    [
+      { column: "started_at", ascending: true },
+      { column: "id", ascending: true },
+    ],
+  )
 
-  return ((data ?? []) as unknown as SessionRow[]).map((r) => ({
+  return (error ? [] : data).map((r) => ({
     id: r.id,
     startedAt: r.started_at,
     disciplineId: r.discipline_id,
@@ -428,15 +446,21 @@ async function loadOverdueReviewsByDiscipline(
   userId: string,
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>()
-  const { data } = await supabase
-    .from("review_items")
-    .select("discipline_id, next_review_at")
-    .eq("user_id", userId)
-    .is("deleted_at", null)
-    .eq("is_suspended", false)
+  // Fase F.1: paginado (review_items cresce com flashcards/simulados; 1
+  // requisição era cortada em 1.000). Erro → mapa vazio, como antes.
+  const { data, error } = await fetchAllRowsPaged<{ discipline_id: string; next_review_at: string | null }>(
+    (withCount) =>
+      supabase
+        .from("review_items")
+        .select("discipline_id, next_review_at", countOption(withCount))
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .eq("is_suspended", false),
+    [{ column: "id", ascending: true }],
+  )
 
   const now = Date.now()
-  for (const r of (data ?? []) as Array<{ discipline_id: string; next_review_at: string | null }>) {
+  for (const r of error ? [] : data) {
     if (!r.next_review_at) continue
     if (new Date(r.next_review_at).getTime() < now) {
       map.set(r.discipline_id, (map.get(r.discipline_id) ?? 0) + 1)
@@ -542,12 +566,10 @@ export async function ensureDailyWindow(
   const weeklyGoalMinutes = weeklyGoalHours * 60
 
   const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
-  const weekStartDay =
-    prefsFirstDay === "Domingo"
-      ? 0
-      : prefsFirstDay === "Segunda-feira"
-        ? 1
-        : ((profile as { week_start_day?: number } | null)?.week_start_day ?? 0)
+  const weekStartDay = resolveWeekStartDay(
+    prefsFirstDay,
+    (profile as { week_start_day?: number } | null)?.week_start_day
+  )
 
   // 2. Limites da semana atual
   const currentWeek = getSaoPauloWeekRange(todayKey, weekStartDay)
@@ -1508,7 +1530,7 @@ export async function pullPendingToToday(
 
     const loaded = await loadActivePlan(supabase, userId)
     if (!loaded) return { ok: false, error: "Nenhum plano ativo encontrado." }
-    const { plan, items } = loaded
+    const { plan } = loaded
 
     // 2. Identificar pendências atuais
     const info = await getReplanInfo(supabase, userId, avail, true)
@@ -1535,42 +1557,9 @@ export async function pullPendingToToday(
       status: string
       discipline_id: string
     }[]
-    const currentTodayMinutes = todayBlocks.reduce((acc, b) => acc + (b.duration_minutes || 0), 0)
     let nextOrder = todayBlocks.length > 0
       ? Math.max(...todayBlocks.map((b) => b.execution_order || 0)) + 1
       : 1
-
-    // 4. Calcular saldo semanal real
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("weekly_study_hours, week_start_day, preferences")
-      .eq("id", userId)
-      .maybeSingle()
-
-    const prefs = profile?.preferences as Record<string, unknown> | null
-    const firstDayPref = prefs?.["firstDayOfWeek"] as string | undefined
-    const weekStartDay =
-      firstDayPref === "Domingo"
-        ? 0
-        : firstDayPref === "Segunda-feira"
-          ? 1
-          : (profile?.week_start_day ?? 0)
-
-    const weekRange = getSaoPauloWeekRange(todayKey, weekStartDay)
-    const { data: weekHistory } = await supabase
-      .from("study_history")
-      .select("duration_minutes")
-      .eq("user_id", userId)
-      .gte("started_at", `${weekRange.mondayKey}T00:00:00.000Z`)
-      .lte("started_at", `${weekRange.sundayKey}T23:59:59.999Z`)
-      .not("duration_minutes", "is", null)
-
-    const studiedSoFar = (weekHistory ?? []).reduce(
-      (acc, h) => acc + ((h as { duration_minutes?: number }).duration_minutes || 0),
-      0,
-    )
-    const weeklyTargetMinutes = Math.max(1, (profile?.weekly_study_hours || 20) * 60)
-    const remainingWeek = Math.max(0, weeklyTargetMinutes - studiedSoFar)
 
     // 5. Executar reajuste manual para cada pendência alvo
     let totalPulledMinutes = 0
@@ -1583,7 +1572,7 @@ export async function pullPendingToToday(
       disciplineNames.push(target.disciplineName)
 
       // Registrar evento no histórico
-      const { data: eventRow, error: evError } = await supabase
+      const { data: eventRow } = await supabase
         .from("study_plan_replan_events")
         .insert({
           user_id: userId,

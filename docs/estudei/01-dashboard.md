@@ -18,10 +18,10 @@ Fornecer ao estudante um painel centralizado de controle da sua rotina de estudo
 ## 🧱 Componentes
 - `DashboardHeader`: Cumprimento personalizado + Data atual + Seletor de Concurso Ativo.
 - `KpiCards`: Cards de tempo líquido estudado (Hoje, Semana, Mês), Streak de Dias e Acurácia.
-- `TodayPlanCard` / `CycleNextCard`: Exibe a disciplina atual a ser estudada com tempo recomendado e atalho para iniciar timer.
-- `PendingReviewsWidget`: Exibe resumo de revisões agendadas para hoje com botão "Iniciar Revisões".
+- `TodayPlanCard` / widget "Foco de hoje" (`IntelligentCycleWidget`): Exibe a disciplina atual a ser estudada com tempo recomendado e atalho para iniciar timer. _(O antigo `CycleNextCard` foi removido na Fase G.)_
+- Widget "Revisões" do catálogo de widgets do Dashboard: resumo de revisões pendentes. _(O antigo `PendingReviewsWidget` foi removido na Fase G.)_
 - `HabitTracker`: Heatmap visual de constância diária.
-- `RecentActivitiesList`: Lista das últimas sessões de estudo finalizadas.
+- Widget "Últimas atividades" do catálogo de widgets: últimas sessões de estudo finalizadas. _(O antigo `RecentActivitiesList` foi removido na Fase G.)_
 
 ---
 

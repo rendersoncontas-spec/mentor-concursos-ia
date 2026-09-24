@@ -5,10 +5,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "NomeIA",
     short_name: "NomeIA",
     description:
-      "Sua preparação rumo à nomeação. Plataforma inteligente de preparação para concursos.",
+      "Sua preparação rumo à nomeação. Planejamento, ciclos e histórico de estudos para concursos.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#0f172a",
+    // Fase E: fundo off-white do app (antes: azul-marinho, herança da marca antiga).
+    background_color: "#fbfaf9",
     theme_color: "#225951",
     icons: [
       {

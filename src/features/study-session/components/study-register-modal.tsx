@@ -16,7 +16,6 @@ import {
   Pause,
   Play,
   RotateCcw,
-  Sparkles,
   ToggleLeft,
   ToggleRight,
   X,
@@ -26,7 +25,7 @@ import { z } from "zod"
 
 import { updateStudySessionAction } from "@/application/study-history/study-history.actions"
 import { useDisciplineData } from "@/features/study-session/hooks/use-discipline-data"
-import { saveStudySessionAction } from "@/application/study-session/study-session.action"
+import { saveStudySessionWithOfflineSupport } from "@/infrastructure/offline"
 import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
 import {
   buildIsoFromSaoPauloDateTime,
@@ -57,9 +56,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { disciplineColorHex } from "@/domain/disciplines/discipline-colors"
-import type { StudyHistory, StudyTechnique } from "@/domain/study-history/study-history.types"
+import type { StudyTechnique } from "@/domain/study-history/study-history.types"
 import {
   type SavedStudySession,
+  dispatchStudySessionQueued,
   dispatchStudySessionSaved,
 } from "@/features/study-session/lib/study-session-events"
 import { TopicAutocomplete } from "@/features/topic-catalog/components/topic-autocomplete"
@@ -158,15 +158,6 @@ function formatDateBR(dateStr?: string) {
   }
 }
 
-function difficultyLabel(difficulty?: string): string {
-  const upper = (difficulty || "").toUpperCase().trim()
-  if (upper === "FACIL" || upper === "FÁCIL" || upper === "EASY" || upper === "BAIXA")
-    return "Fácil"
-  if (upper === "DIFICIL" || upper === "DIFÍCIL" || upper === "HARD" || upper === "ALTA")
-    return "Difícil"
-  return "Média"
-}
-
 const STUDY_TYPE_LABELS: Record<string, string> = {
   TEORIA: "Teoria",
   QUESTOES: "Questões",
@@ -202,8 +193,7 @@ export function StudyRegisterModal({
   const router = useRouter()
   const isEditMode = mode === "edit" && !!sessionToEdit
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { data: disciplineData, loading: disciplinesLoading } = useDisciplineData()
-  const hasActivePlan = disciplineData?.hasActivePlan ?? null
+  const { data: disciplineData } = useDisciplineData()
   const planDisciplines = disciplineData?.planDisciplines ?? []
   const allDisciplines = disciplineData?.allDisciplines ?? []
 
@@ -388,6 +378,10 @@ export function StudyRegisterModal({
 
   const onSubmit = async (data: SessionFormValues) => {
     setIsSubmitting(true)
+    // Fase C (offline-first): true quando o salvamento (cronômetro OU
+    // lançamento manual) foi enfileirado localmente em vez de confirmado
+    // pelo servidor — muda só o texto do toast final, nada mais.
+    let wasPending = false
     try {
       if (isEditMode && sessionToEdit) {
         // Modo EDIÇÃO: atualizar sessão existente
@@ -452,12 +446,18 @@ export function StudyRegisterModal({
         toast.success("Sessão atualizada com sucesso!")
         registerTopicInCatalog(data.topic_name, data.discipline_id)
         if (res.data) {
-          dispatchStudySessionSaved(res.data as SavedStudySession)
+          // Fase F.2: a resposta desta Server Action (que chamou revalidatePath)
+          // já traz a página atual re-renderizada com dados novos.
+          dispatchStudySessionSaved(res.data as SavedStudySession, { serverRefresh: true })
         }
         form.reset()
         onOpenChange(false)
         window.dispatchEvent(new CustomEvent("close-study-session-modal"))
-        router.refresh()
+        // Fase F.2: sem router.refresh() aqui. updateStudySessionAction chama
+        // revalidatePath() ao salvar e, no Next 16, uma Server Action que
+        // revalida já devolve a página atual re-renderizada na própria resposta
+        // (server-action-reducer: FreshnessPolicy.RefreshAll). O router.refresh()
+        // que vinha depois fazia uma SEGUNDA renderização completa da página.
       } else {
         // Modo CRIAÇÃO
         if (!data.discipline_id || !data.discipline_name) {
@@ -491,8 +491,15 @@ export function StudyRegisterModal({
             return
           }
 
-          if (res.session) {
-            dispatchStudySessionSaved(res.session as SavedStudySession)
+          if (res.pending) {
+            // O StudyProvider (finalizeAndSaveSession) já disparou
+            // dispatchStudySessionQueued com o item pendente; aqui só marcamos
+            // o estado para a mensagem de "salvo offline".
+            wasPending = true
+          } else if (res.session) {
+            // Fase F.2: a resposta da Server Action (que chamou revalidatePath)
+            // já traz a página atual re-renderizada com dados novos.
+            dispatchStudySessionSaved(res.session as SavedStudySession, { serverRefresh: true })
           }
         } else {
           // Modo manual: salvar diretamente sem cronômetro ativo
@@ -527,7 +534,7 @@ export function StudyRegisterModal({
             study_time: data.study_time,
           }
 
-          const res = await saveStudySessionAction(directPayload)
+          const res = await saveStudySessionWithOfflineSupport(directPayload)
 
           if (!res || !res.success) {
             const errMsg = res?.error || "Erro desconhecido ao salvar a sessão."
@@ -536,17 +543,35 @@ export function StudyRegisterModal({
             return
           }
 
-          if (res.session) {
-            dispatchStudySessionSaved(res.session as SavedStudySession)
+          if (res.pending) {
+            wasPending = true
+            if (res.pendingSession) {
+              dispatchStudySessionQueued(
+                res.pendingSession as SavedStudySession & { _offlinePending: true; _operationId: string },
+              )
+            }
+          } else if (res.session) {
+            // Fase F.2: a resposta da Server Action (que chamou revalidatePath)
+            // já traz a página atual re-renderizada com dados novos.
+            dispatchStudySessionSaved(res.session as SavedStudySession, { serverRefresh: true })
           }
         }
 
-        toast.success("Estudo salvo com sucesso!")
+        if (wasPending) {
+          toast.success("Estudo salvo offline. Será sincronizado quando a conexão voltar.")
+        } else {
+          toast.success("Estudo salvo com sucesso!")
+        }
         registerTopicInCatalog(data.topic_name, data.discipline_id)
         form.reset()
         onOpenChange(false)
         window.dispatchEvent(new CustomEvent("close-study-session-modal"))
-        router.refresh()
+        // Fase F.2: salvamento confirmado no servidor → saveStudySessionAction
+        // já chamou revalidatePath() e a resposta da Server Action já trouxe a
+        // página atual re-renderizada; um router.refresh() aqui repetiria toda
+        // a renderização. Só o caminho offline (pendente) mantém o refresh de
+        // antes, sem mudança de comportamento.
+        if (wasPending) router.refresh()
       }
     } catch (error: unknown) {
       console.error("[STUDY_SAVE_CLIENT] Exceção:", error)
@@ -560,14 +585,6 @@ export function StudyRegisterModal({
       setIsSubmitting(false)
     }
   }
-
-  const sortedPlanDisciplines = useMemo(
-    () =>
-      [...planDisciplines].sort((a, b) =>
-        a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
-      ),
-    [planDisciplines],
-  )
 
   const selectedDiscipline = useMemo(() => {
     if (!watchDisciplineId) return null
@@ -623,7 +640,7 @@ export function StudyRegisterModal({
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-8 text-xs font-mono"
+                    className="h-8 text-xs tabular-nums"
                     {...field}
                   />
                 </FormControl>
@@ -644,7 +661,7 @@ export function StudyRegisterModal({
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-8 text-xs font-mono"
+                    className="h-8 text-xs tabular-nums"
                     {...field}
                   />
                 </FormControl>
@@ -665,7 +682,7 @@ export function StudyRegisterModal({
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-8 text-xs font-mono"
+                    className="h-8 text-xs tabular-nums"
                     {...field}
                   />
                 </FormControl>
@@ -702,7 +719,7 @@ export function StudyRegisterModal({
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-8 text-xs font-mono"
+                    className="h-8 text-xs tabular-nums"
                     {...field}
                   />
                 </FormControl>
@@ -721,7 +738,7 @@ export function StudyRegisterModal({
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-8 text-xs font-mono"
+                    className="h-8 text-xs tabular-nums"
                     {...field}
                   />
                 </FormControl>
@@ -748,7 +765,7 @@ export function StudyRegisterModal({
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-8 text-xs font-mono"
+                    className="h-8 text-xs tabular-nums"
                     {...field}
                   />
                 </FormControl>
@@ -767,7 +784,7 @@ export function StudyRegisterModal({
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-8 text-xs font-mono"
+                    className="h-8 text-xs tabular-nums"
                     {...field}
                   />
                 </FormControl>
@@ -858,24 +875,23 @@ export function StudyRegisterModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="max-w-[960px] w-[calc(100vw-32px)] max-h-[82vh] p-0 flex flex-col overflow-hidden bg-background border-border/80 shadow-2xl rounded-2xl z-[150]"
+        // Fase E: acompanha monitores grandes (960 → 1080 → 1180px) sem virar tela cheia.
+        className="max-w-[960px] xl:max-w-[1080px] min-[1600px]:max-w-[1180px] w-[calc(100vw-32px)] max-h-[82vh] p-0 flex flex-col overflow-hidden bg-background border-border shadow-xl rounded-lg z-[150]"
         overlayOnClick={handleMinimize}
+        hideCloseButton
       >
         <TooltipProvider delayDuration={200}>
           {/* ═══════════════════════════════════════════════════════════════
               HEADER REFINADO
               ═══════════════════════════════════════════════════════════════ */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-border/60 bg-muted/20 shrink-0">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
-                <Sparkles className="h-4 w-4" />
-              </div>
               <div className="flex flex-col min-w-0">
-                <DialogTitle className="text-sm sm:text-base font-bold tracking-tight text-foreground truncate">
-                  Centro Inteligente de Estudos
+                <DialogTitle className="text-[15px] font-semibold text-foreground truncate">
+                  Central de estudos
                 </DialogTitle>
-                <p className="text-[11px] text-muted-foreground truncate hidden sm:block">
-                  Registre, acompanhe e analise cada sessão de estudo.
+                <p className="text-xs text-muted-foreground truncate hidden sm:block">
+                  Cronômetro ou lançamento manual de uma sessão de estudo.
                 </p>
               </div>
             </div>
@@ -906,7 +922,7 @@ export function StudyRegisterModal({
                     className={cn(
                       "w-8 h-8 rounded-lg transition-colors",
                       floatingTimerEnabled
-                        ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                        ? "text-primary bg-primary/10 hover:bg-primary/15"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                     aria-label={
@@ -931,7 +947,7 @@ export function StudyRegisterModal({
                     variant="ghost"
                     size="icon"
                     onClick={handleClose}
-                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-rose-500/10 hover:text-rose-600"
+                    className="w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
                     aria-label="Fechar"
                   >
                     <X className="w-4 h-4" />
@@ -959,64 +975,66 @@ export function StudyRegisterModal({
                 {/* ═══════════════════════════════════════════════════════════════
                     COLUNA ESQUERDA — CENTRAL DE CONTROLE (320px - 340px)
                     ═══════════════════════════════════════════════════════════════ */}
-                <div className="w-full md:w-[280px] lg:w-[300px] shrink-0 flex flex-col gap-2.5">
+                <div className="w-full md:w-[280px] lg:w-[300px] xl:w-[320px] shrink-0 flex flex-col gap-2.5">
                   {/* Segmented Mode Switcher */}
-                  <div className="p-1 rounded-xl bg-muted/60 border border-border/50 grid grid-cols-2 gap-1 shrink-0">
+                  <div role="tablist" aria-label="Modo de registro" className="p-0.5 rounded-md bg-muted grid grid-cols-2 gap-0.5 shrink-0">
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={!isManualMode}
                       onClick={() => setMode(false)}
                       className={cn(
-                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all select-none",
+                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] text-[13px] font-medium transition-colors select-none",
                         !isManualMode
-                          ? "bg-background text-foreground border border-border/40 font-bold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/40",
+                          ? "bg-card text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      <Clock className="w-3.5 h-3.5 text-primary" />
+                      <Clock className="w-3.5 h-3.5" />
                       <span>Cronômetro</span>
                     </button>
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={isManualMode}
                       onClick={() => setMode(true)}
                       className={cn(
-                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all select-none",
+                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] text-[13px] font-medium transition-colors select-none",
                         isManualMode
-                          ? "bg-background text-foreground border border-border/40 font-bold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/40",
+                          ? "bg-card text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      <FileText className="w-3.5 h-3.5 text-primary" />
+                      <FileText className="w-3.5 h-3.5" />
                       <span>Manual</span>
                     </button>
                   </div>
 
                   {/* Card da Central de Controle */}
-                  <div className="rounded-2xl border border-border/70 bg-card p-3 flex flex-col gap-2.5">
+                  <div className="rounded-lg border border-border bg-card p-3.5 flex flex-col gap-3">
                     {/* Topo do Card: Status Pill & Disciplina */}
                     <div className="flex flex-col gap-2.5">
                       <div className="flex items-center justify-between">
                         {!isManualMode ? (
                           (() => {
-                            let badgeColor = "bg-muted text-muted-foreground border-border/40"
+                            let badgeColor = "text-muted-foreground"
                             let dotColor = "bg-muted-foreground/60"
                             let label = "Pronto para estudar"
 
                             if (phase === "STUDYING") {
-                              badgeColor =
-                                "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                              dotColor = "bg-emerald-500 animate-pulse"
+                              badgeColor = "text-foreground"
+                              dotColor = "bg-primary"
                               label = "Estudando"
                             } else if (phase === "PAUSED") {
-                              badgeColor =
-                                "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                              dotColor = "bg-amber-500"
+                              badgeColor = "text-foreground"
+                              dotColor = "bg-warning"
                               label = "Pausado"
                             }
 
                             return (
                               <span
                                 className={cn(
-                                  "text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border",
+                                  "text-xs font-medium flex items-center gap-1.5",
                                   badgeColor,
                                 )}
                               >
@@ -1026,31 +1044,24 @@ export function StudyRegisterModal({
                             )
                           })()
                         ) : (
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 bg-info/10 text-info border border-info/20">
+                          <span className="text-xs font-medium flex items-center gap-1.5 text-foreground">
                             <span className="w-1.5 h-1.5 rounded-full bg-info" />
-                            Lançamento Manual
+                            Lançamento manual
                           </span>
                         )}
 
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-wider">
-                          Central
-                        </span>
                       </div>
 
                       {/* Disciplina Selecionada Badge */}
                       {watchDisciplineName && (
                         <div
-                          className="flex items-center gap-2 px-3 py-2 rounded-xl border min-h-[36px]"
-                          style={{
-                            backgroundColor: `${selectedColor}14`,
-                            borderColor: `${selectedColor}40`,
-                          }}
+                          className="flex items-center gap-2 min-h-[28px]"
                         >
                           <span
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: selectedColor }}
                           />
-                          <span className="text-sm font-bold text-foreground truncate">
+                          <span className="text-[15px] font-semibold text-foreground truncate">
                             {watchDisciplineName}
                           </span>
                         </div>
@@ -1061,10 +1072,13 @@ export function StudyRegisterModal({
                     {!isManualMode ? (
                       /* ─── CRONÔMETRO DISPLAY ─── */
                       <div className="flex flex-col items-center justify-center gap-1.5">
-                        <div className="text-[58px] sm:text-[64px] leading-none font-mono font-black tracking-tight tabular-nums text-foreground select-none">
+                        <div className={cn(
+                          "text-[44px] sm:text-[48px] leading-none tabular-nums font-medium tracking-tight select-none",
+                          phase === "PAUSED" ? "text-muted-foreground" : "text-foreground",
+                        )}>
                           {formatClock(activeSeconds)}
                         </div>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {phase === "PAUSED" ? "Tempo congelado" : "Tempo ativo"}
                         </span>
 
@@ -1100,7 +1114,7 @@ export function StudyRegisterModal({
                                   resumeSession()
                                 }
                               }}
-                              className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-white font-semibold h-9 rounded-xl shadow-sm hover:shadow-md transition-all"
+                              className="flex-1 gap-2 h-9"
                             >
                               <Play className="h-4 w-4 fill-current" />
                               <span>{phase === "PAUSED" ? "Retomar" : "Iniciar"}</span>
@@ -1110,7 +1124,8 @@ export function StudyRegisterModal({
                               size="sm"
                               type="button"
                               onClick={pauseSession}
-                              className="flex-1 gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold h-9 rounded-xl"
+                              variant="outline"
+                              className="flex-1 gap-2 h-9"
                             >
                               <Pause className="h-4 w-4 fill-current" />
                               <span>Pausar</span>
@@ -1124,7 +1139,7 @@ export function StudyRegisterModal({
                                 size="icon"
                                 type="button"
                                 onClick={resetSession}
-                                className="h-9 w-9 rounded-xl border-border/70 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 hover:border-rose-500/30 shrink-0"
+                                className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
                                 aria-label="Resetar cronômetro"
                               >
                                 <RotateCcw className="h-4 w-4" />
@@ -1135,9 +1150,9 @@ export function StudyRegisterModal({
                         </div>
 
                         {/* Técnica & Som de Foco Compactos */}
-                        <div className="w-full flex flex-col gap-2 pt-2 border-t border-border/40">
+                        <div className="w-full flex flex-col gap-2 pt-2.5 border-t border-border">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               Técnica
                             </span>
                             <FormField
@@ -1173,7 +1188,7 @@ export function StudyRegisterModal({
                       /* ─── MANUAL INPUTS DISPLAY ─── */
                       <div className="flex flex-col gap-3 my-auto py-1">
                         <div>
-                          <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
+                          <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                             Duração Estudada
                           </Label>
                           {/* Segmented Digital Input */}
@@ -1184,17 +1199,17 @@ export function StudyRegisterModal({
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
                                   <FormControl>
-                                    <div className="flex flex-col items-center bg-muted/30 border border-border/60 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                                       <Input
                                         type="number"
                                         min={0}
                                         max={23}
                                         placeholder="0"
-                                        className="text-center font-mono font-bold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
+                                        className="text-center tabular-nums font-semibold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                                      <span className="text-[11px] text-muted-foreground">
                                         Horas
                                       </span>
                                     </div>
@@ -1210,17 +1225,17 @@ export function StudyRegisterModal({
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
                                   <FormControl>
-                                    <div className="flex flex-col items-center bg-muted/30 border border-border/60 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                                       <Input
                                         type="number"
                                         min={0}
                                         max={59}
                                         placeholder="30"
-                                        className="text-center font-mono font-bold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
+                                        className="text-center tabular-nums font-semibold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                                      <span className="text-[11px] text-muted-foreground">
                                         Minutos
                                       </span>
                                     </div>
@@ -1236,17 +1251,17 @@ export function StudyRegisterModal({
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
                                   <FormControl>
-                                    <div className="flex flex-col items-center bg-muted/30 border border-border/60 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                                       <Input
                                         type="number"
                                         min={0}
                                         max={59}
                                         placeholder="0"
-                                        className="text-center font-mono font-bold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
+                                        className="text-center tabular-nums font-semibold text-lg h-7 border-0 p-0 shadow-none bg-transparent focus-visible:ring-0"
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                                      <span className="text-[11px] text-muted-foreground">
                                         Segundos
                                       </span>
                                     </div>
@@ -1260,7 +1275,7 @@ export function StudyRegisterModal({
 
                         <div className="grid grid-cols-2 gap-2.5">
                           <div>
-                            <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
+                            <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                               Data do Estudo
                             </Label>
                             <FormField
@@ -1269,11 +1284,11 @@ export function StudyRegisterModal({
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
                                   <FormControl>
-                                    <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-xl px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                                       <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                       <Input
                                         type="date"
-                                        className="h-6 p-0 border-0 text-xs font-mono bg-transparent shadow-none focus-visible:ring-0 w-full"
+                                        className="h-6 p-0 border-0 text-xs tabular-nums bg-transparent shadow-none focus-visible:ring-0 w-full"
                                         {...field}
                                       />
                                     </div>
@@ -1285,7 +1300,7 @@ export function StudyRegisterModal({
                           </div>
 
                           <div>
-                            <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider mb-1.5 block">
+                            <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                               Horário de Início
                             </Label>
                             <FormField
@@ -1294,11 +1309,11 @@ export function StudyRegisterModal({
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
                                   <FormControl>
-                                    <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-xl px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                                       <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                       <Input
                                         type="time"
-                                        className="h-6 p-0 border-0 text-xs font-mono bg-transparent shadow-none focus-visible:ring-0 w-full"
+                                        className="h-6 p-0 border-0 text-xs tabular-nums bg-transparent shadow-none focus-visible:ring-0 w-full"
                                         {...field}
                                       />
                                     </div>
@@ -1313,30 +1328,30 @@ export function StudyRegisterModal({
                     )}
 
                     {/* Rodapé do Card: 3 Métricas Balanceadas */}
-                    <div className="grid grid-cols-3 divide-x divide-border/50 bg-muted/20 border border-border/40 rounded-xl p-2 text-center shrink-0">
+                    <div className="grid grid-cols-3 divide-x divide-border border-y border-border py-2 text-center shrink-0">
                       {!isManualMode ? (
                         <>
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[11px] text-muted-foreground">
                               Ativo
                             </p>
-                            <p className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 truncate">
+                            <p className="tabular-nums font-semibold text-[13px] text-primary truncate">
                               {formatClock(activeSeconds)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[11px] text-muted-foreground">
                               Pausa
                             </p>
-                            <p className="font-mono font-bold text-xs text-amber-600 dark:text-amber-400 truncate">
+                            <p className="tabular-nums font-semibold text-[13px] text-foreground truncate">
                               {formatClock(pausedSeconds)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[11px] text-muted-foreground">
                               Foco
                             </p>
-                            <p className="font-mono font-bold text-xs text-primary truncate">
+                            <p className="tabular-nums font-semibold text-xs text-primary truncate">
                               {focusPercentage !== null ? `${focusPercentage}%` : "—"}
                             </p>
                           </div>
@@ -1344,26 +1359,26 @@ export function StudyRegisterModal({
                       ) : (
                         <>
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[11px] text-muted-foreground">
                               Duração
                             </p>
-                            <p className="font-mono font-bold text-xs text-foreground truncate">
+                            <p className="tabular-nums font-semibold text-xs text-foreground truncate">
                               {manualTotalMinutes > 0 ? `${manualTotalMinutes} min` : "0 min"}
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[11px] text-muted-foreground">
                               Data
                             </p>
-                            <p className="font-mono font-bold text-xs text-foreground truncate">
+                            <p className="tabular-nums font-semibold text-xs text-foreground truncate">
                               {formatDateBR(watchStudyDate)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                            <p className="text-[11px] text-muted-foreground">
                               Foco
                             </p>
-                            <p className="font-mono font-bold text-xs text-muted-foreground truncate">
+                            <p className="tabular-nums font-semibold text-xs text-muted-foreground truncate">
                               —
                             </p>
                           </div>
@@ -1388,7 +1403,7 @@ export function StudyRegisterModal({
                           <FormItem className="flex flex-col space-y-1.5">
                             <FormLabel className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                               <span>Disciplina</span>
-                              <span className="text-rose-500">*</span>
+                              <span className="text-destructive">*</span>
                             </FormLabel>
                             <DisciplinePopover
                               value={field.value ?? ""}
@@ -1431,7 +1446,7 @@ export function StudyRegisterModal({
                     </div>
 
                     {/* Linha 2: Tipo de Estudo & Dados Complementares */}
-                    <div className="p-2.5 border border-border/60 rounded-2xl bg-muted/20 flex flex-col gap-2">
+                    <div className="flex flex-col gap-2">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                         <FormField
                           control={form.control}
@@ -1443,7 +1458,7 @@ export function StudyRegisterModal({
                               </FormLabel>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
-                                  <SelectTrigger className="font-medium h-9 text-xs sm:text-sm rounded-xl border-border/70 bg-background relative z-[160]">
+                                  <SelectTrigger className="font-medium h-9 text-[13px] bg-card relative z-[160]">
                                     <SelectValue placeholder="Selecione o tipo..." />
                                   </SelectTrigger>
                                 </FormControl>
@@ -1497,7 +1512,7 @@ export function StudyRegisterModal({
                           <FormControl>
                             <Textarea
                               placeholder="Anote conceitos-chave, resumos, dúvidas ou links importantes..."
-                              className="min-h-[72px] max-h-[110px] resize-none text-xs sm:text-sm font-sans bg-muted/10 rounded-xl border-border/60 focus-visible:ring-primary/20"
+                              className="min-h-[72px] max-h-[110px] resize-none text-[13px] font-sans bg-card rounded-md border-border focus-visible:ring-primary/20"
                               {...field}
                             />
                           </FormControl>
@@ -1512,7 +1527,7 @@ export function StudyRegisterModal({
                       ═══════════════════════════════════════════════════════════════ */}
                   <div className="flex flex-col gap-2 pt-1.5 border-t border-border/50 shrink-0">
                     {/* Resumo da Sessão */}
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/30 border border-border/40 text-xs text-muted-foreground flex-wrap">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 text-xs text-muted-foreground flex-wrap">
                       <div className="flex items-center gap-1.5 font-semibold text-foreground">
                         <span
                           className="w-2 h-2 rounded-full shrink-0"
@@ -1541,14 +1556,14 @@ export function StudyRegisterModal({
                         type="button"
                         variant="ghost"
                         onClick={handleClose}
-                        className="h-9 px-4 rounded-xl text-muted-foreground hover:text-foreground text-xs sm:text-sm"
+                        className="h-9 px-4 text-muted-foreground hover:text-foreground"
                       >
                         Cancelar
                       </Button>
                       <Button
                         type="submit"
                         disabled={isSubmitting}
-                        className="h-9 px-6 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs sm:text-sm shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+                        className="h-9 px-5 flex items-center gap-2"
                       >
                         <CheckCircle2 className="h-4 w-4" />
                         <span>{isSubmitting ? "Salvando..." : "Salvar estudo"}</span>

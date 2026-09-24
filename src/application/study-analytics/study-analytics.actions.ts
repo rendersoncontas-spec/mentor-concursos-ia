@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { getStudyHistoryForAnalytics, AnalyticsEngine } from "./study-analytics.service"
 import { isMaintenanceMode } from "@/lib/maintenance"
@@ -325,14 +326,27 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
     startDate = new Date(startOfDayInSaoPauloMs(monthStartKey)).toISOString()
   }
 
-  let query = supabase
-    .from('study_history')
-    .select('user_id, duration_minutes, active_minutes, started_at, metadata')
-
-  if (startDate) query = query.gte('started_at', startDate)
-  if (endDate) query = query.lte('started_at', endDate)
-
-  const { data: historyData } = await query
+  // Fase F.1: paginado (antes 1 requisição cortada em 1.000 linhas → no
+  // período "geral" o total do próprio usuário saía subcontado). Erro →
+  // sem linhas, como antes.
+  const historyResult = await fetchAllRowsPaged<{
+    user_id: string
+    duration_minutes: number | null
+    active_minutes: number | null
+    started_at: string
+    metadata: Record<string, unknown> | null
+  }>(
+    (withCount) => {
+      let query = supabase
+        .from('study_history')
+        .select('user_id, duration_minutes, active_minutes, started_at, metadata', countOption(withCount))
+      if (startDate) query = query.gte('started_at', startDate)
+      if (endDate) query = query.lte('started_at', endDate)
+      return query
+    },
+    [{ column: 'id', ascending: true }],
+  )
+  const historyData = historyResult.error ? null : historyResult.data
 
   const activeUserIds = new Set<string>()
   historyData?.forEach((h) => { if (h.user_id) activeUserIds.add(h.user_id) })

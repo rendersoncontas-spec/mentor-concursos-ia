@@ -36,8 +36,8 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative rounded-xl border bg-card shadow-xs transition-shadow flex flex-col h-auto w-full min-w-0",
-        isDragging && "shadow-xl opacity-80 ring-2 ring-primary z-50",
+        "group relative rounded-lg border border-border bg-card transition-shadow flex flex-col h-auto w-full min-w-0",
+        isDragging && "shadow-lg opacity-90 ring-1 ring-primary/40 z-50",
         colSpan >= 2 && "w-full",
       )}
     >
@@ -47,6 +47,7 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
         {...listeners}
         className="absolute top-2.5 right-2.5 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/70 cursor-grab active:cursor-grabbing z-20 transition-all opacity-30 group-hover:opacity-100 focus-within:opacity-100"
         title="Arraste para reorganizar"
+        aria-label="Arraste para reorganizar"
       >
         <GripVertical className="w-3.5 h-3.5" />
       </div>

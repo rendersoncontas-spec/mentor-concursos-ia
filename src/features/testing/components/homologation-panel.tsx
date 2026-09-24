@@ -95,7 +95,7 @@ export function HomologationPanel() {
                 
                 <div className="space-y-1 w-full">
                   <div className="flex gap-2">
-                    <span className="font-bold text-white">[{log.step}]</span>
+                    <span className="font-semibold text-white">[{log.step}]</span>
                     <span className={getLogStatusClass(log.status)}>
                       {log.message}
                     </span>

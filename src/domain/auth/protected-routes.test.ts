@@ -18,12 +18,9 @@ const REAL_PROTECTED_PAGES = [
   "/conquistas",
   "/dashboard",
   "/dashboard/adaptive",
-  "/dashboard/analytics",
   "/dashboard/history",
   "/dashboard/homologation",
   "/dashboard/mentor",
-  "/dashboard/performance",
-  "/dashboard/questions",
   "/dashboard/reviews",
   "/dashboard/study-session",
   "/disciplines",
@@ -43,6 +40,15 @@ const REAL_PROTECTED_PAGES = [
 test("isProtectedPath: cobre todas as rotas reais de src/app/(protected)", () => {
   for (const path of REAL_PROTECTED_PAGES) {
     assert.equal(isProtectedPath(path), true, `rota protegida real nao coberta pelo middleware: ${path}`)
+  }
+})
+
+test("isProtectedPath: rotas antigas que viraram redirect (Fase G.1) continuam cobertas pelo proxy", () => {
+  // /dashboard/analytics, /performance e /questions nao tem mais page.tsx
+  // (redirect em src/config/legacy-routes.ts). Se o redirect for removido um
+  // dia, o prefixo /dashboard ainda exige login.
+  for (const path of ["/dashboard/analytics", "/dashboard/performance", "/dashboard/questions"]) {
+    assert.equal(isProtectedPath(path), true, path)
   }
 })
 

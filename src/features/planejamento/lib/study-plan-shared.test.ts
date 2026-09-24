@@ -3,7 +3,6 @@ import { test } from "node:test"
 
 import {
   getStudyPlanDay,
-  isDutyShiftDate,
   type BaseCycleBlock,
   type SharedPlanConfig,
 } from "./study-plan-shared.ts"

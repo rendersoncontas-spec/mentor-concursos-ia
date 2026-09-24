@@ -5,11 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import {
-  Archive,
-  BarChart3,
-  Calendar,
   ChevronRight,
-  Clock,
   Copy,
   ExternalLink,
   FileText,
@@ -17,8 +13,6 @@ import {
   Loader2,
   Pause,
   Play,
-  Plus,
-  ShieldCheck,
   Target,
   Trash2,
 } from "lucide-react"
@@ -40,7 +34,9 @@ import {
 } from "@/application/study-plan/list-plans.action"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Metric, MetricStrip } from "@/components/ui/metric"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Progress } from "@/components/ui/progress"
 import type { PlanStatus, PlanType } from "@/domain/study-plan/study-plan.types"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
@@ -68,38 +64,13 @@ function planTypeLabel(type: PlanType | null): string {
 function statusBadge(status: PlanStatus) {
   switch (status) {
     case "ACTIVE":
-      return (
-        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] uppercase px-2 h-5">
-          Ativo
-        </Badge>
-      )
+      return <Badge variant="success">Ativo</Badge>
     case "PAUSED":
-      return (
-        <Badge
-          variant="outline"
-          className="text-amber-600 border-amber-600 font-bold text-[10px] uppercase px-2 h-5"
-        >
-          Pausado
-        </Badge>
-      )
+      return <Badge variant="warning">Pausado</Badge>
     case "ARCHIVED":
-      return (
-        <Badge
-          variant="secondary"
-          className="text-muted-foreground font-bold text-[10px] uppercase px-2 h-5"
-        >
-          Arquivado
-        </Badge>
-      )
+      return <Badge variant="secondary">Arquivado</Badge>
     case "COMPLETED":
-      return (
-        <Badge
-          variant="outline"
-          className="text-info border-info font-bold text-[10px] uppercase px-2 h-5"
-        >
-          Concluído
-        </Badge>
-      )
+      return <Badge variant="outline">Concluído</Badge>
     default:
       return null
   }
@@ -240,391 +211,296 @@ export function PlanosView() {
 
   return (
     <div className="space-y-4 pb-8">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-slate-900/5 dark:bg-slate-100/5 p-6 rounded-2xl border">
-        <div className="space-y-1">
-          <h1 className="text-xl font-black text-foreground tracking-tight">Planos de Estudo</h1>
-          <p className="text-xs text-muted-foreground font-medium max-w-lg">
-            Organize suas estratégias de estudo e escolha qual plano seguir para sua aprovação.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={() => router.push("/planejamento")}
-            className="bg-primary hover:bg-primary/90 text-white font-black text-xs px-6 h-11 rounded-2xl shadow-sm flex items-center gap-2 group"
-          >
-            <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform" />
-            CRIAR NOVO PLANO
-          </Button>
-        </div>
-      </div>
-
-      {/* STATE SUMMARY */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Plano Ativo
-          </span>
-          <span className="text-sm font-black text-foreground truncate block">
-            {activePlan?.name || "Nenhum"}
-          </span>
-        </div>
-        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Carga Semanal
-          </span>
-          <span className="text-sm font-black text-primary block">
-            {activePlan ? formatMinutes(activePlan.totalMinutes) : "0h"}
-          </span>
-        </div>
-        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Disciplinas
-          </span>
-          <span className="text-sm font-black text-foreground block">
-            {activePlan?.disciplinesCount || 0}
-          </span>
-        </div>
-        <div className="bg-card border p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Aderência Real
-          </span>
-          <span className="text-sm font-black text-emerald-500 block">
-            {activePlan?.adherencePercentage !== null &&
-            activePlan?.adherencePercentage !== undefined
+      {/* RESUMO — faixa única de métricas (antes: 4 cards iguais) */}
+      <MetricStrip>
+        <Metric label="Plano ativo" value={<span className="block truncate">{activePlan?.name || "Nenhum"}</span>} size="sm" />
+        <Metric
+          label="Carga semanal"
+          value={activePlan ? formatMinutes(activePlan.totalMinutes) : "0h"}
+          size="sm"
+          tone="primary"
+        />
+        <Metric label="Disciplinas" value={activePlan?.disciplinesCount || 0} size="sm" />
+        <Metric
+          label="Aderência real"
+          value={
+            activePlan?.adherencePercentage !== null && activePlan?.adherencePercentage !== undefined
               ? `${activePlan.adherencePercentage}%`
-              : "—"}
-          </span>
-        </div>
-      </div>
+              : "—"
+          }
+          size="sm"
+        />
+      </MetricStrip>
 
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm font-bold text-muted-foreground">Carregando sua estratégia...</p>
+        <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+          <p className="text-[13px]">Carregando seus planos…</p>
         </div>
       )}
 
       {!isLoading && loadError && (
-        <div className="rounded-2xl border border-dashed border-rose-200 bg-rose-50/30 p-6 flex flex-col items-center gap-4 text-center">
-          <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center">
-            <Trash2 className="h-6 w-6 text-rose-500" />
-          </div>
-          <p className="text-sm text-rose-900 font-bold">{loadError}</p>
-          <Button
-            onClick={loadPlans}
-            variant="outline"
-            className="border-rose-200 text-rose-600 font-bold text-xs h-9"
-          >
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-center">
+          <p className="text-sm font-medium text-destructive">{loadError}</p>
+          <Button onClick={loadPlans} variant="outline" size="sm">
             Tentar novamente
           </Button>
         </div>
       )}
 
-      {/* PLANO ATIVO DISPLAY */}
+      {/* PLANO ATIVO — Fase E: superfície neutra em duas regiões (antes era um
+          bloco escuro invertido com ícone gigante e botões em caixa alta). */}
       {!isLoading && !loadError && (
         <div className="space-y-6">
           {activePlan ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 px-1">
-                <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs font-black uppercase tracking-widest text-foreground">
-                  Plano Atual
-                </span>
-              </div>
+            <section aria-labelledby="plano-atual" className="space-y-2.5">
+              <h2 id="plano-atual" className="type-h3 text-foreground">
+                Plano atual
+              </h2>
 
-              <div className="group relative bg-slate-900 dark:bg-white text-slate-100 dark:text-slate-900 rounded-2xl overflow-hidden shadow-sm transition-all">
-                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <ShieldCheck className="h-32 w-32" />
-                </div>
-
-                <div className="relative z-10 p-8 md:p-10 flex flex-col lg:flex-row gap-10">
-                  <div className="flex-1 space-y-6">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-black tracking-tight">{activePlan.name}</h2>
-                        {statusBadge(activePlan.status)}
-                      </div>
-                      <p className="text-sm text-slate-400 dark:text-slate-500 font-medium leading-relaxed max-w-xl">
-                        {activePlan.description ||
-                          `Este é seu plano de estudo principal focado em ${activePlan.planType === "CICLO_ROTATIVO" ? "rodar as matérias de forma contínua" : "cumprir uma agenda semanal fixa"}.`}
-                      </p>
+              <div className="grid rounded-lg border border-border bg-card lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
+                <div className="min-w-0 space-y-5 p-5">
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="type-h2 text-foreground">{activePlan.name}</h3>
+                      {statusBadge(activePlan.status)}
                     </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 py-2">
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                          Metas
-                        </span>
-                        <div className="flex items-center gap-2 font-black text-lg">
-                          <Clock className="h-4 w-4 text-primary" />
-                          {formatMinutes(activePlan.totalMinutes)}/sem
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                          Conteúdo
-                        </span>
-                        <div className="flex items-center gap-2 font-black text-lg">
-                          <Target className="h-4 w-4 text-emerald-400" />
-                          {activePlan.disciplinesCount} matérias
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                          Início
-                        </span>
-                        <div className="flex items-center gap-2 font-black text-lg">
-                          <Calendar className="h-4 w-4 text-sky-400" />
-                          {formatDate(activePlan.generatedAt)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 pt-2">
-                      <div className="flex items-center justify-between text-xs font-bold">
-                        <span className="text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <BarChart3 className="h-3.5 w-3.5" /> Progresso da Estratégia
-                        </span>
-                        <span>{activePlan.adherencePercentage || 0}% de aderência</span>
-                      </div>
-                      <Progress
-                        value={activePlan.adherencePercentage || 0}
-                        className="h-2 bg-slate-800 dark:bg-slate-200"
-                      />
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 pt-4">
-                      <Button
-                        onClick={() => router.push("/study-plan")}
-                        className="bg-primary hover:bg-primary/90 text-white font-black text-xs px-6 h-10 rounded-2xl shadow-sm flex items-center gap-2"
-                      >
-                        CONTINUAR ESTUDANDO
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push("/planejamento")}
-                        className="border-slate-700 dark:border-slate-300 hover:bg-slate-800 dark:hover:bg-slate-100 text-foreground font-black text-xs px-4 h-9 rounded-2xl flex items-center gap-2"
-                      >
-                        ABRIR PLANEJAMENTO
-                      </Button>
-                      <div className="flex items-center gap-2 h-12 px-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleTogglePause(activePlan, e)}
-                          className="h-10 w-10 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100"
-                          title={activePlan.status === "PAUSED" ? "Retomar" : "Pausar"}
-                        >
-                          {activePlan.status === "PAUSED" ? (
-                            <Play className="h-5 w-5 text-emerald-400" />
-                          ) : (
-                            <Pause className="h-5 w-5 text-amber-400" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleDuplicate(activePlan, e)}
-                          className="h-10 w-10 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100"
-                          title="Duplicar / Criar Versão"
-                        >
-                          <Copy className="h-5 w-5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedPlan(activePlan)}
-                          className="h-10 w-10 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100"
-                          title="Ver Detalhes"
-                        >
-                          <FileText className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    </div>
+                    <p className="prose-width text-[13px] leading-relaxed text-muted-foreground">
+                      {activePlan.description ||
+                        `Este é seu plano de estudo principal focado em ${activePlan.planType === "CICLO_ROTATIVO" ? "rodar as matérias de forma contínua" : "cumprir uma agenda semanal fixa"}.`}
+                    </p>
                   </div>
 
-                  {/* MINI PREVIEW DAS DISCIPLINAS */}
-                  <div className="hidden lg:flex flex-col w-64 bg-slate-800/50 dark:bg-slate-50/50 rounded-2xl border border-slate-700/50 dark:border-slate-200/50 p-5 space-y-4">
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                      Top 5 Disciplinas
-                    </span>
-                    <div className="space-y-3">
-                      {activePlan.disciplines.slice(0, 5).map((d) => (
-                        <div key={d.id} className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between text-[11px] font-bold">
-                            <span className="truncate w-32">{d.name}</span>
-                            <span className="text-primary">{formatMinutes(d.weeklyMinutes)}</span>
-                          </div>
-                          <Progress
-                            value={Math.min(
-                              100,
-                              (d.weeklyMinutes /
-                                (activePlan.totalMinutes / activePlan.disciplinesCount)) *
-                                50,
-                            )}
-                            className="h-1"
-                          />
-                        </div>
-                      ))}
+                  <dl className="grid max-w-xl grid-cols-3 gap-4">
+                    <div className="min-w-0">
+                      <dt className="text-xs text-muted-foreground">Meta semanal</dt>
+                      <dd className="mt-0.5 text-base font-semibold tabular-nums text-foreground">
+                        {formatMinutes(activePlan.totalMinutes)}
+                      </dd>
                     </div>
-                    {activePlan.disciplinesCount > 5 && (
-                      <button
+                    <div className="min-w-0">
+                      <dt className="text-xs text-muted-foreground">Disciplinas</dt>
+                      <dd className="mt-0.5 text-base font-semibold tabular-nums text-foreground">
+                        {activePlan.disciplinesCount}
+                      </dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-xs text-muted-foreground">Início</dt>
+                      <dd className="mt-0.5 text-base font-semibold tabular-nums text-foreground">
+                        {formatDate(activePlan.generatedAt)}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="max-w-xl space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Aderência ao plano</span>
+                      <span className="font-medium tabular-nums text-foreground">
+                        {activePlan.adherencePercentage || 0}%
+                      </span>
+                    </div>
+                    <Progress value={activePlan.adherencePercentage || 0} />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={() => router.push("/study-plan")}>
+                      Continuar estudando
+                      <ChevronRight aria-hidden className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => router.push("/planejamento")}>
+                      Abrir planejamento
+                    </Button>
+                    <div className="flex items-center gap-1 sm:ml-auto">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => handleTogglePause(activePlan, e)}
+                        title={activePlan.status === "PAUSED" ? "Retomar plano" : "Pausar plano"}
+                        aria-label={activePlan.status === "PAUSED" ? "Retomar plano" : "Pausar plano"}
+                      >
+                        {activePlan.status === "PAUSED" ? (
+                          <Play aria-hidden className="h-4 w-4" />
+                        ) : (
+                          <Pause aria-hidden className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => handleDuplicate(activePlan, e)}
+                        title="Duplicar plano"
+                        aria-label="Duplicar plano"
+                      >
+                        <Copy aria-hidden className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         onClick={() => setSelectedPlan(activePlan)}
-                        className="text-[10px] font-black text-primary hover:underline uppercase text-center pt-2"
+                        title="Ver detalhes do plano"
+                        aria-label="Ver detalhes do plano"
                       >
-                        + {activePlan.disciplinesCount - 5} OUTRAS
-                      </button>
-                    )}
+                        <FileText aria-hidden className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
+
+                {/* Maiores cargas semanais */}
+                <div className="hidden min-w-0 space-y-3 border-border p-5 lg:block lg:border-l">
+                  <p className="type-label">Maiores cargas semanais</p>
+                  <div className="space-y-3">
+                    {activePlan.disciplines.slice(0, 5).map((d) => (
+                      <div key={d.id} className="space-y-1">
+                        <div className="flex items-center justify-between gap-3 text-xs">
+                          <span className="truncate text-foreground">{d.name}</span>
+                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                            {formatMinutes(d.weeklyMinutes)}
+                          </span>
+                        </div>
+                        <Progress
+                          value={Math.min(
+                            100,
+                            (d.weeklyMinutes /
+                              (activePlan.totalMinutes / activePlan.disciplinesCount)) *
+                              50,
+                          )}
+                          className="h-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {activePlan.disciplinesCount > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlan(activePlan)}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Ver todas as {activePlan.disciplinesCount} disciplinas
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+            </section>
           ) : (
-            /* EMPTY STATE SEM PLANO ATIVO */
-            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-6 flex flex-col items-center gap-3 text-center">
-              <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
-                <Target className="h-12 w-12 text-primary" />
-              </div>
-              <div className="space-y-2 max-w-sm">
-                <h2 className="text-xl font-black text-foreground">Ainda não há um plano ativo</h2>
-                <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                  Crie uma estratégia de preparação para organizar seus estudos e acelerar sua
-                  aprovação.
-                </p>
-              </div>
-              <Button
-                onClick={() => router.push("/planejamento")}
-                className="bg-primary hover:bg-primary/90 text-white font-black text-xs px-10 h-14 rounded-2xl shadow-sm flex items-center gap-2"
-              >
-                CRIAR MEU PRIMEIRO PLANO
-              </Button>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                Ou use o Planejamento para montar o cronograma
-              </p>
+            <div className="rounded-lg border border-border bg-card">
+              <EmptyState
+                icon={Target}
+                title="Ainda não há um plano ativo"
+                description="Monte um plano no Planejamento para organizar a distribuição dos seus estudos."
+                action={
+                  <Button size="sm" onClick={() => router.push("/planejamento")}>
+                    Criar plano
+                  </Button>
+                }
+              />
             </div>
           )}
 
-          {/* LISTA DE OUTROS PLANOS */}
-          <div className="space-y-6 pt-6">
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                <Archive className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-                  Estratégias Arquivadas / Pausadas
-                </span>
-              </div>
+          {/* OUTROS PLANOS — lista em linhas com ações sempre visíveis (antes:
+              cards com ações que só apareciam no hover, sem acesso por teclado). */}
+          <section aria-labelledby="outros-planos" className="space-y-2.5">
+            <div className="flex items-end justify-between gap-3">
+              <h2 id="outros-planos" className="type-h3 text-foreground">
+                Planos pausados e arquivados
+              </h2>
               {otherPlans.length > 0 && (
-                <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {otherPlans.length} planos
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {otherPlans.length} {otherPlans.length === 1 ? "plano" : "planos"}
                 </span>
               )}
             </div>
 
             {otherPlans.length === 0 ? (
-              <div className="bg-muted/30 rounded-2xl p-6 flex flex-col items-center gap-2 text-center border border-dashed">
-                <History className="h-8 w-8 text-muted-foreground/30" />
-                <p className="text-xs text-muted-foreground font-bold italic">
-                  Nenhum plano anterior encontrado.
-                </p>
-              </div>
+              <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-[13px] text-muted-foreground">
+                Nenhum plano anterior encontrado.
+              </p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {otherPlans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    onClick={() => setSelectedPlan(plan)}
-                    className="group bg-card border rounded-2xl p-6 shadow-xs hover:shadow-sm hover:border-primary/40 transition-all cursor-pointer relative"
-                  >
-                    <div className="absolute top-6 right-6 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => handleActivate(plan.id, e)}
-                        className="h-8 w-8 rounded-lg hover:bg-emerald-50 text-emerald-600"
-                        title="Ativar como Principal"
-                      >
-                        <Play className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => handleDuplicate(plan, e)}
-                        className="h-8 w-8 rounded-lg hover:bg-primary/10 text-primary"
-                        title="Duplicar"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => handleDelete(plan, e)}
-                        className="h-8 w-8 rounded-lg hover:bg-rose-50 text-rose-500"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-black text-base text-foreground truncate pr-16">
-                            {plan.name}
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {statusBadge(plan.status)}
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                            {planTypeLabel(plan.planType)}
-                          </span>
-                        </div>
+              <div className="overflow-hidden rounded-lg border border-border bg-card">
+                <div className="type-label hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_110px_100px_90px_110px_120px] gap-4 border-b border-border bg-muted/40 px-4 py-2 md:grid">
+                  <span>Plano</span>
+                  <span>Tipo</span>
+                  <span>Status</span>
+                  <span className="text-right">Carga</span>
+                  <span className="text-right">Matérias</span>
+                  <span>Criado em</span>
+                  <span className="text-right">Ações</span>
+                </div>
+                <ul className="divide-y divide-border">
+                  {otherPlans.map((plan) => (
+                    <li
+                      key={plan.id}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-muted/30 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_110px_100px_90px_110px_120px]"
+                    >
+                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPlan(plan)}
+                          className="block max-w-full truncate text-left text-sm font-medium text-foreground hover:underline"
+                        >
+                          {plan.name}
+                        </button>
+                        <p className="text-xs text-muted-foreground md:hidden">
+                          {planTypeLabel(plan.planType)} · {formatMinutes(plan.totalMinutes)} ·{" "}
+                          {plan.disciplinesCount} matérias
+                        </p>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4 py-1">
-                        <div className="space-y-0.5">
-                          <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">
-                            Carga
-                          </span>
-                          <div className="text-xs font-black flex items-center gap-1.5">
-                            <Clock className="h-3 w-3 text-primary" />{" "}
-                            {formatMinutes(plan.totalMinutes)}
-                          </div>
-                        </div>
-                        <div className="space-y-0.5">
-                          <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">
-                            Matérias
-                          </span>
-                          <div className="text-xs font-black flex items-center gap-1.5">
-                            <Target className="h-3 w-3 text-emerald-500" /> {plan.disciplinesCount}
-                          </div>
-                        </div>
+                      <span className="hidden truncate text-xs text-muted-foreground md:block">
+                        {planTypeLabel(plan.planType)}
+                      </span>
+                      <span className="hidden md:block">{statusBadge(plan.status)}</span>
+                      <span className="hidden text-right text-xs tabular-nums text-foreground md:block">
+                        {formatMinutes(plan.totalMinutes)}
+                      </span>
+                      <span className="hidden text-right text-xs tabular-nums text-foreground md:block">
+                        {plan.disciplinesCount}
+                      </span>
+                      <span className="hidden text-xs tabular-nums text-muted-foreground md:block">
+                        {formatDate(plan.generatedAt)}
+                        {plan.versionsCount > 1 && <span className="block">{plan.versionsCount} versões</span>}
+                      </span>
+                      <div className="row-span-2 flex items-center justify-end gap-0.5 md:row-span-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => handleActivate(plan.id, e)}
+                          title="Ativar como principal"
+                          aria-label={`Ativar ${plan.name} como plano principal`}
+                        >
+                          <Play aria-hidden className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => handleDuplicate(plan, e)}
+                          title="Duplicar"
+                          aria-label={`Duplicar ${plan.name}`}
+                        >
+                          <Copy aria-hidden className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => handleDelete(plan, e)}
+                          className="text-muted-foreground hover:text-destructive"
+                          title="Excluir"
+                          aria-label={`Excluir ${plan.name}`}
+                        >
+                          <Trash2 aria-hidden className="h-4 w-4" />
+                        </Button>
                       </div>
-
-                      <div className="pt-3 border-t flex items-center justify-between text-[10px] font-bold text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3 w-3" /> {formatDate(plan.generatedAt)}
-                        </div>
-                        {plan.versionsCount > 1 && (
-                          <div className="flex items-center gap-1 text-primary">
-                            <History className="h-3 w-3" /> {plan.versionsCount} versões
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-          </div>
+          </section>
         </div>
       )}
 
       {/* PLAN DETAILS DIALOG */}
       <Dialog open={!!selectedPlan} onOpenChange={() => setSelectedPlan(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 rounded-2xl gap-0 border shadow-xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 rounded-xl gap-0 border shadow-xl">
           {selectedPlan && (
             <div className="flex flex-col">
               {/* DIALOG HEADER */}
@@ -632,7 +508,7 @@ export function PlanosView() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
-                      <h2 className="text-2xl font-black tracking-tight">{selectedPlan.name}</h2>
+                      <h2 className="text-2xl font-semibold tracking-tight">{selectedPlan.name}</h2>
                       {statusBadge(selectedPlan.status)}
                     </div>
                     <p className="text-xs text-slate-400 font-medium">
@@ -643,7 +519,7 @@ export function PlanosView() {
                     {!selectedPlan.active && (
                       <Button
                         onClick={() => handleActivate(selectedPlan.id)}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs h-10 px-6 rounded-xl"
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs h-10 px-6 rounded-xl"
                       >
                         ATIVAR PLANO
                       </Button>
@@ -651,7 +527,7 @@ export function PlanosView() {
                     <Button
                       variant="outline"
                       onClick={() => setSelectedPlan(null)}
-                      className="border-slate-700 hover:bg-slate-800 text-white font-black text-xs h-10 rounded-xl"
+                      className="border-slate-700 hover:bg-slate-800 text-white font-semibold text-xs h-10 rounded-xl"
                     >
                       FECHAR
                     </Button>
@@ -660,28 +536,28 @@ export function PlanosView() {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-slate-800">
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                    <span className="type-label">
                       Carga Semanal
                     </span>
-                    <p className="font-black text-lg">{formatMinutes(selectedPlan.totalMinutes)}</p>
+                    <p className="font-semibold text-lg">{formatMinutes(selectedPlan.totalMinutes)}</p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                    <span className="type-label">
                       Disciplinas
                     </span>
-                    <p className="font-black text-lg">{selectedPlan.disciplinesCount}</p>
+                    <p className="font-semibold text-lg">{selectedPlan.disciplinesCount}</p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                    <span className="type-label">
                       Criado em
                     </span>
-                    <p className="font-black text-lg">{formatDate(selectedPlan.generatedAt)}</p>
+                    <p className="font-semibold text-lg">{formatDate(selectedPlan.generatedAt)}</p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                    <span className="type-label">
                       Aderência
                     </span>
-                    <p className="font-black text-lg text-emerald-400">
+                    <p className="font-semibold text-lg text-emerald-400">
                       {selectedPlan.adherencePercentage || 0}%
                     </p>
                   </div>
@@ -696,14 +572,14 @@ export function PlanosView() {
                     <Button
                       variant="outline"
                       onClick={() => router.push("/planejamento")}
-                      className="font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2"
+                      className="font-semibold text-xs h-9 px-4 rounded-xl flex items-center gap-2"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> Ajustar no Planejamento
                     </Button>
                     <Button
                       variant="outline"
                       onClick={(e) => handleDuplicate(selectedPlan, e)}
-                      className="font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2"
+                      className="font-semibold text-xs h-9 px-4 rounded-xl flex items-center gap-2"
                     >
                       <Copy className="h-3.5 w-3.5" /> Duplicar Estratégia
                     </Button>
@@ -711,7 +587,7 @@ export function PlanosView() {
                   <Button
                     variant="ghost"
                     onClick={(e) => handleDelete(selectedPlan, e)}
-                    className="text-rose-500 font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2 hover:bg-rose-50"
+                    className="text-rose-500 font-semibold text-xs h-9 px-4 rounded-xl flex items-center gap-2 hover:bg-rose-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Excluir permanentemente
                   </Button>
@@ -721,7 +597,7 @@ export function PlanosView() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Target className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-black uppercase tracking-widest">
+                    <span className="text-[13px] font-semibold">
                       Disciplinas do Plano
                     </span>
                   </div>
@@ -731,19 +607,19 @@ export function PlanosView() {
                       <div
                         key={d.id}
                         onClick={() => openDiscipline(d)}
-                        className="p-4 border rounded-2xl hover:border-primary hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
+                        className="p-4 border rounded-xl hover:border-primary hover:shadow-sm cursor-pointer transition-all flex items-center justify-between group"
                       >
                         <div className="space-y-0.5">
-                          <h4 className="font-black text-sm">{d.name}</h4>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                          <h4 className="font-semibold text-sm">{d.name}</h4>
+                          <p className="type-label">
                             {d.area || "Geral"} · {d.itemsCount} blocos
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-black text-sm text-primary">
+                          <p className="font-semibold text-sm text-primary">
                             {formatMinutes(d.weeklyMinutes)}
                           </p>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                          <p className="type-label">
                             por semana
                           </p>
                         </div>
@@ -757,16 +633,16 @@ export function PlanosView() {
                   <div className="space-y-4 pt-6">
                     <div className="flex items-center gap-2">
                       <History className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-black uppercase tracking-widest">
+                      <span className="text-[13px] font-semibold">
                         Histórico de Versões do Grupo
                       </span>
                     </div>
 
-                    <div className="border rounded-2xl overflow-hidden">
+                    <div className="border rounded-xl overflow-hidden">
                       <div className="overflow-x-auto">
                       <table className="w-full text-xs min-w-[480px]">
                         <thead>
-                          <tr className="bg-muted/50 text-muted-foreground font-black uppercase text-[10px] border-b">
+                          <tr className="type-label bg-muted/50 border-b">
                             <th className="text-left p-4">Versão</th>
                             <th className="text-left p-4">Gerado em</th>
                             <th className="text-left p-4">Carga</th>
@@ -780,7 +656,7 @@ export function PlanosView() {
                               key={v.id}
                               className="border-b last:border-0 hover:bg-muted/20 transition-colors"
                             >
-                              <td className="p-4 font-black">v{v.version}</td>
+                              <td className="p-4 font-semibold">v{v.version}</td>
                               <td className="p-4 font-medium">{formatDate(v.generatedAt)}</td>
                               <td className="p-4 font-medium">
                                 {formatMinutes(v.weeklyMinutes)}/sem
@@ -790,7 +666,7 @@ export function PlanosView() {
                                 <Button
                                   variant="link"
                                   onClick={() => handleActivate(v.id)}
-                                  className="text-primary font-bold text-[11px] p-0 h-auto"
+                                  className="text-primary font-semibold text-[11px] p-0 h-auto"
                                 >
                                   Restaurar
                                 </Button>

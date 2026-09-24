@@ -32,7 +32,8 @@ const IDEMPOTENCY_WINDOW_MS = 30 * 1000
 function maskEmail(email: string): string {
   if (!email || !email.includes("@")) return "***@***"
   const [user, domain] = email.split("@")
-  const maskedUser = user ? (user.length > 2 ? `${user.slice(0, 2)}***` : `${user}***`) : "***"
+  let maskedUser = "***"
+  if (user) maskedUser = user.length > 2 ? `${user.slice(0, 2)}***` : `${user}***`
   return `${maskedUser}@${domain}`
 }
 

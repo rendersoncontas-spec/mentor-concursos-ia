@@ -28,16 +28,16 @@ export function SectionCard({
   className?: string
 }) {
   return (
-    <div className={`rounded-xl border bg-card p-5 shadow-xs space-y-4 ${className}`}>
+    <section className={`rounded-lg border border-border bg-card p-4 sm:p-5 space-y-4 ${className}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="font-semibold text-sm">{title}</h3>
+          <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
           {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
         {action}
       </div>
       {children}
-    </div>
+    </section>
   )
 }
 
@@ -53,9 +53,9 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="h-full min-h-24 flex flex-col items-center justify-center text-center border rounded-lg bg-muted/10 px-4 py-8 gap-2">
-      <Inbox className="h-8 w-8 text-muted-foreground" />
-      {title && <p className="text-sm font-bold">{title}</p>}
+    <div className="h-full min-h-24 flex flex-col items-center justify-center text-center border border-dashed border-border rounded-lg px-4 py-8 gap-1.5">
+      <Inbox aria-hidden className="h-5 w-5 text-muted-foreground/70" />
+      {title && <p className="text-sm font-medium text-foreground">{title}</p>}
       <p className="text-xs text-muted-foreground">{message}</p>
       {action}
     </div>
@@ -83,7 +83,7 @@ export function ClassificationChip({ classification }: { classification: string 
   }
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${c.cls}`}
+      className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium border ${c.cls}`}
     >
       {c.label}
     </span>
@@ -112,7 +112,7 @@ export function DeltaBadge({
   const sign = delta > 0 ? "+" : ""
   return (
     <span
-      className={`inline-flex items-center gap-1 text-xs font-bold ${up ? "text-emerald-600" : "text-rose-600"}`}
+      className={`inline-flex items-center gap-1 text-xs font-medium tabular-nums ${up ? "text-success" : "text-destructive"}`}
     >
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {sign}
@@ -163,10 +163,10 @@ export function Metric({
   // separada só por espaçamento e hierarquia tipográfica.
   return (
     <div className="min-w-0 py-1">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         {label}
       </p>
-      <p className={`mt-1 font-black text-xl ${accent ? "text-primary" : "text-foreground"}`}>
+      <p className={`mt-0.5 font-semibold text-lg tabular-nums ${accent ? "text-primary" : "text-foreground"}`}>
         {value}
       </p>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
@@ -263,14 +263,14 @@ export function HeatmapCalendar({
           <div className="flex gap-[3px]">
             <div className="flex flex-col gap-[3px] pr-0.5">
               {["Dom", "Seg", "", "Qua", "", "Sex", ""].map((label, r) => (
-                <span key={r} className="h-[13px] text-[9px] leading-[13px] text-muted-foreground">
+                <span key={r} className="h-[13px] text-[10px] leading-[13px] text-muted-foreground">
                   {label}
                 </span>
               ))}
             </div>
             {grid.map((col, wi) => (
               <div key={wi} className="flex flex-col gap-[3px]">
-                <span className="h-[13px] text-[9px] leading-[13px] text-muted-foreground whitespace-nowrap">
+                <span className="h-[13px] text-[10px] leading-[13px] text-muted-foreground whitespace-nowrap">
                   {colLabels[wi] ? (MONTH_NAMES[Number(colLabels[wi].slice(5, 7))] ?? "") : ""}
                 </span>
                 {[0, 1, 2, 3, 4, 5, 6].map((di) => {

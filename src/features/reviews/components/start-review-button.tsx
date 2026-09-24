@@ -12,12 +12,12 @@ export function StartReviewButton({ disabled }: { disabled: boolean }) {
   return (
     <>
       <button
-        className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-semibold text-sm shadow-sm hover:shadow-md hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+        className="inline-flex h-9 items-center gap-2 bg-primary text-primary-foreground px-3.5 rounded-md font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
-        <Play className="h-4 w-4" fill="currentColor" />
-        Iniciar
+        <Play className="h-3.5 w-3.5" fill="currentColor" />
+        Iniciar revisão
       </button>
       <ReviewPlayerModal open={open} onOpenChange={setOpen} mode="OVERDUE" onFinished={() => router.refresh()} />
     </>

@@ -1,6 +1,8 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { logActionPerf, perfEnabled, perfNow } from "@/lib/perf/server-perf"
+import type { HistoryListPayload } from "./history-list-payload"
 import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 
 import * as Sentry from "@sentry/nextjs"
@@ -26,6 +28,8 @@ import {
   getMonthlyHistory,
   getTotalStudyMinutes,
   getUserHistory,
+  getUserHistoryList,
+  getUserHistorySession,
   updateStudySession,
 } from "./study-history.service"
 
@@ -57,12 +61,58 @@ export async function getMonthlyHistoryAction(year: number, month: number) {
 }
 
 export async function getAllHistoryAction() {
+  // Fase F.1: medição (só durações e contagem de linhas; log `[perf]`).
+  const t0 = perfNow()
   try {
     const supabase = await createClient()
     const effectiveUserId = await getEffectiveUserId(supabase)
     if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
+    const authMs = perfNow() - t0
 
     const data = await getAllUserHistory(supabase, effectiveUserId)
+    logActionPerf("getAllHistoryAction (/dashboard/history)", t0, { rows: data.length, authMs: Math.round(authMs) })
+    return { data, error: null }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message ?? null }
+  }
+}
+
+/**
+ * Fase F.2 — lista do Histórico com payload enxuto (campos da lista, filtros,
+ * agrupamento e totais; disciplina uma vez por disciplina). A edição busca a
+ * linha completa separadamente (getHistorySessionForEditAction).
+ */
+export async function getHistoryListAction(): Promise<{ data: HistoryListPayload | null; error: string | null }> {
+  const t0 = perfNow()
+  try {
+    const supabase = await createClient()
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
+    const authMs = perfNow() - t0
+
+    const data = await getUserHistoryList(supabase, effectiveUserId)
+    // Medição: tamanho do JSON enviado ao navegador (só calculado com [perf] ligado).
+    logActionPerf("getHistoryListAction (/dashboard/history)", t0, {
+      rows: data.rows.length,
+      authMs: Math.round(authMs),
+      ...(perfEnabled() ? { payloadBytes: JSON.stringify(data).length } : {}),
+    })
+    return { data, error: null }
+  } catch (error) {
+    return { data: null, error: (error as { message?: string }).message ?? null }
+  }
+}
+
+/** Fase F.2 — linha completa de UMA sessão do usuário, para o modal de edição. */
+export async function getHistorySessionForEditAction(
+  sessionId: string,
+): Promise<{ data: Record<string, unknown> | null; error: string | null }> {
+  try {
+    const supabase = await createClient()
+    const effectiveUserId = await getEffectiveUserId(supabase)
+    if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
+    const data = await getUserHistorySession(supabase, effectiveUserId, sessionId)
+    if (!data) return { data: null, error: "Sessão não encontrada." }
     return { data, error: null }
   } catch (error) {
     return { data: null, error: (error as { message?: string }).message ?? null }

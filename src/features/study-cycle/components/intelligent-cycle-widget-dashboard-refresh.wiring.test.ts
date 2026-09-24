@@ -52,7 +52,8 @@ describe("IntelligentCycleWidget: Foco de Hoje se atualiza sozinho após qualque
     const source = readWidgetSource()
     assert.match(
       source,
-      /import \{ STUDY_SESSION_SAVED_EVENT \} from "@\/features\/study-session\/lib\/study-session-events"/,
+      // Fase F.2: o mesmo import agora também traz shouldWidgetRefreshOnSaved.
+      /import \{[^}]*\bSTUDY_SESSION_SAVED_EVENT\b[^}]*\} from "@\/features\/study-session\/lib\/study-session-events"/,
     )
   })
 

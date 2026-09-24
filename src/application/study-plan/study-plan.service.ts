@@ -15,6 +15,7 @@ import {
 import { calculateWeeklyDistribution, calculateCycleDistribution, calcDisciplineSummary } from "@/application/study-plan/study-plan.algorithm"
 import { generateAdaptiveDecisions, type AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
 import { getDayInSaoPaulo } from "@/lib/sao-paulo"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 /**
  * Gera e persiste um novo cronograma para o usuário.
@@ -143,11 +144,25 @@ export async function generateStudyPlan(
   // Desempenho real por disciplina (acurácia e volume de estudo nos últimos 90 dias).
   const perfCutoff = new Date()
   perfCutoff.setDate(perfCutoff.getDate() - 90)
-  const { data: perfHistory } = await supabase
-    .from("study_history")
-    .select("discipline_id, duration_minutes, metadata")
-    .eq("user_id", userId)
-    .gte("started_at", perfCutoff.toISOString())
+  // Fase F.1: paginado (90 dias podem passar de 1.000 sessões para quem estuda
+  // muito; antes 1 requisição cortada em 1.000). Erro → sem histórico, como antes.
+  const perfResult = await fetchAllRowsPaged<{
+    discipline_id: string
+    duration_minutes: number | null
+    metadata: Record<string, unknown> | null
+  }>(
+    (withCount) =>
+      supabase
+        .from("study_history")
+        .select("discipline_id, duration_minutes, metadata", countOption(withCount))
+        .eq("user_id", userId)
+        .gte("started_at", perfCutoff.toISOString()),
+    [
+      { column: "started_at", ascending: true },
+      { column: "id", ascending: true },
+    ],
+  )
+  const perfHistory = perfResult.error ? null : perfResult.data
 
   const perfByDiscipline = new Map<string, { answered: number; correct: number; minutes: number }>()
   ;(perfHistory ?? []).forEach((h) => {
@@ -634,29 +649,43 @@ export async function getCycleOverviewData(
 
   if (planError || !plan) return null
 
-  const { data: rawItems, error: itemsError } = await supabase
-    .from("study_plan_items")
-    .select(`
+  // Fase F (performance): itens do plano e histórico desde a criação do plano
+  // dependem só do plano — saem juntos (antes: um depois do outro).
+  // 1. Fetch study history since plan creation to allocate studied minutes
+  const planDate = plan.generated_at || plan.created_at
+  const [{ data: rawItems, error: itemsError }, { data: historyData }] = await Promise.all([
+    supabase
+      .from("study_plan_items")
+      .select(`
       id, study_plan_id, discipline_id, day_of_week,
       duration_minutes, priority, priority_score, recommended_sessions, created_at,
       disciplines ( id, name, area )
     `)
-    .eq("study_plan_id", plan.id)
-    .order("priority", { ascending: true })
+      .eq("study_plan_id", plan.id)
+      .order("priority", { ascending: true }),
+    // Fase F.1: leitura paginada (antes 1 requisição, cortada em 1.000 linhas:
+    // com plano antigo o "estudado" ficava subcontado). Ordem determinística
+    // started_at + id. Erro → sem histórico, como antes (nunca parcial).
+    fetchAllRowsPaged<StudyHistoryRecord>(
+      (withCount) =>
+        supabase
+          .from("study_history")
+          .select("discipline_id, duration_minutes, started_at", countOption(withCount))
+          .eq("user_id", userId)
+          .gte("started_at", planDate),
+      [
+        { column: "started_at", ascending: true },
+        { column: "id", ascending: true },
+      ],
+      { perfLabel: "study_history.desde_o_plano" },
+    ).then(({ data, error }) => ({ data: error ? null : data })),
+  ])
 
   if (itemsError || !rawItems) return null
 
   // Mapear cores fixas por disciplina
   const disciplineColorMap = new Map<string, string>()
   let colorIndex = 0
-
-  // 1. Fetch study history since plan creation to allocate studied minutes
-  const planDate = plan.generated_at || plan.created_at
-  const { data: historyData } = await supabase
-    .from("study_history")
-    .select("discipline_id, duration_minutes, started_at")
-    .eq("user_id", userId)
-    .gte("started_at", planDate)
 
   const studiedMap = new Map<string, number>()
   const history = ((historyData as StudyHistoryRecord[] | null)?.map((h) => ({

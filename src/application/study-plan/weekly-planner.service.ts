@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { isShiftDayForDate } from "@/features/planejamento/lib/planning-form"
 import { getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
-import { getSaoPauloWeekRange, type WeekRangeInfo } from "@/lib/study-time-calculator"
+import { getSaoPauloWeekRange, resolveWeekStartDay, type WeekRangeInfo } from "@/lib/study-time-calculator"
 
 import {
   MAX_DAILY_MINUTES_CAP,
@@ -114,9 +114,8 @@ export function isAvailableStudyDate(
   if (availability.customShiftDays?.[dateKey] === "FOLGA_ESTUDO") return true
 
   if (availability.scheduleMode !== "normal") {
-    const [y, m, d] = dateKey.split("-").map(Number)
+    const [y, m] = dateKey.split("-").map(Number)
     const padM = String(m).padStart(2, "0")
-    const padD = String(d).padStart(2, "0")
     const effectiveAnchor =
       availability.anchorShiftDate ||
       `${y}-${padM}-${String(availability.firstShiftDay).padStart(2, "0")}`
@@ -154,12 +153,10 @@ export async function getWeeklyPlanSummary(
   const weeklyGoalMinutes = weeklyGoalHours * 60
 
   const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
-  const weekStartDay =
-    prefsFirstDay === "Domingo"
-      ? 0
-      : prefsFirstDay === "Segunda-feira"
-        ? 1
-        : ((profile as { week_start_day?: number } | null)?.week_start_day ?? 0)
+  const weekStartDay = resolveWeekStartDay(
+    prefsFirstDay,
+    (profile as { week_start_day?: number } | null)?.week_start_day
+  )
 
   // 2. Limites da semana atual
   const weekRange = getCurrentWeekRange(todayKey, weekStartDay)

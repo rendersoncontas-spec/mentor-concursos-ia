@@ -7,12 +7,12 @@ import {
   calculateCycleSkip,
 } from "./cycle-progress.service"
 import {
-  DEFAULT_MINUTES_BY_DIFFICULTY,
   getDefaultMinutesByDifficulty,
   type StudyCycle,
   type StudyCycleItemWithDetails,
   type StudyCycleSession,
 } from "@/domain/study-cycle/study-cycle.types"
+import { must } from "@/lib/testing/must"
 
 function createMockCycle(overrides: Partial<StudyCycle> = {}): StudyCycle {
   return {
@@ -182,7 +182,6 @@ test("NOVO 5. Matéria fora do ciclo → NÃO conta para o ciclo", () => {
 
 test("NOVO 6. Matéria futura do ciclo estudada antecipadamente → acumula progresso mas NÃO move cursor", () => {
   const cycle = createMockCycle({ current_item_index: 0, current_item_progress_min: 0 })
-  const items = createMockItems()
 
   // Aluno estuda Contabilidade (índice 2, futura) enquanto cursor está em Português (índice 0)
   // O service registerStudyToCycle detecta que não é o item atual e NÃO avança o cursor
@@ -242,7 +241,7 @@ test("NOVO 10. Percentual nunca passa de 100%", () => {
   ]
 
   const overview = buildCycleOverview(cycle, items, sessions)
-  const portItem = overview.items[0]!
+  const portItem = must(overview.items[0])
 
   assert.equal(portItem.studiedMinutesInRound, 60, "Máximo 60 min válidos")
   assert.equal(portItem.extraMinutesInRound, 40, "40 min extras")
@@ -262,7 +261,6 @@ test("NOVO 11. Mesmo study_history_id processado novamente → não duplica", ()
 })
 
 test("NOVO 12. Importação em lote → contabiliza somente matérias do ciclo", () => {
-  const cycle = createMockCycle()
   const items = createMockItems()
   const cycleDisciplineIds = new Set(items.map(i => i.discipline_id))
 
@@ -351,7 +349,7 @@ test("NOVO 14. Planejamento + ciclo → uma sessão alimenta ambos sem duplicar 
   const processedHistories = new Set<string>()
   processedHistories.add(studyHistoryId)
 
-  let wouldProcessAgain = !processedHistories.has(studyHistoryId)
+  const wouldProcessAgain = !processedHistories.has(studyHistoryId)
   assert.equal(wouldProcessAgain, false, "Idempotência impede duplicação no ciclo")
 })
 
@@ -441,7 +439,7 @@ test("5. Extra não aumenta percentual acima de 100% nem no item nem na volta", 
   ]
 
   const overview = buildCycleOverview(cycle, items, sessions)
-  const portItem = overview.items[0]!
+  const portItem = must(overview.items[0])
 
   assert.equal(portItem.studiedMinutesInRound, 60)
   assert.equal(portItem.extraMinutesInRound, 20)
@@ -471,7 +469,6 @@ test("6. Última matéria concluída inicia nova volta (volta 1 -> 2, voltas con
 test("7. REGRA ANTIGA REMOVIDA: Estudo FREE AGORA pode alterar ciclo se matéria estiver no ciclo", () => {
   // ANTES: study_source === "CYCLE" era condição exclusiva
   // AGORA: Qualquer study_source pode contribuir se a matéria estiver no ciclo
-  const studySource = "FREE"
   const cycle = createMockCycle({ current_item_index: 1, current_item_progress_min: 15 })
   const items = createMockItems()
 
@@ -483,7 +480,6 @@ test("7. REGRA ANTIGA REMOVIDA: Estudo FREE AGORA pode alterar ciclo se matéria
 })
 
 test("8. REGRA ANTIGA REMOVIDA: Estudo PLANNED AGORA pode alterar ciclo se matéria estiver no ciclo", () => {
-  const studySource = "PLAN"
   const cycle = createMockCycle({ current_item_index: 2, current_item_progress_min: 30 })
   const items = createMockItems()
 
@@ -494,7 +490,6 @@ test("8. REGRA ANTIGA REMOVIDA: Estudo PLANNED AGORA pode alterar ciclo se maté
 })
 
 test("9. Estudo CYCLE continua funcionando normalmente", () => {
-  const studySource = "CYCLE"
   const cycle = createMockCycle({ current_item_index: 1, current_item_progress_min: 35 })
   const items = createMockItems()
 
@@ -559,7 +554,7 @@ test("13. Pular etapa não transforma automaticamente em 100% e preserva minutos
 
   const updatedCycle = createMockCycle({ current_item_index: 2, current_item_progress_min: 0 })
   const overview = buildCycleOverview(updatedCycle, items, [skipSession])
-  const skippedItem = overview.items[1]!
+  const skippedItem = must(overview.items[1])
 
   assert.equal(skippedItem.status, "PULADO")
   assert.equal(skippedItem.studiedMinutesInRound, 35)
@@ -657,22 +652,22 @@ test("27. buildCycleOverview: difficulty ALTA no banco normaliza para DIFICIL na
   const overview = buildCycleOverview(cycle, items, [])
   const item = overview.items[0]
   assert.ok(item)
-  assert.equal(item!.difficulty, "DIFICIL")
-  assert.equal(item!.priority, "ALTA")
+  assert.equal(must(item).difficulty, "DIFICIL")
+  assert.equal(must(item).priority, "ALTA")
 })
 
 test("28. buildCycleOverview: alterar difficulty de um item não afeta os outros", () => {
   const cycle = createMockCycle()
   const items = createMockItems()
-  items[0]!.priority = "ALTA"
-  items[0]!.difficulty = null as unknown as string
+  must(items[0]).priority = "ALTA"
+  must(items[0]).difficulty = null as unknown as string
 
   const overview = buildCycleOverview(cycle, items, [])
 
-  assert.equal(overview.items[0]!.difficulty, "DIFICIL")
-  assert.equal(overview.items[1]!.difficulty, "DIFICIL")
-  assert.equal(overview.items[2]!.difficulty, "DIFICIL")
-  assert.equal(overview.items[3]!.difficulty, "MEDIA")
+  assert.equal(must(overview.items[0]).difficulty, "DIFICIL")
+  assert.equal(must(overview.items[1]).difficulty, "DIFICIL")
+  assert.equal(must(overview.items[2]).difficulty, "DIFICIL")
+  assert.equal(must(overview.items[3]).difficulty, "MEDIA")
 })
 
 test("29. buildCycleOverview: difficulty FACIL preserva plannedMinutes e order", () => {
@@ -689,9 +684,9 @@ test("29. buildCycleOverview: difficulty FACIL preserva plannedMinutes e order",
   const overview = buildCycleOverview(cycle, items, [])
   const item = overview.items[0]
   assert.ok(item)
-  assert.equal(item!.difficulty, "FACIL")
-  assert.equal(item!.plannedMinutes, 90)
-  assert.equal(item!.order, 1)
+  assert.equal(must(item).difficulty, "FACIL")
+  assert.equal(must(item).plannedMinutes, 90)
+  assert.equal(must(item).order, 1)
 })
 
 test("30. getDefaultMinutesByDifficulty: Fácil/BAIXA/EASY gera 30 minutos", () => {
@@ -721,8 +716,6 @@ test("32. getDefaultMinutesByDifficulty: Difícil/ALTA/HARD gera 90 minutos", ()
 
 test("33. Estudo de matéria já concluída na volta atual → gera EXTRA", () => {
   // Matéria já está concluída (current_index já passou dela)
-  const cycle = createMockCycle({ current_item_index: 2, current_item_progress_min: 0 })
-  const items = createMockItems()
   
   // Simula que Português (index 0) já foi concluído
   // Se aluno estudar Português novamente, deve gerar EXTRA
@@ -756,8 +749,8 @@ test("34. Extra armazenado separadamente não infla progresso", () => {
 
   const overview = buildCycleOverview(cycle, items, sessions)
   
-  assert.equal(overview.items[0]!.studiedMinutesInRound, 60)
-  assert.equal(overview.items[0]!.extraMinutesInRound, 30)
+  assert.equal(must(overview.items[0]).studiedMinutesInRound, 60)
+  assert.equal(must(overview.items[0]).extraMinutesInRound, 30)
   assert.equal(overview.totalStudiedMinutesInRound, 60)
   assert.equal(overview.totalExtraMinutesInRound, 30)
   assert.ok(overview.roundProgressPercentage < 100)
@@ -778,7 +771,7 @@ test("35. Matéria futura acumula progresso na sessão e overview mostra o progr
   const overview = buildCycleOverview(cycle, items, [futureSession])
   
   // Item futuro (Contabilidade) mostra 45 min acumulados na volta atual
-  const contItem = overview.items[2]!
+  const contItem = must(overview.items[2])
   assert.equal(contItem.studiedMinutesInRound, 45, "Futuro deve mostrar os 45 min acumulados")
   assert.equal(contItem.remainingMinutesInRound, 45, "Faltam 45 min para a meta de 90")
   assert.equal(contItem.status, "PENDENTE")
@@ -814,7 +807,7 @@ test("TEMPORAL 1. Estudo ANTES do ciclo (31/08) → NÃO conta, ciclo criado 01/
   // Estudo em 31/08 (antes do ciclo)
   const studyDate = new Date("2026-08-31T10:00:00Z")
   const cycleCreatedAt = cycle.created_at as string
-  const itemCreatedAt = items[0]!.created_at as string
+  const itemCreatedAt = must(items[0]).created_at as string
   const cycleDate = new Date(cycleCreatedAt)
   const itemDate = new Date(itemCreatedAt)
   
@@ -840,7 +833,7 @@ test("TEMPORAL 2. Estudo NO DIA do ciclo (01/09) → CONTA, ciclo criado 01/09",
   // Estudo em 01/09 (mesmo dia do ciclo, após meia-noite)
   const studyDate = new Date("2026-09-01T10:00:00Z")
   const cycleCreatedAt = cycle.created_at as string
-  const itemCreatedAt = items[0]!.created_at as string
+  const itemCreatedAt = must(items[0]).created_at as string
   const cycleDate = new Date(cycleCreatedAt)
   const itemDate = new Date(itemCreatedAt)
   
@@ -861,7 +854,7 @@ test("TEMPORAL 3. Estudo DEPOIS do ciclo (02/09) → CONTA, ciclo criado 01/09",
   
   const studyDate = new Date("2026-09-02T10:00:00Z")
   const cycleCreatedAt = cycle.created_at as string
-  const itemCreatedAt = items[0]!.created_at as string
+  const itemCreatedAt = must(items[0]).created_at as string
   const cycleDate = new Date(cycleCreatedAt)
   const itemDate = new Date(itemCreatedAt)
   
@@ -887,7 +880,7 @@ test("TEMPORAL 4. Múltiplos estudos: apenas pós-ciclo contam", () => {
   ]
   
   const cycleCreatedAt = cycle.created_at as string
-  const itemCreatedAt = items[0]!.created_at as string
+  const itemCreatedAt = must(items[0]).created_at as string
   const cycleDate = new Date(cycleCreatedAt)
   const itemDate = new Date(itemCreatedAt)
   
@@ -922,7 +915,7 @@ test("TEMPORAL 5. Importação Aprovado com data ANTES do ciclo → NÃO conta",
   // Importado hoje, mas atividade foi em 15/08
   const studyDate = new Date("2026-08-15T10:00:00Z")
   const cycleCreatedAt = cycle.created_at as string
-  const itemCreatedAt = items[1]!.created_at as string
+  const itemCreatedAt = must(items[1]).created_at as string
   const cycleDate = new Date(cycleCreatedAt)
   const itemDate = new Date(itemCreatedAt)
   
@@ -944,7 +937,7 @@ test("TEMPORAL 6. Importação Aprovado com data DEPOIS do ciclo → CONTA", () 
   // Importado hoje, atividade foi em 02/09
   const studyDate = new Date("2026-09-02T10:00:00Z")
   const cycleCreatedAt = cycle.created_at as string
-  const itemCreatedAt = items[1]!.created_at as string
+  const itemCreatedAt = must(items[1]).created_at as string
   const cycleDate = new Date(cycleCreatedAt)
   const itemDate = new Date(itemCreatedAt)
   
@@ -970,7 +963,6 @@ test("TEMPORAL 7. Item adicionado DEPOIS (05/09), estudo ANTES (02/09) → NÃO 
     discipline_id: "disc-aud",
     created_at: "2026-09-05T00:00:00Z", // item entrou no ciclo em 05/09
   }
-  const allItems = [...items, newItem]
   
   // Estudo em 02/09 (antes do item entrar no ciclo)
   const studyDate = new Date("2026-09-02T10:00:00Z")
@@ -1000,7 +992,6 @@ test("TEMPORAL 8. Item adicionado DEPOIS (05/09), estudo DEPOIS (06/09) → CONT
     discipline_id: "disc-aud",
     created_at: "2026-09-05T00:00:00Z",
   }
-  const allItems = [...items, newItem]
   
   const studyDate = new Date("2026-09-06T10:00:00Z")
   const cycleCreatedAt = cycle.created_at as string
@@ -1026,7 +1017,7 @@ test("TEMPORAL 9. Matéria futura estudada APÓS ciclo → acumula progresso, n�
   // Estudo antecipado de Contabilidade (index 2, futura) em 02/09
   const studyDate = new Date("2026-09-02T10:00:00Z")
   const cycleCreatedAt = cycle.created_at as string
-  const itemCreatedAt = items[2]!.created_at as string
+  const itemCreatedAt = must(items[2]).created_at as string
   const cycleDate = new Date(cycleCreatedAt)
   const itemDate = new Date(itemCreatedAt)
   
@@ -1128,7 +1119,7 @@ function rebuildCursor(validMinutesPerItem: number[], targets: number[]): {
   let currentItemProgressMin = 0
   let foundIncomplete = false
   for (let i = 0; i < validMinutesPerItem.length; i++) {
-    const target = targets[i]!
+    const target = must(targets[i])
     const valid = Math.min(validMinutesPerItem[i] ?? 0, target)
     if (valid < target) {
       cursorIndex = i

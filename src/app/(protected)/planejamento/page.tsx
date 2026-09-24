@@ -1,10 +1,12 @@
-import { RotateCcw } from "lucide-react"
+import { CalendarDays } from "lucide-react"
 
 import { getCycleOverviewData } from "@/application/study-plan/study-plan.service"
 import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { type CycleOverviewData } from "@/domain/study-plan/study-plan.types"
 import { PlanejamentoClient } from "@/features/planejamento/components/planejamento-client"
 import { createClient } from "@/infrastructure/supabase/server"
+import { PageHeader } from "@/components/ui/page-header"
+import { logPagePerf, startPagePerf, timed } from "@/lib/perf/server-perf"
 
 export const dynamic = "force-dynamic"
 
@@ -17,34 +19,27 @@ export default async function PlanejamentoPage() {
   let cycleData: CycleOverviewData | null = null
 
   try {
+    startPagePerf()
     const supabase = await createClient()
-    const effectiveUser = await getEffectiveSessionUser(supabase)
+    const effectiveUser = await timed("auth.usuario", () => getEffectiveSessionUser(supabase))
 
     if (effectiveUser) {
-      cycleData = await getCycleOverviewData(supabase, effectiveUser.id)
+      cycleData = await timed("planejamento.visao_do_plano", () => getCycleOverviewData(supabase, effectiveUser.id))
     }
+    logPagePerf("/planejamento")
   } catch (error) {
     console.error("Erro ao carregar dados do Planejamento:", error)
   }
 
   return (
-    <div className="flex flex-col min-h-full space-y-6">
-      {/* Page Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <RotateCcw className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold leading-none">Ciclo de Estudos Rotativo</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Organização flexível e contínua baseada em peso e dificuldade
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="flex flex-col min-h-full">
+      <PageHeader
+        icon={CalendarDays}
+        title="Planejamento"
+        description="Distribuição dos estudos por dia, capacidade e metas"
+      />
 
-      <div className="flex-1 p-4 sm:p-5 md:p-6 w-full max-w-full pb-12">
+      <div className="flex-1 page-container py-5 pb-12">
         <PlanejamentoClient initialData={cycleData} />
       </div>
     </div>

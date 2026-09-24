@@ -40,7 +40,7 @@ export function ProtectedLayoutClient({
   }, [])
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-muted/30 relative w-full max-w-full">
+    <div className="flex flex-col h-screen overflow-hidden bg-background relative w-full max-w-full">
       {/* Banner de Modo de Suporte Ativo (se houver sessão em andamento) */}
       {supportSession && (
         <SupportModeBanner
@@ -55,7 +55,7 @@ export function ProtectedLayoutClient({
         {isSidebarOpen && (
           <div
             onClick={() => setIsSidebarOpen(false)}
-            className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition-opacity duration-200"
+            className="md:hidden fixed inset-0 bg-black/40 z-40 transition-opacity duration-200"
             aria-hidden="true"
           />
         )}
@@ -78,7 +78,12 @@ export function ProtectedLayoutClient({
             onOpenMenu={() => setIsSidebarOpen(true)}
           />
 
-          <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full">
+          {/* Fase E: espaço inferior reservado para os botões flutuantes
+              (Bloco de notas / Registrar estudo) não cobrirem o fim das páginas. */}
+          <main
+            id="app-main"
+            className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:pb-20"
+          >
             {children}
           </main>
         </div>

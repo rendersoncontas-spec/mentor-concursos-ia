@@ -63,6 +63,7 @@ function mapRowToConcurso(row: any): ConcursoData {
 }
 
 import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
+import { PageHeader } from "@/components/ui/page-header"
 
 async function getConcursos(): Promise<ConcursoData[]> {
   try {
@@ -88,21 +89,14 @@ export default async function ConcursosPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Page Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <GraduationCap className="h-5 w-5 text-primary" />
-          <div>
-            <h1 className="text-lg font-bold leading-none">Concursos</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Gerencie seus concursos e editais
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={GraduationCap}
+        title="Concursos"
+        description="Gerencie seus concursos e editais"
+      />
 
       {/* Content */}
-      <div className="flex-1 p-4 md:p-6">
+      <div className="flex-1 page-container py-5">
         <ConcursosManagerView initialConcursos={concursos} />
       </div>
     </div>

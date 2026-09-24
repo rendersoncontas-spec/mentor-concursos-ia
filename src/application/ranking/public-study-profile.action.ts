@@ -1,6 +1,7 @@
 "use server"
 
 import * as Sentry from "@sentry/nextjs"
+import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
@@ -179,14 +180,25 @@ export async function getPublicStudyProfileAction(
     }
 
     // 3. Buscar histórico de estudos para calcular métricas públicas
-    const { data: historyRows, error: historyError } = await supabase
-      .from("study_history")
-      .select(
-        "id, discipline_id, started_at, duration_minutes, active_minutes, focus_percentage, focus_score, metadata, disciplines(id, name)",
-      )
-      .eq("user_id", targetUserId)
-      .order("started_at", { ascending: false })
-      .limit(1000)
+    // Fase F.1: antes `.limit(1000)` — os totais "de todo o tempo" (minutos,
+    // questões, sequência mais longa) saíam só das 1.000 sessões mais
+    // recentes. Agora a leitura é paginada até o fim, na mesma ordem.
+    const historyResult = await fetchAllRowsPaged<RawHistoryRow>(
+      (withCount) =>
+        supabase
+          .from("study_history")
+          .select(
+            "id, discipline_id, started_at, duration_minutes, active_minutes, focus_percentage, focus_score, metadata, disciplines(id, name)",
+            countOption(withCount),
+          )
+          .eq("user_id", targetUserId),
+      [
+        { column: "started_at", ascending: false },
+        { column: "id", ascending: false },
+      ],
+    )
+    const historyError = historyResult.error
+    const historyRows = historyError ? null : historyResult.data
 
     if (historyError) {
       console.warn("Aviso ao carregar study_history para perfil público:", historyError.message)

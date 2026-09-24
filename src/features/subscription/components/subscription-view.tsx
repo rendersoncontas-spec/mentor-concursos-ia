@@ -1,15 +1,18 @@
 "use client"
 
+import type React from "react"
 import { useEffect, useState } from "react"
 
-import { Loader2 } from "lucide-react"
+import { Info, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import {
   type SubscriptionData,
   getSubscriptionDataAction,
 } from "@/application/subscription/subscription.action"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
 
 export function SubscriptionView() {
   const [data, setData] = useState<SubscriptionData | null>(null)
@@ -44,117 +47,96 @@ export function SubscriptionView() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-3">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <p className="text-xs text-muted-foreground font-medium">
-          Carregando dados da assinatura...
-        </p>
+      <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
+        <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+        <p className="text-[13px]">Carregando dados da assinatura…</p>
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="rounded-xl border bg-card p-14 shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-4">
-        <h3 className="text-lg font-bold text-foreground">
-          Não foi possível carregar a assinatura
-        </h3>
-        <p className="text-xs text-muted-foreground font-medium">
-          {error || "Tente novamente mais tarde."}
-        </p>
+      <div className="rounded-lg border border-border bg-card px-6 py-12 text-center space-y-1.5">
+        <h2 className="text-sm font-medium text-foreground">Não foi possível carregar a assinatura</h2>
+        <p className="text-[13px] text-muted-foreground">{error || "Tente novamente mais tarde."}</p>
       </div>
     )
   }
 
   const isFree = data.status === "gratuito"
 
+  const details: { label: string; value: React.ReactNode }[] = [
+    { label: "Adesão", value: data.adhesionDate ?? "—" },
+    { label: "Vencimento", value: isFree ? "Sem vencimento (gratuito)" : "—" },
+    { label: "Próximo pagamento", value: isFree ? "Isento" : (data.nextPayment ?? "—") },
+    { label: "Valor", value: data.amount ?? "R$ 0,00" },
+    {
+      label: "Forma de pagamento",
+      value: isFree ? "Plano gratuito (versão Free)" : (data.paymentMethod ?? "—"),
+    },
+  ]
+
   return (
     <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-black text-foreground">Assinatura</h1>
-
-        <Button
-          onClick={handleManageSubscription}
-          className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-5 shadow-xs"
-        >
-          Gerenciar
-        </Button>
-      </div>
-
-      {/* Card do Plano Ativo */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col md:flex-row">
-        {/* Bloco da Esquerda */}
-        <div className="w-full md:w-64 bg-primary text-white font-black text-3xl flex items-center justify-center p-8 shrink-0 tracking-tight">
-          {data.plan}
-        </div>
-
-        {/* Bloco de Detalhes da Direita */}
-        <div className="flex-1 p-6 grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-xs font-semibold">
-          <div className="space-y-2">
-            <p className="text-muted-foreground">
-              <strong className="text-foreground">Status:</strong>{" "}
-              <span className={isFree ? "text-emerald-600 font-bold" : "text-amber-600 font-bold"}>
-                {isFree ? "Ativo (Plano Gratuito)" : data.status}
-              </span>
-            </p>
-            <p className="text-muted-foreground">
-              <strong className="text-foreground">Adesão:</strong> {data.adhesionDate ?? "—"}
-            </p>
-            <p className="text-muted-foreground">
-              <strong className="text-foreground">Vencimento:</strong>{" "}
-              <span className="text-muted-foreground">
-                {isFree ? "Sem vencimento (gratuito)" : "—"}
-              </span>
-            </p>
+      {/* Plano atual — Fase E: cabeçalho da seção + lista de dados (antes: bloco
+          teal sólido com o nome do plano em 30px e um H1 repetindo o título). */}
+      <section aria-labelledby="plano-atual" className="rounded-lg border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-xs text-muted-foreground">Plano atual</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="plano-atual" className="type-h2 text-foreground">
+                {data.plan}
+              </h2>
+              <Badge variant={isFree ? "success" : "warning"}>
+                {isFree ? "Ativo · gratuito" : data.status}
+              </Badge>
+            </div>
           </div>
-
-          <div className="space-y-2">
-            <p className="text-muted-foreground">
-              <strong className="text-foreground">Próximo pagamento:</strong>{" "}
-              {isFree ? "Isento" : (data.nextPayment ?? "—")}
-            </p>
-            <p className="text-muted-foreground">
-              <strong className="text-foreground">Valor:</strong> {data.amount ?? "R$ 0,00"}
-            </p>
-            <p className="text-muted-foreground">
-              <strong className="text-foreground">Forma de pagamento:</strong>{" "}
-              {isFree ? "Plano Gratuito (Versão Free)" : (data.paymentMethod ?? "—")}
-            </p>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+            Gerenciar assinatura
+          </Button>
         </div>
-      </div>
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
+          {details.map((d) => (
+            <div key={d.label} className="min-w-0">
+              <dt className="text-xs text-muted-foreground">{d.label}</dt>
+              <dd className="mt-0.5 text-sm text-foreground tabular-nums">{d.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
 
       {/* Aviso honesto sobre assinatura paga */}
       {isFree && (
-        <div className="rounded-xl border border-amber-300/50 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-xs text-foreground">
-          <strong>Você está no plano gratuito.</strong> A funcionalidade de assinatura paga ainda
-          não está disponível nesta versão do aplicativo. Nenhum valor é cobrado da sua conta.
-        </div>
+        <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-[13px] text-muted-foreground">
+          <Info aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <span className="font-medium text-foreground">Você está no plano gratuito.</span> A
+            assinatura paga ainda não está disponível nesta versão do aplicativo. Nenhum valor é
+            cobrado da sua conta.
+          </span>
+        </p>
       )}
 
       {/* Tabela do Histórico de Compras */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="p-4 border-b bg-card">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-            HISTÓRICO DE COMPRAS
-          </h3>
-        </div>
+      <section aria-labelledby="historico-compras" className="space-y-2.5">
+        <h2 id="historico-compras" className="type-h3 text-foreground">
+          Histórico de compras
+        </h2>
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
 
         {data.purchaseHistory.length === 0 ? (
-          <div className="p-10 flex flex-col items-center justify-center text-center space-y-2">
-            <h4 className="text-sm font-bold text-foreground">
-              Você ainda não possui histórico de compras
-            </h4>
-            <p className="text-xs text-muted-foreground font-medium max-w-md">
-              Quando houver compras ou renovações de assinatura, elas aparecerão aqui.
-            </p>
-          </div>
+          <EmptyState
+            compact
+            title="Nenhuma compra registrada"
+            description="Quando houver compras ou renovações de assinatura, elas aparecerão aqui."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
-                <tr className="border-b bg-muted/30 text-muted-foreground font-semibold">
+                <tr className="type-label border-b bg-muted/40">
                   <th className="px-4 py-3">Data</th>
                   <th className="px-4 py-3">Provedor</th>
                   <th className="px-4 py-3">Assinatura</th>
@@ -168,20 +150,20 @@ export function SubscriptionView() {
               <tbody className="divide-y">
                 {data.purchaseHistory.map((purchase, idx) => (
                   <tr key={idx} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{purchase.date}</td>
-                    <td className="px-4 py-3 font-bold text-foreground">{purchase.provider}</td>
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{purchase.date}</td>
+                    <td className="px-4 py-3 font-semibold text-foreground">{purchase.provider}</td>
                     <td className="px-4 py-3 font-semibold text-foreground">{purchase.plan}</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{purchase.period}</td>
-                    <td className="px-3 py-3 text-center font-bold text-emerald-600">
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{purchase.period}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-emerald-600">
                       <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
                         {purchase.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{purchase.paymentMethod}</td>
-                    <td className="px-3 py-3 text-center text-muted-foreground font-mono">
+                    <td className="px-3 py-3 text-center text-muted-foreground tabular-nums">
                       {purchase.recurring}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
                       {purchase.amount}
                     </td>
                   </tr>
@@ -191,6 +173,7 @@ export function SubscriptionView() {
           </div>
         )}
       </div>
+      </section>
     </div>
   )
 }

@@ -1,30 +1,27 @@
 import Image from "next/image"
 import Link from "next/link"
 
-import { CheckCircle2, ShieldCheck, Sparkles, Star } from "lucide-react"
+import { Check } from "lucide-react"
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen grid lg:grid-cols-12 bg-background font-sans">
-      {/* Lado Esquerdo - Visual SaaS Pro (7 cols) */}
-      <div className="hidden lg:flex lg:col-span-7 relative flex-col justify-between p-12 overflow-hidden bg-slate-950 text-white">
-        {/* Background Gradients & Ambient Effects */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(34,89,81,0.35),rgba(255,255,255,0))]" />
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-teal-600/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-10 right-10 w-80 h-80 bg-teal-500/15 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Header Superior com Logo */}
-        <div className="relative z-10 flex items-center justify-between">
+      {/* Lado esquerdo — apresentação sóbria do produto (Redesign 2.0).
+          Removidos: gradiente radial, manchas desfocadas, selo com ícone de
+          "brilho", depoimento sem fonte verificável ("Aluno Aprovado · 1º
+          Lugar", 5 estrelas) e o selo "Ambiente 100% Seguro". */}
+      <div className="hidden lg:flex lg:col-span-6 xl:col-span-7 relative flex-col justify-between p-12 bg-[hsl(220_20%_12%)] text-white">
+        <div className="flex items-center justify-between">
           <Link
             href="/login"
-            className="flex items-center gap-3 font-bold text-xl tracking-tight text-white hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2.5 font-semibold text-lg tracking-tight text-white hover:opacity-90 transition-opacity"
           >
             <Image
               src="/branding/nomeia-icon.png"
               alt="NomeIA"
-              width={44}
-              height={44}
-              className="w-11 h-11 rounded-xl object-contain shadow-xs ring-2 ring-white/10"
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-md object-contain"
               priority
             />
             <span className="text-white flex items-center">
@@ -32,89 +29,50 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <span className="text-accent">IA</span>
             </span>
           </Link>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-400/20 text-teal-300 text-xs font-medium backdrop-blur-sm">
-            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-            <span>Sua preparação rumo à nomeação.</span>
-          </div>
         </div>
 
-        {/* Conteúdo Central / Proposta de Valor */}
-        <div className="relative z-10 max-w-xl space-y-8 my-auto py-12">
+        <div className="max-w-lg space-y-8 my-auto py-12">
           <div className="space-y-4">
-            <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-white leading-[1.15]">
-              Sua preparação rumo à{" "}
-              <span className="text-teal-400">
-                nomeação
-              </span>
-              .
+            <h1 className="text-[32px] xl:text-[36px] font-semibold tracking-tight text-white leading-[1.2]">
+              Sua preparação rumo à nomeação.
             </h1>
-            <p className="text-slate-300 text-base xl:text-lg leading-relaxed">
-              Gerencie seus estudos com ciclos adaptativos, revisões espaçadas automatizadas e
-              editais verticalizados inteligentes.
+            <p className="text-white/65 text-base leading-relaxed">
+              Ciclos de estudo, revisões espaçadas, edital verticalizado e histórico
+              completo — organizados em um só lugar.
             </p>
           </div>
 
-          {/* Lista de Recursos Principais */}
-          <div className="space-y-3 pt-2">
+          <ul className="space-y-3 border-t border-white/10 pt-6">
             {[
-              "Ciclo rotativo de estudos personalizado",
-              "Revisões espaçadas automáticas (Spaced Repetition)",
-              "Editais verticalizados e acompanhamento por matéria",
-              "Análise de desempenho e foco estratégico",
+              "Ciclo rotativo de estudos com metas por matéria",
+              "Revisões espaçadas agendadas automaticamente",
+              "Edital verticalizado com acompanhamento por tópico",
+              "Registro de estudos e análise de desempenho",
             ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-3 text-slate-200 text-sm xl:text-base">
-                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                </div>
+              <li key={i} className="flex items-center gap-3 text-white/80 text-sm">
+                <Check aria-hidden className="w-4 h-4 shrink-0 text-accent" />
                 <span>{feature}</span>
-              </div>
+              </li>
             ))}
-          </div>
-
-          {/* Depoimento / Prova Social */}
-          <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-md shadow-sm space-y-3">
-            <div className="flex items-center gap-1 text-amber-400">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-amber-400" />
-              ))}
-            </div>
-            <p className="text-slate-300 text-sm italic leading-relaxed">
-              &quot;O NomeIA organizou minha rotina de forma cirúrgica. Consegui cobrir todo o
-              edital e ser aprovado no meu concurso dos sonhos!&quot;
-            </p>
-            <div className="flex items-center gap-3 pt-1">
-              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs shadow-xs">
-                NM
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-white">Aluno Aprovado</p>
-                <p className="text-[11px] text-slate-400">Concurso Federal • 1º Lugar</p>
-              </div>
-            </div>
-          </div>
+          </ul>
         </div>
 
-        {/* Rodapé do Lado Esquerdo */}
-        <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/80 pt-6">
+        <div className="text-xs text-white/45 border-t border-white/10 pt-6">
           <p>© {new Date().getFullYear()} NomeIA. Todos os direitos reservados.</p>
-          <div className="flex items-center gap-2 text-slate-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Ambiente 100% Seguro</span>
-          </div>
         </div>
       </div>
 
       {/* Lado Direito - Container de Formulários (5 cols) */}
-      <div className="lg:col-span-5 flex flex-col justify-between p-6 sm:p-12 lg:p-16 min-h-screen">
+      <div className="lg:col-span-6 xl:col-span-5 flex flex-col justify-between p-6 sm:p-12 lg:p-16 min-h-screen">
         {/* Top Header Mobile */}
         <div className="flex items-center justify-between lg:hidden mb-8">
-          <Link href="/login" className="flex items-center gap-3 font-bold text-lg text-foreground">
+          <Link href="/login" className="flex items-center gap-3 font-semibold text-lg text-foreground">
             <Image
               src="/branding/nomeia-icon.png"
               alt="NomeIA"
               width={36}
               height={36}
-              className="w-9 h-9 rounded-xl object-contain shadow-xs"
+              className="w-8 h-8 rounded-md object-contain"
               priority
             />
             <span className="text-foreground flex items-center">

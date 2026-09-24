@@ -29,7 +29,7 @@ export function MaintenancePage() {
         </div>
 
         <div className="space-y-4 max-w-md">
-          <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl">
+          <h1 className="text-4xl font-semibold tracking-tight lg:text-5xl">
             Sistema em Manutenção
           </h1>
           <p className="text-muted-foreground text-lg leading-relaxed">

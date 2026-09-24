@@ -4,7 +4,7 @@ import { getUserRole } from "@/application/admin/auth-guard"
 import { AdminDashboardView } from "@/features/admin/components/admin-dashboard-view"
 
 export const metadata = {
-  title: "Administração e Suporte | Mentor Concursos IA",
+  title: "Administração e Suporte",
   description: "Painel administrativo e suporte ao estudante.",
 }
 

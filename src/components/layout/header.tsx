@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input"
 import { AccountSettingsModal } from "@/features/profile/components/account-settings-modal"
 import { clearUserLocalData } from "@/utils/user-data"
 import { StudyHeaderControl } from "@/components/study/study-header-control"
+import { ConnectionStatusIndicator } from "@/components/layout/connection-status-indicator"
 
 interface AppHeaderProps {
   userEmail?: string
@@ -77,7 +78,7 @@ useEffect(() => {
        try {
          localStorage.setItem(avatarKey, avatarUrl)
          localStorage.setItem("mentor_user_avatar", avatarUrl)
-       } catch {}
+       } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
      } else if (saved) {
        setAvatarImg(saved)
      }
@@ -114,7 +115,6 @@ useEffect(() => {
   const toggleDarkMode = () => {
     const isDark = resolvedTheme === "dark"
     setTheme(isDark ? "light" : "dark")
-    toast.info(isDark ? "Modo claro ativado." : "Modo escuro ativado.")
   }
 
   const handleRequestEdital = (e: React.FormEvent) => {
@@ -132,7 +132,7 @@ useEffect(() => {
          <button
            type="button"
            onClick={onOpenMenu}
-          className="h-9 w-9 shrink-0 rounded-xl text-foreground hover:bg-muted active:scale-95 transition-colors flex items-center justify-center cursor-pointer md:hidden"
+          className="h-9 w-9 shrink-0 rounded-md text-foreground hover:bg-muted transition-colors flex items-center justify-center cursor-pointer md:hidden"
            aria-label="Abrir menu de navegação"
            title="Abrir menu"
          >
@@ -147,11 +147,14 @@ useEffect(() => {
 
       {/* Direita: Ações Superiores + Avatar do Usuário */}
       <div className="flex items-center gap-1 shrink-0">
+        <ConnectionStatusIndicator />
+
         {/* Botão ? (Ajuda / Suporte) — desktop apenas, disponível no menu em mobile */}
         <button
           onClick={() => toast.info("Central de Ajuda e Suporte do NomeIA")}
-          className="hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
-          title="Ajuda e Suporte"
+          className="hidden h-9 w-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
+          title="Ajuda e suporte"
+          aria-label="Ajuda e suporte"
         >
           <HelpCircle className="h-[18px] w-[18px]" />
         </button>
@@ -159,11 +162,13 @@ useEffect(() => {
         {/* Botão Notificações */}
         <button
           onClick={() => toast.info("Nenhuma nova notificação no momento.")}
-          className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative shrink-0 flex items-center justify-center"
+          className="h-9 w-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative shrink-0 flex items-center justify-center"
           title="Notificações"
+          aria-label="Notificações"
         >
+          {/* Redesign 2.0: removido o ponto de "não lido" fixo — ele aparecia
+              sempre, mesmo sem nenhuma notificação (sinal falso). */}
           <Bell className="h-[18px] w-[18px]" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
         </button>
 
         {/* Botão de Personalização do Home — desktop apenas */}
@@ -171,8 +176,9 @@ useEffect(() => {
           onClick={() => {
             window.dispatchEvent(new CustomEvent("open-dashboard-customization"))
           }}
-          className="hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
-          title="Personalizar Home"
+          className="hidden h-9 w-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
+          title="Personalizar início"
+          aria-label="Personalizar início"
         >
           <Settings className="h-[18px] w-[18px]" />
         </button>
@@ -180,11 +186,12 @@ useEffect(() => {
         {/* Botão Modo Noturno / Tema — desktop apenas, disponível no perfil em mobile */}
         <button
           onClick={toggleDarkMode}
-          className="hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
-          title="Alternar Tema"
+          className="hidden h-9 w-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 md:flex items-center justify-center"
+          title="Alternar tema"
+          aria-label="Alternar tema"
         >
           {mounted && resolvedTheme === "dark" ? (
-            <Sun className="h-[18px] w-[18px] text-amber-400 dark:text-amber-300" />
+            <Sun className="h-[18px] w-[18px]" />
           ) : (
             <Moon className="h-[18px] w-[18px]" />
           )}
@@ -194,8 +201,9 @@ useEffect(() => {
         <div className="relative shrink-0" ref={menuRef}>
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="h-9 w-9 rounded-xl border border-border bg-card text-foreground flex items-center justify-center hover:bg-muted transition-colors focus:outline-none overflow-hidden"
-            title="Menu do Usuário"
+            className="ml-1 h-8 w-8 rounded-full border border-border bg-muted text-muted-foreground flex items-center justify-center hover:border-foreground/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background overflow-hidden"
+            title="Menu do usuário"
+            aria-label="Menu do usuário"
             aria-haspopup="menu"
             aria-expanded={isUserMenuOpen}
           >
@@ -209,15 +217,16 @@ useEffect(() => {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <User className="h-5 w-5 stroke-[2.2]" />
+              <User className="h-4 w-4" />
             )}
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-md z-50 text-foreground space-y-1">
-              {/* Cumprimento: Olá, {userName}... */}
-              <div className="font-bold text-xs text-muted-foreground px-3 py-2 border-b">
-                Olá, <span className="text-foreground font-black">{userName}...</span>
+            <div role="menu" className="absolute right-0 mt-2 w-60 rounded-lg border border-border bg-popover p-1 shadow-lg z-50 text-foreground">
+              {/* Identificação da conta (nome + e-mail), sem saudação. */}
+              <div className="px-2.5 py-2 mb-1 border-b border-border">
+                <p className="text-[13px] font-medium text-foreground truncate">{userName}</p>
+                {userEmail && <p className="text-xs text-muted-foreground truncate">{userEmail}</p>}
               </div>
 
               {/* Opção 1: Minha conta */}
@@ -226,7 +235,8 @@ useEffect(() => {
                   setIsUserMenuOpen(false)
                   setIsAccountModalOpen(true)
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+                role="menuitem"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md hover:bg-muted transition-colors text-left"
               >
                 <UserCheck className="h-4 w-4 text-muted-foreground" />
                 Minha conta
@@ -238,7 +248,8 @@ useEffect(() => {
                   setIsUserMenuOpen(false)
                   router.push("/assinatura")
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+                role="menuitem"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md hover:bg-muted transition-colors text-left"
               >
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
                 Minha assinatura
@@ -250,7 +261,8 @@ useEffect(() => {
                   setIsUserMenuOpen(false)
                   setIsEditalModalOpen(true)
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+                role="menuitem"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md hover:bg-muted transition-colors text-left"
               >
                 <FilePlus className="h-4 w-4 text-muted-foreground" />
                 Pedir um edital
@@ -262,20 +274,22 @@ useEffect(() => {
                   setIsUserMenuOpen(false)
                   router.push("/pedidos-editais")
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+                role="menuitem"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md hover:bg-muted transition-colors text-left"
               >
                 <Library className="h-4 w-4 text-muted-foreground" />
                 Editais cadastrados
               </button>
 
               {/* Opções mobile: Tema e Ajuda (ocultos do header em telas pequenas) */}
-              <div className="border-t my-1 md:hidden" />
+              <div className="border-t border-border my-1 md:hidden" />
               <button
                 onClick={() => {
                   setIsUserMenuOpen(false)
                   toggleDarkMode()
                 }}
-                className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+                role="menuitem"
+                className="md:hidden w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md hover:bg-muted transition-colors text-left"
               >
                 {mounted && resolvedTheme === "dark" ? (
                   <Sun className="h-4 w-4 text-muted-foreground" />
@@ -289,7 +303,8 @@ useEffect(() => {
                   setIsUserMenuOpen(false)
                   toast.info("Central de Ajuda e Suporte do NomeIA")
                 }}
-                className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg hover:bg-muted transition-colors text-left"
+                role="menuitem"
+                className="md:hidden w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md hover:bg-muted transition-colors text-left"
               >
                 <HelpCircle className="h-4 w-4 text-muted-foreground" />
                 Ajuda e suporte
@@ -305,7 +320,8 @@ useEffect(() => {
                   await logoutAction()
                   window.location.replace("/login")
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-left cursor-pointer"
+                role="menuitem"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-destructive rounded-md hover:bg-destructive/10 transition-colors text-left cursor-pointer"
               >
                 <LogOut className="h-4 w-4 text-destructive" />
                 Sair
@@ -319,7 +335,7 @@ useEffect(() => {
       <Dialog open={isEditalModalOpen} onOpenChange={setIsEditalModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold">Solicitar Novo Edital</DialogTitle>
+            <DialogTitle>Solicitar novo edital</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleRequestEdital} className="space-y-4 pt-2">
             <div className="space-y-2">
@@ -343,12 +359,8 @@ useEffect(() => {
               >
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
-              >
-                Enviar Pedido
+              <Button type="submit" size="sm">
+                Enviar pedido
               </Button>
             </DialogFooter>
           </form>

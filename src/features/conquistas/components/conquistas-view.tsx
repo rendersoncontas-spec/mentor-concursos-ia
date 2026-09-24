@@ -47,6 +47,10 @@ import {
   type AchievementDefinition,
   type AchievementRarity,
 } from "@/domain/achievements/achievements.types"
+import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Metric } from "@/components/ui/metric"
+import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 
 /**
@@ -179,28 +183,22 @@ function getAccuracyMinSample(id: string): number {
   }
 }
 
+// Fase E — estados das conquistas só por borda/contraste (sem sombra, sem
+// opacidade que deixava o texto das bloqueadas difícil de ler).
 function getCardBackgroundClass(unlocked: boolean, progressPct: number): string {
-  if (unlocked) {
-    return "bg-card border-border/80 shadow-xs hover:border-primary/50"
-  }
-  if (progressPct > 0) {
-    return "bg-card/90 border-border/60 hover:border-border"
-  }
-  return "bg-muted/20 border-border/40 opacity-75 hover:opacity-100"
+  if (unlocked) return "bg-card border-border"
+  if (progressPct > 0) return "bg-card border-border"
+  return "bg-muted/30 border-border"
 }
 
 function getIconContainerBg(unlocked: boolean, progressPct: number): string {
-  if (unlocked) {
-    return "bg-primary/10 border-primary/30 text-primary shadow-xs"
-  }
-  if (progressPct > 0) {
-    return "bg-muted border-border/60 text-foreground"
-  }
-  return "bg-muted/40 border-border/30 text-muted-foreground/60"
+  if (unlocked) return "bg-primary/10 text-primary"
+  if (progressPct > 0) return "bg-muted text-foreground"
+  return "bg-muted text-muted-foreground"
 }
 
 function getProgressBarColor(unlocked: boolean, progressPct: number): string {
-  if (unlocked) return "bg-emerald-500"
+  if (unlocked) return "bg-success"
   if (progressPct > 0) return "bg-primary"
   return "bg-transparent"
 }
@@ -510,27 +508,13 @@ function evaluateAchievement(
   }
 }
 
+// Fase E — raridade como rótulo discreto com um ponto de cor (antes: selos
+// coloridos em caixa alta, um azul, um roxo e um âmbar, em todo card).
 const RARITY_LABELS: Record<AchievementRarity, { label: string; class: string }> = {
-  comum: {
-    label: "Comum",
-    class:
-      "bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700",
-  },
-  rara: {
-    label: "Rara",
-    class:
-      "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-  },
-  epica: {
-    label: "Épica",
-    class:
-      "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
-  },
-  lendaria: {
-    label: "Lendária",
-    class:
-      "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
-  },
+  comum: { label: "Comum", class: "bg-muted-foreground/40" },
+  rara: { label: "Rara", class: "bg-info" },
+  epica: { label: "Épica", class: "bg-primary" },
+  lendaria: { label: "Lendária", class: "bg-accent" },
 }
 
 export function ConquistasView() {
@@ -622,163 +606,87 @@ export function ConquistasView() {
   }, [filteredAchievements, evaluatedAchievements])
 
   return (
-    <div className="space-y-4 pb-8">
-      {/* ═══════════════════════════════════════════════════════════════
-          HEADER DA PÁGINA & BANNER DE ESTATÍSTICAS
-          ═══════════════════════════════════════════════════════════════ */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
-              <Trophy className="h-7 w-7 text-primary" />
-              <span>Minhas Conquistas</span>
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Construa consistência, volume e evidências sólidas de preparação ao longo da sua
-              jornada.
-            </p>
-          </div>
-        </div>
-
-        {/* Banner Geral de Progresso */}
-        {!isLoading && !loadError && (
-          <div className="rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-              {/* Barra de Progresso Principal */}
-              <div className="flex-1 w-full space-y-2.5">
-                <div className="flex items-center justify-between text-xs sm:text-sm font-semibold">
-                  <span className="text-foreground flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    Progresso Geral de Conquistas
-                  </span>
-                  <span className="font-mono text-primary font-bold text-base sm:text-lg">
-                    {overallPercentage}% ({unlockedCount}/{totalCount})
-                  </span>
-                </div>
-                <div className="h-3 w-full rounded-full bg-muted/80 overflow-hidden p-0.5 border border-border/50">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-700"
-                    style={{ width: `${overallPercentage}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* 3 Blocos de Contagem */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full lg:w-auto shrink-0">
-                <div className="bg-background/80 border border-emerald-500/20 rounded-xl px-3 sm:px-4 py-2 text-center shadow-xs">
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
-                    Conquistadas
-                  </span>
-                  <span className="text-lg sm:text-xl font-mono font-extrabold text-foreground">
-                    {unlockedCount}
-                  </span>
-                </div>
-                <div className="bg-background/80 border border-primary/20 rounded-xl px-3 sm:px-4 py-2 text-center shadow-xs">
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-primary block">
-                    Em Progresso
-                  </span>
-                  <span className="text-lg sm:text-xl font-mono font-extrabold text-foreground">
-                    {inProgressCount}
-                  </span>
-                </div>
-                <div className="bg-background/80 border border-slate-500/20 rounded-xl px-3 sm:px-4 py-2 text-center shadow-xs">
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground block">
-                    Bloqueadas
-                  </span>
-                  <span className="text-lg sm:text-xl font-mono font-extrabold text-muted-foreground">
-                    {lockedCount}
-                  </span>
-                </div>
-              </div>
+    <div className="space-y-5 pb-8">
+      {/* Resumo — Fase E: o título está no cabeçalho fixo; aqui uma faixa de
+          métricas (antes: H1 repetido + banner com 3 blocos coloridos). */}
+      {!isLoading && !loadError && (
+        <div className="grid grid-cols-3 border-y border-border lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+          <div className="col-span-3 min-w-0 space-y-2 border-b border-border px-4 py-3 lg:col-span-1 lg:border-b-0 lg:border-r">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-xs text-muted-foreground">Progresso geral</span>
+              <span className="text-sm font-semibold tabular-nums text-foreground">
+                {overallPercentage}%{" "}
+                <span className="font-normal text-muted-foreground">
+                  ({unlockedCount} de {totalCount})
+                </span>
+              </span>
             </div>
+            <Progress value={overallPercentage} aria-label="Progresso geral das conquistas" />
           </div>
-        )}
-      </div>
+          <Metric className="px-4 py-3" label="Conquistadas" value={unlockedCount} />
+          <Metric className="border-l border-border px-4 py-3" label="Em progresso" value={inProgressCount} />
+          <Metric className="border-l border-border px-4 py-3" label="Bloqueadas" value={lockedCount} tone="muted" />
+        </div>
+      )}
 
-      {/* ═══════════════════════════════════════════════════════════════
-          BARRA DE FILTROS & BUSCA
-          ═══════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-2 bg-muted/30 border border-border/60 rounded-2xl">
-        {/* Status Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto p-1">
-          <button
-            type="button"
-            onClick={() => setStatusFilter("todas")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap",
-              statusFilter === "todas"
-                ? "bg-background text-foreground shadow-xs border border-border/50 font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/40",
-            )}
-          >
-            Todas ({totalCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter("conquistadas")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap",
-              statusFilter === "conquistadas"
-                ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-xs border border-border/50 font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/40",
-            )}
-          >
-            Conquistadas ({unlockedCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter("em_progresso")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap",
-              statusFilter === "em_progresso"
-                ? "bg-background text-primary shadow-xs border border-border/50 font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/40",
-            )}
-          >
-            Em Progresso ({inProgressCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter("bloqueadas")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap",
-              statusFilter === "bloqueadas"
-                ? "bg-background text-muted-foreground shadow-xs border border-border/50 font-bold"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/40",
-            )}
-          >
-            Bloqueadas ({lockedCount})
-          </button>
+      {/* Filtros e busca */}
+      <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
+        <div
+          role="group"
+          aria-label="Filtrar por situação"
+          className="inline-flex max-w-full items-center self-start overflow-x-auto rounded-md bg-muted p-0.5"
+        >
+          {(
+            [
+              ["todas", `Todas (${totalCount})`],
+              ["conquistadas", `Conquistadas (${unlockedCount})`],
+              ["em_progresso", `Em progresso (${inProgressCount})`],
+              ["bloqueadas", `Bloqueadas (${lockedCount})`],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setStatusFilter(id)}
+              aria-pressed={statusFilter === id}
+              className={cn(
+                "whitespace-nowrap rounded-[5px] px-3 py-1 text-xs font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                statusFilter === id
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        {/* Busca e Categoria */}
-        <div className="flex items-center gap-2 px-1">
-          <div className="relative flex-1 md:w-56">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 md:w-64">
+            <Search aria-hidden className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
-              type="text"
-              placeholder="Buscar conquista..."
+              type="search"
+              placeholder="Buscar conquista…"
+              aria-label="Buscar conquista"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-8 pr-3 text-xs bg-background border border-border/60 rounded-xl placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-8 w-full rounded-md border border-input bg-card pl-8 pr-3 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
 
-          <div className="relative shrink-0">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              aria-label="Filtrar por categoria"
-              className="h-8 px-2.5 text-xs bg-background border border-border/60 rounded-xl text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-medium"
-            >
-              <option value="todas">Todas as categorias</option>
-              {ACHIEVEMENT_CATEGORIES.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.title}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            aria-label="Filtrar por categoria"
+            className="h-8 shrink-0 rounded-md border border-input bg-card px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="todas">Todas as categorias</option>
+            {ACHIEVEMENT_CATEGORIES.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.title}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -786,48 +694,45 @@ export function ConquistasView() {
           ESTADOS DE CARREGAMENTO / ERRO / CONTEÚDO
           ═══════════════════════════════════════════════════════════════ */}
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-xs text-muted-foreground font-medium">Carregando conquistas...</p>
+        <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
+          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+          <p className="text-[13px]">Carregando conquistas…</p>
         </div>
       )}
 
       {!isLoading && loadError && (
-        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6 text-center space-y-3 max-w-md mx-auto">
-          <p className="text-sm text-rose-600 dark:text-rose-400 font-medium">{loadError}</p>
-          <button
-            type="button"
-            onClick={load}
-            className="bg-primary hover:bg-primary/90 text-white text-xs font-semibold px-6 py-2 rounded-xl"
-          >
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-center">
+          <p className="text-sm font-medium text-destructive">{loadError}</p>
+          <Button type="button" variant="outline" size="sm" onClick={load}>
             Tentar novamente
-          </button>
+          </Button>
         </div>
       )}
 
       {!isLoading && !loadError && categoriesWithItems.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border p-6 text-center space-y-2">
-          <Filter className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-          <h3 className="text-sm font-bold text-foreground">Nenhuma conquista encontrada</h3>
-          <p className="text-xs text-muted-foreground">
-            Tente ajustar os filtros ou o termo de busca para visualizar as conquistas.
-          </p>
+        <div className="rounded-lg border border-dashed border-border">
+          <EmptyState
+            icon={Filter}
+            title="Nenhuma conquista encontrada"
+            description="Ajuste os filtros ou o termo de busca para ver as conquistas."
+          />
         </div>
       )}
 
       {!isLoading && !loadError && facts && categoriesWithItems.length > 0 && (
-        <div className="space-y-12">
+        <div className="space-y-8">
           {categoriesWithItems.map((cat) => (
-            <div key={cat.id} className="space-y-4">
+            <section key={cat.id} aria-label={cat.title} className="space-y-3">
               {/* Header da Categoria */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <span
-                      className="w-3 h-3 rounded-full shrink-0 shadow-xs"
+                      aria-hidden
+                      className="h-2 w-2 shrink-0 rounded-full"
                       style={{ backgroundColor: cat.color }}
                     />
-                    <h2 className="text-sm sm:text-base font-extrabold tracking-tight text-foreground">
+                    <h2 className="type-h3 text-foreground">
                       {cat.title}
                     </h2>
                   </div>
@@ -835,10 +740,10 @@ export function ConquistasView() {
                 </div>
 
                 <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
-                  <span className="text-xs font-mono font-bold text-foreground">
+                  <span className="text-xs tabular-nums text-muted-foreground">
                     {cat.unlockedInCat} de {cat.totalInCat}
                   </span>
-                  <div className="w-24 h-2 rounded-full bg-muted/80 overflow-hidden border border-border/40">
+                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${cat.catPct}%`, backgroundColor: cat.color }}
@@ -848,7 +753,7 @@ export function ConquistasView() {
               </div>
 
               {/* Grid dos Cards de Conquista */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 min-[1600px]:grid-cols-4">
                 {cat.items.map(({ def, unlocked, progressPct, progressText, unlockedAtText }) => {
                   const rarity = RARITY_LABELS[def.rarity]
 
@@ -856,7 +761,7 @@ export function ConquistasView() {
                     <div
                       key={def.id}
                       className={cn(
-                        "rounded-2xl border p-4 sm:p-5 flex flex-col justify-between gap-3.5 transition-all duration-200 relative overflow-hidden",
+                        "rounded-lg border p-4 flex flex-col justify-between gap-3 relative",
                         getCardBackgroundClass(unlocked, progressPct),
                       )}
                     >
@@ -866,27 +771,24 @@ export function ConquistasView() {
                           {/* Container do Ícone */}
                           <div
                             className={cn(
-                              "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-transform",
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
                               getIconContainerBg(unlocked, progressPct),
                             )}
                           >
                             <AchievementIcon
                               name={def.iconName}
                               unlocked={unlocked}
-                              className={unlocked ? "text-primary" : "text-muted-foreground"}
+                              className="h-[18px] w-[18px]"
                             />
                           </div>
 
                           <div className="min-w-0 space-y-0.5">
-                            <h3 className="text-sm font-bold text-foreground leading-snug truncate">
+                            {/* Fase E: título em até 2 linhas (antes era cortado com "…") */}
+                            <h3 className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
                               {def.title}
                             </h3>
-                            <span
-                              className={cn(
-                                "inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border",
-                                rarity.class,
-                              )}
-                            >
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", rarity.class)} />
                               {rarity.label}
                             </span>
                           </div>
@@ -894,14 +796,12 @@ export function ConquistasView() {
 
                         {/* Status Stamp */}
                         {unlocked ? (
-                          <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Concluída</span>
-                          </div>
+                          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-success">
+                            <CheckCircle2 aria-hidden className="h-3.5 w-3.5" />
+                            Concluída
+                          </span>
                         ) : (
-                          <div className="text-muted-foreground/50 shrink-0">
-                            <Lock className="w-4 h-4" />
-                          </div>
+                          <Lock aria-label="Bloqueada" className="h-4 w-4 shrink-0 text-muted-foreground/60" />
                         )}
                       </div>
 
@@ -911,25 +811,23 @@ export function ConquistasView() {
                       </p>
 
                       {/* Barra de Progresso & Rótulo de Status */}
-                      <div className="space-y-1.5 pt-1 border-t border-border/40">
-                        <div className="flex items-center justify-between text-[11px] leading-none">
+                      <div className="space-y-1.5 border-t border-border pt-2.5">
+                        <div className="flex items-center justify-between gap-3 text-[11px] leading-none">
                           <span
                             className={cn(
-                              "font-medium truncate max-w-[200px]",
-                              unlocked
-                                ? "text-emerald-600 dark:text-emerald-400 font-semibold"
-                                : "text-muted-foreground",
+                              "min-w-0 truncate",
+                              unlocked ? "text-success" : "text-muted-foreground",
                             )}
                           >
                             {unlockedAtText ? `Conquistada em ${unlockedAtText}` : progressText}
                           </span>
-                          <span className="font-mono font-bold text-foreground shrink-0 text-[11px]">
+                          <span className="tabular-nums font-semibold text-foreground shrink-0 text-[11px]">
                             {progressPct}%
                           </span>
                         </div>
 
                         {/* Mini Barra de Progresso */}
-                        <div className="h-1.5 w-full rounded-full bg-muted/80 overflow-hidden">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                           <div
                             className={cn(
                               "h-full rounded-full transition-all duration-500",
@@ -943,7 +841,7 @@ export function ConquistasView() {
                   )
                 })}
               </div>
-            </div>
+            </section>
           ))}
         </div>
       )}

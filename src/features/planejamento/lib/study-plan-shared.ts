@@ -93,7 +93,7 @@ export function getSavedScaleConfig(): SharedPlanConfig {
   try {
     const savedCustom = localStorage.getItem("mentor_custom_shift_days")
     if (savedCustom) customShiftDays = JSON.parse(savedCustom)
-  } catch {}
+  } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
 
   return {
     scheduleMode,

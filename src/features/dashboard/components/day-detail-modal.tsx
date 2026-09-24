@@ -88,7 +88,7 @@ export function DayDetailModal({ open, onOpenChange, date }: Props) {
             {/* Disciplinas */}
             {detail.disciplines.length > 0 && (
               <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <h4 className="text-[13px] font-semibold text-foreground mb-2">
                   Matérias Estudadas
                 </h4>
                 <div className="space-y-1.5">
@@ -118,7 +118,7 @@ export function DayDetailModal({ open, onOpenChange, date }: Props) {
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-muted/50 rounded-lg p-3 text-center">
-      <div className="text-lg font-bold text-foreground">{value}</div>
+      <div className="text-lg font-semibold text-foreground">{value}</div>
       <div className="text-[11px] text-muted-foreground">{label}</div>
     </div>
   )

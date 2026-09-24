@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </Suspense>
 
       <div className="space-y-2 text-center sm:text-left">
-        <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Acesse sua conta
         </h1>
         <p className="text-sm text-muted-foreground">

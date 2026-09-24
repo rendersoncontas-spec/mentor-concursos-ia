@@ -1,13 +1,20 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import {
   runCycleMigration,
   type CycleMigrationRepository,
-  type RunCycleMigrationInput,
+  type DryRunReport,
+  type ExecutionReport,
 } from "./cycle-migration.service"
-import type { StudyCycle, StudyCycleItem, StudyCycleSession } from "@/domain/study-cycle/study-cycle.types"
+import type { StudyCycle, StudyCycleItem } from "@/domain/study-cycle/study-cycle.types"
 import type { StudyPlan, StudyPlanItem } from "@/domain/study-plan/study-plan.types"
+
+/** Primeiro elemento, falhando o teste se a lista estiver vazia. */
+function firstOf<T>(list: readonly T[]): T {
+  const item = list[0]
+  assert.ok(item !== undefined, "lista vazia")
+  return item
+}
 
 // --- Mock Repo ---
 
@@ -32,18 +39,20 @@ const FAKE_REPO: CycleMigrationRepository = {
 test("migration: dry-run de ciclo com 60 min legado gera 60 min no plano", async () => {
   const result = await runCycleMigration(FAKE_REPO, { dryRun: true, userId: "u1" })
   assert.equal(result.dryRun, true)
-  const dry = result as any
-  assert.equal(dry.users[0].source.itemsTotalPlannedMinutes, 60)
-  assert.equal(dry.users[0].target.itemsTotalMinutes, 60)
-  assert.equal(dry.users[0].status, "VALIDATED")
+  const dry = result as DryRunReport
+  const first = firstOf(dry.users)
+  assert.equal(first.source.itemsTotalPlannedMinutes, 60)
+  assert.equal(first.target.itemsTotalMinutes, 60)
+  assert.equal(first.status, "VALIDATED")
 })
 
 test("migration: execução real migra ciclo", async () => {
   const result = await runCycleMigration(FAKE_REPO, { dryRun: false, userId: "u1" })
   assert.equal(result.dryRun, false)
-  const exec = result as any
-  assert.equal(exec.migratedUsers[0].userId, "u1")
-  assert.ok(exec.migratedUsers[0].planId)
+  const exec = result as ExecutionReport
+  const migrated = firstOf(exec.migratedUsers)
+  assert.equal(migrated.userId, "u1")
+  assert.ok(migrated.planId)
 })
 
 test("migration: dry-run divergente detecta erro", async () => {
@@ -59,8 +68,8 @@ test("migration: dry-run divergente detecta erro", async () => {
     fetchMigratedPlanItems: async () => [{ study_plan_id: "p1", duration_minutes: 60 } as StudyPlanItem], // LEGADO=100, CANÔNICO=60
   }
   const result = await runCycleMigration(brokenRepo, { dryRun: true, userId: "u1" })
-  const dry = result as any
-  assert.equal(dry.users[0].status, "DIVERGENCES_FOUND")
+  const dry = result as DryRunReport
+  assert.equal(firstOf(dry.users).status, "DIVERGENCES_FOUND")
 })
 
 test("migration: dry-run detecta drift em ciclo ja migrado (plano canônico diverge do legado)", async () => {
@@ -73,10 +82,10 @@ test("migration: dry-run detecta drift em ciclo ja migrado (plano canônico dive
     ],
   }
   const result = await runCycleMigration(driftRepo, { dryRun: true, userId: "u1" })
-  const dry = result as any
-  const user = dry.users[0]
+  const dry = result as DryRunReport
+  const user = firstOf(dry.users)
   assert.equal(user.status, "DIVERGENCES_FOUND")
-  const minutesDiv = user.divergences.find((d: any) => d.field === "PLANNED_MINUTES")
+  const minutesDiv = user.divergences.find((d) => d.field === "PLANNED_MINUTES")
   assert.ok(minutesDiv)
   assert.equal(minutesDiv.expected, 60)
   assert.equal(minutesDiv.actual, 30)

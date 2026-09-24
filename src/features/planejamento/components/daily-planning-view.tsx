@@ -1,21 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { useRouter } from "next/navigation"
 
 import {
   AlertTriangle,
   BookOpen,
-  Calendar as CalendarIcon,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Coffee,
   PlayCircle,
   RefreshCw,
-  Sparkles,
   Undo2,
   Wrench,
 } from "lucide-react"
@@ -201,6 +198,13 @@ export function DailyPlanningView({
   } | null>(null)
   const [pullingPending, setPullingPending] = useState(false)
 
+  // Fase F.1: chamadas simultâneas com a mesma disponibilidade compartilham a
+  // mesma busca. Ex.: ao concluir um bloco, o componente dispara
+  // STUDY_SESSION_SAVED_EVENT (cujo listener abaixo chama loadReplanInfo) e
+  // logo em seguida faz `await loadReplanInfo()` — eram 2 execuções idênticas
+  // de getReplanInfoAction em fila. Uma chamada feita DEPOIS que a anterior
+  // terminou continua buscando de novo normalmente.
+  const replanInFlightRef = useRef<{ key: string; token: object; promise: Promise<void> } | null>(null)
   const loadReplanInfo = useCallback(async () => {
     const availability = {
       studyDays,
@@ -208,19 +212,29 @@ export function DailyPlanningView({
       firstShiftDay,
       anchorShiftDate: anchorShiftDate || undefined,
     }
-    try {
-      const res = await getReplanInfoAction(availability)
-      if (res.data) {
-        setReplanInfo(res.data)
-        try {
-          localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
-        } catch {
-          /* noop */
+    const key = JSON.stringify(availability)
+    const inFlight = replanInFlightRef.current
+    if (inFlight && inFlight.key === key) return inFlight.promise
+
+    const token = {}
+    const promise = (async () => {
+      try {
+        const res = await getReplanInfoAction(availability)
+        if (res.data) {
+          setReplanInfo(res.data)
+          try {
+            localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
+          } catch {
+            /* noop */
+          }
         }
+      } finally {
+        setLoadingReplan(false)
+        if (replanInFlightRef.current?.token === token) replanInFlightRef.current = null
       }
-    } finally {
-      setLoadingReplan(false)
-    }
+    })()
+    replanInFlightRef.current = { key, token, promise }
+    return promise
   }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate])
 
   useEffect(() => {
@@ -332,7 +346,7 @@ export function DailyPlanningView({
       const reverted = prev.filter((k) => !keysToRemove.includes(k))
       try {
         localStorage.setItem("mentor_closed_block_keys", JSON.stringify(reverted))
-      } catch {}
+      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
       return reverted
     })
   }
@@ -349,7 +363,7 @@ export function DailyPlanningView({
       const updated = Array.from(new Set([...prev, ...newKeys]))
       try {
         localStorage.setItem("mentor_closed_block_keys", JSON.stringify(updated))
-      } catch {}
+      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
       return updated
     })
 
@@ -464,15 +478,6 @@ export function DailyPlanningView({
     }
     return hDateStr === selectedDateStr
   })
-
-  // Total studied minutes on the selected day
-  const completedMinutes = historyForDay.reduce((sum, h) => sum + h.minutes, 0)
-
-  // Total cycle workload in minutes
-  const totalCycleMinutes = blocks.reduce((acc, b) => acc + b.durationMinutes, 0)
-  const activeDaysCount = Math.max(1, studyDays.length)
-  const targetDailyMinutes =
-    totalCycleMinutes > 0 ? Math.max(30, Math.round(totalCycleMinutes / activeDaysCount)) : 180
 
   const dayOfWeek = selectedDate.getDay()
   const dateNum = selectedDate.getDate()
@@ -595,7 +600,7 @@ export function DailyPlanningView({
     completed: boolean,
     studied: number,
     duration: number,
-    manuallyClosed: boolean,
+    _manuallyClosed: boolean,
     _manualPendingMinutes: number,
   ) => {
     if (completed) return `${studied || 0} min estudados`
@@ -658,14 +663,12 @@ export function DailyPlanningView({
     if (blocks.length > 0) {
       return (
         <div className="py-12 text-center space-y-4">
-          <div className="w-14 h-14 bg-emerald-500/10 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
-            <Coffee className="w-7 h-7" />
-          </div>
+          <Coffee aria-hidden className="w-5 h-5 mx-auto text-muted-foreground/70" />
           <div className="space-y-1 max-w-sm mx-auto">
-            <h4 className="text-base font-extrabold text-foreground">Dia de Descanso Programado</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              De acordo com seu planejamento, você não tem matérias agendadas para este dia.
-              Aproveite para descansar ou fazer revisões livres!
+            <h4 className="text-sm font-medium text-foreground">Dia de descanso programado</h4>
+            <p className="text-[13px] text-muted-foreground leading-relaxed">
+              Seu planejamento não tem matérias agendadas para este dia.
+              Use o tempo para descansar ou fazer revisões livres.
             </p>
           </div>
           {onSwitchToCiclo && (
@@ -673,27 +676,29 @@ export function DailyPlanningView({
               onClick={onSwitchToCiclo}
               variant="outline"
               size="sm"
-              className="font-bold text-xs gap-1.5 rounded-xl border-primary/30 text-primary hover:bg-primary/5 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Ver Sequência do Ciclo
+              Ver sequência do ciclo
             </Button>
           )}
         </div>
       )
     }
     return (
-      <div className="py-12 text-center space-y-3">
-        <BookOpen className="w-10 h-10 mx-auto text-muted-foreground/50" />
-        <p className="text-sm font-semibold text-muted-foreground">
-          Nenhum planejamento criado ainda.
+      <div className="py-12 text-center space-y-2">
+        <BookOpen aria-hidden className="w-5 h-5 mx-auto text-muted-foreground/70" />
+        <p className="text-sm font-medium text-foreground">
+          Nenhum planejamento criado
+        </p>
+        <p className="text-[13px] text-muted-foreground">
+          Gere um cronograma a partir do seu ciclo e da sua disponibilidade.
         </p>
         {onReplan && (
           <Button
             onClick={onReplan}
             size="sm"
-            className="font-bold text-xs bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer"
+            className="mt-1"
           >
-            Gerar Planejamento com IA
+            Gerar planejamento
           </Button>
         )}
       </div>
@@ -703,35 +708,32 @@ export function DailyPlanningView({
   return (
     <div
       className={cn(
-        "p-3.5 sm:p-4.5 space-y-3.5 w-full",
-        !embedded && "bg-card border rounded-xl shadow-2xs",
+        "p-4 space-y-3.5 w-full",
+        !embedded && "bg-card border border-border rounded-lg",
         className,
       )}
     >
       {/* Linha 1: Controles de Data e Navegação */}
       <div className="flex items-start justify-between gap-3 border-b pb-2.5">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <CalendarIcon className="w-4 h-4" />
-          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base sm:text-lg font-black text-foreground capitalize leading-tight">
+              <h2 className="text-[15px] font-semibold text-foreground capitalize leading-tight">
                 {dateFormatted}
               </h2>
               {isToday && (
-                <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 rounded-full">
+                <span className="px-1.5 py-0.5 text-[11px] font-medium bg-primary/10 text-primary rounded-sm">
                   Hoje
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground font-medium mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
               {scheduledTasks.length > 0
                 ? `${scheduledTasks.length} matéria${scheduledTasks.length !== 1 ? "s" : ""} programada${scheduledTasks.length !== 1 ? "s" : ""} • Total de ${Math.floor(totalMinutes / 60)}h${totalMinutes % 60}min`
                 : "Nenhum planejamento ativo para esta data"}
             </p>
             {hasAdjustments && (
-              <p className="text-[11px] font-bold text-primary mt-0.5 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" /> Ajustado devido às pendências de ontem
               </p>
             )}
@@ -743,7 +745,7 @@ export function DailyPlanningView({
             variant="outline"
             size="icon"
             onClick={handlePrevDay}
-            className="h-10 w-10 rounded-lg"
+            className="h-9 w-9"
             aria-label="Dia anterior"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -753,16 +755,16 @@ export function DailyPlanningView({
               variant="outline"
               size="sm"
               onClick={handleGoToday}
-              className="h-10 px-3 rounded-lg text-xs font-bold text-primary border-primary/30 hidden sm:flex"
+              className="h-9 hidden sm:flex"
             >
-              Ir para Hoje
+              Hoje
             </Button>
           )}
           <Button
             variant="outline"
             size="icon"
             onClick={handleNextDay}
-            className="h-10 w-10 rounded-lg"
+            className="h-9 w-9"
             aria-label="Próximo dia"
           >
             <ChevronRight className="h-4 w-4" />
@@ -772,19 +774,19 @@ export function DailyPlanningView({
 
       {/* REGRA 0 — Aviso de manutenção (replanejamento pausado) */}
       {replanInfo?.replanPaused && (
-        <div className="flex items-start sm:items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-lg px-2.5 py-2">
-          <Wrench className="w-3.5 h-3.5 shrink-0 mt-0.5 sm:mt-0 text-sky-600" />
-          <p className="text-[12px] leading-snug">
-            <span className="font-bold text-sky-600">Replanejamento pausado temporariamente.</span>{" "}
-            <span className="text-sky-600/80">Nenhum novo reajuste será gerado.</span>
+        <div className="flex items-start sm:items-center gap-2 border-l-2 border-info bg-info/5 px-3 py-2">
+          <Wrench className="w-3.5 h-3.5 shrink-0 mt-0.5 sm:mt-0 text-info" />
+          <p className="text-[13px] leading-snug">
+            <span className="font-medium text-foreground">Replanejamento pausado temporariamente.</span>{" "}
+            <span className="text-muted-foreground">Nenhum novo reajuste será gerado.</span>
           </p>
         </div>
       )}
 
       {/* Aviso de reajuste automático */}
       {showBanner && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-primary/10 border border-primary/20 rounded-xl px-3.5 py-2.5">
-          <p className="text-xs font-bold text-primary flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-l-2 border-primary bg-primary/5 px-3 py-2">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
             <RefreshCw className="w-3.5 h-3.5 shrink-0" />
             Cronograma reajustado — {lastEvent.message}
           </p>
@@ -793,7 +795,7 @@ export function DailyPlanningView({
               variant="ghost"
               size="sm"
               onClick={() => setShowPendencies((v) => !v)}
-              className="h-7 px-2.5 text-[11px] font-bold text-primary rounded-lg cursor-pointer"
+              className="h-7 px-2.5 text-[11px] font-semibold text-primary rounded-lg cursor-pointer"
             >
               {showPendencies ? "Ocultar alterações" : "Ver alterações"}
             </Button>
@@ -803,7 +805,7 @@ export function DailyPlanningView({
                 size="sm"
                 onClick={() => handleUndo(lastEvent.id)}
                 disabled={busy}
-                className="h-7 px-2.5 text-[11px] font-bold text-muted-foreground rounded-lg cursor-pointer"
+                className="h-7 px-2.5 text-[11px] font-semibold text-muted-foreground rounded-lg cursor-pointer"
               >
                 <Undo2 className="w-3 h-3 mr-1" /> Desfazer
               </Button>
@@ -814,12 +816,12 @@ export function DailyPlanningView({
 
       {/* Painel de pendências */}
       {showPendencyPanel && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 space-y-2.5">
+        <div className="border-l-2 border-warning bg-warning/5 px-3 py-2.5 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 flex items-center gap-1.5">
+            <h4 className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" /> Pendências de estudos anteriores
             </h4>
-            <span className="text-xs font-black text-amber-700 font-mono">
+            <span className="text-xs font-semibold text-amber-700 tabular-nums">
               Total: {formatMinutes(replanInfo?.totalPendingMinutes ?? 0)}
             </span>
           </div>
@@ -828,11 +830,11 @@ export function DailyPlanningView({
             {(replanInfo?.pendingByDiscipline ?? []).map((p) => (
               <div
                 key={p.disciplineId}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-background/80 border border-amber-500/20 rounded-lg p-2.5 shadow-xs"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-card border border-border rounded-md p-2.5"
               >
                 <div className="flex items-center justify-between sm:justify-start gap-3">
-                  <span className="text-xs font-bold text-foreground">{p.disciplineName}</span>
-                  <span className="text-xs font-black text-amber-700 dark:text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-semibold text-foreground">{p.disciplineName}</span>
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 tabular-nums bg-amber-500/10 px-2 py-0.5 rounded-md">
                     {formatMinutes(p.pendingMinutes)}
                   </span>
                 </div>
@@ -852,7 +854,7 @@ export function DailyPlanningView({
                     size="sm"
                     onClick={() => setPendingToPull(p)}
                     disabled={pullingPending}
-                    className="h-7 px-2.5 text-[11px] font-bold bg-primary text-white hover:bg-primary/90 rounded-lg cursor-pointer shadow-xs"
+                    className="h-7 px-2.5 text-xs cursor-pointer"
                   >
                     Puxar para hoje
                   </Button>
@@ -876,7 +878,7 @@ export function DailyPlanningView({
                 size="sm"
                 onClick={() => void handleManualReplan()}
                 disabled={busy || replanInfo?.replanPaused}
-                className="h-8 px-3 text-[11px] font-bold bg-primary text-white hover:bg-primary/90 rounded-lg cursor-pointer"
+                className="h-8 px-3 text-[11px] rounded-lg cursor-pointer"
               >
                 <RefreshCw className={`w-3 h-3 mr-1 ${busy ? "animate-spin" : ""}`} />
                 {replanInfo?.replanPaused ? "Pausado" : "Recalcular cronograma"}
@@ -886,14 +888,15 @@ export function DailyPlanningView({
         </div>
       )}
 
-      {/* Linha 2: Pílulas de Métricas — Meta, Estudado, Falta, Planejado, Pendências */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2 border-b pb-3 sm:pb-3.5">
+      {/* Linha 2: métricas em uma única faixa com divisórias (Redesign 2.0 —
+          antes eram 5 "pílulas" coloridas, uma cor por métrica). */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 divide-x divide-border border-y border-border [&>*]:border-border max-sm:[&>*:nth-child(4)]:border-l-0 max-sm:[&>*:nth-child(n+4)]:border-t">
         {/* Meta (semanal) */}
-        <div className="bg-primary/5 dark:bg-primary/10 border border-primary/15 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-primary/10">
-          <span className="text-[10px] font-extrabold uppercase text-primary/70 tracking-wider truncate">
+        <div className="px-3 py-2 flex flex-col min-w-0">
+          <span className="text-xs text-muted-foreground truncate">
             Meta
           </span>
-          <span className="text-[10px] sm:text-xs font-black text-primary font-mono truncate mt-0.5 sm:mt-1">
+          <span className="text-sm font-semibold text-foreground tabular-nums truncate mt-0.5">
             {periodGoal
               ? `${Math.floor(periodGoal.goalMinutes / 60)}h${periodGoal.goalMinutes % 60 > 0 ? `${periodGoal.goalMinutes % 60}min` : ""}`
               : "—"}
@@ -901,11 +904,11 @@ export function DailyPlanningView({
         </div>
 
         {/* Estudado (período) */}
-        <div className="bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-emerald-500/15">
-          <span className="text-[10px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider truncate">
+        <div className="px-3 py-2 flex flex-col min-w-0">
+          <span className="text-xs text-muted-foreground truncate">
             Estudado
           </span>
-          <span className="text-[10px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono truncate mt-0.5 sm:mt-1">
+          <span className="text-sm font-semibold text-primary tabular-nums truncate mt-0.5">
             {periodGoal
               ? `${Math.floor(periodGoal.studiedMinutes / 60)}h${periodGoal.studiedMinutes % 60 > 0 ? `${periodGoal.studiedMinutes % 60}min` : ""}`
               : loadingGoal
@@ -915,14 +918,14 @@ export function DailyPlanningView({
         </div>
 
         {/* Falta (meta - estudado) */}
-        <div className="bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-amber-500/15">
-          <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 tracking-wider truncate">
+        <div className="px-3 py-2 flex flex-col min-w-0">
+          <span className="text-xs text-muted-foreground truncate">
             Falta
           </span>
-          <span className="text-[10px] sm:text-xs font-black text-amber-600 dark:text-amber-400 font-mono truncate mt-0.5 sm:mt-1">
+          <span className="text-sm font-semibold text-foreground tabular-nums truncate mt-0.5">
             {periodGoal
               ? periodGoal.remainingMinutes <= 0
-                ? "Meta!"
+                ? "Meta cumprida"
                 : `${Math.floor(periodGoal.remainingMinutes / 60)}h${periodGoal.remainingMinutes % 60 > 0 ? `${periodGoal.remainingMinutes % 60}min` : ""}`
               : loadingGoal
                 ? "..."
@@ -931,11 +934,11 @@ export function DailyPlanningView({
         </div>
 
         {/* Planejado para hoje */}
-        <div className="bg-muted/40 dark:bg-muted/20 border border-border/40 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all hover:bg-muted/60">
-          <span className="text-[10px] font-extrabold uppercase text-muted-foreground tracking-wider truncate">
+        <div className="px-3 py-2 flex flex-col min-w-0">
+          <span className="text-xs text-muted-foreground truncate">
             Hoje
           </span>
-          <span className="text-[10px] sm:text-xs font-black text-foreground font-mono truncate mt-0.5 sm:mt-1">
+          <span className="text-sm font-semibold text-foreground tabular-nums truncate mt-0.5">
             {Math.floor(totalMinutes / 60)}h{totalMinutes % 60 > 0 ? `${totalMinutes % 60}min` : ""}
           </span>
         </div>
@@ -949,9 +952,9 @@ export function DailyPlanningView({
             }
           }}
           className={cn(
-            "bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/20 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between min-w-0 transition-all",
+            "px-3 py-2 flex flex-col min-w-0 transition-colors",
             (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
-              "cursor-pointer hover:bg-rose-500/20 active:scale-[0.98]",
+              "cursor-pointer hover:bg-muted/60",
           )}
           title={
             (replanInfo?.totalPendingMinutes ?? 0) > 0
@@ -962,14 +965,17 @@ export function DailyPlanningView({
           }
         >
           <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400 tracking-wider truncate">
+            <span className="text-xs text-muted-foreground truncate">
               Pendências
             </span>
             {(replanInfo?.totalPendingMinutes ?? 0) > 0 && (
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+              <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
             )}
           </div>
-          <span className="text-[10px] sm:text-xs font-black text-rose-600 dark:text-rose-400 font-mono truncate mt-0.5 sm:mt-1">
+          <span className={cn(
+            "text-sm font-semibold tabular-nums truncate mt-0.5",
+            (replanInfo?.totalPendingMinutes ?? 0) > 0 ? "text-destructive" : "text-foreground",
+          )}>
             {pendingLabel}
           </span>
         </div>
@@ -978,10 +984,10 @@ export function DailyPlanningView({
       {/* Linha 3: Cronograma do Dia */}
       <div className="space-y-4 pt-1">
         <div className="flex items-center justify-between border-b pb-2">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-            Cronograma do Dia
+          <h3 className="text-[13px] font-semibold text-foreground">
+            Cronograma do dia
           </h3>
-          <span className="text-xs font-bold text-primary">
+          <span className="text-xs text-muted-foreground tabular-nums">
             {scheduledTasks.length} matéria{scheduledTasks.length !== 1 ? "s" : ""} programada
             {scheduledTasks.length !== 1 ? "s" : ""}
           </span>
@@ -990,13 +996,13 @@ export function DailyPlanningView({
         {loadingReplan && !replanInfo ? (
           <div className="space-y-2.5">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 rounded-xl border bg-muted/20 animate-pulse" />
+              <div key={i} className="h-16 rounded-lg bg-muted animate-skeleton" />
             ))}
           </div>
         ) : scheduledTasks.length === 0 ? (
           renderEmptyState()
         ) : (
-          <div className="space-y-2.5">
+          <div className="divide-y divide-border border-y border-border">
             {scheduledTasks.map((task) => {
               const progressPct = task.completed
                 ? 100
@@ -1015,12 +1021,12 @@ export function DailyPlanningView({
               return (
                 <div
                   key={task.id}
-                  className="flex flex-col gap-3 p-3 sm:p-3.5 border rounded-xl hover:border-primary/40 transition-all bg-muted/20"
+                  className="flex flex-col gap-3 py-3 px-1 hover:bg-muted/30 transition-colors"
                 >
                   {/* Header: color bar + discipline + time slot + badges */}
                   <div className="flex items-start gap-3">
                     <div
-                      className="w-1.5 self-stretch rounded-full shrink-0"
+                      className="w-1 self-stretch rounded-full shrink-0"
                       style={{ backgroundColor: task.color }}
                     />
                     <div className="flex-1 min-w-0">
@@ -1028,39 +1034,37 @@ export function DailyPlanningView({
                         <div className="flex-1 min-w-0 space-y-1.5">
                           {/* Line 1: time slot + duration + status badge + pending badge */}
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-mono font-bold text-muted-foreground flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
+                            <span className="text-xs tabular-nums text-muted-foreground">
                               {task.timeSlot}
                             </span>
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
-                              {task.durationMinutes} min
+                            <span className="text-xs tabular-nums text-muted-foreground">
+                              · {task.durationMinutes} min
                             </span>
                             {status === "CONCLUIDO" && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 flex items-center gap-1">
+                              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-sm bg-success/10 text-success flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
                                 Concluído
                               </span>
                             )}
                             {status === "EM_ANDAMENTO" && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
+                              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary flex items-center gap-1">
                                 Em andamento
                               </span>
                             )}
                             {status === "PENDENCIA" && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
+                              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-sm bg-warning/15 text-foreground">
                                 Pendência
                               </span>
                             )}
                             {status === "PENDENTE" && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
+                              <span className="text-[11px] font-medium text-muted-foreground">
                                 Pendente
                               </span>
                             )}
                           </div>
 
                           {/* Line 2: discipline name */}
-                          <h4 className="text-sm font-bold text-foreground truncate">{task.disciplineName}</h4>
+                          <h4 className="text-sm font-semibold text-foreground truncate">{task.disciplineName}</h4>
 
                           {/* Line 3: progress text */}
                           <p className="text-xs text-muted-foreground">
@@ -1103,7 +1107,7 @@ export function DailyPlanningView({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setBlockToClose(task)}
-                                className="h-8 w-[110px] px-0 text-[11px] font-bold rounded-lg cursor-pointer justify-center"
+                                className="h-8 w-[110px] px-0 text-xs cursor-pointer justify-center"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                                 Concluir
@@ -1121,7 +1125,7 @@ export function DailyPlanningView({
                                 )
                               }}
                               size="sm"
-                              className="h-8 w-[110px] px-0 text-[11px] font-bold rounded-lg shadow-xs cursor-pointer justify-center"
+                              className="h-8 w-[110px] px-0 text-xs cursor-pointer justify-center"
                             >
                               <PlayCircle className="w-3.5 h-3.5 mr-1" />
                               {task.studiedMinutes > 0 ? "Continuar" : "Iniciar"}
@@ -1188,8 +1192,7 @@ export function DailyPlanningView({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black text-foreground">
-              <Sparkles className="w-5 h-5 text-primary" />
+            <DialogTitle className="flex items-center gap-2 font-semibold text-foreground">
               Puxar pendência para hoje?
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground pt-1.5 leading-relaxed">
@@ -1206,7 +1209,7 @@ export function DailyPlanningView({
               size="sm"
               onClick={() => setPendingToPull(null)}
               disabled={pullingPending}
-              className="text-xs font-bold rounded-xl cursor-pointer"
+              className="text-xs font-semibold rounded-xl cursor-pointer"
             >
               Cancelar
             </Button>
@@ -1214,7 +1217,7 @@ export function DailyPlanningView({
               size="sm"
               onClick={() => void handleConfirmPullPending()}
               disabled={pullingPending}
-              className="text-xs font-bold bg-primary text-white hover:bg-primary/90 rounded-xl cursor-pointer"
+              className="cursor-pointer"
             >
               {pullingPending ? (
                 <>

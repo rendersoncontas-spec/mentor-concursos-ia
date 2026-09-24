@@ -5,6 +5,7 @@ import { type SupabaseClient } from "@supabase/supabase-js"
 
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { buildCycleOverview } from "@/application/study-cycle/cycle-progress.service"
+import { fetchAllCycleSessions } from "@/application/study-cycle/cycle-sessions.reader"
 import { fetchActivePlanDisciplines } from "@/application/study-session/get-disciplines.action"
 import { createClient } from "@/infrastructure/supabase/server"
 import type {
@@ -62,10 +63,8 @@ async function fetchActiveCycleDisciplines(
 
   if (!items || items.length === 0) return []
 
-  const { data: sessions } = await supabase
-    .from("study_cycle_sessions")
-    .select("*")
-    .eq("cycle_id", cycle.id)
+  // Fase F.1: leitura paginada de study_cycle_sessions (antes cortada em 1.000).
+  const { data: sessions } = await fetchAllCycleSessions(supabase, { cycleId: cycle.id })
 
   const { data: skipRows } = await supabase
     .from("study_cycle_item_skips")

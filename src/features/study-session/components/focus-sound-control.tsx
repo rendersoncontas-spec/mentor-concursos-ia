@@ -84,7 +84,7 @@ export function FocusSoundControl({
 
       {isActive && showVolume && (
         <div className="flex items-center gap-2 px-1 py-1 rounded-md bg-muted/30 border border-border/40">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase shrink-0">
+          <span className="type-label shrink-0">
             Vol
           </span>
           <Slider
@@ -98,7 +98,7 @@ export function FocusSoundControl({
             className="flex-1"
             aria-label="Volume do som de foco"
           />
-          <span className="text-[10px] font-mono font-bold w-7 text-right shrink-0">
+          <span className="text-[10px] tabular-nums font-semibold w-7 text-right shrink-0">
             {volume}%
           </span>
         </div>

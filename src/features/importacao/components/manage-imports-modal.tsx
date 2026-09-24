@@ -123,7 +123,7 @@ export function ManageImportsModal({
 
         <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-6 py-4">
           <Database className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-black uppercase tracking-wider text-foreground">
+          <h2 className="text-[13px] font-semibold text-foreground">
             Gerenciar importações
           </h2>
         </div>
@@ -142,9 +142,9 @@ export function ManageImportsModal({
           {!loading && imports.length === 0 && (
             <div className="rounded-xl border bg-card p-8 text-center space-y-3">
               <Database className="h-8 w-8 text-muted-foreground/30 mx-auto" />
-              <p className="text-sm font-bold text-foreground">Nenhuma importação encontrada</p>
+              <p className="text-sm font-semibold text-foreground">Nenhuma importação encontrada</p>
               {loadError ? (
-                <p className="text-[11px] font-bold text-rose-600">{loadError}</p>
+                <p className="text-[11px] font-semibold text-rose-600">{loadError}</p>
               ) : (
                 <p className="text-[11px] text-muted-foreground">
                   Importe seu histórico de outra plataforma para começar.
@@ -152,7 +152,7 @@ export function ManageImportsModal({
               )}
               <Button
                 size="sm"
-                className="bg-primary hover:bg-primary/90 text-white font-bold text-xs gap-2"
+                className="gap-2"
                 onClick={() => {
                   onOpenChange(false)
                   onImportClick?.()
@@ -169,12 +169,12 @@ export function ManageImportsModal({
                 <div key={item.id} className="rounded-xl border bg-card p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-0.5 min-w-0">
-                      <p className="text-sm font-extrabold text-foreground">
+                      <p className="text-sm font-semibold text-foreground">
                         {originDisplayName(item.source as never, item.sourceName)}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {formatImportDate(item.createdAt)} •{" "}
-                        <span className="font-bold">
+                        <span className="font-semibold">
                           {item.sessionCount} registro{item.sessionCount !== 1 ? "s" : ""}
                         </span>
                         {item.fileName ? ` • ${item.fileName}` : ""}
@@ -184,7 +184,7 @@ export function ManageImportsModal({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-[10px] font-bold gap-1 h-7"
+                        className="text-[10px] font-semibold gap-1 h-7"
                         onClick={() => {
                           window.location.assign(`/dashboard/history?import=${item.id}`)
                         }}
@@ -195,7 +195,7 @@ export function ManageImportsModal({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-[10px] font-bold gap-1 h-7 text-rose-600 border-rose-200 hover:bg-rose-50"
+                        className="text-[10px] font-semibold gap-1 h-7 text-rose-600 border-rose-200 hover:bg-rose-50"
                         onClick={() => setConfirmingDeleteId(item.id)}
                       >
                         <Trash2 className="h-3 w-3" />
@@ -206,7 +206,7 @@ export function ManageImportsModal({
 
                   {confirmingDeleteId === item.id && (
                     <div className="rounded-lg border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-3 space-y-2">
-                      <p className="text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                      <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
                         EXCLUIR IMPORTAÇÃO?
                       </p>
                       <p className="text-[11px] text-rose-700 dark:text-rose-300 leading-relaxed">
@@ -220,7 +220,7 @@ export function ManageImportsModal({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1 text-[11px] font-bold"
+                          className="flex-1 text-[11px] font-semibold"
                           onClick={() => setConfirmingDeleteId(null)}
                           disabled={deletingId !== null}
                         >
@@ -228,7 +228,7 @@ export function ManageImportsModal({
                         </Button>
                         <Button
                           size="sm"
-                          className="flex-1 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white"
+                          className="flex-1 text-[11px] font-semibold bg-rose-600 hover:bg-rose-700 text-white"
                           disabled={deletingId !== null}
                           onClick={() => void handleDeleteBatch(item.id)}
                         >
@@ -252,14 +252,14 @@ export function ManageImportsModal({
             <div className="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/10 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
-                <p className="text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                <p className="text-[13px] font-semibold text-rose-700 dark:text-rose-300">
                   Excluir todos os dados importados
                 </p>
               </div>
 
               {confirmAllStep === 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                  <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
                     Excluir todos os dados importados?
                   </p>
                   <p className="text-[11px] text-rose-700 dark:text-rose-300 leading-relaxed">
@@ -268,7 +268,7 @@ export function ManageImportsModal({
                   </p>
                   <ul className="text-[11px] text-rose-700 dark:text-rose-300 space-y-0.5">
                     {perOriginSummary().map(([name, count]) => (
-                      <li key={name} className="flex justify-between font-bold">
+                      <li key={name} className="flex justify-between font-semibold">
                         <span>{name}:</span>
                         <span>{count}</span>
                       </li>
@@ -277,7 +277,7 @@ export function ManageImportsModal({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="text-[11px] font-bold border-rose-300 text-rose-700 hover:bg-rose-100"
+                    className="text-[11px] font-semibold border-rose-300 text-rose-700 hover:bg-rose-100"
                     onClick={() => setConfirmAllStep(1)}
                   >
                     Continuar
@@ -287,7 +287,7 @@ export function ManageImportsModal({
 
               {confirmAllStep === 1 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                  <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
                     Esta ação removerá todas as sessões importadas da sua conta e não poderá ser
                     desfeita.
                   </p>
@@ -299,7 +299,7 @@ export function ManageImportsModal({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 text-[11px] font-bold"
+                      className="flex-1 text-[11px] font-semibold"
                       onClick={() => setConfirmAllStep(0)}
                       disabled={deletingAll}
                     >
@@ -307,7 +307,7 @@ export function ManageImportsModal({
                     </Button>
                     <Button
                       size="sm"
-                      className="flex-1 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white"
+                      className="flex-1 text-[11px] font-semibold bg-rose-600 hover:bg-rose-700 text-white"
                       disabled={deletingAll}
                       onClick={() => void handleDeleteAll()}
                     >

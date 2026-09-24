@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Plus } from "lucide-react"
+import { ChevronsUpDown, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,7 +36,6 @@ export function DisciplineSelector({
   onSelect,
   onAddCustom,
   excludedIds = [],
-  placeholder = "Buscar disciplina...",
   buttonLabel = "Buscar disciplina...",
   buttonClassName,
 }: Props) {
@@ -98,7 +97,7 @@ export function DisciplineSelector({
                   <button
                     type="button"
                     onClick={handleAddCustom}
-                    className="w-full text-left flex items-center gap-2 font-bold text-primary hover:underline"
+                    className="w-full text-left flex items-center gap-2 font-semibold text-primary hover:underline"
                   >
                     <Plus className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Clock, CheckCircle2, AlertTriangle, Ban, Play, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ReviewSessionMode } from "@/domain/reviews/models"
@@ -31,13 +32,16 @@ const INTERVAL_LABELS: Record<RepetitionInterval, string> = {
   "custom": "Personalizado",
 }
 
+// Redesign 2.0: o rótulo do intervalo (24h, 7d...) já é a informação —
+// antes cada intervalo tinha uma cor própria (azul, ciano, teal, roxo,
+// rosa, âmbar), sem significado além do próprio texto.
 const INTERVAL_COLORS: Record<RepetitionInterval, string> = {
-  "24h": "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  "7d": "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
-  "15d": "bg-teal-500/10 text-teal-700 dark:text-teal-400",
-  "30d": "bg-purple-500/10 text-purple-700 dark:text-purple-400",
-  "60d": "bg-rose-500/10 text-rose-700 dark:text-rose-400",
-  "custom": "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  "24h": "bg-muted text-muted-foreground",
+  "7d": "bg-muted text-muted-foreground",
+  "15d": "bg-muted text-muted-foreground",
+  "30d": "bg-muted text-muted-foreground",
+  "60d": "bg-muted text-muted-foreground",
+  "custom": "bg-muted text-muted-foreground",
 }
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
@@ -50,9 +54,9 @@ const TABS: { id: ReviewStatus; label: string; icon: React.ElementType }[] = [
 ]
 
 function badgeStyle(isActive: boolean, tabId: ReviewStatus, count: number): string {
-  if (isActive) return "bg-primary text-white"
-  if (tabId === "overdue" && count > 0) return "bg-red-500/10 text-red-600 dark:text-red-400"
-  return "bg-muted text-muted-foreground"
+  if (tabId === "overdue" && count > 0) return "bg-destructive/10 text-destructive"
+  if (isActive) return "bg-primary/10 text-primary"
+  return "bg-background/60 text-muted-foreground"
 }
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
@@ -63,12 +67,12 @@ function ReviewCard({ item, onReview }: { item: TabReviewItem; onReview: () => v
   const isIgnored = item.status === "ignored"
 
   return (
-    <div
+    <li
       className={cn(
-        "rounded-xl border p-4 transition-all hover:shadow-xs group",
-        isOverdue && "border-red-200 dark:border-red-900/50 bg-red-500/5",
-        isCompleted && "opacity-60 bg-muted/30",
-        isIgnored && "opacity-50 bg-muted/20",
+        "px-4 py-3 transition-colors hover:bg-muted/30 group",
+        isOverdue && "border-l-2 border-l-destructive",
+        isCompleted && "opacity-60",
+        isIgnored && "opacity-50",
       )}
     >
       <div className="flex items-start gap-3">
@@ -83,19 +87,19 @@ function ReviewCard({ item, onReview }: { item: TabReviewItem; onReview: () => v
             </div>
 
             {/* Interval badge */}
-            <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${INTERVAL_COLORS[item.interval]}`}>
+            <span className={`shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded-sm ${INTERVAL_COLORS[item.interval]}`}>
               {INTERVAL_LABELS[item.interval]}
             </span>
           </div>
 
-          <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center justify-between mt-1.5">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 {new Date(item.dueDate).toLocaleDateString("pt-BR")}
               </span>
               {isOverdue && item.lapses && (
-                <span className="flex items-center gap-1 text-red-500">
+                <span className="flex items-center gap-1 text-destructive">
                   <AlertTriangle className="h-3 w-3" />
                   {item.lapses} lapsos
                 </span>
@@ -104,20 +108,21 @@ function ReviewCard({ item, onReview }: { item: TabReviewItem; onReview: () => v
 
             {!isCompleted && !isIgnored && (
               <button
+                type="button"
                 onClick={onReview}
-                className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 opacity-0 group-hover:opacity-100 transition-all"
+                className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 rounded-md px-2 py-1.5 -mr-2 hover:bg-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Play className="h-3 w-3" fill="currentColor" />
                 Revisar
               </button>
             )}
             {isCompleted && (
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 aria-label="Concluída" className="h-4 w-4 text-success" />
             )}
           </div>
         </div>
       </div>
-    </div>
+    </li>
   )
 }
 
@@ -127,6 +132,7 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReview
   const [activeTab, setActiveTab] = useState<ReviewStatus>("scheduled")
   const [playerOpen, setPlayerOpen] = useState(false)
   const [playerMode, setPlayerMode] = useState<ReviewSessionMode>("ALL")
+  const router = useRouter()
 
   const filtered = initialReviews.filter((r) => r.status === activeTab)
   const counts = {
@@ -139,7 +145,7 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReview
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted/40 p-1 rounded-xl border">
+      <div role="tablist" aria-label="Filtrar revisões" className="flex w-full gap-0.5 rounded-md bg-muted p-0.5 sm:inline-flex sm:w-auto">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const count = counts[tab.id]
@@ -149,18 +155,21 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReview
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              aria-selected={isActive}
+              aria-label={`${tab.label} (${count})`}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isActive
-                  ? "bg-background text-foreground shadow-xs"
+                  ? "bg-card text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground",
-                tab.id === "overdue" && count > 0 && !isActive && "text-red-500 hover:text-red-600",
               )}
             >
-              <Icon className="h-3.5 w-3.5 hidden sm:block" />
+              {/* Fase E: o ícone aparece também no mobile (antes só o número ficava visível) */}
+              <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden sm:inline">{tab.label}</span>
               <span className={cn(
-                "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold",
+                "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-sm text-[11px] font-medium tabular-nums",
                 badgeStyle(isActive, tab.id, count),
               )}>
                 {count}
@@ -172,13 +181,13 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReview
 
       {/* Content */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center border rounded-xl bg-muted/20">
-          <CheckCircle2 className="h-10 w-10 text-green-500/40 mb-3" />
-          <p className="text-sm font-semibold text-muted-foreground">Nenhuma revisão nesta categoria</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Continue estudando para gerar revisões automáticas!</p>
+        <div className="flex flex-col items-center justify-center py-12 text-center border border-border rounded-lg bg-card">
+          <CheckCircle2 aria-hidden className="h-5 w-5 text-muted-foreground/70 mb-2" />
+          <p className="text-sm font-medium text-foreground">Nenhuma revisão nesta categoria</p>
+          <p className="text-[13px] text-muted-foreground mt-1">As revisões são agendadas automaticamente a partir dos seus estudos.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <ul className="rounded-lg border border-border bg-card divide-y divide-border">
           {filtered.map((item) => (
             <ReviewCard
               key={item.id}
@@ -189,7 +198,7 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReview
               }}
             />
           ))}
-        </div>
+        </ul>
       )}
 
       <ReviewPlayerModal
@@ -197,7 +206,12 @@ export function ReviewTabs({ initialReviews = [] }: { initialReviews?: TabReview
         onOpenChange={setPlayerOpen}
         mode={playerMode}
         onFinished={() => {
-          if (typeof window !== "undefined") window.location.reload()
+          // Fase F: antes, um reload completo da janela — recarregava o app
+          // inteiro (JS, layout, providers, fila offline) só para atualizar
+          // esta lista. As abas são 100% derivadas de `initialReviews`, então
+          // router.refresh() (re-render do servidor, mesmo padrão do
+          // StartReviewButton) traz os mesmos dados atualizados.
+          router.refresh()
         }}
       />
     </div>

@@ -60,7 +60,7 @@ export const PRESET_ICONS = [
   { id: "scale", label: "Direito / Justiça", icon: Scale },
   { id: "award", label: "Medalha", icon: Award },
   { id: "flame", label: "Fogo / Foco", icon: Flame },
-  { id: "sparkles", label: "Inteligência IA", icon: Sparkles },
+  { id: "sparkles", label: "Destaque", icon: Sparkles },
   { id: "star", label: "Estrela", icon: Star },
   { id: "landmark", label: "Fiscal / Governo", icon: Landmark },
 ]
@@ -200,23 +200,22 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-xl bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] flex flex-col">
+      <div role="dialog" aria-modal="true" className="w-full max-w-xl bg-card rounded-lg shadow-xl border border-border overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <GraduationCap className="h-4 w-4 text-primary" />
-            </div>
-            <h2 className="text-base font-black text-foreground">
-              {initial?.id ? "Editar Concurso" : "Novo Concurso"}
+            <h2 className="text-base font-semibold text-foreground">
+              {initial?.id ? "Editar concurso" : "Novo concurso"}
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            aria-label="Fechar"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -227,7 +226,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
           {/* Seção 1: Ícone / Logo do Curso ou Concurso */}
           <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider flex items-center gap-1.5">
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider flex items-center gap-1.5">
                 <ImageIcon className="h-3.5 w-3.5 text-primary" />
                 Ícone ou Imagem do Curso / Concurso
               </label>
@@ -244,7 +243,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Visualização Atual do Ícone */}
             <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm group">
+              <div className="relative w-14 h-14 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm group">
                 <RenderConcursoIcon iconKey={icon} className="h-7 w-7 text-primary" />
               </div>
               <div className="flex-1 space-y-2">
@@ -262,7 +261,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
                   />
                   <label
                     htmlFor="concurso-icon-file-input"
-                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary/90 transition-all"
+                    className="cursor-pointer inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-within:ring-2 focus-within:ring-ring"
                   >
                     <Upload className="h-3.5 w-3.5" />
                     Importar Imagem
@@ -283,7 +282,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Presets de Ícones */}
             <div className="pt-2 border-t border-border/60">
-              <p className="text-[10px] font-extrabold text-muted-foreground tracking-wider mb-2">
+              <p className="text-[10px] font-semibold text-muted-foreground tracking-wider mb-2">
                 Ícones Pré-definidos
               </p>
               <div className="flex items-center gap-2 flex-wrap">
@@ -314,7 +313,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Nome */}
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider">
                 Nome do Concurso / Curso *
               </label>
               <div className="relative">
@@ -336,7 +335,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Cargo */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Cargo</label>
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider">Cargo</label>
               <input
                 value={role}
                 onChange={e => setRole(e.target.value)}
@@ -347,7 +346,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Banca */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Banca</label>
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider">Banca</label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -361,7 +360,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Data da Prova */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Data da Prova</label>
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider">Data da Prova</label>
               <input
                 type="date"
                 value={examDate}
@@ -372,7 +371,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Horário */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Horário</label>
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider">Horário</label>
               <input
                 type="time"
                 value={examTime}
@@ -383,7 +382,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Local */}
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Local da Prova</label>
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider">Local da Prova</label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -397,7 +396,7 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
 
             {/* Edital PDF */}
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-extrabold text-muted-foreground tracking-wider">Link do Edital (PDF)</label>
+              <label className="text-[10px] font-semibold text-muted-foreground tracking-wider">Link do Edital (PDF)</label>
               <div className="relative">
                 <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -416,14 +415,14 @@ function ConcursoFormModal({ open, onClose, onSave, initial, isSaving }: Concurs
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 text-sm font-bold rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors"
+              className="flex-1 py-2.5 text-sm font-semibold rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors"
             >
               Cancelar
             </button>
             <Button
               type="submit"
               disabled={isSaving}
-              className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl py-2.5 h-auto gap-2 shadow-sm hover:shadow-md transition-all"
+              className="flex-1 gap-2"
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {submitLabel}
@@ -448,14 +447,11 @@ interface DeleteConfirmModalProps {
 function DeleteConfirmModal({ open, name, onConfirm, onCancel, isLoading }: DeleteConfirmModalProps) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm bg-card rounded-2xl shadow-2xl border border-border p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div role="alertdialog" aria-modal="true" className="w-full max-w-sm bg-card rounded-lg shadow-xl border border-border p-5 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
-            <Trash2 className="h-5 w-5 text-destructive" />
-          </div>
           <div>
-            <h3 className="font-black text-base text-foreground">Excluir Concurso</h3>
+            <h3 className="font-semibold text-base text-foreground">Excluir Concurso</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Esta ação não pode ser desfeita.</p>
           </div>
         </div>
@@ -468,14 +464,14 @@ function DeleteConfirmModal({ open, name, onConfirm, onCancel, isLoading }: Dele
           <button
             onClick={onCancel}
             disabled={isLoading}
-            className="flex-1 py-2.5 text-sm font-bold rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            className="flex-1 py-2.5 text-sm font-semibold rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>
           <Button
             onClick={onConfirm}
             disabled={isLoading}
-            className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold rounded-xl h-auto py-2.5 gap-2"
+            className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-semibold rounded-xl h-auto py-2.5 gap-2"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
             {isLoading ? "Excluindo..." : "Excluir"}
@@ -503,11 +499,11 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
 
   let statusBadge: { label: string; className: string }
   if (concurso.is_active) {
-    statusBadge = { label: "Ativo", className: "bg-primary text-white" }
+    statusBadge = { label: "Ativo", className: "bg-primary" }
   } else if (concurso.is_archived) {
-    statusBadge = { label: "Arquivado", className: "bg-muted text-muted-foreground" }
+    statusBadge = { label: "Arquivado", className: "bg-muted-foreground/40" }
   } else {
-    statusBadge = { label: "Inativo", className: "bg-muted text-muted-foreground/70" }
+    statusBadge = { label: "Inativo", className: "bg-muted-foreground/40" }
   }
 
   let daysStr = "Data não definida"
@@ -515,49 +511,70 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
     if (concurso.days_remaining > 0) {
       daysStr = `Faltam ${concurso.days_remaining} dias`
     } else if (concurso.days_remaining === 0) {
-      daysStr = "Hoje é o dia!"
+      daysStr = "Prova hoje"
     } else {
       daysStr = "Prova realizada"
     }
   }
 
+  // Redesign 2.0 — cada concurso é uma LINHA de uma lista de projetos
+  // (nome, status, prova, banca, ações), não um card isolado.
   return (
     <div className={cn(
-      "relative group rounded-2xl border bg-card p-5 flex flex-col gap-4 shadow-xs transition-all duration-200",
-      concurso.is_active
-        ? "border-primary/40 bg-primary/[0.02]"
-        : "border-border hover:border-border/80 hover:shadow-xs",
-      concurso.is_archived && "opacity-60"
+      "relative group grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.6fr)_110px_170px_auto] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_110px_170px_150px] items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-muted/30",
+      concurso.is_active && "border-l-2 border-l-primary",
+      concurso.is_archived && "opacity-70"
     )}>
-      {/* Header do Card */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className={cn(
-            "relative w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border shadow-2xs transition-all",
-            concurso.is_active ? "bg-primary/10 border-primary/25 text-primary" : "bg-muted border-border text-muted-foreground"
-          )}>
-            <RenderConcursoIcon iconKey={concurso.icon} className={cn("h-5.5 w-5.5", concurso.is_active ? "text-primary" : "text-muted-foreground")} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-black text-sm text-foreground truncate">{concurso.name}</h3>
-              <span className={cn("text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider", statusBadge.className)}>
-                {statusBadge.label}
-              </span>
-            </div>
-            {(concurso.role || concurso.banca) && (
-              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                {[concurso.role, concurso.banca].filter(Boolean).join(" · ")}
-              </p>
-            )}
-          </div>
+      {/* Nome + cargo/banca */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="relative w-8 h-8 rounded-md flex items-center justify-center shrink-0 overflow-hidden border border-border bg-muted text-muted-foreground">
+          <RenderConcursoIcon iconKey={concurso.icon} className="h-4 w-4 text-muted-foreground" />
         </div>
+        <div className="min-w-0">
+          <h3 className="font-medium text-sm text-foreground truncate">{concurso.name}</h3>
+          <p className="text-xs text-muted-foreground truncate lg:hidden">
+            {[concurso.role, concurso.banca].filter(Boolean).join(" · ") || "Cargo e banca não informados"}
+          </p>
+        </div>
+      </div>
 
-        {/* Menu de Ações */}
+      {/* Cargo / banca em coluna própria no desktop largo */}
+      <span className="hidden lg:block truncate text-xs text-muted-foreground">
+        {[concurso.role, concurso.banca].filter(Boolean).join(" · ") || "Não informados"}
+      </span>
+
+      {/* Status */}
+      <span className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", statusBadge.className)} />
+        <span className={concurso.is_active ? "text-foreground font-medium" : undefined}>{statusBadge.label}</span>
+      </span>
+
+      {/* Data da prova */}
+      <span className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+        <Calendar aria-hidden className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">{daysStr}</span>
+      </span>
+
+      {/* Ações */}
+      <div className="flex items-center justify-end gap-1">
+        {concurso.is_active && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onViewEdital}
+            className="hidden sm:inline-flex text-primary hover:text-primary hover:bg-primary/10"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Ver edital
+          </Button>
+        )}
         <div className="relative shrink-0">
           <button
             onClick={() => setMenuOpen(v => !v)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            aria-label={`Ações de ${concurso.name}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
           >
             <MoreVertical className="h-4 w-4" />
           </button>
@@ -565,37 +582,57 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-8 z-50 w-48 bg-popover border border-border rounded-xl shadow-xl py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div role="menu" className="absolute right-0 top-9 z-50 w-48 bg-popover border border-border rounded-lg shadow-lg p-1">
                 <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => { setMenuOpen(false); onEdit(concurso) }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-foreground rounded-md hover:bg-muted transition-colors"
                 >
                   <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> Editar
                 </button>
                 <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => { setMenuOpen(false); onDuplicate(concurso.id, concurso.name) }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-foreground rounded-md hover:bg-muted transition-colors"
                 >
                   <Copy className="h-3.5 w-3.5 text-muted-foreground" /> Duplicar
                 </button>
                 {!concurso.is_active && (
                   <button
+                    type="button"
+                    role="menuitem"
                     onClick={() => { setMenuOpen(false); onActivate(concurso.id, concurso.name) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors"
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-foreground rounded-md hover:bg-muted transition-colors"
                   >
-                    <Star className="h-3.5 w-3.5" /> Definir como Ativo
+                    <Star className="h-3.5 w-3.5 text-muted-foreground" /> Definir como ativo
+                  </button>
+                )}
+                {concurso.is_active && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setMenuOpen(false); onViewEdital() }}
+                    className="sm:hidden w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-foreground rounded-md hover:bg-muted transition-colors"
+                  >
+                    <BookOpen className="h-3.5 w-3.5 text-muted-foreground" /> Ver edital
                   </button>
                 )}
                 <div className="border-t border-border my-1" />
                 <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => { setMenuOpen(false); onArchive(concurso.id, concurso.name) }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-foreground rounded-md hover:bg-muted transition-colors"
                 >
-                  <Archive className="h-3.5 w-3.5" /> {concurso.is_archived ? "Desarquivar" : "Arquivar"}
+                  <Archive className="h-3.5 w-3.5 text-muted-foreground" /> {concurso.is_archived ? "Desarquivar" : "Arquivar"}
                 </button>
                 <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => { setMenuOpen(false); onDelete(concurso.id, concurso.name) }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/5 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-destructive rounded-md hover:bg-destructive/10 transition-colors"
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Excluir
                 </button>
@@ -605,36 +642,10 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
         </div>
       </div>
 
-      {/* Metadados */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Calendar className="h-3.5 w-3.5 text-primary/70 shrink-0" />
-          <span className="truncate">{daysStr}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
-          <span>Edital do concurso</span>
-        </div>
-        {concurso.banca && (
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground col-span-2">
-            <Building2 className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-            <span className="truncate">Banca: {concurso.banca}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Ações do Card */}
-      {concurso.is_active && (
-        <div className="pt-1 border-t border-border">
-          <button
-            onClick={onViewEdital}
-            className="w-full text-xs font-bold text-primary hover:text-primary/80 flex items-center justify-center gap-1.5 py-1.5 rounded-lg hover:bg-primary/5 transition-colors"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            Ver Edital Verticalizado
-          </button>
-        </div>
-      )}
+      {/* Mobile: status + data em linha secundária */}
+      <p className="md:hidden col-span-2 pl-11 text-xs text-muted-foreground tabular-nums">
+        {statusBadge.label} · {daysStr}
+      </p>
     </div>
   )
 }
@@ -643,22 +654,15 @@ function ConcursoCard({ concurso, onEdit, onDuplicate, onActivate, onArchive, on
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center space-y-5">
-      <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
-        <GraduationCap className="h-10 w-10 text-primary/60" />
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-xl font-black text-foreground">Nenhum concurso cadastrado</h2>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Adicione seu primeiro concurso para começar a organizar seus estudos de forma inteligente.
-        </p>
-      </div>
-      <Button
-        onClick={onNew}
-        className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-6 rounded-xl shadow-sm hover:shadow-md transition-all"
-      >
+    <div className="flex flex-col items-center justify-center py-14 text-center space-y-2 rounded-lg border border-border bg-card">
+      <GraduationCap aria-hidden className="h-5 w-5 text-muted-foreground/70" />
+      <h2 className="text-sm font-medium text-foreground">Nenhum concurso cadastrado</h2>
+      <p className="text-[13px] text-muted-foreground max-w-sm">
+        Cadastre o concurso que você está preparando para organizar edital, datas e ciclo.
+      </p>
+      <Button onClick={onNew} size="sm" className="mt-2">
         <Plus className="h-4 w-4" />
-        Adicionar Primeiro Concurso
+        Adicionar concurso
       </Button>
     </div>
   )
@@ -791,10 +795,10 @@ export function ConcursosManagerView({ initialConcursos }: ConcursosManagerViewP
   return (
     <div className="space-y-4 pb-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-foreground">Meus Concursos</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h2 className="type-h3 text-foreground">Meus concursos</h2>
+          <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
             {concursos.length === 0
               ? "Nenhum concurso cadastrado ainda."
               : `${activeConcursos.length} concurso${activeConcursos.length !== 1 ? "s" : ""} • ${concursos.filter(c => c.is_active).length} ativo`
@@ -803,11 +807,11 @@ export function ConcursosManagerView({ initialConcursos }: ConcursosManagerViewP
         </div>
         <Button
           onClick={() => { setEditingConcurso(undefined); setFormOpen(true) }}
-          className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 rounded-xl shadow-sm hover:shadow-md transition-all w-full sm:w-auto"
+          className="w-full sm:w-auto"
           disabled={isPending}
         >
           <Plus className="h-4 w-4" />
-          Novo Concurso
+          Novo concurso
         </Button>
       </div>
 
@@ -819,7 +823,14 @@ export function ConcursosManagerView({ initialConcursos }: ConcursosManagerViewP
       {/* Grid de Concursos Ativos */}
       {activeConcursos.length > 0 && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="rounded-lg border border-border bg-card divide-y divide-border">
+            <div className="type-label hidden lg:grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_110px_170px_150px] gap-x-4 bg-muted/40 px-4 py-2">
+              <span>Concurso</span>
+              <span>Cargo · banca</span>
+              <span>Status</span>
+              <span>Prova</span>
+              <span className="text-right">Ações</span>
+            </div>
             {activeConcursos.map(c => (
               <ConcursoCard
                 key={c.id}
@@ -841,11 +852,11 @@ export function ConcursosManagerView({ initialConcursos }: ConcursosManagerViewP
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Archive className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider">
-              Arquivados ({archivedConcursos.length})
+            <h2 className="text-[13px] font-semibold text-foreground">
+              Arquivados <span className="font-normal text-muted-foreground tabular-nums">· {archivedConcursos.length}</span>
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="rounded-lg border border-border bg-card divide-y divide-border">
             {archivedConcursos.map(c => (
               <ConcursoCard
                 key={c.id}

@@ -9,8 +9,8 @@ import { env } from "@/config/env"
 import { MentorFeed } from "@/features/mentor-ai/components/mentor-feed"
 
 export const metadata = {
-  title: "Análise Inteligente",
-  description: "Análise inteligente e copiloto de estudos no NomeIA.",
+  title: "Análise de desempenho",
+  description: "Análise de desempenho dos seus estudos no NomeIA.",
 }
 
 export default async function MentorPage() {
