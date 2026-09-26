@@ -338,3 +338,154 @@ test("Skips duráveis continuam válidos após um DELETE em study_history (nunca
   assert.equal(after.state.totalRoundsDone, 0)
   assert.equal(after.state.currentItemIndex, 1) // "a" ainda satisfeito pelo skip; cursor vai para "b"
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FASE CICLO — "Concluir volta" (encerrar manualmente a rodada atual).
+//
+// PRIMEIRA TENTATIVA (histórico, não usada mais): marcar TODAS as matérias da
+// rodada atual com o marcador atemporal de skip (study_cycle_item_skips), o
+// mesmo usado por "pular matéria". Os dois primeiros testes abaixo (Caso 1 e
+// Caso 3), quando escritos contra essa abordagem, FALHARAM: como isSatisfied()
+// não sabe QUANDO o marcador foi criado em relação ao estudo real, marcar
+// todos os itens de uma vez fecha a rodada antes de processar estudo real que
+// já pertencia a ela, atribuindo esse tempo à rodada seguinte por engano. Isso
+// só é seguro no uso original porque lá apenas UM item é pulado por vez, com
+// os demais ainda dependendo de progresso real.
+//
+// IMPLEMENTAÇÃO ATUAL: concludeCurrentCycleRound grava um EVENTO NO TEMPO
+// (roundConclusions — ver migration 20260926_cycle_round_conclusions.sql),
+// não um marcador atemporal. O motor intercala esse evento cronologicamente
+// com os estudos reais (usando startedAt/occurredAt) e só o aplica quando,
+// ao alcançá-lo no replay, a rodada nele registrada ainda for a rodada
+// corrente — isso é o que impede um clique redundante de fechar duas rodadas
+// de uma vez (Caso 3). A transição de rodada em si (advanceCompletedRounds)
+// continua sendo exatamente a mesma usada pela conclusão natural — nenhuma
+// lógica paralela de avanço de rodada foi criada.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("Concluir volta — Caso 1: rodada parcialmente estudada avança exatamente uma rodada, cursor no primeiro item, 0% na nova volta", () => {
+  const before = reconcileCycleFromStudies(items, [
+    { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 2592, startedAt: "2026-09-20T10:00:00.000Z" }, // 72% de 3600s
+  ])
+  assert.equal(before.state.currentRound, 1)
+  assert.equal(before.state.currentItemIndex, 0)
+
+  // "Concluir volta": o clique acontece DEPOIS do estudo real já registrado.
+  const afterConclude = reconcileCycleFromStudies(
+    items,
+    [{ id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 2592, startedAt: "2026-09-20T10:00:00.000Z" }],
+    [],
+    [{ roundNumber: 1, occurredAt: "2026-09-20T11:00:00.000Z" }],
+  )
+
+  assert.equal(afterConclude.state.totalRoundsDone, 1)
+  assert.equal(afterConclude.state.currentRound, 2)
+  assert.equal(afterConclude.state.currentItemIndex, 0)
+  assert.equal(afterConclude.state.currentItemProgressSeconds, 0)
+  // O estudo real de 2592s em "a" continua registrado, intacto, na sessão da
+  // rodada 1 — "concluir volta" nunca apaga nem altera estudo real.
+  const session = afterConclude.sessions.find((s) => s.study_history_id === "a1")
+  assert.equal(session?.seconds_contributed, 2592)
+  assert.equal(session?.round_number, 1)
+})
+
+test("Concluir volta — Caso 2: nenhum estudo na rodada, ainda assim inicia a próxima rodada corretamente", () => {
+  const result = reconcileCycleFromStudies(items, [], [], [{ roundNumber: 1, occurredAt: "2026-09-20T11:00:00.000Z" }])
+
+  assert.equal(result.state.currentRound, 2)
+  assert.equal(result.state.currentItemIndex, 0)
+  assert.equal(result.state.currentItemProgressSeconds, 0)
+  assert.equal(result.sessions.length, 0) // nenhuma sessão fabricada — zero estudo real, zero sessão
+})
+
+test("Concluir volta — Caso 3: clique redundante (rodada já fechou sozinha por estudo real) não avança duas rodadas", () => {
+  // As duas matérias completam a rodada 1 sozinhas, por estudo real, ANTES do
+  // clique chegar ao servidor. O servidor lê current_round fresco no momento
+  // do clique, então o evento gravado já aponta para a rodada 2 (a que
+  // realmente está aberta nesse instante) — não para a 1.
+  const result = reconcileCycleFromStudies(
+    items,
+    [
+      { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600, startedAt: "2026-09-20T10:00:00.000Z" },
+      { id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600, startedAt: "2026-09-20T10:05:00.000Z" },
+    ],
+    [],
+    [{ roundNumber: 2, occurredAt: "2026-09-20T11:00:00.000Z" }],
+  )
+
+  // Rodada 1 fechou naturalmente (ambas 100%); o clique força o fechamento da
+  // rodada 2 (vazia) em seguida — duas transições no total, mas nenhuma delas
+  // duplicada pelo próprio clique.
+  assert.equal(result.state.totalRoundsDone, 2)
+  assert.equal(result.state.currentRound, 3)
+  assert.equal(result.sessions.length, 2) // as duas sessões reais, nada fabricado
+})
+
+test("Concluir volta — Caso 3b: evento referenciando uma rodada já superada (stale) é um no-op, nunca fecha duas rodadas", () => {
+  // Mesmo cenário do Caso 3, mas simulando um evento "atrasado"/inconsistente
+  // que ainda aponta para a rodada 1 mesmo depois dela já ter fechado
+  // naturalmente por estudo real antes do evento ser alcançado no replay.
+  // O guard `currentRound === roundNumber` deve tratar isso como um no-op.
+  const result = reconcileCycleFromStudies(
+    items,
+    [
+      { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 3600, startedAt: "2026-09-20T10:00:00.000Z" },
+      { id: "b1", cycleItemId: "b", disciplineId: "discipline-b", seconds: 3600, startedAt: "2026-09-20T10:05:00.000Z" },
+    ],
+    [],
+    [{ roundNumber: 1, occurredAt: "2026-09-20T11:00:00.000Z" }],
+  )
+
+  assert.equal(result.state.totalRoundsDone, 1) // só o avanço natural, o evento stale não conta
+  assert.equal(result.state.currentRound, 2)
+  assert.equal(result.sessions.length, 2)
+})
+
+test("Concluir volta — Caso 4: ciclo com uma única disciplina avança exatamente uma rodada", () => {
+  const oneItem = [{ id: "solo", disciplineId: "discipline-solo", disciplineName: "Solo", targetSeconds: 1800 }]
+
+  const result = reconcileCycleFromStudies(oneItem, [], [], [{ roundNumber: 1, occurredAt: "2026-09-20T11:00:00.000Z" }])
+
+  assert.equal(result.state.totalRoundsDone, 1)
+  assert.equal(result.state.currentRound, 2)
+  assert.equal(result.state.currentItemIndex, 0)
+})
+
+test("Concluir volta — Caso 12: o primeiro item da nova volta é exatamente o primeiro item da sequência original (nunca reordena)", () => {
+  const result = reconcileCycleFromStudies(items, [], [], [{ roundNumber: 1, occurredAt: "2026-09-20T11:00:00.000Z" }])
+
+  // items[0] é "a" — o índice do cursor na nova volta deve apontar para ele.
+  assert.equal(result.state.currentItemIndex, 0)
+  assert.equal(items[result.state.currentItemIndex]?.id, "a")
+})
+
+test("Concluir volta — idempotência: reaplicar o mesmo evento (ex.: rebuild repetido) não avança a rodada de novo", () => {
+  const conclusions = [{ roundNumber: 1, occurredAt: "2026-09-20T11:00:00.000Z" }]
+  const once = reconcileCycleFromStudies(items, [], [], conclusions)
+  const again = reconcileCycleFromStudies(items, [], [], conclusions)
+
+  assert.deepEqual(once.state, again.state)
+  assert.equal(again.state.currentRound, 2)
+})
+
+test("Concluir volta — estudo real registrado DEPOIS do clique é atribuído à rodada nova, nunca à concluída", () => {
+  // Este é o teste que prova a correção do bug original: um "concluir volta"
+  // seguido de estudo real genuíno não pode "roubar" esse estudo de volta
+  // para a rodada que acabou de ser fechada administrativamente.
+  const result = reconcileCycleFromStudies(
+    items,
+    [
+      { id: "a1", cycleItemId: "a", disciplineId: "discipline-a", seconds: 1000, startedAt: "2026-09-20T10:00:00.000Z" }, // antes do clique
+      { id: "a2", cycleItemId: "a", disciplineId: "discipline-a", seconds: 500, startedAt: "2026-09-20T12:00:00.000Z" }, // depois do clique
+    ],
+    [],
+    [{ roundNumber: 1, occurredAt: "2026-09-20T11:00:00.000Z" }],
+  )
+
+  const before = result.sessions.find((s) => s.study_history_id === "a1")
+  const after = result.sessions.find((s) => s.study_history_id === "a2")
+  assert.equal(before?.round_number, 1)
+  assert.equal(after?.round_number, 2)
+  assert.equal(result.state.currentRound, 2)
+  assert.equal(result.state.currentItemProgressSeconds, 500) // só o estudo pós-conclusão conta na rodada nova
+})

@@ -81,7 +81,6 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       topic_name: data["topic_name"] || null,
       focus_sound: data["focus_sound"] || null,
       focus_sound_volume: data["focus_sound_volume"] ?? null,
-      reviews_completed: data["reviews_completed"] || 0,
       is_manual_mode: data["is_manual_mode"] === true || data["is_manual_mode"] === "true",
       // Vínculo com o ciclo de estudo
       cycle_id: data["cycle_id"] || null,

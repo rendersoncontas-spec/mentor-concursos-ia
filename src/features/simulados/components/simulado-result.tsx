@@ -23,8 +23,6 @@ import { cn } from "@/lib/utils"
 import type { SimuladoResultPayload, ScoreBand, TrendSummary } from "@/domain/simulados/types"
 import {
   addQuestionToStudyListAction,
-  createFlashcardFromQuestionAction,
-  sendQuestionToReviewAction,
 } from "@/application/simulados/simulados.actions"
 import { formatTimer } from "@/application/simulados/simulado-engine"
 
@@ -285,28 +283,6 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
                     )}
 
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="rounded-lg text-[11px] font-semibold"
-                        disabled={busyQuestion === q.questionId}
-                        onClick={() =>
-                          runIntegration(sendQuestionToReviewAction, header.id, q.questionId, "Enviada para revisão!")
-                        }
-                      >
-                        <BookOpenCheck className="h-3.5 w-3.5" /> Enviar para revisão
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="rounded-lg text-[11px] font-semibold"
-                        disabled={busyQuestion === q.questionId}
-                        onClick={() =>
-                          runIntegration(createFlashcardFromQuestionAction, header.id, q.questionId, "Flashcard criado!")
-                        }
-                      >
-                        Criar flashcard
-                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

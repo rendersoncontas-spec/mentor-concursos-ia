@@ -127,25 +127,10 @@ export async function getPublicStudyProfileAction(
       .maybeSingle()
 
     if (profileError || !profileData) {
-      // Se não encontrou no profile com RLS, pode ser outro usuário:
-      // montar perfil mínimo público com dados básicos
-      const defaultName = "Estudante"
-      return {
-        success: true,
-        data: {
-          id: targetUserId,
-          name: defaultName,
-          avatarUrl: null,
-          initials: computeInitials(defaultName),
-          bgColor: computeBgColor(targetUserId),
-          targetContest: "Concurseiro",
-          isPrivate: !isSelf,
-          isSelf,
-          stats: null,
-          topDisciplines: [],
-          recentActivities: [],
-        },
-      }
+      // Fase H: antes montava um perfil "Estudante" marcado como PRIVADO
+      // ("Este usuário mantém seu desempenho privado") — uma afirmação falsa:
+      // o perfil só não pôde ser lido (RLS de profiles / RPC indisponível).
+      return { success: false, data: null, error: "Não foi possível carregar este perfil agora." }
     }
 
     const preferences = (profileData.preferences as Record<string, unknown>) || {}

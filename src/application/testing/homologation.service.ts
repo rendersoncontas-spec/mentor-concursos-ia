@@ -59,7 +59,6 @@ export class HomologationService {
         questionsAnswered: 20,
         correctAnswers: 18, // 90% Acerto
         wrongAnswers: 2,
-        reviewsCompleted: 5,
       })
       logs[logs.length - 1] = {
         step: "Executar Sessão Orchestrator",
@@ -68,7 +67,11 @@ export class HomologationService {
         details: sessionResult,
       }
 
-      // 3. Validar IGA e Mentor
+      // 3. Validar a resposta do Mentor
+      //
+      // Fase I.6 (M1): não há mais IGA para validar — o índice era composto por
+      // números não medidos e saiu do contrato. O que se valida aqui é o que o
+      // Mentor de fato produz: a observação vinda dos insights reais.
       logs.push({
         step: "Validar Mentor",
         status: "PENDING",
@@ -79,7 +82,7 @@ export class HomologationService {
         step: "Validar Mentor",
         status: "SUCCESS",
         message: "Mentor respondeu com sucesso",
-        details: { iga: sessionResult.igaAfter, msg: sessionResult.mentorResponse },
+        details: { msg: sessionResult.mentorResponse },
       }
     } catch (e: unknown) {
       logs.push({
@@ -119,7 +122,6 @@ export class HomologationService {
         questionsAnswered: 10,
         correctAnswers: 10,
         wrongAnswers: 0,
-        reviewsCompleted: 0,
       })
       const msgA = resA.mentorResponse
       logs[logs.length - 1] = {
@@ -146,7 +148,6 @@ export class HomologationService {
         questionsAnswered: 10,
         correctAnswers: 2,
         wrongAnswers: 8,
-        reviewsCompleted: 0,
       })
       const msgB = resB.mentorResponse
       logs[logs.length - 1] = {

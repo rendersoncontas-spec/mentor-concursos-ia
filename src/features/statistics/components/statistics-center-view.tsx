@@ -89,6 +89,25 @@ import {
 
 const TIMEZONE = "America/Sao_Paulo"
 
+/**
+ * Sinal de revisão vazio, usado quando a leitura de revisões falhou (Fase I.6,
+ * M3). Não é "zero revisões" apresentado ao aluno: é a ausência de sinal para os
+ * derivados (insights e atenção), que só falam de revisão quando há número > 0.
+ * A seção de revisões, essa sim, mostra o erro explicitamente.
+ */
+const EMPTY_REVISION_STATISTICS: ReturnType<typeof computeRevisionStatistics> = {
+  totalPending: 0,
+  overdue: 0,
+  dueToday: 0,
+  upcoming: 0,
+  completedLast30: 0,
+  completionRate: null,
+  byDiscipline: [],
+}
+
+/** Fase H: rótulo do card "Semana" pelo dia de início configurado (antes fixo "segunda"). */
+const WEEK_START_LABEL = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"]
+
 type RangeId = "all" | "7" | "30" | "90" | "365" | "custom"
 
 const RANGES: { id: RangeId; label: string; days: number }[] = [
@@ -297,6 +316,18 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
           ),
     [filteredSessions, filteredAttempts, rangeKeys, now, isAllRange, isCustomRange],
   )
+  // ── Fase I.8: o que NÃO pôde ser lido ────────────────────────────────────
+  // Cada leitura do payload que falha vira estado de erro da SEÇÃO que fala
+  // sobre aquele dado — a página continua mostrando o resto, que é verdadeiro.
+  const attemptsUnavailable = payload != null && payload.attempts === null
+  const editalUnavailable = payload != null && payload.userDisciplines === null
+  const planUnavailable = payload?.activePlanError === true
+  const weekStartUnknown = payload != null && payload.weekStartDay === null
+
+  // A semana continua começando no domingo quando não há preferência: a regra
+  // do produto não mudou. O que a tela passa a saber é QUANDO esse domingo veio
+  // de uma leitura que falhou — e aí ela avisa, em vez de apresentar o padrão
+  // como se fosse escolha do aluno.
   const weekStartDay = payload?.weekStartDay ?? 0
   const timeCards = useMemo(
     () => computeTimeCards(buckets, now, TIMEZONE, weekStartDay),
@@ -318,19 +349,28 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
     [buckets, now],
   )
   const frequency = useMemo(() => computeFrequency(buckets, now, TIMEZONE, weekStartDay), [buckets, now, weekStartDay])
-  const revisionStats = useMemo(
-    () =>
-      computeRevisionStatistics(
-        payload?.reviewItems ?? [],
-        payload?.reviewsCompletedLast30 ?? 0,
-        now,
-        registry,
-      ),
-    [payload?.reviewItems, payload?.reviewsCompletedLast30, now, registry],
+  // Fase I.6 (achado M3): `null` nas leituras de revisão quer dizer que a consulta
+  // não respondeu. Nesse caso NÃO calculamos estatística de revisão: a seção
+  // mostra erro em vez de "Sem revisões", e nenhum número de revisão é exibido.
+  const revisionStats = useMemo(() => {
+    if (!payload || payload.reviewItems === null || payload.reviewsCompletedLast30 === null) return null
+    return computeRevisionStatistics(
+      payload.reviewItems,
+      payload.reviewsCompletedLast30,
+      now,
+      registry,
+    )
+  }, [payload, now, registry])
+  // Sem dado de revisão não há sinal de revisão: mapa vazio significa "nenhuma
+  // informação", e é assim que os derivados (atenção, insights) se comportam —
+  // eles ficam calados em vez de afirmar que não há atraso.
+  const revisionSignal = useMemo(
+    () => revisionStats ?? EMPTY_REVISION_STATISTICS,
+    [revisionStats],
   )
   const overdueByDiscipline = useMemo(() => {
     const m = new Map<string, number>()
-    revisionStats.byDiscipline.forEach((d) => m.set(d.disciplineId, d.overdue))
+    revisionStats?.byDiscipline.forEach((d) => m.set(d.disciplineId, d.overdue))
     return m
   }, [revisionStats])
 
@@ -407,7 +447,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
         streaks,
         comparisons,
         planning,
-        revision: revisionStats,
+        revision: revisionSignal,
         disciplineStats,
         topicStats,
         timeCards,
@@ -427,7 +467,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
       streaks,
       comparisons,
       planning,
-      revisionStats,
+      revisionSignal,
       disciplineStats,
       topicStats,
       timeCards,
@@ -439,8 +479,8 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
     ],
   )
   const priorities = useMemo(
-    () => computePriorities(disciplineStats, revisionStats),
-    [disciplineStats, revisionStats],
+    () => computePriorities(disciplineStats, revisionSignal),
+    [disciplineStats, revisionSignal],
   )
   const weeklyReport = useMemo(() => computeWeeklyReport(buckets, now, TIMEZONE), [buckets, now])
   const monthlyReport = useMemo(() => computeMonthlyReport(buckets, now, TIMEZONE), [buckets, now])
@@ -458,7 +498,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
       if (s.disciplineId && !byId.has(s.disciplineId))
         byId.set(s.disciplineId, s.disciplineName ?? s.disciplineId)
     })
-    payload?.disciplines.forEach((d) => {
+    ;(payload?.disciplines ?? []).forEach((d) => {
       if (d.id) byId.set(d.id, d.name)
     })
     return [...byId.entries()]
@@ -682,7 +722,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
           <Metric
             label="Semana"
             value={formatDurationRaw(timeCards.weekMinutes)}
-            sub="segunda → hoje"
+            sub={`${WEEK_START_LABEL[weekStartDay] ?? "domingo"} → hoje`}
             accent
           />
           <Metric
@@ -865,7 +905,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
       <SectionCard
         title="Calendário de atividade"
         subtitle="Intensidade de estudo por dia (nível por percentil)"
-        action={<HeatmapLegendNote />}
+        action={<HeatmapLegendNote weekStartUnknown={weekStartUnknown} />}
       >
         {heatmap.length > 0 ? (
           <HeatmapCalendar cells={heatmap} now={now} timezone={TIMEZONE} />
@@ -933,7 +973,12 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
           title="Questões ao longo do tempo"
           subtitle="Volume diário e acurácia em linha"
         >
-          {questionTrend.length === 0 ? (
+          {attemptsUnavailable ? (
+            <EmptyState
+              title="Questões indisponíveis"
+              message="Não foi possível carregar suas tentativas de questões. Isto não significa que você não respondeu nenhuma — atualize a página em instantes."
+            />
+          ) : questionTrend.length === 0 ? (
             <EmptyState title="Sem questões" message="Sem questões registradas no período." />
           ) : (
             <div className="h-56">
@@ -1005,6 +1050,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
             disciplineStats={disciplineStats}
             topicStats={topicStats.filter((t) => t.wrong > 0)}
             empty={questionStats.total === 0}
+            unavailable={attemptsUnavailable}
           />
         </SectionCard>
       </div>
@@ -1023,27 +1069,46 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
       >
         {productivity.score === null ? (
           <div>
-            <EmptyState title="Produtividade indisponível" message="Complete ao menos 3 sessões no período para calcular o índice de produtividade — a fórmula soma tempo ativo (40%), acurácia (30%), foco (20%) e constância (10%)." />
+            <EmptyState title="Produtividade indisponível" message="Complete ao menos 3 sessões no período para calcular o índice de produtividade — a fórmula soma tempo ativo (40%), acurácia (30%), foco (20%) e constância (10%); com menos de 5 questões a acurácia sai e os pesos passam a 40%, 45% e 15%." />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Fase H: pesos e valores conforme o cálculo realmente feito. */}
             <Metric
-              label="Tempo ativo (40%)"
+              label={`Tempo ativo (${productivity.weights?.activeRatio ?? 40}%)`}
               value={`${productivity.breakdown.activeRatioScore}%`}
               sub="minutos ativos ÷ duração total"
             />
             <Metric
-              label="Acurácia (30%)"
-              value={`${productivity.breakdown.accuracyScore}%`}
-              sub="com ≥5 questões no período"
+              label={
+                productivity.weights?.accuracy
+                  ? `Acurácia (${productivity.weights.accuracy}%)`
+                  : "Acurácia (fora do índice)"
+              }
+              value={
+                productivity.weights?.hasAccuracy === false
+                  ? "—"
+                  : `${productivity.breakdown.accuracyScore}%`
+              }
+              sub={
+                productivity.weights?.hasAccuracy === false
+                  ? "menos de 5 questões no período"
+                  : "com ≥5 questões no período"
+              }
             />
             <Metric
-              label="Foco (20%)"
-              value={`${productivity.breakdown.focusScore}%`}
-              sub="foco médio das sessões"
+              label={`Foco (${productivity.weights?.focus ?? 20}%)`}
+              value={
+                productivity.weights?.hasFocus === false ? "—" : `${productivity.breakdown.focusScore}%`
+              }
+              sub={
+                productivity.weights?.hasFocus === false
+                  ? "sem foco registrado (conta como 0 no índice)"
+                  : "foco médio das sessões"
+              }
             />
             <Metric
-              label="Constância (10%)"
+              label={`Constância (${productivity.weights?.consistency ?? 10}%)`}
               value={`${productivity.breakdown.consistencyScore}%`}
               sub="dias estudados nos últimos 7"
             />
@@ -1138,7 +1203,12 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
           ) : null
         }
       >
-        {!planning.hasPlan ? (
+        {planUnavailable ? (
+          <EmptyState
+            title="Plano indisponível"
+            message="Não foi possível consultar seu plano de estudo. Isto não quer dizer que você está sem plano ativo — atualize a página em instantes."
+          />
+        ) : !planning.hasPlan ? (
           <EmptyState title="Sem plano ativo" message="Quando houver um plano ativo, o gráfico mostra o planejado por dia da semana (pela grade do plano) contra o realizado." />
         ) : (
           <>
@@ -1228,7 +1298,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
         action={
           <div className="flex items-center gap-2">
             <span className="text-2xl font-semibold text-primary tabular-nums">
-              {edital.percentage}%
+              {Math.round(edital.percentage)}%
             </span>
             <div className="w-28">
               <ProgressBar pct={edital.percentage} />
@@ -1236,7 +1306,12 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
           </div>
         }
       >
-        {edital.total === 0 ? (
+        {editalUnavailable ? (
+          <EmptyState
+            title="Edital indisponível"
+            message="Não foi possível carregar suas disciplinas. Isto não significa que você está sem edital cadastrado — atualize a página em instantes."
+          />
+        ) : edital.total === 0 ? (
           <EmptyState title="Sem edital" message="Adicione um concurso (edital) para acompanhar a cobertura por disciplina." />
         ) : (
           <>
@@ -1345,7 +1420,7 @@ function filterSessions(
 }
 
 function filterAttempts(
-  attempts: StatisticsCenterPayload["attempts"],
+  attempts: NonNullable<StatisticsCenterPayload["attempts"]>,
   rangeKeys: string[],
   disciplineId: string,
   timezone: string,
@@ -1510,7 +1585,17 @@ function Donut({ value, size }: { value: number | null; size: number }) {
   )
 }
 
-function HeatmapLegendNote() {
+function HeatmapLegendNote({ weekStartUnknown = false }: { weekStartUnknown?: boolean }) {
+  // Fase I.8: quando a preferência de início de semana não pôde ser lida, a tela
+  // usa o domingo padrão do produto e DIZ que está fazendo isso — em vez de
+  // apresentar o padrão como se fosse a configuração do aluno.
+  if (weekStartUnknown) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        Não foi possível ler sua preferência de início de semana; exibindo a partir de domingo.
+      </span>
+    )
+  }
   return (
     <span className="text-[10px] text-muted-foreground">
       níveis por percentil de minutos por dia
@@ -1874,15 +1959,29 @@ function ErrorMap({
   disciplineStats,
   topicStats,
   empty,
+  unavailable,
 }: {
   disciplineStats: DisciplineStat[]
   topicStats: TopicStat[]
   empty: boolean
+  /** Fase I.8: a leitura das tentativas falhou — "sem erros" seria mentira. */
+  unavailable: boolean
 }) {
   const byDiscipline = [...disciplineStats]
     .sort((a, b) => b.wrong - a.wrong)
     .filter((d) => d.wrong > 0)
   const byTopic = [...topicStats].sort((a, b) => b.wrong - a.wrong).slice(0, 5)
+
+  if (unavailable) {
+    return (
+      <div>
+        <EmptyState
+          title="Erros indisponíveis"
+          message="A leitura das suas tentativas de questões falhou, então não dá para dizer onde você errou. Atualize a página em instantes."
+        />
+      </div>
+    )
+  }
 
   if (empty || (byDiscipline.length === 0 && byTopic.length === 0)) {
     return (
@@ -1937,16 +2036,32 @@ function ErrorMap({
 
 // ─── Revisões ───────────────────────────────────────────────────────────────
 
-function RevisionSection({ revision }: { revision: ReturnType<typeof computeRevisionStatistics> }) {
+function RevisionSection({
+  revision,
+}: {
+  revision: ReturnType<typeof computeRevisionStatistics> | null
+}) {
   return (
     <SectionCard
       title="Revisões (memória)"
       subtitle="Fila do motor de repetição espaçada — atrasadas, de hoje e concluídas nos últimos 30 dias"
       action={<Brain className="h-4 w-4 text-primary" />}
     >
-      {revision.totalPending === 0 && revision.completedLast30 === 0 ? (
+      {/*
+        Fase I.6 (M3): três estados distintos. `null` = a consulta não respondeu,
+        e aí não mostramos número nenhum — antes esse caso caía no estado vazio e
+        dizia "Sem revisões", como se o aluno nunca tivesse revisado.
+      */}
+      {revision === null && (
+        <EmptyState
+          title="Não foi possível carregar as revisões"
+          message="A consulta ao servidor falhou, então não temos como mostrar sua fila nem as revisões concluídas. Atualize a página em instantes."
+        />
+      )}
+      {revision !== null && revision.totalPending === 0 && revision.completedLast30 === 0 && (
         <EmptyState title="Sem revisões" message="Nenhum item de revisão ainda. Quando o motor de repetição espaçada tiver itens, eles aparecem aqui com a taxa de conclusão." />
-      ) : (
+      )}
+      {revision !== null && (revision.totalPending > 0 || revision.completedLast30 > 0) && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <Metric label="Pendentes" value={revision.totalPending} sub="em fila" />
@@ -2261,8 +2376,12 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
         >
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold">{h.label}</p>
+            {/* Fase H: o destaque vem da maior acurácia (≥ 5 questões) OU, sem
+                nenhum período com 5 questões, do maior tempo — o texto diz qual. */}
             {h.best && (
-              <span className="text-[11px] font-medium text-success">Melhor rendimento</span>
+              <span className="text-[11px] font-medium text-success">
+                {h.questions >= 5 ? "Melhor rendimento" : "Mais tempo de estudo"}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-2">
@@ -2290,10 +2409,16 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
               </p>
             </div>
           </div>
-          {h.best && (
+          {h.best && h.questions >= 5 && (
             <p className="text-[10px] text-emerald-600 mt-1.5">
               Melhor desempenho registrado (maior acurácia com ≥ 5 questões) — considere fixar a
               prática nesse horário.
+            </p>
+          )}
+          {h.best && h.questions < 5 && (
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              Período com mais tempo de estudo. Nenhum período tem 5 ou mais questões para comparar
+              acurácia.
             </p>
           )}
         </div>

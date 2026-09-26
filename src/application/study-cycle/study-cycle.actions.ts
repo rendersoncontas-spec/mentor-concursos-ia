@@ -14,7 +14,12 @@ import type {
 import { createClient } from "@/infrastructure/supabase/server"
 import { loadActiveCycleOverview, loadCycleOverviewById, loadCyclesOverview } from "./cycle-overview.reader"
 import { fetchAllCycleSessions } from "./cycle-sessions.reader"
-import { reconcileCycleProgress, registerStudyToCycle, skipCurrentCycleItem } from "./cycle-study-registration.service"
+import {
+  concludeCurrentCycleRound,
+  reconcileCycleProgress,
+  registerStudyToCycle,
+  skipCurrentCycleItem,
+} from "./cycle-study-registration.service"
 
 async function getUser() {
   const supabase = await createClient()
@@ -548,6 +553,38 @@ export async function skipCycleCurrentItemAction(cycleId: string) {
     return { success: true }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro ao pular matéria."
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * Encerra administrativamente a volta atual do ciclo e inicia a próxima do
+ * zero (ação manual do usuário, nunca estudo real).
+ *
+ * Regras:
+ * - NÃO cria study_history, NÃO adiciona minutos, NÃO marca nenhuma matéria
+ *   como estudada — o percentual real de cada item continua refletindo só
+ *   o tempo realmente estudado nesta rodada e nas anteriores.
+ * - Delega inteiramente a concludeCurrentCycleRound (mesma transição central
+ *   de rodada usada pela conclusão natural e por "pular matéria" — nenhuma
+ *   lógica paralela de avanço foi criada aqui).
+ * - O usuário efetivo e a posse do ciclo são resolvidos e verificados dentro
+ *   de concludeCurrentCycleRound (getEffectiveUserId + .eq("user_id", ...)),
+ *   nunca a partir de um userId vindo do cliente.
+ */
+export async function concludeCycleRoundAction(cycleId: string) {
+  try {
+    const result = await concludeCurrentCycleRound(cycleId)
+    if (!result.success) {
+      return { success: false, error: result.error || "Erro ao concluir a volta." }
+    }
+
+    revalidatePath("/ciclos")
+    revalidatePath("/dashboard")
+    revalidatePath("/dashboard/history")
+    return { success: true }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro ao concluir a volta."
     return { success: false, error: message }
   }
 }

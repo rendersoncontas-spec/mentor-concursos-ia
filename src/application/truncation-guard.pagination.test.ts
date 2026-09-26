@@ -2,7 +2,7 @@ import { describe, it } from "node:test"
 import assert from "node:assert/strict"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { getPendingReviewsSummary } from "@/application/review-engine/review-engine.service"
+import { listExistingSourceIds } from "@/application/review-engine/review.repository"
 import { getStudyHistoryForAnalytics } from "@/application/study-analytics/study-analytics.service"
 import { getAllUserHistory } from "@/application/study-history/study-history.service"
 import { FakePostgrest } from "@/lib/testing/fake-postgrest"
@@ -83,22 +83,39 @@ describe("study_history acima de 1.000 linhas", () => {
 })
 
 describe("review_items acima de 1.000 linhas", () => {
-  it("KPI 'Revisões pendentes' do Dashboard conta TODOS os itens vencidos (1.500), não só 1.000", async () => {
-    const past = new Date(Date.now() - 3 * 86_400_000).toISOString()
-    const future = new Date(Date.now() + 5 * 86_400_000).toISOString()
+  // Fase I.2: o KPI "Revisões pendentes" do Dashboard (getPendingReviewsSummary)
+  // saiu junto com o widget — decisão D6, revisões vivem só na página de
+  // Revisões. A garantia da Fase F.1 continua travada aqui sobre a leitura
+  // paginada de review_items que SOBROU no produto: descobrir quais conteúdos do
+  // edital o aluno já tem em revisão, usada pelo modal "Adicionar à revisão".
+  it("o catálogo reconhece TODOS os itens já em revisão (1.800), não só os 1.000 primeiros", async () => {
     const items = Array.from({ length: 1800 }, (_, k) => ({
       id: `r${String(k).padStart(6, "0")}`,
       user_id: USER,
-      next_review_at: k < 1500 ? past : future,
-      lapses_count: k % 4,
-      difficulty: 5,
-      deleted_at: null,
-      is_suspended: false,
+      discipline_id: "d1",
+      source_id: `src-${String(k).padStart(6, "0")}`,
     }))
     const { supabase } = client({ review_items: items })
-    const summary = await getPendingReviewsSummary(supabase, USER)
-    assert.equal(summary.count, 1500)
-    assert.equal(summary.overdue + summary.today, 1500)
-    assert.equal(summary.nextReview, future)
+
+    const existing = await listExistingSourceIds(supabase, USER, "d1")
+
+    assert.equal(existing.size, 1800)
+    // Um conteúdo além do corte de 1.000 precisa aparecer como "já está em
+    // revisão"; sem paginação a UI ofereceria adicioná-lo de novo.
+    assert.equal(existing.has("src-001799"), true)
+  })
+
+  it("não mistura itens de outro aluno nem de outra disciplina", async () => {
+    const { supabase } = client({
+      review_items: [
+        { id: "a", user_id: USER, discipline_id: "d1", source_id: "meu-topico" },
+        { id: "b", user_id: "outro", discipline_id: "d1", source_id: "topico-alheio" },
+        { id: "c", user_id: USER, discipline_id: "d2", source_id: "outra-disciplina" },
+      ],
+    })
+
+    const existing = await listExistingSourceIds(supabase, USER, "d1")
+
+    assert.deepEqual([...existing], ["meu-topico"])
   })
 })

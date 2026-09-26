@@ -291,9 +291,25 @@ export interface ProductivityBreakdown {
   consistencyScore: number
 }
 
+/**
+ * Fase H: pesos REALMENTE usados no índice. Com < 5 questões a acurácia fica
+ * fora e o índice passa a 40/45/15 — a tela mostrava sempre "30%/20%/10%".
+ * `hasFocus`/`hasAccuracy` dizem se o componente tinha dado (sem dado, a tela
+ * mostra "—" em vez de "0%").
+ */
+export interface ProductivityWeights {
+  activeRatio: number
+  accuracy: number | null
+  focus: number
+  consistency: number
+  hasAccuracy: boolean
+  hasFocus: boolean
+}
+
 export interface ProductivityStatistics {
   score: number | null
   breakdown: ProductivityBreakdown
+  weights?: ProductivityWeights
 }
 
 export interface Insight {
@@ -1292,13 +1308,18 @@ export function computeAttentionScore(d: {
   score += revScore * 15
   if (d.overdue > 0) reasons.push(`${d.overdue} revisões atrasadas`)
 
+  // Fase H: o status real gravado em user_disciplines é "STUDYING" (ver
+  // domain/disciplines/disciplines.types.ts); só "EM_ESTUDO" era comparado,
+  // então disciplinas em estudo caíam em "outros" (0.2) e o motivo nunca
+  // aparecia. Os dois nomes são aceitos.
+  const inStudy = d.status === "EM_ESTUDO" || d.status === "STUDYING"
   let coverScore: number
   if (d.status === "NOT_STARTED") coverScore = 1
-  else if (d.status === "EM_ESTUDO") coverScore = 0.6
+  else if (inStudy) coverScore = 0.6
   else coverScore = 0.2
   score += coverScore * 10
   if (d.status === "NOT_STARTED") reasons.push("Nunca começada")
-  if (d.status === "EM_ESTUDO") reasons.push("Em estudo mas sem dominar")
+  if (inStudy) reasons.push("Em estudo mas sem dominar")
 
   let trendScore: number
   if (d.trendDirection === "DOWN") trendScore = 1
@@ -2096,7 +2117,13 @@ export function computeRevisionStatistics(
   now: Date,
   disciplineRegistry: Map<string, DisciplineMeta>,
 ): RevisionStatistics {
-  const todayIso = now.toISOString().slice(0, 10)
+  // Fase H: "hoje" e o dia de vencimento em São Paulo (antes: dia UTC — entre
+  // 21h e 24h a divisão atrasada/para hoje errava um dia).
+  const todayIso = todayKey(now, DEFAULT_TIMEZONE)
+  const dueKeyOf = (iso: string): string => {
+    const p = localParts(iso, DEFAULT_TIMEZONE)
+    return p ? dateKeyFromYmd(p.year, p.month, p.day) : iso.slice(0, 10)
+  }
   let total = 0
   let overdue = 0
   let dueToday = 0
@@ -2128,7 +2155,7 @@ export function computeRevisionStatistics(
   items.forEach((it) => {
     if (!it.nextReviewAt) return
     total += 1
-    const dueIso = it.nextReviewAt.slice(0, 10)
+    const dueIso = dueKeyOf(it.nextReviewAt)
     if (dueIso < todayIso) {
       overdue += 1
       addToDiscipline(it.disciplineId, "overdue")
@@ -2270,6 +2297,9 @@ export function computeProductivity(
 
   return {
     score: score === null ? null : Math.round(Math.min(100, Math.max(0, score))),
+    weights: hasAccuracy
+      ? { activeRatio: 40, accuracy: 30, focus: 20, consistency: 10, hasAccuracy: true, hasFocus: focusScore !== null }
+      : { activeRatio: 40, accuracy: null, focus: 45, consistency: 15, hasAccuracy: false, hasFocus: focusScore !== null },
     breakdown: {
       activeRatioScore: Math.round(activeRatioScore * 100),
       accuracyScore: accuracyScore !== null ? Math.round(accuracyScore * 100) : 0,
@@ -2465,12 +2495,15 @@ export function generateInsights(input: InsightInput): Insight[] {
   const priority = input.disciplineStats
     .slice()
     .sort((a, b) => b.attentionScore - a.attentionScore)[0]
-  if (priority && priority.attentionScore >= 40) {
+  // Fase H: só com um motivo calculado (antes caía em "não estudada há tempo"
+  // mesmo sem esse dado).
+  const priorityReason = priority?.attentionReasons[0]
+  if (priority && priority.attentionScore >= 40 && priorityReason) {
     insights.push({
       id: "prioridade",
       severity: "warning",
       title: `Foco sugerido: ${priority.name}`,
-      message: `Entre suas matérias, ${priority.name} concentra os maiores sinais de atenção: ${priority.attentionReasons[0] ?? "não estudada há tempo"}.`,
+      message: `Entre suas matérias, ${priority.name} concentra os maiores sinais de atenção: ${priorityReason}.`,
     })
   }
 
@@ -2495,7 +2528,7 @@ export function generateInsights(input: InsightInput): Insight[] {
         id: "acuraciamensal",
         severity: "positive",
         title: "Acurácia em evolução",
-        message: `Sua acurácia subiu ${Math.round(m.delta)} pontos percentuais no mês. O padrão de revisão está dando resultado.`,
+        message: `Sua acurácia subiu ${Math.round(m.delta)} pontos percentuais no mês.`,
       })
     }
   }

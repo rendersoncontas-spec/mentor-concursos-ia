@@ -1,269 +1,206 @@
 // ============================================================================
-// Tipos do módulo de Revisões (Mentor Concursos IA) — Sprint 14
-// Reutiliza a estrutura da Sprint 6 (review_items/review_queue/review_history)
-// e adiciona flashcards, sessões persistentes e configurações.
+// Domínio de Revisões — Fase I.1 (sistema real de repetição espaçada).
+//
+// A unidade de revisão é um CONTEÚDO DO EDITAL (tópico ou subtópico). O item de
+// revisão guarda apenas o estado de memória e o agendamento; o conteúdo continua
+// nas tabelas de origem (topics / subtopics).
+//
+// Flashcards e questões NÃO fazem parte desta entrega (decisões D1/D3/D25): não
+// há tipo, tabela nem fluxo para eles aqui.
 // ============================================================================
 
-export type ReviewStage = "NEW" | "LEARNING" | "REVIEW" | "MASTERED" | "LAPSED"
-export type ReviewSourceType = "QUESTION" | "TOPIC" | "FLASHCARD" | "STUDY_SESSION"
+/** Os 4 estados do próprio FSRS. "Atrasado" e "maduro" são derivados, não guardados. */
+export type ReviewState = "NEW" | "LEARNING" | "REVIEW" | "RELEARNING"
 
+export const REVIEW_STATE_LABEL: Record<ReviewState, string> = {
+  NEW: "Novo",
+  LEARNING: "Aprendendo",
+  REVIEW: "Em revisão",
+  RELEARNING: "Reaprendendo",
+}
+
+/** Nota do aluno. 1 = não lembrou; 2 a 4 = lembrou (com esforço decrescente). */
 export type ReviewGrade = 1 | 2 | 3 | 4
 
 export const REVIEW_GRADE_LABEL: Record<ReviewGrade, string> = {
-  1: "Novamente",
+  1: "Errei",
   2: "Difícil",
   3: "Bom",
   4: "Fácil",
 }
 
-export const REVIEW_GRADE_TAG = { 1: "again", 2: "hard", 3: "good", 4: "easy" } as const
+export const REVIEW_GRADES: readonly ReviewGrade[] = [1, 2, 3, 4]
 
-export type FlashcardType = "QA" | "CLOZE" | "TRUE_FALSE" | "MULTIPLE_CHOICE" | "OPEN" | "QUESTION"
-
-export const FLASHCARD_TYPE_LABEL: Record<FlashcardType, string> = {
-  QA: "Pergunta → Resposta",
-  CLOZE: "Lacuna (Cloze)",
-  TRUE_FALSE: "Verdadeiro ou Falso",
-  MULTIPLE_CHOICE: "Múltipla Escolha",
-  OPEN: "Pergunta Aberta",
-  QUESTION: "Questão de Concurso → Explicação",
+export function isReviewGrade(value: unknown): value is ReviewGrade {
+  return value === 1 || value === 2 || value === 3 || value === 4
 }
 
-export type ReviewProfile = "EQUILIBRADO" | "ALTA_RETENCAO" | "RETA_FINAL" | "LEVE"
+/** Origem do conteúdo revisado (D1/D5): `sourceId` aponta para topics/subtopics. */
+export type ReviewSourceType = "EDITAL_TOPIC" | "EDITAL_SUBTOPIC"
 
-export const REVIEW_PROFILE_LABEL: Record<ReviewProfile, string> = {
-  EQUILIBRADO: "Concurso — Equilibrado",
-  ALTA_RETENCAO: "Concurso — Alta Retenção",
-  RETA_FINAL: "Concurso — Reta Final",
-  LEVE: "Revisão Leve",
+export const REVIEW_SOURCE_LABEL: Record<ReviewSourceType, string> = {
+  EDITAL_TOPIC: "Tópico",
+  EDITAL_SUBTOPIC: "Subtópico",
 }
 
-/** Estudo de memória conforme o FSRS v4 (determinístico). */
-export interface SrsState {
-  review_stage: ReviewStage
-  stability: number        // S em dias
-  difficulty: number       // D (1 a 10)
-  retrievability: number   // R (0 a 1) no momento
-  interval_days: number    // próximo intervalo (dias; <1 para minutos)
-  next_review_at: string
-  memory_strength: number  // 0 a 100 (display)
-  forget_probability: number
-  /** Contadores para a ação persistir junto (auto-save). */
-  review_count: number
-  consecutive_correct: number
-  consecutive_wrong: number
-  lapses_count: number
+export function isReviewSourceType(value: unknown): value is ReviewSourceType {
+  return value === "EDITAL_TOPIC" || value === "EDITAL_SUBTOPIC"
 }
 
-/** Linha da tabela review_items. */
+/**
+ * Estado de memória de um item — exatamente o que o agendador lê e escreve, e o
+ * que `review_items` persiste. Nenhum campo derivado ou de exibição aqui.
+ */
+export interface ReviewMemory {
+  state: ReviewState
+  /** S do FSRS, em dias. */
+  stability: number
+  /** D do FSRS, de 1 a 10. */
+  difficulty: number
+  /** Intervalo em dias agendado pela última resposta (0 nos passos de minutos). */
+  scheduledDays: number
+  /** Passo atual de (re)aprendizagem; sem ele o item nunca se forma para REVIEW. */
+  learningSteps: number
+  /** Quantas respostas o item já recebeu. */
+  reps: number
+  /** Quantas vezes o aluno esqueceu um item que já estava em revisão. */
+  lapses: number
+  lastReviewAt: string | null
+  /** Quando o item volta (o "due"). */
+  dueAt: string
+}
+
 export interface ReviewItem {
   id: string
-  user_id: string
-  discipline_id: string
-  topic_id: string | null
-
-  source_type: ReviewSourceType
-  source_id: string
-
-  review_stage: ReviewStage
-  ease_factor: number
-  stability_score: number
-  memory_strength: number
-  forget_probability: number
-
-  last_review_at: string | null
-  next_review_at: string | null
-  review_count: number
-  lapses_count: number
-
-  base_priority: number
-
-  card_type: FlashcardType
-  card_front: string | null
-  card_back: string | null
-  tags: string[]
-  difficulty: number
-  last_interval_days: number
-  consecutive_correct: number
-  consecutive_wrong: number
-  is_suspended: boolean
-  is_favorite: boolean
-  deleted_at: string | null
-
-  created_at: string
-  updated_at: string
-}
-
-/** payload de resposta para o player (sem gabarito até revelar). */
-export interface ReviewCardFront {
-  reviewItemId: string
-  cardType: FlashcardType
-  front: string
-  disciplineName: string
-  topicName: string | null
-  lapsesCount: number
-  isFavorite: boolean
-  reviewCount: number
-  /** Riscos exibidos no player (leech etc). */
-  flag: "LEECH" | "LAPSE_RISK" | null
-}
-
-export interface ReviewCardReveal extends ReviewCardFront {
-  back: string
-  /** Apenas para MULTIPLE_CHOICE: alternativas ao lado do gabarito. */
-  alternatives: { label: string; text: string; correct: boolean }[]
-  /** Intervalos previstos pelo FSRS para cada botão (min/dias reais). */
-  intervals: { grade: ReviewGrade; label: string; preview: string }[]
-}
-
-export type ReviewSessionMode =
-  | "ALL"          // 🔥 Revisar agora (fila inteligente completa)
-  | "OVERDUE"      // ⏰ Atrasadas
-  | "TODAY"        // 📅 De hoje
-  | "NEW"          // 🆕 Novos
-  | "HARD"         // 🧠 Difíceis (dificuldade alta / muitas falhas)
-  | "AT_RISK"      // ⚠️ Em risco de esquecimento
-  | "ERRORS"       // ❌ Meus erros (lapsos de questões)
-  | "MASTERED"     // 🏆 Dominados
-  | "LAPSED"       // 💥 Lapsos
-  | "RAPIDA"       // ⚡ Revisão rápida
-  | "DISCIPLINE"   // 📚 Por disciplina
-  | "TOPIC"        // 🎯 Por tópico
-
-export interface ReviewSession {
-  id: string
-  user_id: string
-  status: "ACTIVE" | "COMPLETED" | "DISCARDED"
-  mode: ReviewSessionMode
-  filters: Record<string, unknown>
-  queue_ids: string[]
-  answered_ids: string[]
-  cards_total: number
-  started_at: string
-  finished_at: string | null
-}
-
-export type ReviewFilters = {
-  mode: ReviewSessionMode
-  disciplineId?: string | null
-  topicId?: string | null
-  count?: number | null // Revisão rápida
-  maxReviews?: number | null // teto do dia (aplicado pelo serviço)
-}
-
-export interface ReviewSettings {
-  user_id: string
-  new_cards_per_day: number
-  max_reviews_per_day: number
-  desired_retention: number
-  max_daily_minutes: number | null
-  review_profile: ReviewProfile
-  exam_date: string | null
-  reta_final: boolean
-  auto_add_errors: boolean
-}
-
-export interface ReviewReport {
-  cardsReviewed: number
-  again: number
-  hard: number
-  good: number
-  easy: number
-  remembered: number
-  retention: number
-  totalSeconds: number
-  avgSecondsPerCard: number
-  worstTopics: { name: string; disciplineName: string; retention: number; reviewed: number }[]
-}
-
-export interface RetentionPoint {
-  label: string
-  retention: number | null
-  reviewed: number
-}
-
-export interface ReviewCalendarDay {
-  date: string
-  count: number
-}
-
-export interface ReviewLoadForecast {
-  todayCount: number
-  todayMinutes: number
-  tomorrowCount: number
-  tomorrowMinutes: number
-  week7Count: number
-  week7Minutes: number
-  week30Count: number
-  week30Minutes: number
-  loadWarning: string | null
-}
-
-export interface ReviewDisciplineSummary {
+  userId: string
   disciplineId: string
-  name: string
-  total: number
-  due: number
-  retention: number | null
+  sourceType: ReviewSourceType
+  sourceId: string
+  memory: ReviewMemory
+  suspendedAt: string | null
+  archivedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
-export interface ReviewTopicSummary {
-  topicId: string | null
-  topicName: string
+/** Item com os nomes resolvidos para exibição (o conteúdo vive na origem). */
+export interface ReviewItemView {
+  id: string
+  sourceType: ReviewSourceType
+  sourceId: string
+  /** Nome do tópico ou do subtópico. */
+  title: string
+  /** Para subtópico, o nome do tópico pai. */
+  parentTitle: string | null
+  disciplineId: string
   disciplineName: string
-  total: number
-  retention: number | null
+  state: ReviewState
+  dueAt: string
   lastReviewAt: string | null
-  nextReviewAt: string | null
-}
-
-export interface LeechItem {
-  reviewItemId: string
-  cardType: FlashcardType
-  front: string
-  disciplineName: string
-  topicName: string | null
+  reps: number
   lapses: number
-  consecutiveWrong: number
-  reviewCount: number
+  stability: number
+  suspendedAt: string | null
+  archivedAt: string | null
 }
 
-/** Payload completo do dashboard (todos os números vêm do banco). */
-export interface ReviewDashboardData {
-  retention: number | null
-  doneToday: number
+/** Onde o item cai na fila de hoje (derivado da data, no fuso de São Paulo). */
+export type ReviewBucket = "OVERDUE" | "TODAY" | "NEW" | "UPCOMING"
+
+export const REVIEW_BUCKET_LABEL: Record<ReviewBucket, string> = {
+  OVERDUE: "Atrasada",
+  TODAY: "Para hoje",
+  NEW: "Nova",
+  UPCOMING: "Próxima",
+}
+
+export interface ReviewCounts {
   overdue: number
-  dueToday: number
-  newCount: number
-  hardCount: number
-  atRiskCount: number
-  errorCount: number
-  funnel: Record<ReviewStage, number>
-  totalItems: number
-  calendar: ReviewCalendarDay[]
-  forecast: ReviewLoadForecast
-  byDiscipline: ReviewDisciplineSummary[]
-  byTopic: ReviewTopicSummary[]
-  leech: LeechItem[]
-  reteFinalActive: boolean
-  hasActiveSession: boolean
-  retentionByPeriod: { d7: number | null; d30: number | null; d90: number | null; d180: number | null; d365: number | null }
-  evolution: RetentionPoint[]
-  analyses: string[]
-  recommendations: string[]
-  recentReviews: { label: string; retention: number | null; reviewed: number }[]
+  today: number
+  newItems: number
+  upcoming: number
+  suspended: number
+  archived: number
 }
 
-// ─── Convenções compartilhadas ─────────────────────────────────────────────────────────
+/** Retenção medida: respostas "lembrei" ÷ respostas. `rate` null sem respostas. */
+export interface ReviewRetention {
+  rate: number | null
+  answered: number
+}
 
-export const FSRS_WEIGHTS = [
-  0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61,
-] as const
+export interface ReviewsOverview {
+  /**
+   * Contagens medidas. `null` = NÃO foi possível ler (Fase I.5, achado A2):
+   * antes, falha de consulta virava zero e a página dizia "Você não tem revisões
+   * agendadas" com o botão de revisar desabilitado. Zero agora significa apenas
+   * uma coisa: o banco respondeu que não há itens naquele grupo.
+   */
+  counts: ReviewCounts | null
+  /** Itens a revisar agora, na ordem da fila (atrasadas → hoje → novas). */
+  due: ReviewItemView[]
+  upcoming: ReviewItemView[]
+  suspended: ReviewItemView[]
+  archived: ReviewItemView[]
+  /** Próximo vencimento futuro, quando não há nada para agora. */
+  nextDueAt: string | null
+  /** Retenção medida; `null` em `rate` quando ainda não há respostas. */
+  retention: ReviewRetention
+  hasActiveSession: boolean
+}
 
-export const FSRS_D0 = 4.93
-export const FSRS_MINUTES_REVIEW_STEP = 10 // passo de re-aprendizagem quando "Novamente"
-export const MASTERY_MIN_REVIEWS = 5
-export const MASTERY_MIN_STABILITY = 21 // dias
-export const MASTERY_MIN_CONSECUTIVE = 3
-export const LEECH_LAPSES = 5
-export const LEECH_CONSECUTIVE_WRONG = 4
+export interface ReviewSessionSummary {
+  id: string
+  status: "ACTIVE" | "COMPLETED" | "DISCARDED"
+  startedAt: string
+  finishedAt: string | null
+  itemsAnswered: number
+}
+
+/** Previsão de quando o item volta para cada nota (calculada pelo agendador). */
+export interface ReviewGradePreview {
+  grade: ReviewGrade
+  label: string
+  /** Texto pronto: "10 min", "2 dias", "3 meses". */
+  preview: string
+}
+
+export interface ReviewCard {
+  itemId: string
+  sourceType: ReviewSourceType
+  title: string
+  parentTitle: string | null
+  disciplineName: string
+  state: ReviewState
+  bucket: ReviewBucket
+  dueAt: string
+  reps: number
+  lapses: number
+  previews: ReviewGradePreview[]
+}
+
+export interface ReviewSessionState {
+  sessionId: string
+  /**
+   * Quantas respostas esta sessão já tem. `null` quando a leitura da sessão
+   * falhou (Fase I.7) — antes virava `0`, e o cabeçalho anunciava "0
+   * respondidas" a um aluno que acabara de responder cinco cards.
+   */
+  itemsAnswered: number | null
+  /**
+   * Quantos itens ainda estão vencidos agora (a fila é recalculada a cada
+   * resposta). `null` quando a contagem não pôde ser lida — nunca 0 por erro.
+   */
+  remaining: number | null
+  card: ReviewCard | null
+}
+
+export interface ReviewSessionReport {
+  itemsAnswered: number
+  remembered: number
+  forgot: number
+  durationMinutes: number
+  nextDueAt: string | null
+  studyRegistered: boolean
+  cycleSyncError: string | null
+}

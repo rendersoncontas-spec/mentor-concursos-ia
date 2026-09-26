@@ -364,7 +364,11 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
       <MetricStrip>
         <Metric label="Tempo de estudo" value={totalStats.studyTimeFormatted} />
         <Metric label="Questões" value={totalStats.totalQuestions} />
-        <Metric label="Acerto" value={`${totalStats.accuracyPercentage}%`} />
+        {/* Fase H: sem questões não há acerto — "—", não "0%". */}
+        <Metric
+          label="Acerto"
+          value={totalStats.totalQuestions > 0 ? `${totalStats.accuracyPercentage}%` : "—"}
+        />
         <Metric label="Disciplinas" value={disciplines.length} />
         <div className="col-span-2 min-w-0 space-y-1.5 lg:col-span-1">
           <div className="flex items-baseline justify-between gap-2">

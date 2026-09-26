@@ -495,7 +495,8 @@ export function HistoryView() {
     0,
   )
   const totalWrong = totalAnswered - totalCorrect
-  const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0
+  // Fase H: sem questões nas sessões filtradas não há desempenho — "—", não "0%".
+  const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : null
   const totalPagesRead = currentSessions.reduce(
     (acc, s) => acc + Number(s.metadata?.["pages_read"] || 0),
     0,
@@ -875,7 +876,7 @@ export function HistoryView() {
             Desempenho
           </span>
           <div className="flex items-baseline gap-2 flex-wrap">
-            <p className="text-xl font-semibold text-foreground tabular-nums">{accuracy}%</p>
+            <p className="text-xl font-semibold text-foreground tabular-nums">{accuracy === null ? "—" : `${accuracy}%`}</p>
             <span className="text-xs text-muted-foreground tabular-nums">
               {totalCorrect} acertos · {totalWrong > 0 ? totalWrong : 0} erros
             </span>

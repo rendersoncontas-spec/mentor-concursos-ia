@@ -56,6 +56,10 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   >("ciclo")
   const [isManualCreation, setIsManualCreation] = useState(false)
 
+  // P1.1 (auditoria itens 8): este componente NÃO busca ReplanInfo — recebe
+  // initialData via prop do servidor. Os `return []`/`[]` abaixo são vazio REAL
+  // (usuário sem plano), não erro mascarado. Erros de ReplanInfo são tratados
+  // nas subviews (weekly/daily/calendar) com REPLAN_UNAVAILABLE_MESSAGE.
   const [blocks, setBlocks] = useState<StudyCycleBlock[]>(() => {
     if (initialData?.blocks && initialData.blocks.length > 0) {
       return initialData.blocks.map((b) => ({

@@ -159,3 +159,37 @@ test("generateAdaptiveDecisions: creates weight decrease for high retention", ()
   assert.equal(decrease!.disciplineId, "d3")
   assert.equal(decrease!.delta, -0.15)
 })
+
+// Fase H — o gerador de plano (study-plan.service.ts) montava um contexto com
+// valores fixos (energia 3, sequência 5, desempenho 50/60 sem dados, retenção =
+// acerto, janela única) e passava ao motor. O bloco foi removido; este teste
+// prova que a remoção não muda o cronograma: com esse formato de contexto o
+// motor NUNCA produz decisão, qualquer que seja o desempenho real.
+test("contexto antigo do gerador de plano nunca produz decisão (remoção do mock é neutra)", () => {
+  const scores = [0, 1, 10, 25, 49, 50, 60, 69, 70, 85, 86, 99, 100]
+  for (const weeklyHours of [0, 5, 20, 31, 60]) {
+    for (const a of scores) {
+      for (const b of scores) {
+        const context: AnalyticsContext = {
+          userId: "u1",
+          disciplines: [a, b].map((score, i) => ({
+            id: `d${i}`,
+            name: `D${i}`,
+            weight: 3 + i,
+            performanceScore: score,
+            retentionRate: score,
+            lapsesCount: 0,
+            daysSinceLastStudy: 0,
+          })),
+          userStats: {
+            averageEnergy: 3,
+            weeklyHoursStudied: weeklyHours,
+            currentStreak: 5,
+            totalBacklogReviews: 0,
+          },
+        }
+        assert.deepEqual(generateAdaptiveDecisions(context), [], `scores=${a},${b} horas=${weeklyHours}`)
+      }
+    }
+  }
+})

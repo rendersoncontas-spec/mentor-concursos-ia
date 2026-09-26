@@ -13,7 +13,6 @@ import {
   DAY_SHORT,
 } from "@/domain/study-plan/study-plan.types"
 import { calculateWeeklyDistribution, calculateCycleDistribution, calcDisciplineSummary } from "@/application/study-plan/study-plan.algorithm"
-import { generateAdaptiveDecisions, type AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
 import { getDayInSaoPaulo } from "@/lib/sao-paulo"
 import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
@@ -23,7 +22,13 @@ import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
  * 2. Chama o algoritmo puro
  * 3. Desativa planos anteriores
  * 4. Persiste o novo plano
+ *
+ * P1.1 — PRODUCT_SUGGESTED_WEEKLY_HOURS (25h) é default legítimo de produto,
+ * usado SOMENTE quando o usuário não possui meta configurada. Erro de leitura
+ * do perfil retorna null (indisponível), nunca cai no default.
  */
+export const PRODUCT_SUGGESTED_WEEKLY_HOURS = 25
+
 export async function generateStudyPlan(
   supabase: SupabaseClient,
   userId: string,
@@ -31,14 +36,19 @@ export async function generateStudyPlan(
   targetId?: string,
   overrideWeeklyHours?: number
 ): Promise<{ id: string; version: number } | null> {
-  // 1a. Buscar perfil
-  const { data: profile } = await supabase
+  // 1a. Buscar perfil — P1.1: distinguir erro de leitura vs ausência real.
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("weekly_study_hours, experience_level")
     .eq("id", userId)
     .maybeSingle()
 
-  const targetHours = overrideWeeklyHours || profile?.weekly_study_hours || 25
+  if (profileError) {
+    console.error("generateStudyPlan: profile read error", profileError)
+    return null
+  }
+
+  const targetHours = overrideWeeklyHours || profile?.weekly_study_hours || PRODUCT_SUGGESTED_WEEKLY_HOURS
 
   // 1b. Buscar concurso ativo (exam_id pode ser null para concursos customizados)
   const { data: target } = await supabase
@@ -140,98 +150,15 @@ export async function generateStudyPlan(
     (userDisciplines ?? []).map((ud) => [ud.discipline_id, ud.status as string])
   )
 
-  // 1e. Construir AnalyticsContext para o Motor Adaptativo
-  // Desempenho real por disciplina (acurácia e volume de estudo nos últimos 90 dias).
-  const perfCutoff = new Date()
-  perfCutoff.setDate(perfCutoff.getDate() - 90)
-  // Fase F.1: paginado (90 dias podem passar de 1.000 sessões para quem estuda
-  // muito; antes 1 requisição cortada em 1.000). Erro → sem histórico, como antes.
-  const perfResult = await fetchAllRowsPaged<{
-    discipline_id: string
-    duration_minutes: number | null
-    metadata: Record<string, unknown> | null
-  }>(
-    (withCount) =>
-      supabase
-        .from("study_history")
-        .select("discipline_id, duration_minutes, metadata", countOption(withCount))
-        .eq("user_id", userId)
-        .gte("started_at", perfCutoff.toISOString()),
-    [
-      { column: "started_at", ascending: true },
-      { column: "id", ascending: true },
-    ],
-  )
-  const perfHistory = perfResult.error ? null : perfResult.data
-
-  const perfByDiscipline = new Map<string, { answered: number; correct: number; minutes: number }>()
-  ;(perfHistory ?? []).forEach((h) => {
-    const meta = (h.metadata ?? {}) as Record<string, unknown>
-    const answered = Number(meta["questions_answered"]) || 0
-    const correct = Number(meta["questions_correct"]) || 0
-    const record = perfByDiscipline.get(h.discipline_id) ?? { answered: 0, correct: 0, minutes: 0 }
-    record.answered += answered
-    record.correct += correct
-    record.minutes += Number(h.duration_minutes) || 0
-    perfByDiscipline.set(h.discipline_id, record)
-  })
-
-  let hasRealPerformance = false
-  const mockContext: AnalyticsContext = {
-    userId,
-    disciplines: examDisciplines.map(ed => {
-      const record = perfByDiscipline.get(ed.discipline_id)
-      let performanceScore = 50
-      let retentionRate = 50
-      if (record && (record.answered > 0 || record.minutes > 0)) {
-        hasRealPerformance = true
-        performanceScore = record.answered > 0
-          ? Math.round((record.correct / record.answered) * 100)
-          : 60
-        retentionRate = performanceScore
-      }
-      return {
-        id: ed.discipline_id,
-        name: ed.discipline?.name || "Desconhecido",
-        weight: ed.weight,
-        performanceScore,
-        retentionRate,
-        lapsesCount: 0,
-        daysSinceLastStudy: 0
-      }
-    }),
-    userStats: {
-      averageEnergy: 3,
-      weeklyHoursStudied: profile?.weekly_study_hours ?? 20,
-      currentStreak: 5,
-      totalBacklogReviews: 0
-    }
-  }
-
-  // 1f. Gerar decisões adaptativas
-  const adaptiveDecisions = generateAdaptiveDecisions(mockContext)
-
-  // 1g. Salvar decisões no banco (Auditoria) — somente com desempenho real,
-  // para não persistir recomendações fabricadas no adaptive_history.
-  if (hasRealPerformance && adaptiveDecisions.length > 0) {
-    const historyPayload = adaptiveDecisions.map(d => ({
-      user_id: userId,
-      discipline_id: d.disciplineId,
-      recommendation_type: d.recommendationType,
-      previous_value: d.previousValue,
-      new_value: d.newValue,
-      delta: d.delta,
-      reason: d.reason,
-      confidence: d.confidence,
-      engine: d.engine,
-      algorithm_version: d.algorithmVersion,
-      expires_at: d.expiresAt,
-      is_active: true
-    }))
-    
-    const { error: aleError } = await supabase.from("adaptive_history").insert(historyPayload)
-    if (aleError) console.error("Erro ao salvar adaptive_history:", aleError)
-  }
+  // Fase H: aqui existia um "contexto do Motor Adaptativo" com valores FIXOS
+  // (energia 3, sequência 5; desempenho 50/60 quando a disciplina não tinha
+  // questões; retenção = acerto) que alimentava generateAdaptiveDecisions e
+  // gravava o resultado em adaptive_history. Com a versão atual do motor
+  // (histerese de 2 janelas e risco de burnout só com energia < 40) esse
+  // contexto de janela única nunca produzia decisão — o bloco só custava uma
+  // leitura paginada de 90 dias de study_history. Removido sem mudar o
+  // cronograma gerado (ver adaptive-learning.test.ts: "contexto antigo do
+  // gerador de plano nunca produz decisão").
 
   // 2. Montar input e chamar algoritmo puro
   const weeklyMinutes = targetHours * 60
@@ -247,7 +174,6 @@ export async function generateStudyPlan(
       weight: ed.weight,
       status: statusMap.get(ed.discipline_id) ?? "NOT_STARTED",
     })),
-    adaptiveDecisions
   }
 
   const algorithmItems = calculateWeeklyDistribution(algorithmInput)
@@ -302,6 +228,17 @@ export async function generateStudyPlan(
     console.error("generateStudyPlan: plan insert error", planError)
     return null
   }
+
+  // P1.2 — cura otimista de corrida (criação em duas abas): a desativação
+  // acima + este insert não são atômicos; duas abas podem deixar dois ACTIVE.
+  // Garante um único ativo (last-write-wins explícito, sem destruir dados:
+  // o rival vira ARCHIVED). Leitores pegam o mais recente por generated_at.
+  await supabase
+    .from("study_plans")
+    .update({ active: false, status: "ARCHIVED", archived_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("active", true)
+    .neq("id", newPlan.id)
 
   // 4c. Inserir itens do plano
   const itemsToInsert = algorithmItems.map((item) => ({

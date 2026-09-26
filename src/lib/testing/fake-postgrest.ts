@@ -94,7 +94,13 @@ function project(row: Row, cols: string | null): Row {
   return out
 }
 
-class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; count: number | null }> {
+export interface FakePostgrestError {
+  message: string
+}
+
+class FakeQuery
+  implements PromiseLike<{ data: Row[] | Row | null; error: FakePostgrestError | null; count: number | null }>
+{
   private filters: Filter[] = []
   private orders: Array<{ col: string; asc: boolean }> = []
   private rangeFrom: number | null = null
@@ -147,6 +153,16 @@ class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; 
       method: this.method,
     })
     if (this.method !== "select") return { data: null, error: null, count: null }
+    // Fase I.8 — injeção de falha (para testar erro≠ausência): consome uma
+    // falha pendente da tabela, se houver, e devolve `error` como o PostgREST
+    // devolveria — nenhum dado. Sem falha marcada, o comportamento é o mesmo
+    // de sempre (leitura bem-sucedida).
+    const pending = this.db.failures[this.table] ?? 0
+    if (pending > 0) {
+      this.db.failures[this.table] = pending - 1
+      const message = this.db.failureMessages[this.table] ?? `fake-postgrest: falha simulada em ${this.table}`
+      return { data: null, error: { message }, count: null }
+    }
     let rows = (this.db.tables[this.table] ?? []).filter((r) => this.filters.every((f) => f(r)))
     const count = this.withCount ? rows.length : null
     if (this.orders.length > 0) {
@@ -170,8 +186,13 @@ class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; 
     return { data: projected, error: null, count }
   }
 
-  then<R1 = { data: Row[] | Row | null; error: null; count: number | null }, R2 = never>(
-    onfulfilled?: ((value: { data: Row[] | Row | null; error: null; count: number | null }) => R1 | PromiseLike<R1>) | null,
+  then<
+    R1 = { data: Row[] | Row | null; error: FakePostgrestError | null; count: number | null },
+    R2 = never,
+  >(
+    onfulfilled?:
+      | ((value: { data: Row[] | Row | null; error: FakePostgrestError | null; count: number | null }) => R1 | PromiseLike<R1>)
+      | null,
     onrejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null,
   ): PromiseLike<R1 | R2> {
     return Promise.resolve()
@@ -182,6 +203,13 @@ class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; 
 
 export class FakePostgrest {
   readonly requests: FakeRequest[] = []
+  /**
+   * Fase I.8 — quantas vezes cada tabela ainda deve falhar (consumido a cada
+   * `select`). Populado só por `failOn`; sem chamar `failOn`, o comportamento
+   * é o de sempre (nunca falha) — não quebra nenhum teste existente.
+   */
+  readonly failures: Record<string, number> = {}
+  readonly failureMessages: Record<string, string> = {}
   constructor(
     readonly tables: Record<string, Row[]>,
     readonly maxRows = 1000,
@@ -191,5 +219,14 @@ export class FakePostgrest {
   }
   get writes() {
     return this.requests.filter((r) => r.method !== "select")
+  }
+  /**
+   * Marca `table` para responder com `{ data: null, error }` nas próximas
+   * `times` leituras (`select`), depois volta a responder normalmente. Serve
+   * para testar que um erro de leitura vira estado de erro, não ausência.
+   */
+  failOn(table: string, times = 1, message?: string): void {
+    this.failures[table] = (this.failures[table] ?? 0) + times
+    if (message) this.failureMessages[table] = message
   }
 }

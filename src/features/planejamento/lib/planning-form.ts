@@ -28,7 +28,9 @@ export const DURATION_OPTIONS = [30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 18
 
 export const MIN_WEEKLY_HOURS = 5
 export const MAX_WEEKLY_HOURS = 50
-/** Estimativa de capacidade diária usada para a carga "disponível". */
+/** P1.2 — HEURÍSTICA INTERNA (estimativa de 3h/dia), não capacidade pessoal medida.
+ * Usada só no wizard para estimar carga compatível (dias × 3h).
+ * Nunca exibir como "sua capacidade diária é 3h". */
 export const DAILY_STUDY_CAP_HOURS = 3
 
 export const LS_WEEKLY_HOURS = "mentor_user_weekly_hours"

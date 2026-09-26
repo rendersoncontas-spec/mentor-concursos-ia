@@ -16,6 +16,10 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import {
+  getPlanningPreferencesAction,
+  savePlanningPreferencesAction,
+} from "@/application/study-plan/planning-preferences.action"
 import { generateStudyPlanAction } from "@/application/study-plan/generate-study-plan.action"
 import { getDisciplinesForAutocomplete } from "@/application/study-session/get-disciplines.action"
 import { Button } from "@/components/ui/button"
@@ -32,11 +36,11 @@ import { Slider } from "@/components/ui/slider"
 import {
   DAILY_STUDY_CAP_HOURS,
   DURATION_OPTIONS,
-  LS_CUSTOM_SCALE,
   LS_FIRST_SHIFT,
   LS_MAX_MIN,
   LS_MIN_MIN,
   LS_SCALE,
+  LS_SHIFT_ANCHOR_DATE,
   LS_STUDY_DAYS,
   LS_STYLE,
   LS_WEEKLY_HOURS,
@@ -50,7 +54,6 @@ import {
   formatMinutesLabel,
   isShiftDayForDate,
   isShiftDayForScale,
-  LS_SHIFT_ANCHOR_DATE,
   planningReason,
   validatePlanningForm,
 } from "@/features/planejamento/lib/planning-form"
@@ -155,9 +158,15 @@ export function PlanningWizardModal({
   onComplete,
 }: PlanningWizardModalProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
+  // P1.5: banco é a fonte oficial. weeklySuggested=true → valor exibido é
+  // sugestão de produto, não meta configurada pelo usuário.
+  const [weeklySuggested, setWeeklySuggested] = useState(false)
   const [allDbDisciplines, setAllDbDisciplines] = useState<string[]>(ALL_DISCIPLINES)
   const [searchTerm, setSearchTerm] = useState("")
   const [showAutocomplete, setShowAutocomplete] = useState(false)
+  // P1.1: erro ao buscar disciplinas NÃO é silencioso nem vira "lista vazia".
+  // O wizard continua (lista local segue válida); mostra aviso + tentar de novo.
+  const [disciplinesLoadError, setDisciplinesLoadError] = useState(false)
 
   // Step 1 State: Organização
   const [planningMode, setPlanningMode] = useState<"ciclo" | "semanal">("ciclo")
@@ -178,7 +187,7 @@ export function PlanningWizardModal({
   })
   const [customWorkDays, setCustomWorkDays] = useState(3)
   const [customOffDays, setCustomOffDays] = useState(2)
-  const [firstShiftDay] = useState<number>(() => {
+  const [firstShiftDay, setFirstShiftDay] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(LS_FIRST_SHIFT)
       if (saved) return parseInt(saved)
@@ -220,6 +229,40 @@ export function PlanningWizardModal({
     if (open) {
       const timer = setTimeout(() => {
         if (typeof window !== "undefined") {
+          // P1.5: banco primeiro. Servidor resolve banco > legado local > default;
+          // o retorno já indica a fonte (migrateUp executa a lazy migration).
+          getPlanningPreferencesAction({
+            workScale: localStorage.getItem(LS_SCALE),
+            firstShiftDay: localStorage.getItem(LS_FIRST_SHIFT),
+            shiftAnchorDate: localStorage.getItem(LS_SHIFT_ANCHOR_DATE),
+            studyDays: localStorage.getItem(LS_STUDY_DAYS),
+            customScale: localStorage.getItem("mentor_user_custom_scale"),
+          })
+            .then((res) => {
+              if (!res.data) return
+              const prefs = res.data
+              setEscalaTrabalho(prefs.workScale)
+              setFirstShiftDay(prefs.firstShiftDay)
+              if (prefs.shiftAnchorDate) setAnchorShiftDate(prefs.shiftAnchorDate)
+              if (prefs.studyDays.length > 0) {
+                const full: Record<string, string> = {
+                  dom: "Domingo", seg: "Segunda", ter: "Terça", qua: "Quarta",
+                  qui: "Quinta", sex: "Sexta", sab: "Sábado",
+                }
+                setSelectedDays(prefs.studyDays.map((d) => full[d] ?? d))
+              }
+              // Banco vence o local: meta real do usuário tem prioridade.
+              if (prefs.weeklyGoalHours !== null) {
+                setWeeklyHoursInput(
+                  String(Math.min(MAX_WEEKLY_HOURS, Math.max(MIN_WEEKLY_HOURS, prefs.weeklyGoalHours))),
+                )
+                setWeeklySuggested(false)
+              } else {
+                // Sem meta no banco: mantém legado/default e sinaliza sugestão.
+                setWeeklySuggested(true)
+              }
+            })
+            .catch(() => {})
           const savedHours = localStorage.getItem(LS_WEEKLY_HOURS)
           const savedMin = localStorage.getItem(LS_MIN_MIN)
           const savedMax = localStorage.getItem(LS_MAX_MIN)
@@ -304,9 +347,13 @@ export function PlanningWizardModal({
             if (res?.allDisciplines && res.allDisciplines.length > 0) {
               const dbNames = res.allDisciplines.map((d) => d.name)
               setAllDbDisciplines(Array.from(new Set([...dbNames, ...ALL_DISCIPLINES])))
+              setDisciplinesLoadError(false)
             }
           })
-          .catch(() => {})
+          .catch(() => {
+            // P1.1: mostra estado discreto de erro; lista local continua válida.
+            setDisciplinesLoadError(true)
+          })
       }, 0)
       return () => clearTimeout(timer)
     }
@@ -467,12 +514,8 @@ export function PlanningWizardModal({
         if (dayConfigMode === "escala") {
           localStorage.setItem(LS_SCALE, escalaTrabalho)
           localStorage.setItem(LS_FIRST_SHIFT, firstShiftDay.toString())
-          if (isCustomScale) {
-            localStorage.setItem(
-              LS_CUSTOM_SCALE,
-              JSON.stringify({ work: customWorkDays, off: customOffDays }),
-            )
-          }
+          // P1.5: sem escrita de LS_CUSTOM_SCALE — custom_NxM já está em
+          // work_scale (derivado, sem coluna/chave redundante).
         } else {
           localStorage.setItem(LS_SCALE, "normal")
         }
@@ -490,12 +533,25 @@ export function PlanningWizardModal({
         localStorage.setItem(LS_STUDY_DAYS, JSON.stringify(shortDays))
 
         localStorage.setItem(LS_WEEKLY_HOURS, weeklyHoursNum.toString())
-        localStorage.setItem(LS_MIN_MIN, minMinutes.toString())
-        localStorage.setItem(LS_MAX_MIN, maxMinutes.toString())
-        localStorage.setItem(LS_STYLE, sessionStyle)
+        // P1.5: sem escrita de LS_MIN_MIN/LS_MAX_MIN/LS_STYLE — o algoritmo
+        // não consome essas preferências; gravá-las seria falsa persistência.
+        // Duração/estilo valem só para esta sessão do wizard (estado em memória).
 
         window.dispatchEvent(new Event("mentor_scale_updated"))
       }
+
+      // P1.5: banco é a fonte oficial — persiste preferências validadas antes
+      // de gerar. Falha de banco não bloqueia a geração (compatibilidade).
+      const dayMapShortDb: Record<string, string> = {
+        Domingo: "dom", Segunda: "seg", Terça: "ter", Quarta: "qua",
+        Quinta: "qui", Sexta: "sex", Sábado: "sab",
+      }
+      await savePlanningPreferencesAction({
+        workScale: dayConfigMode === "escala" ? escalaTrabalho : "normal",
+        firstShiftDay,
+        shiftAnchorDate: anchorShiftDate || null,
+        studyDays: selectedDays.map((d) => dayMapShortDb[d] ?? d),
+      }).catch(() => ({ ok: false as const, error: "prefs" }))
 
       const res = await generateStudyPlanAction(
         planningReason(mode),
@@ -764,6 +820,12 @@ export function PlanningWizardModal({
                           <div className="type-label mt-0.5">
                             / semana
                           </div>
+                          {/* P1.5: valor sem meta no banco = sugestão, não escolha. */}
+                          {weeklySuggested && (
+                            <div className="text-[10px] font-semibold text-muted-foreground mt-0.5">
+                              Valor sugerido
+                            </div>
+                          )}
                         </div>
                         <Button
                           type="button"
@@ -855,7 +917,7 @@ export function PlanningWizardModal({
                       </div>
                       <div>
                         <div className="type-label">
-                          Disponível
+                          Estimativa
                         </div>
                         <div className="text-base font-semibold tabular-nums text-primary">
                           {capacityHours}h
@@ -872,12 +934,12 @@ export function PlanningWizardModal({
                     <div className="border-t pt-2">
                       {loadOk ? (
                         <p className="text-[11px] font-semibold text-emerald-700">
-                          Sua carga cabe na sua disponibilidade estimada.
+                          Sua carga cabe na estimativa (cerca de 3h por dia de estudo).
                         </p>
                       ) : (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <p className="text-[11px] font-semibold text-amber-700">
-                            Desejada ultrapassa a disponibilidade em {loadDiff}h.
+                            Desejada ultrapassa a estimativa em {loadDiff}h.
                           </p>
                           <Button
                             size="sm"
@@ -1111,6 +1173,32 @@ export function PlanningWizardModal({
                     <Plus className="h-3.5 w-3.5" />
                     Adicionar nova matéria personalizada
                   </label>
+
+                  {/* P1.1: estado discreto de erro (lista local continua válida). */}
+                  {disciplinesLoadError && (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                        Não foi possível sincronizar as matérias do banco. A lista local continua disponível.
+                      </p>
+                      <button
+                        type="button"
+                        className="shrink-0 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                        onClick={() => {
+                          setDisciplinesLoadError(false)
+                          getDisciplinesForAutocomplete()
+                            .then((res) => {
+                              if (res?.allDisciplines && res.allDisciplines.length > 0) {
+                                const dbNames = res.allDisciplines.map((d) => d.name)
+                                setAllDbDisciplines(Array.from(new Set([...dbNames, ...ALL_DISCIPLINES])))
+                              }
+                            })
+                            .catch(() => setDisciplinesLoadError(true))
+                        }}
+                      >
+                        Tentar de novo
+                      </button>
+                    </div>
+                  )}
 
                   <div className="relative">
                     <div className="flex gap-2">

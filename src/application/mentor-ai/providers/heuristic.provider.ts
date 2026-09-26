@@ -8,7 +8,7 @@ export class HeuristicProvider implements MentorAIProvider {
   async analyze(context: IntelligenceContext): Promise<MentorResponse> {
     
     // 1. Processamento bruto
-    const { insights, globalScore } = RuleEngine.executeAll(context)
+    const { insights } = RuleEngine.executeAll(context)
     
     // 2. Priorização
     const sortedInsights = Prioritizer.rank(insights)
@@ -24,7 +24,6 @@ export class HeuristicProvider implements MentorAIProvider {
     const longTerm = humanInsights.filter(i => i.type === "EVOLUTION" || i.type === "MOTIVATION")
 
     return {
-      globalScore,
       feed: {
         now,
         today,

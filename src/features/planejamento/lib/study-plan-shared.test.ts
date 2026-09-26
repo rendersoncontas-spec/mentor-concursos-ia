@@ -6,6 +6,7 @@ import {
   type BaseCycleBlock,
   type SharedPlanConfig,
 } from "./study-plan-shared.ts"
+import { todayKeyInSaoPaulo } from "@/lib/sao-paulo.ts"
 
 const MOCK_CYCLE_BLOCKS: BaseCycleBlock[] = [
   { id: "b1", disciplineId: "d-const", disciplineName: "Direito Constitucional", durationMinutes: 60, color: "#2563EB" },
@@ -113,4 +114,24 @@ test("FALLBACK DETERMINÍSTICO: Quando não há blocos no servidor, gera slices 
   assert.deepEqual(monthlyFallback, weeklyFallback)
   assert.ok(monthlyFallback.blocks.length > 0)
   assert.equal(monthlyFallback.plannedMinutes, weeklyFallback.plannedMinutes)
+})
+
+// P1.1 — ano nunca é fixo: explícito é respeitado, virada de ano funciona,
+// e ausência cai no ano real de America/Sao_Paulo (nunca 2026 hardcoded).
+test("P1.1 ANO: year explícito é respeitado (2027 e virada 31/12→01/01)", () => {
+  const dec31 = getStudyPlanDay("2027-12-31", null, MOCK_CONFIG_24x72, [])
+  assert.equal(dec31.dateStr, "2027-12-31")
+  assert.equal(dec31.dayOfWeekIndex, new Date(2027, 11, 31).getDay())
+
+  const jan01 = getStudyPlanDay("2028-01-01", null, MOCK_CONFIG_24x72, [])
+  assert.equal(jan01.dateStr, "2028-01-01")
+  assert.equal(jan01.dayOfWeekIndex, new Date(2028, 0, 1).getDay())
+})
+
+test("P1.1 ANO: sem ano válido usa o ano real de São Paulo (nunca fixo)", () => {
+  const res = getStudyPlanDay("abcd-08-15", null, MOCK_CONFIG_24x72, [])
+  const expectedYear = Number(todayKeyInSaoPaulo().split("-")[0])
+  assert.ok(Number.isFinite(expectedYear))
+  // dayOfWeekIndex deve bater com o ano derivado, não com 2026 fixo
+  assert.equal(res.dayOfWeekIndex, new Date(expectedYear, 7, 15).getDay())
 })

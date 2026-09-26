@@ -11,11 +11,13 @@ export function getWeeklyGoalProgress(ctx: AnalyticsContext, weeklyTargetHours: 
     // Sanity check: se weeklyTargetHours for > 168 (horas semanais normais), foi passado em minutos
     const safeHours = weeklyTargetHours && weeklyTargetHours > 168 ? weeklyTargetHours / 60 : weeklyTargetHours
     const targetMinutes = safeHours && safeHours > 0 ? Math.round(safeHours * 60) : 0
-    const percentage = targetMinutes > 0 
-      ? Math.round((weeklyMinutes / targetMinutes) * 100)
-      : 0
-      
-    const remainingMinutes = targetMinutes > 0 ? Math.max(0, targetMinutes - weeklyMinutes) : 0
+    // Fase H: sem meta definida não existe percentual — null ("—" na tela),
+    // não 0%.
+    if (targetMinutes <= 0) {
+      return { target: null, achieved: weeklyMinutes, percentage: null, remaining: null }
+    }
+    const percentage = Math.round((weeklyMinutes / targetMinutes) * 100)
+    const remainingMinutes = Math.max(0, targetMinutes - weeklyMinutes)
 
     return {
       target: targetMinutes,
@@ -37,11 +39,13 @@ export function getDailyGoalProgress(ctx: AnalyticsContext, weeklyTargetHours: n
     const safeHours = weeklyTargetHours && weeklyTargetHours > 168 ? weeklyTargetHours / 60 : weeklyTargetHours
     const safeDays = Math.max(1, Math.min(7, activeDaysPerWeek))
     const targetMinutes = safeHours && safeHours > 0 ? Math.round((safeHours * 60) / safeDays) : 0
-    const percentage = targetMinutes > 0 
-      ? Math.round((dailyMinutes / targetMinutes) * 100)
-      : 0
-      
-    const remainingMinutes = targetMinutes > 0 ? Math.max(0, targetMinutes - dailyMinutes) : 0
+    // Fase H: sem meta definida não existe percentual — null ("—" na tela),
+    // não 0%.
+    if (targetMinutes <= 0) {
+      return { target: null, achieved: dailyMinutes, percentage: null, remaining: null }
+    }
+    const percentage = Math.round((dailyMinutes / targetMinutes) * 100)
+    const remainingMinutes = Math.max(0, targetMinutes - dailyMinutes)
 
     return {
       target: targetMinutes,

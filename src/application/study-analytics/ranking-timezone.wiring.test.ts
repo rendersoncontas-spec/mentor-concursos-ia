@@ -44,7 +44,8 @@ describe("getRankingViaDirectQuery usa helpers de fuso de São Paulo para os lim
       source,
       /import \{ getDayInSaoPaulo, daysAgoKeyInSaoPaulo, startOfDayInSaoPauloMs, endOfDayInSaoPauloMs \} from "@\/lib\/sao-paulo"/,
     )
-    assert.match(source, /import \{ getSaoPauloWeekRange \} from "@\/lib\/study-time-calculator"/)
+    // Fase H: o mesmo import agora também traz resolveWeekStartDay.
+    assert.match(source, /import \{[^}]*\bgetSaoPauloWeekRange\b[^}]*\} from "@\/lib\/study-time-calculator"/)
   })
 
   it("os limites de semana/mês vêm de chaves de calendário em SP, não de getDay()/getFullYear() locais", () => {

@@ -178,6 +178,9 @@ export async function generateStudyPlanAction(
 
     return { success: true, planId: plan.id, version: plan.version }
   } catch (err: unknown) {
+    // P1.1 (auditoria item 12): NÃO revalidar paths aqui de propósito.
+    // Revalidar após falha poderia servir cache com estado parcial/antigo
+    // como se fosse novo. Erro retorna sem revalidate; sucesso revalida acima.
     console.error("generateStudyPlanAction error:", err)
     return { success: false, error: "Erro interno ao gerar o cronograma." }
   }

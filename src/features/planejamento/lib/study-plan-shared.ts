@@ -16,8 +16,16 @@ import {
   isShiftDayForDate,
   type ScheduleMode,
 } from "@/features/planejamento/lib/planning-form"
+import { todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 export const WEEKDAY_KEYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"]
+
+/**
+ * P1.1 — contrato compartilhado: falha ao carregar o cronograma NÃO é lista vazia.
+ * Views devem exibir este aviso discreto e manter os últimos dados salvos.
+ */
+export const REPLAN_UNAVAILABLE_MESSAGE =
+  "Não foi possível atualizar o cronograma. Exibindo os últimos dados salvos."
 
 export interface StudyPlanDayBlock {
   id: string
@@ -135,8 +143,15 @@ export function getStudyPlanDay(
   cycleBlocks: BaseCycleBlock[] = [],
   historyForDay: Array<{ disciplineId: string; minutes: number }> = [],
 ): StudyPlanDayInfo {
-  const [year, month, day] = dateStr.split("-").map(Number)
-  const d = new Date(year ?? 2026, (month ?? 1) - 1, day ?? 1)
+  // P1.1: nunca usar ano fixo como fallback permanente. dateStr deve ser
+  // "YYYY-MM-DD"; se o ano vier ausente/inválido, deriva do hoje real em
+  // America/Sao_Paulo (helper central), respeitando virada de ano.
+  const [rawYear, rawMonth, rawDay] = dateStr.split("-").map(Number)
+  const fallbackYear = Number(todayKeyInSaoPaulo().split("-")[0]) || new Date().getFullYear()
+  const year = Number.isFinite(rawYear) ? (rawYear as number) : fallbackYear
+  const month = Number.isFinite(rawMonth) ? (rawMonth as number) : 1
+  const day = Number.isFinite(rawDay) ? (rawDay as number) : 1
+  const d = new Date(year, month - 1, day)
   const dayOfWeekIndex = d.getDay() // 0 = Dom, 6 = Sáb
   const weekdayKey = WEEKDAY_KEYS[dayOfWeekIndex] ?? "dom"
 

@@ -46,7 +46,6 @@ interface FinalStats {
   focusPercent: number | null
   questions: number
   correct: number
-  reviews: number
   energy: number
   interrupted: boolean
 }
@@ -93,7 +92,6 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   // Avaliação
   const [questions, setQuestions] = useState(0)
   const [correct, setCorrect] = useState(0)
-  const [reviews, setReviews] = useState(0)
   const [energyFin, setEnergyFin] = useState(3)
 
   // Salvamento
@@ -201,7 +199,6 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setQuestions(0)
         setCorrect(0)
-        setReviews(0)
         setEnergyFin(3)
         setPhase("IDLE")
       }
@@ -257,7 +254,6 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
             : null,
         questions,
         correct,
-        reviews,
         energy: energyFin,
         interrupted,
       }
@@ -265,7 +261,6 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       const res = await finalizeAndSaveSession({
         questions_answered: questions,
         questions_correct: correct,
-        reviews_completed: reviews,
         energy_level: energyFin,
         interrupted,
       })
@@ -304,7 +299,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     } finally {
       setIsSubmitting(false)
     }
-  }, [isSubmitting, correct, questions, reviews, energyFin, finalizeAndSaveSession, router])
+  }, [isSubmitting, correct, questions, energyFin, finalizeAndSaveSession, router])
 
   if (!isReady) return null
 
@@ -599,16 +594,17 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="reviews-completed">Revisões concluídas (tópicos)</Label>
-              <Input
-                id="reviews-completed"
-                type="number"
-                min={0}
-                value={reviews}
-                onChange={(e) => setReviews(Math.max(0, Number(e.target.value)))}
-              />
-            </div>
+            {/*
+              Fase I.6 (achado M6): aqui havia o campo "Revisões concluídas
+              (tópicos)". O número ia para o metadata do estudo, não era lido por
+              nada e alimentava um stub que só escrevia no console — nenhum item do
+              motor de revisões era concluído. O campo sugeria ao aluno que ele
+              estava marcando revisões como feitas, e não estava.
+
+              Revisão continua sendo o que a decisão D2 define: o aluno adiciona o
+              tópico em /dashboard/reviews e responde lá. Nada aqui cria, conclui ou
+              agenda revisão.
+            */}
 
             <hr />
 

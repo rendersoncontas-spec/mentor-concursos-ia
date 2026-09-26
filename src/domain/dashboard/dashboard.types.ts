@@ -1,5 +1,5 @@
 import { type CycleBlock, type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
-import type { HeatmapDay, Insight, RankingItem, TimeSeriesDataPoint, GoalProgress } from "@/application/study-analytics/types"
+import type { HeatmapDay, RankingItem, TimeSeriesDataPoint, GoalProgress } from "@/application/study-analytics/types"
 
 export interface DashboardProfile {
   name: string | null
@@ -28,14 +28,6 @@ export interface DashboardDisciplinesStats {
   completed: number
   revising: number
   studying: number
-}
-
-export interface PendingReviewsSummary {
-  count: number
-  overdue: number
-  today: number
-  highPriority: number
-  nextReview: string | null
 }
 
 export interface RecentActivityItem {
@@ -67,7 +59,6 @@ export interface DashboardAnalytics {
     revisions?: GoalProgress
     studyDays?: GoalProgress
   }
-  insights: Insight[]
   stats: {
     dailyMinutes: number
     weeklyMinutes: number
@@ -123,10 +114,41 @@ export interface PeriodPerformanceData {
 
 export type PerformanceByPeriod = Record<PerformancePeriod, PeriodPerformanceData>
 
+/**
+ * Fase I.8 — quais leituras do Dashboard falharam nesta carga.
+ *
+ * `true` significa "a leitura falhou", não "não há dado": os campos correspondentes
+ * do snapshot (stats vindos do histórico, disciplinas, plano ativo, atividades
+ * recentes etc.) usam um valor seguro (vazio/zero) só para não quebrar os
+ * cálculos, e widgets que dependem deles devem tratar essa flag como "dado
+ * indisponível", nunca como "zero real". Ausente/`false` = leitura ok (ou,
+ * genuinamente, sem dado).
+ */
+export interface DashboardDataIssues {
+  /** Leitura de `profiles` (nome, metas semanais, dia de início da semana). */
+  profile: boolean
+  /** Leitura de `user_targets` (meta ativa: prova, cargo, data). */
+  target: boolean
+  /** `getCycleOverviewData` — ciclo de estudo ativo (Cycle Engine). */
+  cycle: boolean
+  /** `getTodayStudyItems` — itens planejados para hoje. */
+  todayPlan: boolean
+  /** `getStudyHistoryForAnalytics` — histórico de estudo (alimenta a maior parte de `stats`/`analytics`). */
+  history: boolean
+  /** `getRecentActivities` — últimas atividades. */
+  activities: boolean
+  /** Leitura paginada de `question_attempts`. */
+  attempts: boolean
+  /** `getUserDisciplines` — disciplinas do edital do usuário. */
+  disciplines: boolean
+}
+
 export interface DashboardSnapshot {
   user: DashboardProfile | null
   activeTarget: DashboardTarget | null
   stats: DashboardAnalytics["stats"] & {
+    /** Minutos de todo o histórico (Fase H). */
+    totalMinutes?: number
     totalQuestions?: number
     correctQuestions?: number
     wrongQuestions?: number
@@ -141,9 +163,14 @@ export interface DashboardSnapshot {
   cycleBlocks?: CycleBlock[] | null
   rawDisciplines: DashboardRawDiscipline[]
   subjectContexts?: DashboardSubjectContext[]
-  reviews: PendingReviewsSummary
   recentActivities: RecentActivityItem[]
   analytics: DashboardAnalytics
+  /**
+   * Fase I.8: mapa de quais leituras falharam nesta carga (erro ≠ ausência).
+   * Opcional por compatibilidade com fixtures de teste existentes; em
+   * produção `getDashboardData` sempre preenche os 8 campos.
+   */
+  dataIssues?: DashboardDataIssues
 }
 
 // Compatibilidade durante refatoração

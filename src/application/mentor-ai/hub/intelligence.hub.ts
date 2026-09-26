@@ -41,8 +41,12 @@ export class IntelligenceHub {
       }
     }
 
-    // 2. Meta semanal real do perfil
-    let weeklyHoursTarget = 20
+    // 2. Meta semanal real do perfil — sem valor de consolo.
+    //
+    // Fase I.6 (M2): começava em 20 e só era substituída se o perfil tivesse
+    // valor. Quem não configurou meta nenhuma entrava no contexto como se tivesse
+    // escolhido 20 horas por semana. Agora: tem meta → usa a meta; não tem → null.
+    let weeklyHoursTarget: number | null = null
     const { data: profile } = await supabase
       .from("profiles")
       .select("weekly_study_hours")
@@ -60,19 +64,6 @@ export class IntelligenceHub {
       generatedAt: new Date(),
       snapshotId,
       userId,
-
-      performance: {
-        overallAccuracy: 0,
-        disciplinesAccuracy: {},
-        weakestDisciplines: [],
-        strongestDisciplines: []
-      },
-
-      reviews: {
-        totalOverdue: 0,
-        criticalOverdue: 0,
-        itemsToReviewToday: 0
-      },
 
       studyHistory: {
         totalMinutes,

@@ -101,7 +101,15 @@ export function DeltaBadge({
   invert?: boolean
   suffix?: string
 }) {
-  if (delta === null || delta === 0) {
+  // Fase H: `null` = sem dado para comparar (antes aparecia como "igual").
+  if (delta === null) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+        <Minus className="h-3 w-3" /> sem comparação
+      </span>
+    )
+  }
+  if (delta === 0) {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
         <Minus className="h-3 w-3" /> igual
@@ -240,6 +248,8 @@ export function HeatmapCalendar({
   })
 
   const lastDate = cells[cells.length - 1]?.date ?? ""
+  // Fase H: dias COM estudo (antes contava todos os dias do intervalo).
+  const activeDays = cells.filter((c) => c.minutes > 0).length
 
   return (
     <div className="space-y-2">
@@ -247,7 +257,7 @@ export function HeatmapCalendar({
         <span className="text-xs text-muted-foreground">
           {hover
             ? `${formatBRDate(hover.date)} — ${hover.minutes > 0 ? `${Math.round(hover.minutes)}min de estudo` : "sem sessões"}`
-            : `${cells.length} dias de atividade`}
+            : `${activeDays} de ${cells.length} dias com estudo`}
         </span>
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
           Menos

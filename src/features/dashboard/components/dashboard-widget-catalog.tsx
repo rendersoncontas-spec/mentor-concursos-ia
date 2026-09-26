@@ -19,7 +19,6 @@ import {
   HelpCircle,
   MapPin,
   Quote,
-  RotateCcw,
   SquarePen,
   Target,
   Trophy,
@@ -28,6 +27,12 @@ import {
 
 import { cn } from "@/lib/utils"
 import { formatDurationMinutes } from "@/lib/format-duration"
+import {
+  dailyBars,
+  dashboardMilestones,
+  lastSevenDaysActivity,
+  percentOrDash,
+} from "@/features/dashboard/lib/widget-display"
 
 import {
   type RecentHistoryEntry,
@@ -59,13 +64,24 @@ export interface DashboardWidgetProps {
 // 1. WIDGET: Tempo de Estudo
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
+  // Fase I.8: o histórico de estudo alimenta dailyMinutes/weeklyMinutes. Se a
+  // leitura falhou, `dataIssues.history` distingue isso de "0 minutos hoje" —
+  // sem essa flag, uma falha de leitura mostrava um "0min" indistinguível de
+  // um dia real sem estudo.
+  const historyUnavailable = snapshot?.dataIssues?.history === true
   const weeklyMins =
     snapshot?.analytics?.stats?.weeklyMinutes ?? snapshot?.stats?.weeklyMinutes ?? 0
   const dailyMins = snapshot?.analytics?.stats?.dailyMinutes ?? snapshot?.stats?.dailyMinutes ?? 0
+  const dailyDisplay = historyUnavailable ? "—" : formatDurationMinutes(dailyMins)
+  const weeklyDisplay = historyUnavailable ? "—" : formatDurationMinutes(weeklyMins)
   const weeklyHours = snapshot?.user?.weekly_study_hours
   const targetMins = weeklyHours ? weeklyHours * 60 : null
 
-  const pct = targetMins ? Math.min(100, Math.round((weeklyMins / targetMins) * 100)) : null
+  const pct = historyUnavailable
+    ? null
+    : targetMins
+      ? Math.min(100, Math.round((weeklyMins / targetMins) * 100))
+      : null
 
   if (colSpan === 1) {
     return (
@@ -82,7 +98,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
           <div>
             <span className="type-label block mb-0.5">Hoje</span>
             <span className="text-sm sm:text-base font-semibold text-foreground tabular-nums leading-tight">
-              {formatDurationMinutes(dailyMins)}
+              {dailyDisplay}
             </span>
           </div>
           <div className="text-right">
@@ -90,7 +106,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
               Semana
             </span>
             <span className="text-sm sm:text-base font-semibold text-primary tabular-nums leading-tight">
-              {formatDurationMinutes(weeklyMins)}
+              {weeklyDisplay}
             </span>
           </div>
         </div>
@@ -121,7 +137,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
               Hoje
             </span>
             <span className="text-base font-semibold text-foreground tabular-nums">
-              {formatDurationMinutes(dailyMins)}
+              {dailyDisplay}
             </span>
           </div>
           <div className="p-2.5">
@@ -129,7 +145,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
               Esta Semana
             </span>
             <span className="text-base font-semibold text-primary tabular-nums">
-              {formatDurationMinutes(weeklyMins)}
+              {weeklyDisplay}
             </span>
           </div>
         </div>
@@ -160,7 +176,7 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             Hoje
           </span>
           <span className="text-xl font-semibold text-foreground tabular-nums">
-            {formatDurationMinutes(dailyMins)}
+            {dailyDisplay}
           </span>
         </div>
         <div className="p-3.5">
@@ -168,14 +184,14 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             Esta Semana
           </span>
           <span className="text-xl font-semibold text-primary tabular-nums">
-            {formatDurationMinutes(weeklyMins)}
+            {weeklyDisplay}
           </span>
         </div>
         <div className="p-3.5">
           <span className="type-label block">
             Progresso
           </span>
-          <span className="text-xl font-semibold text-foreground tabular-nums">{pct}%</span>
+          <span className="text-xl font-semibold text-foreground tabular-nums">{percentOrDash(pct)}</span>
         </div>
       </div>
 
@@ -185,21 +201,21 @@ export function WidgetTempoEstudo({ snapshot, colSpan }: DashboardWidgetProps) {
             Distribuição diária
           </span>
           <div className="flex gap-2">
-            {["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"].map((day, idx) => {
-              const ev = snapshot?.analytics?.evolution?.[idx]
-              const mins = ev?.value ?? 0
-              return (
-                <div key={day} className="flex flex-col items-center gap-1">
-                  <div className="w-2 bg-muted rounded-full h-12 relative flex items-end">
-                    <div
-                      className="bg-primary w-full rounded-full transition-all"
-                      style={{ height: `${Math.min(100, (mins / 120) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] font-semibold text-muted-foreground">{day}</span>
+            {/* Fase H: rótulo = dia real de cada ponto (últimos 7 dias corridos). */}
+            {dailyBars(snapshot?.analytics?.evolution).map((bar) => (
+              <div key={bar.key} className="flex flex-col items-center gap-1">
+                <div
+                  className="w-2 bg-muted rounded-full h-12 relative flex items-end"
+                  title={`${bar.key}: ${formatDurationMinutes(bar.minutes)}`}
+                >
+                  <div
+                    className="bg-primary w-full rounded-full transition-all"
+                    style={{ height: `${bar.heightPct}%` }}
+                  />
                 </div>
-              )
-            })}
+                <span className="text-[10px] font-semibold text-muted-foreground">{bar.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -263,6 +279,14 @@ function PerformancePeriodSelector({
 export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
   const [selectedPeriod, setSelectedPeriod] = React.useState<PerformancePeriod>("SEMANA")
 
+  // Fase I.9: totalQuestions/correctQuestions/wrongQuestions/accuracyPercentage
+  // (em qualquer período) vêm de rawHistory + question_attempts combinados. Se
+  // qualquer uma das duas leituras falhou, esses números são um "0" fabricado,
+  // não um desempenho real — inclusive o ranking de matérias por tempo (que
+  // vem só de rawHistory).
+  const desempenhoUnavailable =
+    snapshot?.dataIssues?.history === true || snapshot?.dataIssues?.attempts === true
+
   // Obter dados do período selecionado
   const defaultPeriodData = {
     totalQuestions: snapshot?.stats?.totalQuestions ?? 0,
@@ -278,7 +302,13 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
   const total = periodStats.totalQuestions
   const correct = periodStats.correctQuestions
   const wrong = periodStats.wrongQuestions
-  const disciplineRanking = snapshot?.analytics?.rankings?.disciplines || []
+  // Fase H: sem questões no período não existe acurácia — "—", não "0%".
+  // Fase I.9: leitura indisponível também é "—", nunca um número calculado.
+  const accuracyText = desempenhoUnavailable ? "—" : percentOrDash(accuracy, total > 0)
+  const totalDisplay = desempenhoUnavailable ? "—" : total
+  const correctDisplay = desempenhoUnavailable ? "—" : correct
+  const wrongDisplay = desempenhoUnavailable ? "—" : wrong
+  const disciplineRanking = desempenhoUnavailable ? [] : snapshot?.analytics?.rankings?.disciplines || []
   const periodLabel =
     PERFORMANCE_PERIOD_OPTIONS.find((o) => o.key === selectedPeriod)?.label || "Semana"
 
@@ -290,7 +320,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             <Target className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> Desempenho
           </span>
           <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-600 tabular-nums">
-            {accuracy}%
+            {accuracyText}
           </span>
         </div>
 
@@ -305,20 +335,20 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
 
         <div className="flex items-center justify-between gap-2 my-auto">
           <div className="text-xl sm:text-2xl font-semibold text-foreground tabular-nums leading-tight">
-            {accuracy}%
+            {accuracyText}
           </div>
           <div className="text-right text-[10px] sm:text-[11px] text-muted-foreground font-medium leading-tight">
             <div>
-              <strong className="text-emerald-600 font-semibold">{correct}</strong> acertos
+              <strong className="text-emerald-600 font-semibold">{correctDisplay}</strong> acertos
             </div>
             <div>
-              <strong className="text-rose-500 font-semibold">{wrong}</strong> erros
+              <strong className="text-rose-500 font-semibold">{wrongDisplay}</strong> erros
             </div>
           </div>
         </div>
         <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-muted-foreground border-t pt-1.5">
           <span>Total ({periodLabel})</span>
-          <span className="tabular-nums text-foreground font-semibold">{total} questões</span>
+          <span className="tabular-nums text-foreground font-semibold">{totalDisplay} questões</span>
         </div>
       </div>
     )
@@ -337,31 +367,31 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
               onChange={setSelectedPeriod}
             />
             <span className="text-xs font-semibold text-emerald-600 tabular-nums">
-              {accuracy}% Acurácia
+              {accuracyText} Acurácia
             </span>
           </div>
         </div>
         <div className="flex items-center justify-between gap-2 my-auto">
           <div className="flex items-center gap-3">
-            <span className="text-xl font-semibold text-foreground tabular-nums">{accuracy}%</span>
+            <span className="text-xl font-semibold text-foreground tabular-nums">{accuracyText}</span>
             <div className="text-xs text-muted-foreground font-medium">
               <div>
-                <strong className="text-emerald-600">{correct}</strong> acertos
+                <strong className="text-emerald-600">{correctDisplay}</strong> acertos
               </div>
               <div>
-                <strong className="text-rose-500">{wrong}</strong> erros
+                <strong className="text-rose-500">{wrongDisplay}</strong> erros
               </div>
             </div>
           </div>
           <div className="text-right text-xs font-semibold text-muted-foreground">
             Total ({periodLabel}):{" "}
-            <span className="tabular-nums text-foreground font-semibold">{total}</span>
+            <span className="tabular-nums text-foreground font-semibold">{totalDisplay}</span>
           </div>
         </div>
         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
           <div
             className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-            style={{ width: `${accuracy}%` }}
+            style={{ width: `${desempenhoUnavailable ? 0 : accuracy}%` }}
           />
         </div>
       </div>
@@ -380,7 +410,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             onChange={setSelectedPeriod}
           />
           <span className="text-xs font-semibold text-emerald-600 tabular-nums">
-            Aproveitamento: {accuracy}%
+            Aproveitamento: {accuracyText}
           </span>
         </div>
       </div>
@@ -389,49 +419,42 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="type-label block">
             Total ({periodLabel})
           </span>
-          <span className="text-lg font-semibold text-foreground tabular-nums">{total}</span>
+          <span className="text-lg font-semibold text-foreground tabular-nums">{totalDisplay}</span>
         </div>
         <div className="p-3 text-center">
           <span className="text-[11px] text-emerald-600 font-semibold block">Acertos</span>
-          <span className="text-lg font-semibold text-emerald-600 tabular-nums">{correct}</span>
+          <span className="text-lg font-semibold text-emerald-600 tabular-nums">{correctDisplay}</span>
         </div>
         <div className="p-3 text-center">
           <span className="text-[11px] text-rose-500 font-semibold block">Erros</span>
-          <span className="text-lg font-semibold text-rose-500 tabular-nums">{wrong}</span>
+          <span className="text-lg font-semibold text-rose-500 tabular-nums">{wrongDisplay}</span>
         </div>
         <div className="p-3 text-center">
           <span className="text-[11px] text-primary font-semibold block">Precisão</span>
-          <span className="text-lg font-semibold text-primary tabular-nums">{accuracy}%</span>
+          <span className="text-lg font-semibold text-primary tabular-nums">{accuracyText}</span>
         </div>
       </div>
 
+      {/* Fase H: a lista antiga dizia "Melhores desempenhos por matéria" e
+          mostrava sempre "0%" (lia campos que o ranking não tem). O ranking é
+          por TEMPO de estudo no histórico, então é isso que ela mostra. */}
       {disciplineRanking.length > 0 && (
         <div className="mt-4 space-y-2">
           <span className="text-xs font-medium text-muted-foreground">
-            Melhores desempenhos por matéria
+            Matérias mais estudadas (tempo total)
           </span>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {disciplineRanking.slice(0, 4).map(
-              (
-                item: {
-                  name?: string
-                  disciplineName?: string
-                  accuracy?: number
-                  percentage?: number
-                },
-                idx: number,
-              ) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-[11px] font-semibold"
-                >
-                  <span className="truncate pr-2">{item.name || item.disciplineName}</span>
-                  <span className="text-emerald-600 tabular-nums">
-                    {item.accuracy || item.percentage || 0}%
-                  </span>
-                </div>
-              ),
-            )}
+            {disciplineRanking.slice(0, 4).map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-[11px] font-semibold"
+              >
+                <span className="truncate pr-2">{item.name}</span>
+                <span className="text-foreground tabular-nums">
+                  {formatDurationMinutes(item.value)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -444,9 +467,18 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProps) {
   const router = useRouter()
+  // Fase I.8: cobertura do edital vem de `getUserDisciplines` — se a leitura
+  // falhou, "0%"/"0 matérias" pareceria um edital vazio, quando na verdade
+  // não sabemos o real progresso.
+  const disciplinesUnavailable = snapshot?.dataIssues?.disciplines === true
   const progress = snapshot?.stats?.editalProgress ?? 0
   const completed = snapshot?.stats?.completedTopics ?? 0
   const total = snapshot?.disciplinesStats?.total ?? 0
+  const progressBadge = disciplinesUnavailable ? "—" : `${progress}%`
+  const progressBadgeLong = disciplinesUnavailable ? "—" : `${progress}% Concluído`
+  const completedLabel = disciplinesUnavailable ? "—" : String(completed)
+  const totalLabel = disciplinesUnavailable ? "—" : String(total)
+  const progressBarPct = disciplinesUnavailable ? 0 : progress
 
   if (colSpan === 1) {
     return (
@@ -459,19 +491,19 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
             <FileText className="w-3.5 h-3.5 text-muted-foreground" /> Progresso no edital
           </span>
           <span className="text-[10px] font-semibold text-primary tabular-nums">
-            {progress}%
+            {progressBadge}
           </span>
         </div>
         <div className="my-auto flex items-baseline justify-between">
           <span className="text-xl sm:text-2xl font-semibold text-foreground tabular-nums leading-tight">
-            {completed} <span className="text-xs text-muted-foreground font-semibold">/ {total}</span>
+            {completedLabel} <span className="text-xs text-muted-foreground font-semibold">/ {totalLabel}</span>
           </span>
           <span className="text-[10px] text-muted-foreground font-semibold">matérias</span>
         </div>
         <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
           <div
             className="bg-primary h-full rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${progressBarPct}%` }}
           />
         </div>
       </div>
@@ -488,20 +520,20 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
           <FileText className="w-3.5 h-3.5 text-muted-foreground" /> Progresso no edital
         </span>
         <span className="text-xs font-semibold text-primary tabular-nums">
-          {progress}% Concluído
+          {progressBadgeLong}
         </span>
       </div>
       <div className="space-y-2 my-auto">
         <div className="flex justify-between text-xs font-semibold text-muted-foreground">
           <span>Cobertura do Conteúdo</span>
           <span className="text-foreground tabular-nums font-semibold">
-            {completed} / {total} matérias
+            {completedLabel} / {totalLabel} matérias
           </span>
         </div>
         <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
           <div
             className="bg-primary h-full rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${progressBarPct}%` }}
           />
         </div>
       </div>
@@ -513,11 +545,20 @@ export function WidgetProgressoEdital({ snapshot, colSpan }: DashboardWidgetProp
 // 4. WIDGET: Constância nos Estudos
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
+  // Fase I.8: streak/heatmap vêm do histórico de estudo — se a leitura
+  // falhou, mostrar "—" em vez de "0 dias seguidos" (uma sequência quebrada
+  // que nunca aconteceu).
+  const historyUnavailable = snapshot?.dataIssues?.history === true
   const streak =
     snapshot?.analytics?.stats?.consecutiveStreak ?? snapshot?.stats?.consecutiveStreak ?? 0
   const longest =
     snapshot?.analytics?.stats?.longestStreak ?? snapshot?.stats?.longestStreak ?? streak
-  const heatmap = snapshot?.analytics?.heatmap || []
+  const heatmap = historyUnavailable ? [] : snapshot?.analytics?.heatmap || []
+  const streakBadge = historyUnavailable ? "—" : `${streak}d`
+  const streakBig = historyUnavailable ? "—" : String(streak)
+  const recordeBadge = historyUnavailable ? "—" : `${longest}d`
+  const streakConsecutiveLabel = historyUnavailable ? "—" : `${streak} dias consecutivos`
+  const longestLabel = historyUnavailable ? "—" : `${longest} dias`
 
   if (colSpan === 1) {
     return (
@@ -527,18 +568,18 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
             <Flame className="w-3.5 h-3.5 text-muted-foreground" /> Constância
           </span>
           <span className="text-[10px] sm:text-[11px] font-semibold text-accent tabular-nums">
-            {streak}d
+            {streakBadge}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 my-auto">
           <div>
             <span className="text-xl sm:text-2xl font-semibold text-foreground tabular-nums leading-tight">
-              {streak}
+              {streakBig}
             </span>
             <span className="text-[10px] sm:text-[11px] text-muted-foreground font-semibold ml-1">dias seguidos</span>
           </div>
           <div className="text-right text-[10px] sm:text-[11px] text-muted-foreground font-semibold leading-tight">
-            Recorde: <span className="text-accent font-semibold">{longest}d</span>
+            Recorde: <span className="text-accent font-semibold">{recordeBadge}</span>
           </div>
         </div>
         <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-border/50">
@@ -546,11 +587,10 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
             Registro diário
           </span>
           <div className="flex items-center gap-1">
-            {(heatmap.length > 0
-              ? heatmap.slice(-7)
-              : Array.from({ length: 7 }, () => ({ minutes: 0, date: "" }))
-            ).map((day, idx) => {
-              const studied = (day?.minutes ?? 0) > 0 || idx < streak
+            {/* Fase H: verde só nos dias com estudo (antes `idx < streak`
+                pintava os dias mais antigos da fileira). */}
+            {lastSevenDaysActivity(heatmap).map((day, idx) => {
+              const studied = day.studied
               return (
                 <div
                   key={idx}
@@ -576,16 +616,16 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
           <Flame className="w-3.5 h-3.5 text-muted-foreground" /> Constância e sequência ativa
         </span>
         <span className="text-xs font-semibold text-accent tabular-nums">
-          {streak} dias consecutivos
+          {streakConsecutiveLabel}
         </span>
       </div>
       <div className="flex items-center justify-between my-auto">
         <div>
-          <span className="text-2xl font-semibold text-foreground tabular-nums">{streak}</span>
+          <span className="text-2xl font-semibold text-foreground tabular-nums">{streakBig}</span>
           <span className="text-xs text-muted-foreground font-semibold ml-1">dias seguidos</span>
         </div>
         <div className="text-right text-xs text-muted-foreground font-semibold">
-          Maior Sequência: <span className="text-accent font-semibold">{longest} dias</span>
+          Maior Sequência: <span className="text-accent font-semibold">{longestLabel}</span>
         </div>
       </div>
 
@@ -649,23 +689,45 @@ export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
   const router = useRouter()
-  const total = snapshot?.stats?.totalQuestions ?? 0
-  const target = snapshot?.analytics?.goals?.questions?.target ?? null
-  const achieved = snapshot?.analytics?.goals?.questions?.achieved ?? total
+
+  // Fase I.9: total/correct/wrong/accuracy (histórico completo) e achieved
+  // (semana, via analytics.goals) vêm de rawHistory + question_attempts. Se
+  // qualquer uma das duas leituras falhou, esses números não podem aparecer
+  // como se fossem reais — inclusive o fallback que soma `rawDisciplines`,
+  // já que `rawDisciplines.correctCount/wrongCount` são derivados das MESMAS
+  // leituras em dashboard.service.ts (não é uma fonte independente).
+  const questoesUnavailable =
+    snapshot?.dataIssues?.history === true || snapshot?.dataIssues?.attempts === true
+  // Meta (target) vem do perfil — se o perfil falhou, não sabemos se existe
+  // meta configurada; "Livre"/target null ficaria indistinguível de "sem meta".
+  const metaUnavailable = snapshot?.dataIssues?.profile === true
+
+  const total = questoesUnavailable ? 0 : (snapshot?.stats?.totalQuestions ?? 0)
+  const target = metaUnavailable ? null : (snapshot?.analytics?.goals?.questions?.target ?? null)
+  // Fase H: sem o dado da semana, 0 — antes caía no TOTAL de todo o histórico,
+  // exibido como "resolvidas esta semana".
+  const achieved = questoesUnavailable ? 0 : (snapshot?.analytics?.goals?.questions?.achieved ?? 0)
 
   // Porcentagem REAL (sem travar em 100%, ex: 90 / 50 = 180%)
-  const realPct = target && target > 0 ? Math.round((achieved / target) * 100) : null
+  const realPct =
+    !questoesUnavailable && !metaUnavailable && target && target > 0
+      ? Math.round((achieved / target) * 100)
+      : null
   const progressWidth = Math.min(100, realPct ?? 0)
 
   // Diferença em relação à meta
-  const diff = target !== null ? achieved - target : null
+  const diff = !questoesUnavailable && !metaUnavailable && target !== null ? achieved - target : null
 
   // Acertos, Erros e Aproveitamento
-  let correct = snapshot?.stats?.correctQuestions ?? 0
-  let wrong = snapshot?.stats?.wrongQuestions ?? 0
-  let accuracy = snapshot?.stats?.accuracyPercentage ?? null
+  let correct = questoesUnavailable ? 0 : (snapshot?.stats?.correctQuestions ?? 0)
+  let wrong = questoesUnavailable ? 0 : (snapshot?.stats?.wrongQuestions ?? 0)
+  let accuracy = questoesUnavailable ? null : (snapshot?.stats?.accuracyPercentage ?? null)
 
+  // Fase I.9: fallback cruzado só é seguro quando a fonte principal NÃO
+  // falhou — senão estaríamos "confirmando" um zero fabricado com dados que
+  // vêm da mesma leitura quebrada.
   if (
+    !questoesUnavailable &&
     correct === 0 &&
     wrong === 0 &&
     snapshot?.rawDisciplines &&
@@ -676,9 +738,19 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
   }
 
   const answeredSum = correct + wrong
-  if (accuracy === null && answeredSum > 0) {
+  if (!questoesUnavailable && accuracy === null && answeredSum > 0) {
     accuracy = Math.round((correct / answeredSum) * 100)
   }
+  // Fase H: sem nenhuma questão respondida não há aproveitamento ("—", não "0%").
+  if (!questoesUnavailable && answeredSum === 0 && total === 0) accuracy = null
+
+  // Fase I.9: textos de exibição — "—" quando indisponível, nunca o número
+  // (forçado a 0 acima só para as contas de barra/diff, nunca renderizado).
+  const achievedDisplay = questoesUnavailable ? "—" : achieved
+  const correctDisplay = questoesUnavailable ? "—" : correct
+  const wrongDisplay = questoesUnavailable ? "—" : wrong
+  const accuracyDisplay = accuracy !== null ? `${accuracy}%` : "—"
+  const targetDisplay = metaUnavailable ? "indisponível" : target !== null ? target : "—"
 
   if (colSpan === 1) {
     return (
@@ -691,7 +763,11 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" /> Questões
           </span>
-          {realPct !== null ? (
+          {questoesUnavailable || metaUnavailable ? (
+            <span className="text-[10px] font-semibold text-muted-foreground">
+              Indisponível
+            </span>
+          ) : realPct !== null ? (
             <span
               className={cn(
                 "text-[10px] sm:text-[11px] font-semibold tabular-nums transition-colors",
@@ -712,7 +788,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           <div className="flex items-baseline justify-between gap-1.5">
             <div>
               <span className="text-xl sm:text-2xl font-semibold text-foreground tabular-nums leading-none tracking-tight">
-                {achieved}
+                {achievedDisplay}
               </span>
               <span className="text-[10px] sm:text-[11px] text-muted-foreground font-semibold ml-1.5">
                 resolvidas esta semana
@@ -746,9 +822,9 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
               />
             </div>
             <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium">
-              <span>Meta semanal: {target !== null ? target : "—"}</span>
+              <span>Meta semanal: {targetDisplay}</span>
               <span>
-                {achieved} de {target !== null ? target : "—"}
+                {achievedDisplay} de {targetDisplay}
               </span>
             </div>
           </div>
@@ -758,16 +834,16 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
         <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-border/50 text-[10px] font-semibold">
           <div className="flex items-center gap-2">
             <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-              <Check className="w-3 h-3 stroke-[2.5]" /> {correct} acertos
+              <Check className="w-3 h-3 stroke-[2.5]" /> {correctDisplay} acertos
             </span>
             <span className="text-rose-500 flex items-center gap-0.5">
-              <X className="w-3 h-3 stroke-[2.5]" /> {wrong} erros
+              <X className="w-3 h-3 stroke-[2.5]" /> {wrongDisplay} erros
             </span>
           </div>
-          <div className="text-muted-foreground">
-            Aprov:{" "}
+          <div className="text-muted-foreground" title="Acertos, erros e aproveitamento de todo o histórico">
+            Aprov. total:{" "}
             <span className="tabular-nums text-foreground font-semibold">
-              {accuracy !== null ? `${accuracy}%` : "—"}
+              {accuracyDisplay}
             </span>
           </div>
         </div>
@@ -784,7 +860,11 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
         <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
           <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" /> Meta de questões semanal
         </span>
-        {realPct !== null ? (
+        {questoesUnavailable || metaUnavailable ? (
+          <span className="text-xs font-semibold text-muted-foreground">
+            Indisponível
+          </span>
+        ) : realPct !== null ? (
           <span
             className={cn(
               "text-xs font-semibold tabular-nums",
@@ -795,7 +875,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           </span>
         ) : (
           <span className="text-xs font-semibold text-primary tabular-nums">
-            {achieved} resolvidas
+            {achievedDisplay} resolvidas
           </span>
         )}
       </div>
@@ -805,7 +885,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="type-label block">
             Realizadas
           </span>
-          <span className="text-xl font-semibold tabular-nums text-foreground">{achieved}</span>
+          <span className="text-xl font-semibold tabular-nums text-foreground">{achievedDisplay}</span>
           <span className="text-[10px] text-muted-foreground font-medium block">
             esta semana
           </span>
@@ -816,7 +896,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             Meta Semanal
           </span>
           <span className="text-xl font-semibold tabular-nums text-foreground">
-            {target ?? "—"}
+            {targetDisplay}
           </span>
           <span
             className={cn(
@@ -826,7 +906,11 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
                 : "text-amber-600"
             )}
           >
-            {diff !== null
+            {questoesUnavailable
+              ? "Indisponível"
+              : metaUnavailable
+              ? "Meta indisponível"
+              : diff !== null
               ? diff >= 0
                 ? `+${diff} acima`
                 : `${diff} para meta`
@@ -839,12 +923,12 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             Acertos / Erros
           </span>
           <div className="flex items-baseline gap-1 text-xl font-semibold tabular-nums">
-            <span className="text-emerald-600 dark:text-emerald-400">{correct}</span>
+            <span className="text-emerald-600 dark:text-emerald-400">{correctDisplay}</span>
             <span className="text-xs text-muted-foreground font-normal">/</span>
-            <span className="text-rose-500">{wrong}</span>
+            <span className="text-rose-500">{wrongDisplay}</span>
           </div>
           <span className="text-[10px] text-muted-foreground font-medium block">
-            respostas
+            respostas (total)
           </span>
         </div>
 
@@ -853,10 +937,10 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             Aproveitamento
           </span>
           <span className="text-xl font-semibold tabular-nums text-primary">
-            {accuracy !== null ? `${accuracy}%` : "—"}
+            {accuracyDisplay}
           </span>
           <span className="text-[10px] text-muted-foreground font-medium block">
-            taxa de acertos
+            taxa de acertos (total)
           </span>
         </div>
       </div>
@@ -865,7 +949,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
         <div className="flex justify-between text-xs font-semibold text-muted-foreground">
           <span>Progresso Semanal</span>
           <span className="text-foreground tabular-nums font-semibold">
-            {realPct !== null ? `${realPct}%` : "—"}
+            {questoesUnavailable || metaUnavailable ? "—" : realPct !== null ? `${realPct}%` : "—"}
           </span>
         </div>
         <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
@@ -885,75 +969,28 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7. WIDGET: Revisões
-// ─────────────────────────────────────────────────────────────────────────────
-export function WidgetRevisoes({ snapshot, colSpan }: DashboardWidgetProps) {
-  const router = useRouter()
-  const count = snapshot?.reviews?.count ?? 0
-
-  if (colSpan === 1) {
-    return (
-      <div
-        className="p-4 flex flex-col justify-between h-full space-y-2 cursor-pointer hover:bg-muted/10 transition-colors"
-        onClick={() => router.push("/dashboard/reviews")}
-      >
-        <div className="flex items-center justify-between border-b pb-2">
-          <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
-            <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" /> Revisões
-          </span>
-          <span className="text-[10px] font-semibold text-primary tabular-nums">
-            {count}
-          </span>
-        </div>
-        <div>
-          <div className="text-xl font-semibold text-foreground tabular-nums leading-tight">
-            {count} pendentes
-          </div>
-          <div className="text-[11px] text-primary font-medium mt-0.5">Abrir revisões</div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className="p-5 flex flex-col justify-between h-full space-y-3 cursor-pointer hover:bg-muted/10 transition-colors"
-      onClick={() => router.push("/dashboard/reviews")}
-    >
-      <div className="flex items-center justify-between border-b pb-2">
-        <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
-          <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" /> Central de revisões
-        </span>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation()
-            router.push("/dashboard/reviews")
-          }}
-          className="h-7 text-xs font-semibold text-primary border-primary/30"
-        >
-          Ver todas
-        </Button>
-      </div>
-      <div className="flex items-center justify-between my-auto">
-        <div>
-          <div className="text-xl font-semibold text-foreground tabular-nums">{count} pendentes</div>
-          <p className="text-xs text-muted-foreground font-medium">Revisões agendadas para hoje</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 8. WIDGET: Metas de Estudo
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidgetProps) {
   const goals = snapshot?.analytics?.goals
-  const hoursPct = goals?.weekly?.percentage ?? null
-  const qPct = goals?.questions?.percentage ?? null
-  const daysPct = goals?.studyDays?.percentage ?? null
+  // Fase I.9: cada meta cruza a config do perfil (target) com uma leitura de
+  // dados (achieved). Se qualquer uma falhou, o percentual é fabricado — não
+  // dá para saber se "sem meta" é real ou se é a leitura que quebrou.
+  const profileFailed = snapshot?.dataIssues?.profile === true
+  const historyFailed = snapshot?.dataIssues?.history === true
+  const attemptsFailed = snapshot?.dataIssues?.attempts === true
+
+  const hoursUnavailable = profileFailed || historyFailed
+  const questionsUnavailable = profileFailed || historyFailed || attemptsFailed
+  const daysUnavailable = profileFailed || historyFailed
+
+  const hoursPct = hoursUnavailable ? null : (goals?.weekly?.percentage ?? null)
+  const qPct = questionsUnavailable ? null : (goals?.questions?.percentage ?? null)
+  const daysPct = daysUnavailable ? null : (goals?.studyDays?.percentage ?? null)
+
+  const hoursText = hoursUnavailable ? "indisponível" : hoursPct === null ? "—" : `${hoursPct}%`
+  const qText = questionsUnavailable ? "indisponível" : qPct === null ? "—" : `${qPct}%`
+  const daysText = daysUnavailable ? "indisponível" : daysPct === null ? "—" : `${daysPct}%`
 
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-4">
@@ -979,7 +1016,7 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
           <div className="flex justify-between text-xs font-semibold">
             <span className="text-muted-foreground">Horas</span>
             <span className="text-foreground tabular-nums">
-              {hoursPct === null ? "—" : `${hoursPct}%`}
+              {hoursText}
             </span>
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
@@ -993,7 +1030,7 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
         <div className="space-y-1">
           <div className="flex justify-between text-xs font-semibold">
             <span className="text-muted-foreground">Questões</span>
-            <span className="text-foreground tabular-nums">{qPct === null ? "—" : `${qPct}%`}</span>
+            <span className="text-foreground tabular-nums">{qText}</span>
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
             <div
@@ -1007,7 +1044,7 @@ export function WidgetMetasEstudo({ snapshot, onOpenGoalsModal }: DashboardWidge
           <div className="flex justify-between text-xs font-semibold">
             <span className="text-muted-foreground">Dias Ativos</span>
             <span className="text-foreground tabular-nums">
-              {daysPct === null ? "—" : `${daysPct}%`}
+              {daysText}
             </span>
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
@@ -1037,6 +1074,12 @@ export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetPr
   const router = useRouter()
   const rows = snapshot?.rawDisciplines || []
   const contexts = snapshot?.subjectContexts || []
+  // Fase I.9: a LISTA de matérias vem de getUserDisciplines (dataIssues.disciplines);
+  // os números por matéria (correctCount/wrongCount/tempo) vêm de attempts +
+  // rawHistory (dataIssues.history/attempts) — são falhas independentes.
+  const disciplinesUnavailable = snapshot?.dataIssues?.disciplines === true
+  const statsUnavailable =
+    snapshot?.dataIssues?.history === true || snapshot?.dataIssues?.attempts === true
 
   const contextById = React.useMemo(() => {
     const map = new Map<string, (typeof contexts)[number]>()
@@ -1097,13 +1140,15 @@ export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetPr
           título da linha. */}
       {ordered.length === 0 ? (
         <p className="py-6 text-center text-xs font-medium text-muted-foreground">
-          Nenhuma matéria disponível ainda.
+          {disciplinesUnavailable
+            ? "Não foi possível carregar suas matérias agora."
+            : "Nenhuma matéria disponível ainda."}
         </p>
       ) : (
         <ul className="-mx-1 flex-1 divide-y divide-border">
           {visible.map(({ disc, ctx }, idx: number) => {
             const answered = disc.correctCount + disc.wrongCount
-            const accuracy = answered > 0 ? disc.accuracyPercentage : null
+            const accuracy = !statsUnavailable && answered > 0 ? disc.accuracyPercentage : null
             const context = [
               ctx?.planned ? "no plano" : null,
               ctx?.inCycle ? "no ciclo" : null,
@@ -1142,7 +1187,9 @@ export function WidgetDesempenhoMateria({ snapshot, colSpan }: DashboardWidgetPr
                     />
                   </div>
                   {accuracy === null ? (
-                    <span className="shrink-0 text-[11px] text-muted-foreground">Sem questões</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {statsUnavailable ? "Indisponível" : "Sem questões"}
+                    </span>
                   ) : (
                     <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                       <span className="font-semibold text-foreground">{accuracy}%</span>
@@ -1167,11 +1214,18 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
   // REGRA DE PONTOS DO RANKING DAS MATÉRIAS
   // A única regra de ranking por disciplina existente no sistema é baseada em
   // tempo de estudo (getDisciplineRanking). Para não criar uma segunda regra
-  // incompatível, os pontos reutilizam essa métrica: 1 ponto = 1 minuto de
-  // estudo na disciplina, acumulado no período de 30 dias (item.value).
+  // incompatível, o ranking reutiliza essa métrica: minutos de estudo na
+  // disciplina em TODO o histórico (item.value — o Dashboard carrega o
+  // histórico inteiro; o comentário antigo dizia "30 dias"). Fase H: exibido
+  // como tempo, não como "pts".
   // A ordenação é determinística (minutos -> nº de sessões -> nome alfabético),
   // definida em application/study-analytics/rankings.ts.
-  const ranking = snapshot?.analytics?.rankings?.disciplines || []
+  // Fase I.9: este ranking usa só rawHistory (getDisciplineRanking, acima) —
+  // é uma métrica diferente do ranking global de usuários (getRankingViaDirectQuery,
+  // usado na página /ranking, corrigido na Fase I.8). A dependência real deste
+  // widget é dataIssues.history, não o ranking global.
+  const rankingUnavailable = snapshot?.dataIssues?.history === true
+  const ranking = rankingUnavailable ? [] : snapshot?.analytics?.rankings?.disciplines || []
 
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-3">
@@ -1184,7 +1238,9 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
       <div className="space-y-2 my-auto">
         {ranking.length === 0 ? (
           <div className="text-center py-4 text-xs text-muted-foreground font-medium">
-            Sem dados suficientes para o ranking.
+            {rankingUnavailable
+              ? "Ranking indisponível no momento."
+              : "Sem dados suficientes para o ranking."}
           </div>
         ) : (
           ranking.slice(0, colSpan === 3 ? 5 : 3).map((item, idx) => (
@@ -1203,7 +1259,9 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
                   </span>
                 )}
               </div>
-              <span className="tabular-nums text-primary shrink-0">{item.value ?? 0} pts</span>
+              <span className="tabular-nums text-primary shrink-0">
+                {formatDurationMinutes(item.value ?? 0)}
+              </span>
             </div>
           ))
         )}
@@ -1217,6 +1275,9 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetUltimasAtividades({ snapshot, colSpan }: DashboardWidgetProps) {
   const router = useRouter()
+  // Fase I.8: distinguir "a leitura falhou" de "não há atividades" — antes as
+  // duas situações mostravam a mesma mensagem de lista vazia.
+  const activitiesUnavailable = snapshot?.dataIssues?.activities === true
   const activities = snapshot?.recentActivities || []
 
   return (
@@ -1235,7 +1296,11 @@ export function WidgetUltimasAtividades({ snapshot, colSpan }: DashboardWidgetPr
       </div>
 
       <div className="space-y-2 my-auto">
-        {activities.length === 0 ? (
+        {activitiesUnavailable ? (
+          <div className="text-center py-6 text-xs text-muted-foreground font-medium">
+            Não foi possível carregar suas atividades recentes agora.
+          </div>
+        ) : activities.length === 0 ? (
           <div className="text-center py-6 text-xs text-muted-foreground font-medium">
             Nenhuma atividade registrada recentemente.
           </div>
@@ -1265,19 +1330,23 @@ export function WidgetUltimasAtividades({ snapshot, colSpan }: DashboardWidgetPr
 // 12. WIDGET: Conquistas & Marcos
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
-  const streak = snapshot?.stats?.consecutiveStreak ?? 0
-  const totalMins = snapshot?.stats?.weeklyMinutes ?? 0
+  // Fase I.9: totalMinutes/consecutiveStreak vêm de rawHistory; totalQuestions
+  // vem de rawHistory + question_attempts combinados (performanceByPeriod.TOTAL
+  // em dashboard.service.ts). Se qualquer uma dessas leituras falhou, os marcos
+  // calculados a partir delas não são reais — não dá para dizer que uma
+  // conquista está "bloqueada" quando na verdade é que não sabemos o valor.
+  const conquistasUnavailable =
+    snapshot?.dataIssues?.history === true || snapshot?.dataIssues?.attempts === true
 
-  const badges = [
-    { title: "Primeiro Estudo", desc: "Concluiu o 1º ciclo", unlocked: totalMins > 0 },
-    { title: "Consistência", desc: "Estudou 3 dias seguidos", unlocked: streak >= 3 },
-    { title: "Maratona", desc: "Estudou +10 horas", unlocked: totalMins >= 600 },
-    {
-      title: "Mestre",
-      desc: "Respondeu 50+ questões",
-      unlocked: (snapshot?.stats?.totalQuestions ?? 0) >= 50,
-    },
-  ]
+  // Fase H: marcos sobre o histórico inteiro (antes: minutos da SEMANA, e
+  // "Primeiro Estudo"/"Maratona" trancavam de novo a cada semana).
+  const badges = conquistasUnavailable
+    ? []
+    : dashboardMilestones({
+        totalMinutes: snapshot?.stats?.totalMinutes ?? 0,
+        currentStreak: snapshot?.stats?.consecutiveStreak ?? 0,
+        totalQuestions: snapshot?.stats?.totalQuestions ?? 0,
+      })
 
   return (
     <div className="p-5 flex flex-col justify-between h-full space-y-3">
@@ -1286,25 +1355,31 @@ export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
           <Award className="w-3.5 h-3.5 text-muted-foreground" /> Conquistas & marcos
         </span>
         <span className="text-xs font-semibold text-primary tabular-nums">
-          {badges.filter((b) => b.unlocked).length} / {badges.length}
+          {conquistasUnavailable ? "—" : `${badges.filter((b) => b.unlocked).length} / ${badges.length}`}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 my-auto">
-        {badges.slice(0, colSpan === 1 ? 2 : 4).map((b, idx) => (
-          <div
-            key={idx}
-            className={`p-2.5 rounded-xl border text-center space-y-1 transition-all ${
-              b.unlocked
-                ? "bg-primary/10 border-primary/30 text-primary"
-                : "bg-muted/20 border-muted opacity-50"
-            }`}
-          >
-            <Award className="w-5 h-5 mx-auto" />
-            <div className="font-semibold text-[11px] truncate">{b.title}</div>
-          </div>
-        ))}
-      </div>
+      {conquistasUnavailable ? (
+        <p className="py-6 text-center text-xs font-medium text-muted-foreground my-auto">
+          Não foi possível carregar suas conquistas agora.
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 my-auto">
+          {badges.slice(0, colSpan === 1 ? 2 : 4).map((b, idx) => (
+            <div
+              key={idx}
+              className={`p-2.5 rounded-xl border text-center space-y-1 transition-all ${
+                b.unlocked
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-muted/20 border-muted opacity-50"
+              }`}
+            >
+              <Award className="w-5 h-5 mx-auto" />
+              <div className="font-semibold text-[11px] truncate" title={b.desc}>{b.title}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1313,6 +1388,9 @@ export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
 // 13. WIDGET: Data da Prova
 // ─────────────────────────────────────────────────────────────────────────────
 export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
+  // Fase I.8: "meta ativa" vem de `user_targets` — se a leitura falhou, não
+  // dá para saber se a pessoa tem uma prova cadastrada ou não.
+  const targetUnavailable = snapshot?.dataIssues?.target === true
   const targetDate = snapshot?.activeTarget?.exam_date
   const examName =
     snapshot?.activeTarget?.exam_name || snapshot?.activeTarget?.target_exam || "Prova"
@@ -1357,6 +1435,10 @@ export function WidgetDataProva({ snapshot }: DashboardWidgetProps) {
               </div>
             </div>
           </>
+        ) : targetUnavailable ? (
+          <div className="text-xs text-muted-foreground font-medium text-center py-2">
+            Não foi possível carregar sua prova agora.
+          </div>
         ) : (
           <div className="text-xs text-muted-foreground font-medium text-center py-2">
             Nenhuma prova cadastrada.
@@ -1711,12 +1793,6 @@ export const WIDGET_REGISTRY: Record<
     description: "Acompanhamento da meta semanal de questões resolvidas.",
     defaultSpan: 1,
     component: WidgetQuestoes,
-  },
-  revisoes: {
-    name: "Revisões",
-    description: "Revisões pendentes e agendadas para o dia.",
-    defaultSpan: 1,
-    component: WidgetRevisoes,
   },
   desempenho_materia: {
     name: "Desempenho por Matéria",

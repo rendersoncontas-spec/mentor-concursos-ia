@@ -7,7 +7,7 @@ import { getStudyHistoryForAnalytics, AnalyticsEngine } from "./study-analytics.
 import { isMaintenanceMode } from "@/lib/maintenance"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
 import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo, startOfDayInSaoPauloMs, endOfDayInSaoPauloMs } from "@/lib/sao-paulo"
-import { getSaoPauloWeekRange } from "@/lib/study-time-calculator"
+import { getSaoPauloWeekRange, resolveWeekStartDay } from "@/lib/study-time-calculator"
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -327,8 +327,14 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
   }
 
   // Fase F.1: paginado (antes 1 requisição cortada em 1.000 linhas → no
-  // período "geral" o total do próprio usuário saía subcontado). Erro →
-  // sem linhas, como antes.
+  // período "geral" o total do próprio usuário saía subcontado).
+  //
+  // Fase I.8: erro NÃO é mais "sem linhas". Sem o histórico, todo mundo entrava
+  // no ranking com 0 minutos e o aluno via a si mesmo zerado, em posição de
+  // último — um dado falso, e ainda por cima comparativo. Agora a leitura que
+  // falha devolve erro controlado, e a tela mostra o estado de erro que ela já
+  // tem, com "Tentar novamente". A fórmula, a ordenação e os desempates do
+  // ranking continuam exatamente os mesmos.
   const historyResult = await fetchAllRowsPaged<{
     user_id: string
     duration_minutes: number | null
@@ -346,7 +352,14 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
     },
     [{ column: 'id', ascending: true }],
   )
-  const historyData = historyResult.error ? null : historyResult.data
+  if (historyResult.error) {
+    console.error("[RANKING] Erro ao carregar o histórico do ranking:", historyResult.error)
+    return {
+      data: null,
+      error: "Não foi possível calcular o ranking agora. Tente novamente em instantes.",
+    }
+  }
+  const historyData = historyResult.data
 
   const activeUserIds = new Set<string>()
   historyData?.forEach((h) => { if (h.user_id) activeUserIds.add(h.user_id) })
@@ -374,10 +387,21 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
       questions_count: number
       pages_count: number
     }
-    const { data: statsRows } = await supabase
+    const { data: statsRows, error: statsError } = await supabase
       .from('public_study_stats')
       .select('user_id, display_name, total_minutes, questions_count, pages_count')
       .returns<PublicStudyStatsRow[]>()
+
+    // Fase I.8: neste caminho (RLS limitando o histórico a um usuário) a visão
+    // pública É o ranking. Se ela falha, não existe ranking para mostrar — e
+    // seguir em frente deixaria o aluno sozinho no quadro, com 0 minutos.
+    if (statsError) {
+      console.error("[RANKING] Erro ao carregar public_study_stats:", statsError)
+      return {
+        data: null,
+        error: "Não foi possível calcular o ranking agora. Tente novamente em instantes.",
+      }
+    }
 
     statsRows?.forEach((row) => {
       totalsByUser.set(row.user_id, {
@@ -503,11 +527,12 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
 // meta semanal (profiles.weekly_study_hours + minutos da semana) e constância
 // (sequência atual e recorde). Reutiliza o AnalyticsEngine e o histórico do usuário.
 export interface RankingPersonalContext {
+  /** Fase H: target/percentage/remaining = null quando o aluno não definiu meta. */
   weeklyGoal: {
-    targetMinutes: number
+    targetMinutes: number | null
     achievedMinutes: number
-    percentage: number
-    remainingMinutes: number
+    percentage: number | null
+    remainingMinutes: number | null
   }
   streak: {
     consecutiveDays: number
@@ -532,7 +557,7 @@ export async function getRankingPersonalContextAction(): Promise<{
     const [profileResult, history] = await Promise.all([
       supabase
         .from("profiles")
-        .select("weekly_study_hours, week_start_day")
+        .select("weekly_study_hours, week_start_day, preferences")
         .eq("id", user.id)
         .maybeSingle(),
       getStudyHistoryForAnalytics(supabase, user.id, 365),
@@ -543,15 +568,23 @@ export async function getRankingPersonalContextAction(): Promise<{
       history as unknown as StudyHistory[],
       365,
       "America/Sao_Paulo",
-      profile?.week_start_day ?? 0,
+      // Fase H: mesma regra de início de semana do resto do app (preferência
+      // firstDayOfWeek > coluna week_start_day > Domingo).
+      resolveWeekStartDay(
+        (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"],
+        profile?.week_start_day,
+      ),
     )
     const base = AnalyticsEngine.aggregations.getBase(ctx)
 
-    const targetMinutes = (profile?.weekly_study_hours || 10) * 60
+    // Fase H: sem meta definida, não inventar uma ("|| 10" mostrava 10h como
+    // se fosse a meta do aluno).
+    const goalHours = profile?.weekly_study_hours
+    const targetMinutes = goalHours && goalHours > 0 ? goalHours * 60 : null
     const achievedMinutes = base.weeklyMinutes
-    const remainingMinutes = Math.max(0, targetMinutes - achievedMinutes)
+    const remainingMinutes = targetMinutes !== null ? Math.max(0, targetMinutes - achievedMinutes) : null
     const percentage =
-      targetMinutes > 0 ? Math.min(100, Math.round((achievedMinutes / targetMinutes) * 100)) : 0
+      targetMinutes !== null ? Math.min(100, Math.round((achievedMinutes / targetMinutes) * 100)) : null
 
     return {
       data: {
@@ -631,40 +664,3 @@ export async function getRecentStudyHistoryAction(
     return { data: null, error: (error as { message?: string }).message ?? "Erro inesperado." }
   }
 }
-
-// Nova função de teste para debug direto do RPC
-export async function testGlobalRankingRpc() {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    await supabase.rpc('get_global_ranking', {
-      p_period: 'this_week',
-      p_current_user_id: user?.id || null
-    })
-    
-    // Verificar dados na tabela study_history
-    await supabase
-      .from('study_history')
-      .select('user_id, active_minutes, duration_minutes, started_at, completed, metadata')
-      .limit(10)
-    
-    // Verificar se question_attempts existe
-    await supabase
-      .from('question_attempts')
-      .select('user_id, correct, answered_at')
-      .limit(10)
-    
-    // Verificar perfis (apenas coluna name)
-    await supabase
-      .from('profiles')
-      .select('id, name')
-      .limit(10)
-    
-    return { success: true, debug: "Verifique o console do servidor" }
-  } catch (err) {
-    console.error("[TEST RPC] Error:", err)
-    return { success: false, error: (err as { message?: string }).message }
-  }
-}
-

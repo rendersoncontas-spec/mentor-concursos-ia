@@ -203,7 +203,7 @@ function getProgressBarColor(unlocked: boolean, progressPct: number): string {
   return "bg-transparent"
 }
 
-function evaluateAchievement(
+export function evaluateAchievement(
   def: AchievementDefinition,
   facts: AchievementsFacts,
 ): EvaluatedAchievement {
@@ -252,8 +252,8 @@ function evaluateAchievement(
       currentValue = facts.reviews >= 1 ? 1 : 0
       unlocked = facts.reviews >= 1
       progressText = unlocked
-        ? `${pluralize(facts.reviews, "revisão realizada", "revisões realizadas")}.`
-        : "Conclua sua primeira revisão."
+        ? `${pluralize(facts.reviews, "revisão respondida", "revisões respondidas")}.`
+        : "Responda sua primeira revisão na página de Revisões."
       break
 
     // 2. CONSTÂNCIA
@@ -347,10 +347,10 @@ function evaluateAchievement(
       currentValue = facts.reviews
       unlocked = facts.reviews >= def.targetValue
       if (unlocked) {
-        progressText = `Você já concluiu ${facts.reviews.toLocaleString("pt-BR")} revisões.`
+        progressText = `Você já respondeu ${facts.reviews.toLocaleString("pt-BR")} revisões.`
       } else {
         const remaining = def.targetValue - facts.reviews
-        progressText = `Você já concluiu ${facts.reviews}. Faltam ${pluralize(remaining, "revisão", "revisões")}.`
+        progressText = `Você já respondeu ${facts.reviews}. Faltam ${pluralize(remaining, "revisão", "revisões")}.`
       }
       break
 
@@ -397,20 +397,30 @@ function evaluateAchievement(
         ? `Aderência semanal de ${facts.adherencePercentage}%.`
         : `Aderência atual: ${facts.adherencePercentage}% (meta: ${def.targetValue}%).`
       break
-    case "PLAN_MASTER_4_WEEKS":
-      currentValue = facts.adherencePercentage >= 90 ? 1 : 0
+    case "PLAN_MASTER_4_WEEKS": {
+      // Fase H: não existe histórico de aderência semana a semana. O critério
+      // verificável com os dados reais é a sequência: estudar TODOS os dias
+      // por 28 dias cobre todos os dias planejados dessas 4 semanas. Antes o
+      // progresso marcava "1 de 4" só pela aderência da semana atual.
+      const fullWeeks = Math.min(4, Math.floor(facts.streak / 7))
       unlocked = facts.adherencePercentage >= 90 && facts.streak >= 28
+      currentValue = unlocked ? 4 : Math.min(3, fullWeeks)
       progressText = unlocked
-        ? "4 semanas consecutivas com 90%+ de aderência."
-        : "Mantenha consistência semana a semana no planejamento."
+        ? "4 semanas seguidas estudando todos os dias."
+        : `Critério verificável: estudo diário por 4 semanas (sequência atual: ${pluralize(facts.streak, "dia", "dias")}).`
       break
+    }
     case "REPLAN_FAST_RECOVERY":
     case "REPLAN_ROUTE_TURN":
-      currentValue = facts.replanRecoveredCount >= 1 || facts.streak >= 7 ? 1 : 0
+      // Fase H: antes desbloqueava com qualquer sequência de 7 dias e dizia
+      // "Pendência recuperada" — sem nenhuma pendência verificada. O app não
+      // registra se um bloco redistribuído foi estudado, então a conquista
+      // fica bloqueada até existir essa medição.
+      currentValue = facts.replanRecoveredCount >= 1 ? 1 : 0
       unlocked = currentValue >= 1
       progressText = unlocked
-        ? "Pendência recuperada sem quebrar o ritmo."
-        : "Recupere blocos atrasados pelo sistema adaptativo."
+        ? "Pendência recuperada pelo replanejamento."
+        : "Ainda não medida: o app não registra quando um bloco redistribuído é estudado."
       break
 
     // 9. COBERTURA DO EDITAL
@@ -426,14 +436,21 @@ function evaluateAchievement(
     case "COVERAGE_75_PCT":
     case "COVERAGE_90_PCT":
     case "COVERAGE_100_PCT": {
-      // Base estimada de tópicos cadastrados
-      const estimatedTotal = Math.max(facts.distinctTopicsStudied, 40)
-      const pct = Math.min(100, Math.round((facts.distinctTopicsStudied / estimatedTotal) * 100))
+      // Fase H: denominador REAL — tópicos do edital ativo, com a mesma regra
+      // de "tópicos estudados" da página Disciplinas (tópicos × domínio). Antes
+      // era `max(tópicos digitados, 40)`: 40 nomes distintos = "100% do edital".
+      if (facts.editalTopicsTotal <= 0) {
+        currentValue = 0
+        unlocked = false
+        progressText = "Sem edital com tópicos cadastrados para medir a cobertura."
+        break
+      }
+      const pct = Math.min(100, Math.round((facts.editalTopicsStudied / facts.editalTopicsTotal) * 100))
       currentValue = pct
       unlocked = pct >= def.targetValue
       progressText = unlocked
-        ? `Cobertura de ${pct}% (${facts.distinctTopicsStudied} tópicos registrados).`
-        : `Você estudou ${facts.distinctTopicsStudied} tópicos (cobertura: ${pct}%).`
+        ? `Cobertura de ${pct}% (${facts.editalTopicsStudied} de ${facts.editalTopicsTotal} tópicos).`
+        : `Cobertura atual: ${pct}% (${facts.editalTopicsStudied} de ${facts.editalTopicsTotal} tópicos do edital).`
       break
     }
 

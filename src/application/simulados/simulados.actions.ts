@@ -766,24 +766,18 @@ async function buildResultPayload(
       if (attErr) console.error("[SIMULADO] Erro ao registrar tentativas:", attErr)
     }
 
-    // Erros → revisões (review_items / motor FSRS existente)
-    const wrong = corrected.filter((c) => c.isCorrect === false)
-    if (wrong.length > 0) {
-      const reviewRows = wrong.map((c) => ({
-        user_id: userId,
-        discipline_id: c.disciplineId,
-        topic_id: c.topicId,
-        source_type: "QUESTION",
-        source_id: c.questionId,
-        review_stage: "LEARNING",
-        next_review_at: new Date().toISOString(),
-        base_priority: 2.0,
-      }))
-      const { error: revErr } = await supabase
-        .from("review_items")
-        .upsert(reviewRows, { onConflict: "user_id, source_type, source_id" })
-      if (revErr) console.error("[SIMULADO] Erro ao criar revisões:", revErr)
-    }
+    // Fase I.1 — decisões D1 e D2: nesta versão o sistema de revisões cobre
+    // SOMENTE tópicos e subtópicos do edital, e a criação de item de revisão é
+    // manual ("Adicionar à revisão", na página de Revisões). Por isso o
+    // fechamento do simulado NÃO cria mais revisões a partir dos erros.
+    //
+    // O que existia aqui inseria review_items com source_type "QUESTION" — um
+    // tipo que o schema real não aceita mais (CHECK source_type in
+    // ('EDITAL_TOPIC','EDITAL_SUBTOPIC')) e que já falhava em silêncio, só
+    // registrando console.error. As tentativas continuam sendo gravadas em
+    // question_attempts acima; nada do simulado foi perdido.
+    //
+    // Revisar erros de questão é item de roadmap (FUTURO), não algo entregue.
   }
 
   // Histórico e comparação
@@ -974,75 +968,22 @@ async function assertOwnsQuestion(supabase: Supabase, userId: string, simuladoId
   return !!data
 }
 
-async function fetchQuestionForIntegration(supabase: Supabase, questionId: string) {
-  const { data } = await supabase
-    .from("questions")
-    .select("id, discipline_id, topic_id, statement, correct_answer, explanation")
-    .eq("id", questionId)
-    .single()
-  return data
-}
-
-export async function sendQuestionToReviewAction(simuladoId: string, questionId: string): Promise<{ error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { user } = await requireUser(supabase)
-    if (!user) return { error: "Não autenticado." }
-    if (!(await assertOwnsQuestion(supabase, user.id, simuladoId, questionId))) return { error: "Questão não pertence ao seu simulado." }
-
-    const q = await fetchQuestionForIntegration(supabase, questionId)
-    if (!q) return { error: "Questão não encontrada." }
-
-    const { error } = await supabase.from("review_items").upsert(
-      {
-        user_id: user.id,
-        discipline_id: q.discipline_id,
-        topic_id: q.topic_id ?? null,
-        source_type: "QUESTION",
-        source_id: q.id,
-        review_stage: "LEARNING",
-        next_review_at: new Date().toISOString(),
-        base_priority: 2.0,
-      },
-      { onConflict: "user_id, source_type, source_id" }
-    )
-    return { error: error ? `Erro ao enviar para revisão: ${error.message}` : null }
-  } catch (e) {
-    return { error: (e as { message?: string })?.message ?? "Erro ao enviar para revisão." }
-  }
-}
-
-export async function createFlashcardFromQuestionAction(simuladoId: string, questionId: string): Promise<{ error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { user } = await requireUser(supabase)
-    if (!user) return { error: "Não autenticado." }
-    if (!(await assertOwnsQuestion(supabase, user.id, simuladoId, questionId))) return { error: "Questão não pertence ao seu simulado." }
-
-    const q = await fetchQuestionForIntegration(supabase, questionId)
-    if (!q) return { error: "Questão não encontrada." }
-    if (!q.explanation) {
-      return { error: "Esta questão não possui explicação cadastrada — o flashcard seria vazio. Envie para revisão ou adicione aos estudos." }
-    }
-
-    const { error } = await supabase.from("review_items").upsert(
-      {
-        user_id: user.id,
-        discipline_id: q.discipline_id,
-        topic_id: q.topic_id ?? null,
-        source_type: "FLASHCARD",
-        source_id: q.id,
-        review_stage: "NEW",
-        next_review_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id, source_type, source_id" }
-    )
-    return { error: error ? `Erro ao criar flashcard: ${error.message}` : null }
-  } catch (e) {
-    return { error: (e as { message?: string })?.message ?? "Erro ao criar flashcard." }
-  }
-}
-
+/**
+ * Fase I.2 — as duas ações legadas de "enviar questão para revisão" e "criar
+ * flashcard da questão" foram REMOVIDAS. Elas gravavam review_items com
+ * source_type "QUESTION"/"FLASHCARD", tipos que o schema real não aceita mais
+ * (CHECK source_type in ('EDITAL_TOPIC','EDITAL_SUBTOPIC')), e não tinham
+ * nenhum caller ativo: quem as chamava era SimuladoResultView, componente que
+ * nenhuma página importa.
+ *
+ * Revisar questões e flashcards são itens de roadmap (FUTURO), não recursos
+ * desativados: quando existirem, entram pelo módulo de revisões, com origem
+ * própria no schema. O teste review-study-history-d4.wiring garante que nada
+ * volte a criar revisão a partir de questão.
+ *
+ * `addQuestionToStudyListAction` (abaixo) não tem relação com revisões: grava em
+ * question_lists / question_list_items e continua funcionando.
+ */
 export async function addQuestionToStudyListAction(simuladoId: string, questionId: string): Promise<{ error: string | null }> {
   try {
     const supabase = await createClient()

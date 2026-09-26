@@ -1,7 +1,7 @@
-import type { GlobalScore, Insight, IntelligenceContext } from "./mentor-ai.models"
+import type { Insight, IntelligenceContext } from "./mentor-ai.models"
 
 export interface MentorResponse {
-  globalScore: GlobalScore
+  // Fase I.6 (M1): sem `globalScore` — ver mentor-ai.models.ts.
   feed: {
     now: Insight[]      // 🎯 Faça primeiro / Urgências
     today: Insight[]    // 📅 Hoje

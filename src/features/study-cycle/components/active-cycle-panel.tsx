@@ -7,6 +7,7 @@ import {
   CircleDashed,
   Clock,
   Edit3,
+  Flag,
   Pause,
   Play,
   SkipForward,
@@ -14,6 +15,7 @@ import {
 import { toast } from "sonner"
 
 import {
+  concludeCycleRoundAction,
   pauseCycleAction,
   skipCycleCurrentItemAction,
 } from "@/application/study-cycle/study-cycle.actions"
@@ -123,6 +125,8 @@ export function ActiveCyclePanel({
   const { startSession, sessionSummary } = useStudyActions()
   const [isSkipping, setIsSkipping] = useState(false)
   const [isPausing, setIsPausing] = useState(false)
+  const [isConcluding, setIsConcluding] = useState(false)
+  const [showConcludeConfirm, setShowConcludeConfirm] = useState(false)
 
   const {
     cycle,
@@ -196,6 +200,30 @@ export function ActiveCyclePanel({
     }
   }, [currentItem, cycle.id, onRefresh])
 
+  /**
+   * Encerra administrativamente a volta atual e inicia a próxima do zero.
+   * Ação puramente administrativa: NUNCA registra estudo, minutos ou marca
+   * matérias como concluídas — apenas avança o cursor do ciclo, reutilizando
+   * a mesma transição central de rodada usada pela conclusão natural (ver
+   * concludeCurrentCycleRound).
+   */
+  const handleConcludeRound = useCallback(async () => {
+    if (isConcluding) return
+    setIsConcluding(true)
+    try {
+      const res = await concludeCycleRoundAction(cycle.id)
+      if (res.success) {
+        toast.success("Nova volta iniciada.")
+        onRefresh()
+      } else {
+        toast.error(res.error || "Erro ao concluir a volta.")
+      }
+    } finally {
+      setIsConcluding(false)
+      setShowConcludeConfirm(false)
+    }
+  }, [cycle.id, isConcluding, onRefresh])
+
   const remainingRoundMinutes = Math.max(0, totalPlannedMinutesPerRound - totalStudiedMinutesInRound)
 
   return (
@@ -242,6 +270,17 @@ export function ActiveCyclePanel({
               >
                 <Pause className="h-3.5 w-3.5" />
                 Pausar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowConcludeConfirm(true)}
+                disabled={isConcluding}
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                title="Encerrar a volta atual e iniciar uma nova, do zero"
+              >
+                <Flag className="h-3.5 w-3.5" />
+                Concluir volta
               </Button>
               {onSelectAnotherCycle && (
                 <Button
@@ -571,6 +610,38 @@ export function ActiveCyclePanel({
           </ol>
         </div>
       </section>
+
+      {/* DIÁLOGO DE CONFIRMAÇÃO — concluir volta manualmente */}
+      {showConcludeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="max-w-sm w-full p-5 space-y-3 shadow-xl">
+            <h3 className="text-base font-semibold text-foreground">Concluir ciclo atual?</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Isso encerra a volta atual e inicia uma nova volta do zero. Seus estudos já
+              realizados serão preservados. Nenhum tempo de estudo será adicionado.
+            </p>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowConcludeConfirm(false)}
+                disabled={isConcluding}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConcludeRound}
+                disabled={isConcluding}
+                className="font-semibold text-xs gap-1.5"
+              >
+                <Flag className="h-3.5 w-3.5" />
+                {isConcluding ? "Concluindo..." : "Concluir e iniciar nova volta"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

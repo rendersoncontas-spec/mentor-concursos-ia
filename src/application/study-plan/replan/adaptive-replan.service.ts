@@ -46,6 +46,12 @@ export type PeriodFilter = "semana" | "mes" | "ano" | "total"
 export interface PeriodGoalData {
   /** Meta de estudo do período em minutos (ex: semana = weekly_study_hours * 60) */
   goalMinutes: number
+  /**
+   * P1.2 — origem da meta: "configured" (valor real do usuário) ou
+   * "suggested" (default de produto, ex. 20h). A UI deve rotular "sugerida"
+   * quando for suggested — nunca apresentar como escolha do usuário.
+   */
+  goalSource: "configured" | "suggested"
   /** Tempo efetivamente estudado no período (registros reais do study_history) */
   studiedMinutes: number
   /** Tempo restante para atingir a meta */
@@ -75,14 +81,24 @@ export async function getPeriodGoalData(
   const today = new Date(`${todayKey}T00:00:00Z`)
 
   // 1. Buscar meta semanal e preferência de primeiro dia do perfil
-  const { data: profile } = await supabase
+  // P1.1: erro de leitura propaga (throw) — nunca vira 20h silencioso.
+  // Ausência real → default de produto (20h) com origem "sugerida".
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("weekly_study_hours, week_start_day, preferences")
     .eq("id", userId)
     .maybeSingle()
 
+  if (profileError) {
+    throw new Error(`period-goal-unavailable: ${profileError.message ?? "profile read error"}`)
+  }
+
+  const profileWeekly = (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours
   const weeklyGoalHours =
-    (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours ?? 20
+    typeof profileWeekly === "number" && Number.isFinite(profileWeekly) ? profileWeekly : 20
+  // P1.2 — origem explícita para a UI (configured vs suggested).
+  const goalSource: PeriodGoalData["goalSource"] =
+    typeof profileWeekly === "number" && Number.isFinite(profileWeekly) ? "configured" : "suggested"
   const weeklyGoalMinutes = weeklyGoalHours * 60
 
   const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
@@ -193,6 +209,7 @@ export async function getPeriodGoalData(
 
   return {
     goalMinutes,
+    goalSource,
     studiedMinutes,
     remainingMinutes,
     dailyGoalMinutes,
@@ -442,31 +459,22 @@ async function loadSessions(
 }
 
 async function loadOverdueReviewsByDiscipline(
-  supabase: SupabaseClient,
-  userId: string,
+  _supabase: SupabaseClient,
+  _userId: string,
 ): Promise<Map<string, number>> {
-  const map = new Map<string, number>()
-  // Fase F.1: paginado (review_items cresce com flashcards/simulados; 1
-  // requisição era cortada em 1.000). Erro → mapa vazio, como antes.
-  const { data, error } = await fetchAllRowsPaged<{ discipline_id: string; next_review_at: string | null }>(
-    (withCount) =>
-      supabase
-        .from("review_items")
-        .select("discipline_id, next_review_at", countOption(withCount))
-        .eq("user_id", userId)
-        .is("deleted_at", null)
-        .eq("is_suspended", false),
-    [{ column: "id", ascending: true }],
-  )
-
-  const now = Date.now()
-  for (const r of error ? [] : data) {
-    if (!r.next_review_at) continue
-    if (new Date(r.next_review_at).getTime() < now) {
-      map.set(r.discipline_id, (map.get(r.discipline_id) ?? 0) + 1)
-    }
-  }
-  return map
+  // Fase I.1 / decisão D6: as revisões vivem SOMENTE na página de Revisões e
+  // não alimentam o replanejamento. Esta função é mantida (a assinatura é usada
+  // pelo restante do replan) mas devolve um mapa vazio, sem consultar o banco.
+  //
+  // Comportamento idêntico ao de hoje: a consulta anterior filtrava por
+  // `deleted_at`/`is_suspended`, colunas que não existem em review_items no
+  // schema real — a consulta falhava e o mapa já saía vazio. A diferença é que
+  // agora isso é explícito, em vez de depender de um erro silencioso.
+  //
+  // Se algum dia as revisões forem integradas ao planejamento, isso é uma
+  // decisão de produto: precisa voltar com consulta paginada e filtros
+  // `suspended_at is null` / `archived_at is null`.
+  return new Map<string, number>()
 }
 
 async function loadExamDaysLeft(supabase: SupabaseClient, userId: string): Promise<number | null> {
@@ -555,14 +563,20 @@ export async function ensureDailyWindow(
   const existingDates = new Set(existing.map((b) => b.scheduled_date))
 
   // 1. Buscar meta semanal do perfil e preferência de início da semana
-  const { data: profile } = await supabase
+  // P1.1: erro de leitura propaga (throw) — nunca vira 20h silencioso.
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("weekly_study_hours, week_start_day, preferences")
     .eq("id", userId)
     .maybeSingle()
 
+  if (profileError) {
+    throw new Error(`ensure-window-unavailable: ${profileError.message ?? "profile read error"}`)
+  }
+
+  const profileWeekly = (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours
   const weeklyGoalHours =
-    (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours ?? 20
+    typeof profileWeekly === "number" && Number.isFinite(profileWeekly) ? profileWeekly : 20
   const weeklyGoalMinutes = weeklyGoalHours * 60
 
   const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
@@ -1515,7 +1529,7 @@ export async function pullPendingToToday(
   userId: string,
   disciplineId?: string,
   availability?: ReplanAvailability,
-): Promise<{ ok: boolean; message?: string; error?: string }> {
+): Promise<{ ok: boolean; message?: string; error?: string; reconcileOk?: boolean }> {
   try {
     const todayKey = todayKeyInSaoPaulo()
     const avail = availability ?? DEFAULT_AVAILABILITY
@@ -1622,12 +1636,21 @@ export async function pullPendingToToday(
     }
 
     // 6. Sincronizar planejamento semanal de forma consistente
+    // P1.1: falha aqui NÃO é "nada para reconciliar". Registra e sinaliza
+    // via reconcileOk (compat: campo novo opcional), sem reverter o pull.
     const { reconcileWeeklyPlan } = await import("@/application/study-plan/weekly-planner.service")
-    await reconcileWeeklyPlan(supabase, userId, avail).catch(() => null)
+    let reconcileOk = true
+    try {
+      await reconcileWeeklyPlan(supabase, userId, avail)
+    } catch (reconcileError) {
+      reconcileOk = false
+      Sentry.captureException(reconcileError, { extra: { feature: FEATURE, step: "pull_pending_reconcile" } })
+    }
 
     return {
       ok: true,
       message: `Pendência de ${disciplineNames.join(", ")} (${totalPulledMinutes}min) puxada para hoje com sucesso!`,
+      reconcileOk,
     }
   } catch (error) {
     Sentry.captureException(error, { extra: { feature: FEATURE, step: "pull_pending_to_today" } })

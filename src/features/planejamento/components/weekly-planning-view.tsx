@@ -27,9 +27,11 @@ import {
   getSavedScaleConfig,
   getStudyPlanDay,
   isDutyShiftDate,
+  REPLAN_UNAVAILABLE_MESSAGE,
   WEEKDAY_KEYS,
   type SharedPlanConfig,
 } from "@/features/planejamento/lib/study-plan-shared"
+import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { type StudyCycleBlock } from "./planning-view"
@@ -80,6 +82,9 @@ export function WeeklyPlanningView({
   })
 
   useEffect(() => {
+    // P1.5: banco é a fonte oficial; sincroniza uma vez (down-sync ou lazy
+    // migration) e o evento mentor_scale_updated atualiza este estado.
+    void syncPlanningPreferencesFromServer()
     const handleUpdate = () => {
       setScaleConfig(getSavedScaleConfig())
       const savedFirstDay = localStorage.getItem("mentor_user_first_day_of_week")
@@ -102,6 +107,8 @@ export function WeeklyPlanningView({
       return null
     }
   })
+  // P1.1: erro de leitura do ReplanInfo ≠ lista vazia. Mantém últimos dados e avisa.
+  const [replanError, setReplanError] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -113,13 +120,20 @@ export function WeeklyPlanningView({
           firstShiftDay: scaleConfig.firstShiftDay,
           anchorShiftDate: scaleConfig.anchorShiftDate || undefined,
         })
-        if (active && res.data) {
+        if (!active) return
+        if (res.data) {
           setReplanInfo(res.data)
+          setReplanError(false)
           try {
             localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
           } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
+        } else if (res.error) {
+          setReplanError(true)
         }
-      } catch { /* falha de rede ao buscar o replanejamento: mantém o último valor exibido */ }
+      } catch {
+        // P1.1: falha de rede ao buscar o replanejamento: mantém o último valor exibido + aviso.
+        if (active) setReplanError(true)
+      }
     }
     load()
     const handleSaved = () => {
@@ -221,10 +235,9 @@ export function WeeklyPlanningView({
         time: `${b.durationMinutes} min`,
         date: `Dia ${dayIdx}`,
         repeat: "Semanal",
-        topic:
-          b.origin === "REAJUSTE" || b.origin === "CRITICO"
-            ? "Reajuste Adaptativo"
-            : "Revisão e Questões",
+        // Fase H: sem tópico inventado — antes todo bloco do plano aparecia
+        // como "Revisão e Questões".
+        topic: b.origin === "REAJUSTE" || b.origin === "CRITICO" ? "Reajuste Adaptativo" : "",
         dayOfWeekIndex: dayIdx,
         completed: completedTaskIds[evtId] ?? b.completed,
         color: b.color || "#2563EB",
@@ -237,9 +250,11 @@ export function WeeklyPlanningView({
     setCompletedTaskIds((prev) => {
       const current = !prev[evtId]
       toast.success(
+        // Fase H: a marcação vale só nesta tela (não grava histórico nem meta);
+        // o texto antigo dizia "Meta diária atualizada".
         current
-          ? "Estudo concluído! Meta diária atualizada."
-          : "Estudo marcado como pendente.",
+          ? "Marcado como concluído nesta visualização."
+          : "Marcado como pendente nesta visualização.",
       )
       return { ...prev, [evtId]: current }
     })
@@ -250,7 +265,7 @@ export function WeeklyPlanningView({
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [formDiscipline, setFormDiscipline] = useState("")
   const [formTime, setFormTime] = useState("01:00")
-  const [formDate, setFormDate] = useState("02/08/2026")
+  const [formDate, setFormDate] = useState("")
   const [formRepeat, setFormRepeat] = useState("Não se repete")
   const [formTopic, setFormTopic] = useState("")
   const [formDayIndex, setFormDayIndex] = useState(0)
@@ -259,7 +274,11 @@ export function WeeklyPlanningView({
     setEditingEventId(null)
     setFormDiscipline("")
     setFormTime("01:00")
-    setFormDate(`0${dayIdx + 2}/08/2026`)
+    // Fase H: data REAL do dia clicado na semana exibida (antes uma string fixa
+    // "0X/08/2026").
+    const dayHeader = daysHeader.find((d) => d.dayIdx === dayIdx)
+    const [y, m, d] = (dayHeader?.dateStr ?? "").split("-")
+    setFormDate(y && m && d ? `${d}/${m}/${y}` : "")
     setFormRepeat("Não se repete")
     setFormTopic("")
     setFormDayIndex(dayIdx)
@@ -333,6 +352,12 @@ export function WeeklyPlanningView({
 
   return (
     <div className="space-y-6">
+      {/* P1.1: erro de leitura ≠ "sem planejamento". Aviso discreto, página segue. */}
+      {replanError && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+          {REPLAN_UNAVAILABLE_MESSAGE}
+        </div>
+      )}
       {/* Legenda de Status de Meta */}
       <div className="flex items-center justify-between bg-card border rounded-xl p-4 text-xs font-semibold">
         <span className="text-muted-foreground">Status da Meta Diária de Estudo:</span>

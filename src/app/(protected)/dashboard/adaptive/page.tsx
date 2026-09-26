@@ -1,10 +1,8 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
-import { Activity, History, ShieldAlert } from "lucide-react"
+import { Activity, History } from "lucide-react"
 
-import { calculateLearningHealthScore } from "@/application/adaptive-learning/adaptive-learning.service"
-import type { AnalyticsContext } from "@/application/adaptive-learning/adaptive-learning.service"
 import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
 import { Logo } from "@/components/ui/logo"
 import { createClient } from "@/infrastructure/supabase/server"
@@ -20,54 +18,12 @@ export default async function AdaptiveDashboardPage() {
   const effectiveUser = await getEffectiveSessionUser(supabase)
   if (!effectiveUser) redirect("/login")
 
-  // Buscar perfil e disciplinas reais do usuário
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("weekly_study_hours, streak_days")
-    .eq("id", effectiveUser.id)
-    .maybeSingle()
-
-  const { data: userDisciplines } = await supabase
-    .from("user_disciplines")
-    .select(
-      `
-      discipline_id,
-      disciplines ( id, name )
-    `,
-    )
-    .eq("user_id", effectiveUser.id)
-
-  const realDisciplines = (userDisciplines || []).map((ud) => {
-    const joined = ud.disciplines as unknown as { name?: string } | null
-    return {
-      id: ud.discipline_id,
-      name: joined?.name || "Disciplina",
-      weight: 2,
-      performanceScore: 70,
-      retentionRate: 75,
-      lapsesCount: 0,
-      daysSinceLastStudy: 0,
-    }
-  })
-
-  const realContext: AnalyticsContext = {
-    userId: effectiveUser.id,
-    disciplines: realDisciplines,
-    userStats: {
-      averageEnergy: 3,
-      weeklyHoursStudied: profile?.weekly_study_hours || 0,
-      currentStreak: profile?.streak_days || 0,
-      totalBacklogReviews: 0,
-    },
-  }
-
-  const lhs = calculateLearningHealthScore(realContext)
-
-  function scoreColor(score: number): string {
-    if (score >= 80) return "text-green-500"
-    if (score >= 50) return "text-amber-500"
-    return "text-red-500"
-  }
+  // Fase H: o "Learning Health Score" desta página era calculado com valores
+  // FIXOS (desempenho 70 e retenção 75 para toda disciplina, energia 3, sem
+  // backlog nem lapsos) — só a sequência e a meta semanal vinham do perfil. O
+  // número parecia personalizado sem ser. Não existe hoje fonte real de
+  // retenção (não há revisões registradas: review_items/review_history vazios),
+  // então a métrica fica oculta até existir cálculo real. O log abaixo é real.
 
   // Busca o histórico real da tabela adaptive_history
   const { data: history } = await supabase
@@ -118,72 +74,18 @@ export default async function AdaptiveDashboardPage() {
           </nav>
         </div>
 
-        {/* Termômetro LHS */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="border rounded-lg p-6 bg-card flex flex-col justify-between md:col-span-2 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-              <Activity className="h-48 w-48" />
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Activity className="h-5 w-5 text-indigo-500" /> Learning Health Score (LHS)
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Índice unificado de saúde do seu ecossistema de aprendizado.
-              </p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-between">
-              <div className="flex items-baseline gap-3">
-                <p className={`text-6xl font-semibold ${scoreColor(lhs.score)}`}>{lhs.score}</p>
-                <p className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full uppercase tracking-wider">
-                  {lhs.statusLabel}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t">
-              <div>
-                <p className="text-xs text-muted-foreground">Retenção</p>
-                <p className="font-semibold">{Math.round(lhs.components.retention)}%</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Performance</p>
-                <p className="font-semibold">{Math.round(lhs.components.performance)}%</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Consistência</p>
-                <p className="font-semibold">{Math.round(lhs.components.consistency)}%</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Energia (Burnout)</p>
-                <p className={`font-semibold ${lhs.burnoutRisk === "HIGH" ? "text-red-500" : ""}`}>
-                  {lhs.burnoutRisk}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border rounded-lg p-6 bg-card flex flex-col justify-center gap-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-red-500" /> Detecção de Risco
-            </h3>
-            {lhs.burnoutRisk === "HIGH" ? (
-              <div className="bg-red-50 text-red-900 p-4 rounded-md border border-red-100 text-sm">
-                <p className="font-semibold mb-1">Risco Crítico de Burnout</p>
-                <p>
-                  Volume de estudos excede sua capacidade atual de recuperação energética. O motor
-                  cortou 20% da carga horária gerada.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-green-50 text-green-900 p-4 rounded-md border border-green-100 text-sm">
-                <p className="font-semibold mb-1">Risco Baixo</p>
-                <p>Níveis de energia compatíveis com a carga horária atual.</p>
-              </div>
-            )}
-          </div>
+        {/* Fase H: o antigo termômetro "Learning Health Score" e o painel
+            "Detecção de Risco" usavam valores fixos (ver comentário acima) e
+            foram substituídos por este aviso até existir cálculo real. */}
+        <div className="border rounded-lg p-6 bg-card">
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <Activity className="h-5 w-5 text-muted-foreground" /> Saúde de aprendizado
+          </h3>
+          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+            Indisponível. Este índice dependia de medições de retenção por revisão que ainda não
+            existem para a sua conta, e por isso não é exibido. Nenhum número é mostrado aqui até
+            haver um cálculo feito com os seus dados.
+          </p>
         </div>
 
         {/* Histórico e Auditoria */}
@@ -194,6 +96,12 @@ export default async function AdaptiveDashboardPage() {
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
               Registro das intervenções do Adaptive Learning Engine no seu cronograma.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 max-w-3xl">
+              Nesses registros, &quot;retenção&quot; foi a taxa de acerto das suas sessões nos 90
+              dias anteriores à geração do cronograma; quando uma disciplina não tinha questões
+              registradas, o motor usou um valor padrão (50% ou 60%). A geração de cronograma
+              atual não registra novas intervenções.
             </p>
           </div>
           <div className="p-0">
@@ -211,8 +119,7 @@ export default async function AdaptiveDashboardPage() {
                 {displayHistory.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-xs text-muted-foreground">
-                      Nenhuma intervenção registrada ainda. O motor executará adaptações conforme
-                      você estuda.
+                      Nenhuma intervenção registrada.
                     </td>
                   </tr>
                 ) : (

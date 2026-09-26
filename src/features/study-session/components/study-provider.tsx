@@ -646,7 +646,6 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           // Avaliação (Cronograma)
           energy_level: (formData?.["energy_level"] as number) ?? null,
           interrupted: Boolean(formData?.["interrupted"]),
-          reviews_completed: (formData?.["reviews_completed"] as number) || 0,
           // Tempo calculado
           activeSeconds: session.activeSeconds,
           pausedSeconds: session.pausedSeconds,

@@ -54,18 +54,22 @@ describe("Auditoria de performance (queries redundantes / N+1)", () => {
     )
   })
 
-  it("getReviewDashboardSummary não duplica a query de review_history (era buscada duas vezes de forma idêntica)", () => {
+  it("a visão geral de Revisões lê review_history uma única vez (a retenção medida não é buscada duas vezes)", () => {
+    // Fase I.1: o antigo getReviewDashboardSummary deixou de existir junto com
+    // o resumo de revisões do Dashboard; a mesma garantia passou para
+    // getReviewsOverview, que é a única leitura da página de Revisões.
     const source = readSource("src/application/review-engine/review.service.ts")
-    const fnBody = extractTopLevelExport(source, "export async function getReviewDashboardSummary")
-    // Fase F.1: a leitura passou a ser paginada (fetchAllRowsPaged), então a
-    // consulta não está mais numa linha só; o que se verifica continua sendo
-    // UMA leitura de review_history na função.
-    const reviewHistoryQueryPattern = /\.from\("review_history"\)/g
-    const matches = fnBody.match(reviewHistoryQueryPattern) ?? []
+    const fnBody = extractTopLevelExport(source, "export async function getReviewsOverview")
+    const matches = fnBody.match(/repo\.recentGrades\(/g) ?? []
     assert.equal(
       matches.length,
       1,
-      `getReviewDashboardSummary deve buscar o histórico de revisões de 365 dias uma única vez (encontrado ${matches.length}x)`,
+      `getReviewsOverview deve ler o histórico de revisões uma única vez (encontrado ${matches.length}x)`,
+    )
+    assert.equal(
+      source.includes('.from("review_history")'),
+      false,
+      "o serviço não fala com o banco direto: quem conhece as colunas é review.repository.ts",
     )
   })
 

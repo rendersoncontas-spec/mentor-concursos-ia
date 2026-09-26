@@ -103,7 +103,7 @@ describe("Dashboard — histórico com metadata reduzido", () => {
     const used = new Set([...src.matchAll(/meta\["([a-z_]+)"\]/g)].map((m) => m[1]))
     assert.deepEqual([...used].sort(), [...DASHBOARD_METADATA_KEYS].sort())
     assert.ok(src.includes("getStudyHistoryForAnalytics(supabase, userId, 0, { metadataKeys: DASHBOARD_METADATA_KEYS })"))
-    for (const f of ["context", "aggregations", "heatmap", "rankings", "evolution", "goals", "insights"]) {
+    for (const f of ["context", "aggregations", "heatmap", "rankings", "evolution", "goals"]) {
       const engine = fs.readFileSync(path.join(process.cwd(), `src/application/study-analytics/${f}.ts`), "utf-8")
       assert.equal(/\bmetadata\b/.test(engine), false, `${f}.ts não deveria ler metadata`)
     }

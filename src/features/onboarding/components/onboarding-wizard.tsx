@@ -454,7 +454,7 @@ export function OnboardingWizard() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Isso ajudará a IA a montar um cronograma realista.
+                      Isso ajuda a montar um cronograma realista.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

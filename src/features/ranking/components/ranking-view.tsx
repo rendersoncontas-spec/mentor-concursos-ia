@@ -1340,9 +1340,9 @@ function RankRankingRow({
             </Badge>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground truncate">
-          {student.targetContest || "Concurseiro Focado"}
-        </p>
+        {/* Fase H: saiu a linha "targetContest" — o RPC sempre devolve a
+            constante "Global" (e o fallback era "Concurseiro Focado"), o que
+            parecia o concurso do aluno sem ser. */}
       </div>
 
       {/* Valor da Métrica */}
@@ -1377,11 +1377,18 @@ function GapLine({ icon, text }: { icon: ReactNode; text: string }) {
 ──────────────────────────────────────────────────────────────────────────────*/
 function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null }) {
   const goal = personal?.weeklyGoal
-  const achieved = goal ? formatGoalTime(goal.achievedMinutes) : "0h"
-  const target = goal ? formatGoalTime(goal.targetMinutes) : "20h"
-  const remaining = goal ? formatGoalTime(goal.remainingMinutes) : "—"
-  const percentage = goal?.percentage ?? 0
-  const done = !!goal && goal.remainingMinutes <= 0 && goal.achievedMinutes > 0
+  // Fase H: sem meta definida (ou sem dados) nada de "20h" inventado.
+  const hasGoal = !!goal && goal.targetMinutes !== null
+  const achieved = goal ? formatGoalTime(goal.achievedMinutes) : "—"
+  const target = hasGoal && goal.targetMinutes !== null ? formatGoalTime(goal.targetMinutes) : null
+  const remaining =
+    hasGoal && goal.remainingMinutes !== null ? formatGoalTime(goal.remainingMinutes) : "—"
+  const percentage = hasGoal ? (goal.percentage ?? 0) : 0
+  const done =
+    hasGoal && goal.remainingMinutes !== null && goal.remainingMinutes <= 0 && goal.achievedMinutes > 0
+  let goalStatusText = `Faltam ${remaining} para atingir a meta`
+  if (!hasGoal) goalStatusText = "Meta semanal não definida"
+  else if (done) goalStatusText = "Meta semanal atingida!"
 
   return (
     <section className="rounded-xl border bg-card p-5 space-y-4">
@@ -1396,7 +1403,7 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
               : "bg-primary/10 text-primary border border-primary/20"
           }`}
         >
-          {percentage}%
+          {hasGoal ? `${percentage}%` : "—"}
         </span>
       </div>
 
@@ -1404,10 +1411,12 @@ function WeeklyGoalCard({ personal }: { personal: RankingPersonalContext | null 
         <div>
           <p className="text-2xl sm:text-3xl font-semibold text-foreground leading-none tabular-nums">
             {achieved}
-            <span className="text-xs text-muted-foreground font-semibold ml-1">/ {target}</span>
+            {target && (
+              <span className="text-xs text-muted-foreground font-semibold ml-1">/ {target}</span>
+            )}
           </p>
           <p className="text-[11px] text-muted-foreground font-medium mt-1">
-            {done ? "Meta semanal atingida!" : `Faltam ${remaining} para atingir a meta`}
+            {goalStatusText}
           </p>
         </div>
       </div>

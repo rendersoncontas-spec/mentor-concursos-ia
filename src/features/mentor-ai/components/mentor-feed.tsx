@@ -7,14 +7,20 @@ interface MentorFeedProps {
 }
 
 export function MentorFeed({ response }: MentorFeedProps) {
-  const { globalScore, feed } = response
-
-  let trendLabel = "Estável"
-  if (globalScore.trend === "UP") {
-    trendLabel = "Melhorando"
-  } else if (globalScore.trend === "DOWN") {
-    trendLabel = "Caindo"
-  }
+  // Fase H: o "Índice Geral de Aprendizado" e a tendência deixaram de ser
+  // exibidos — o índice era a média de 5 componentes em que 3 (desempenho,
+  // retenção e questões) vinham de `overallAccuracy`, fixo em 0, e a tendência
+  // era sempre "STABLE".
+  //
+  // Fase I.6 (M1): eles também deixaram de EXISTIR. O Global Score saiu do
+  // contrato do Mentor e não é mais gravado em `mentor_history`. Só as
+  // observações abaixo, vindas de dado real, chegam aqui.
+  const { feed } = response
+  const isEmpty =
+    feed.now.length === 0 &&
+    feed.today.length === 0 &&
+    feed.week.length === 0 &&
+    feed.longTerm.length === 0
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
@@ -24,17 +30,20 @@ export function MentorFeed({ response }: MentorFeedProps) {
           <h1 className="type-h1 text-foreground">
             Análise de desempenho
           </h1>
-          <p className="text-muted-foreground text-lg mt-1 flex items-center gap-2">
-            Índice Geral de Aprendizado:{" "}
-            <strong className="text-foreground">{globalScore.score}</strong>
-            <span className="text-sm font-medium bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
-              {trendLabel}
-            </span>
+          <p className="text-muted-foreground mt-1">
+            Observações calculadas a partir das suas sessões dos últimos 30 dias.
           </p>
         </div>
       </div>
 
       <div className="space-y-12">
+        {isEmpty && (
+          <p className="text-muted-foreground">
+            Nenhuma observação no momento. Elas aparecem quando os seus registros indicam algo
+            relevante (por exemplo, a energia média informada nas sessões).
+          </p>
+        )}
+
         {/* AGORA */}
         {feed.now.length > 0 && (
           <section>

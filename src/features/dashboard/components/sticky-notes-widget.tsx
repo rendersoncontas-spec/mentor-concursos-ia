@@ -114,7 +114,8 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
   const [isMinimized, setIsMinimized] = useState(false)
   const [isPinned, setIsPinned] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved")
-  const [lastSavedText, setLastSavedText] = useState<string>("Salvo agora")
+  // Fase H: começa vazio — "Salvo agora" aparecia antes de qualquer salvamento.
+  const [lastSavedText, setLastSavedText] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState("")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
@@ -312,7 +313,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
     toast.success(nextPinned ? "Nota fixada no topo!" : "Nota desfixada.")
   }
 
-  const handleCreateNewNote = () => {
+  const handleCreateNewNote = async () => {
     const newId = crypto.randomUUID()
     const newNote: UserNote = {
       id: newId,
@@ -337,8 +338,10 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
     try {
       localStorage.setItem(LOCAL_STORAGE_ACTIVE_ID, newId)
     } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
-    void saveUserNoteAction(newNote)
-    toast.success("Nova nota criada!")
+    // Fase H: só confirma depois que o servidor confirmou.
+    const res = await saveUserNoteAction(newNote)
+    if (res.success) toast.success("Nova nota criada!")
+    else toast.error("A nota foi criada nesta tela, mas não foi salva no servidor.")
   }
 
   const handleDeleteNote = async () => {
@@ -366,11 +369,12 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
         }
       }
     } else {
-      handleCreateNewNote()
+      void handleCreateNewNote()
     }
 
-    await deleteUserNoteAction(idToDelete)
-    toast.success("Nota excluída com sucesso.")
+    const res = await deleteUserNoteAction(idToDelete)
+    if (res.success) toast.success("Nota excluída com sucesso.")
+    else toast.error("Não foi possível excluir a nota no servidor.")
   }
 
   // Executar comandos de formatação com document.execCommand
@@ -846,7 +850,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
                   <span>Salvando...</span>
                 </>
               )}
-              {saveStatus === "saved" && (
+              {saveStatus === "saved" && lastSavedText && (
                 <>
                   <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                   <span>{lastSavedText}</span>

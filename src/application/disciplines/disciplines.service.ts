@@ -297,6 +297,50 @@ export interface DisciplinesPageData {
   }[]
 }
 
+/**
+ * Tópicos estudados de uma disciplina = total de tópicos do edital × domínio
+ * (mastery_level 0-100). Regra única, usada pela página Disciplinas e pela
+ * cobertura do edital das Conquistas (Fase H).
+ */
+export function topicsStudiedFromMastery(topicsTotal: number, masteryLevel: number | null | undefined): number {
+  return topicsTotal > 0 ? Math.round((topicsTotal * (masteryLevel ?? 0)) / 100) : 0
+}
+
+/**
+ * Fase H — cobertura do edital ativo com a MESMA regra da página Disciplinas
+ * (tópicos do edital × domínio de cada disciplina). `topicsTotal = 0` quando
+ * não há edital com tópicos cadastrados: aí não existe cobertura a medir.
+ */
+export async function getEditalTopicCoverage(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ topicsTotal: number; topicsStudied: number }> {
+  const { data: rawTarget } = await supabase
+    .from("user_targets")
+    .select("id, exam_id")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle()
+  if (!rawTarget?.exam_id) return { topicsTotal: 0, topicsStudied: 0 }
+
+  const [userDisciplines, edital] = await Promise.all([
+    getUserDisciplines(supabase, userId, rawTarget.id),
+    getExamEdital(supabase, rawTarget.exam_id),
+  ])
+  const topicsByDiscipline = new Map<string, number>()
+  edital?.disciplines?.forEach((d) => topicsByDiscipline.set(d.id, d.subjects?.length || 0))
+
+  let topicsTotal = 0
+  let topicsStudied = 0
+  for (const ud of userDisciplines) {
+    const total = topicsByDiscipline.get(ud.discipline_id) || 0
+    topicsTotal += total
+    topicsStudied += topicsStudiedFromMastery(total, ud.mastery_level)
+  }
+  return { topicsTotal, topicsStudied }
+}
+
 export async function getDisciplinesPageData(
   supabase: SupabaseClient,
   userId: string,
@@ -418,8 +462,7 @@ export async function getDisciplinesPageData(
     const topicsTotal = topicsByDiscipline.get(discId) || 0
 
     // Tópicos estudados baseado no mastery_level (0-100) aplicado ao total
-    const mastery = ud.mastery_level ?? 0
-    const topicsStudied = topicsTotal > 0 ? Math.round((topicsTotal * mastery) / 100) : 0
+    const topicsStudied = topicsStudiedFromMastery(topicsTotal, ud.mastery_level)
 
     grandTotalTopics += topicsTotal
     grandTotalTopicsStudied += topicsStudied

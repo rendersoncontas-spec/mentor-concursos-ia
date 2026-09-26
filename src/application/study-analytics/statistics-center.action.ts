@@ -1,12 +1,12 @@
 "use server"
 
+import { activeReviewItemsOnly } from "@/application/review-engine/review.repository"
 import { createClient } from "@/infrastructure/supabase/server"
 import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import { fetchAllPagesInParallel, type PageResult } from "@/lib/parallel-pagination"
 import {
-  sanitizeSession,
   sanitizeAttempt,
   sanitizeDisciplineMeta,
   sanitizeUserDiscipline,
@@ -18,6 +18,7 @@ import {
   type ReviewItemRow,
   type ActivePlan,
 } from "./engine/stats-engine"
+import { toStudySessions } from "./study-sessions-read"
 
 // ─── Cache em memória (TTL 5 minutos) ──────────────────────────────────────
 // Invalidação explícita via invalidateStatisticsCenterCache() após mutações,
@@ -33,13 +34,40 @@ const cache = new Map<string, CacheEntry>()
 
 export interface StatisticsCenterPayload {
   sessions: SessionRecord[]
-  attempts: QuestionAttemptRecord[]
-  disciplines: DisciplineMeta[]
-  userDisciplines: UserDisciplineInput[]
-  reviewItems: ReviewItemRow[]
-  reviewsCompletedLast30: number
+  /**
+   * Tentativas de questões. `null` = a leitura FALHOU (Fase I.8). Antes, erro
+   * virava `[]` e a página dizia "Sem questões registradas no período" — a mesma
+   * tela de quem nunca respondeu questão nenhuma.
+   */
+  attempts: QuestionAttemptRecord[] | null
+  /**
+   * Disciplinas do aluno e o status de cada uma no edital. As duas saem da mesma
+   * consulta, então falham juntas: `null` = a leitura falhou (Fase I.8); `[]` =
+   * o banco respondeu e o aluno não tem disciplinas cadastradas.
+   */
+  disciplines: DisciplineMeta[] | null
+  userDisciplines: UserDisciplineInput[] | null
+  /**
+   * Itens de revisão ativos. `null` = a leitura FALHOU (Fase I.6, achado M3):
+   * antes, erro virava lista vazia e a página dizia "Sem revisões". Lista vazia
+   * agora significa só uma coisa: o aluno não tem itens.
+   */
+  reviewItems: ReviewItemRow[] | null
+  /** Revisões respondidas nos últimos 30 dias. `null` = a leitura falhou. */
+  reviewsCompletedLast30: number | null
   activePlan: ActivePlan | null
-  weekStartDay?: number
+  /**
+   * `true` quando a leitura do plano falhou (Fase I.8). Sem isto, `activePlan:
+   * null` significava ao mesmo tempo "não tem plano ativo" e "não deu para
+   * consultar o plano", e a tela afirmava a primeira das duas.
+   */
+  activePlanError: boolean
+  /**
+   * Dia em que a semana começa, por preferência do aluno. `null` = a preferência
+   * não pôde ser lida (Fase I.8) — diferente de "nunca configurou", que é o
+   * domingo padrão do produto.
+   */
+  weekStartDay?: number | null
 }
 
 // Limite de segurança: 50.000 sessões carregadas por usuário (muito acima do
@@ -88,8 +116,24 @@ export async function invalidateStatisticsCenterCache(userId?: string): Promise<
   }
 }
 
-async function fetchActivePlan(supabase: Supabase, userId: string): Promise<ActivePlan | null> {
-  const { data: plan } = await supabase
+/**
+ * Plano de estudo ativo.
+ *
+ * Fase I.8: o retorno passou a ser `{ plan } | null`, com o `null` EXTERNO
+ * significando "a consulta falhou". Antes as três leituras aqui dentro
+ * descartavam o `error` e qualquer falha saía como `null`, indistinguível de
+ * "este aluno não tem plano ativo" — e a tela afirmava justamente isso.
+ *
+ * As três contam como falha: sem `study_plans` não se sabe se há plano; sem
+ * `study_plan_items` não dá para montar a grade; e sem `profiles` a meta semanal
+ * cairia silenciosamente na soma dos blocos, exibindo um número diferente do que
+ * o aluno configurou sob o rótulo "Meta semanal".
+ */
+async function fetchActivePlan(
+  supabase: Supabase,
+  userId: string,
+): Promise<{ plan: ActivePlan | null } | null> {
+  const { data: plan, error: planError } = await supabase
     .from("study_plans")
     .select("id, active")
     .eq("user_id", userId)
@@ -98,12 +142,21 @@ async function fetchActivePlan(supabase: Supabase, userId: string): Promise<Acti
     .limit(1)
     .maybeSingle()
 
-  if (!plan) return null
+  if (planError) {
+    console.error("[ESTATISTICAS] Erro ao carregar o plano ativo:", planError)
+    return null
+  }
+  if (!plan) return { plan: null }
 
-  const { data: items } = await supabase
+  const { data: items, error: itemsError } = await supabase
     .from("study_plan_items")
     .select("day_of_week, duration_minutes, discipline_id")
     .eq("study_plan_id", plan.id)
+
+  if (itemsError) {
+    console.error("[ESTATISTICAS] Erro ao carregar os blocos do plano:", itemsError)
+    return null
+  }
 
   const planItems = (items ?? [])
     .map((it) => ({
@@ -113,14 +166,21 @@ async function fetchActivePlan(supabase: Supabase, userId: string): Promise<Acti
     }))
     .filter((it) => it.durationMinutes > 0)
 
-  if (planItems.length === 0) return null
+  // Plano sem nenhum bloco com duração é, para esta tela, o mesmo que não ter
+  // plano: não há grade para comparar com o realizado.
+  if (planItems.length === 0) return { plan: null }
 
   // Busca as metas configuradas pelo usuário no perfil
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("weekly_study_hours, weekly_questions_goal, weekly_study_days_goal")
     .eq("id", userId)
     .maybeSingle()
+
+  if (profileError) {
+    console.error("[ESTATISTICAS] Erro ao carregar as metas do perfil:", profileError)
+    return null
+  }
 
   // Carga semanal em HORAS:
   // Se o usuário tem weekly_study_hours no perfil (ex: 25h), usamos esse valor exato.
@@ -132,10 +192,12 @@ async function fetchActivePlan(supabase: Supabase, userId: string): Promise<Acti
     : calculatedHours
 
   return {
-    weeklyHours: weeklyHours && weeklyHours > 0 ? weeklyHours : null,
-    weeklyQuestions: profile?.weekly_questions_goal ?? null,
-    weeklyDays: profile?.weekly_study_days_goal ?? null,
-    items: planItems,
+    plan: {
+      weeklyHours: weeklyHours && weeklyHours > 0 ? weeklyHours : null,
+      weeklyQuestions: profile?.weekly_questions_goal ?? null,
+      weeklyDays: profile?.weekly_study_days_goal ?? null,
+      items: planItems,
+    },
   }
 }
 
@@ -151,44 +213,22 @@ const SESSION_SELECT = `
         disciplines ( id, name, area )
       `
 
-function mapSessionRow(row: Record<string, unknown>): SessionRecord | null {
-  const disc = Array.isArray(row["disciplines"]) ? row["disciplines"][0] : row["disciplines"]
-  return sanitizeSession({
-    id: row["id"] as string,
-    discipline_id: (row["discipline_id"] as string) ?? null,
-    discipline_name: (disc as { name?: string } | null)?.name ?? null,
-    discipline_area: (disc as { area?: string | null } | null)?.area ?? null,
-    started_at: row["started_at"] as string,
-    finished_at: (row["finished_at"] as string | null) ?? null,
-    duration_minutes: row["duration_minutes"] as number | null,
-    active_minutes: row["active_minutes"] as number | null,
-    paused_minutes: row["paused_minutes"] as number | null,
-    planned_minutes: row["planned_minutes"] as number | null,
-    completed: row["completed"] as boolean,
-    interrupted: row["interrupted"] as boolean,
-    energy_level: (row["energy_level"] as number | null) ?? null,
-    difficulty: (row["difficulty"] as number | null) ?? null,
-    focus_score: (row["focus_score"] as number | null) ?? null,
-    study_type: (row["study_type"] as string | null) ?? null,
-    study_source: (row["study_source"] as string | null) ?? null,
-    notes: (row["notes"] as string | null) ?? null,
-    metadata: (row["metadata"] as Record<string, unknown>) ?? {},
-    pages_read: (row["metadata"] as Record<string, unknown> | null)?.["pages_read"],
-    questions_answered: (row["metadata"] as Record<string, unknown> | null)?.["questions_answered"],
-    questions_correct: (row["metadata"] as Record<string, unknown> | null)?.["questions_correct"],
-    flashcards_reviewed: (row["metadata"] as Record<string, unknown> | null)?.["flashcards_reviewed"],
-    topic_name: (row["metadata"] as Record<string, unknown> | null)?.["topic_name"],
-    focus_percentage: (row["metadata"] as Record<string, unknown> | null)?.["focus_percentage"],
-  }, !!row["origin_source"])
-}
-
 // 1. Sessões de estudo (a fonte primária de dados).
 //    Carregamos TODAS as sessões do usuário (sem filtro de data) para
 //    permitir o período "Tudo" nas Estatísticas — o filtro acontecerá no
 //    cliente. Paginamos porque o PostgREST limita ~1000 linhas por
 //    requisição; Fase F: páginas em paralelo após a primeira (que traz a
 //    contagem) e "id" desempatando started_at iguais entre páginas.
-async function loadSessions(supabase: Supabase, userId: string): Promise<SessionRecord[]> {
+//
+//    Fase I.7: esta leitura devolve `null` quando a consulta FALHA, e nunca uma
+//    lista. O motivo é mais forte do que o padrão geral de erro-não-é-zero: a
+//    paginação devolve, junto com o erro, as páginas que já tinham chegado. Com
+//    o comportamento anterior, uma falha na 3ª de 12 páginas produzia um
+//    histórico PARCIAL que a página tratava como completo — total de horas,
+//    sequência de dias, mapa de calor e horas por disciplina todos menores do
+//    que a realidade, sem nenhum aviso. Lista vazia agora significa uma coisa
+//    só: o banco respondeu e o aluno não tem sessões registradas.
+async function loadSessions(supabase: Supabase, userId: string): Promise<SessionRecord[] | null> {
   try {
     const { data: rows, error } = await fetchAllPagesInParallel<Record<string, unknown>>(
       (from, to, withCount) =>
@@ -202,17 +242,29 @@ async function loadSessions(supabase: Supabase, userId: string): Promise<Session
       { pageSize: 1000, maxRows: SESSIONS_LIMIT, perfLabel: "study_history.estatisticas" },
     )
     if (error) console.error("[ESTATISTICAS] Erro ao carregar study_history:", error)
-    // Mesmo comportamento de antes em caso de erro: segue com o que já leu.
-    return rows.map(mapSessionRow).filter((s): s is SessionRecord => s !== null)
+    // A decisão erro-não-é-lista mora em toStudySessions (regra única, testada
+    // por comportamento): erro → null, inclusive descartando páginas parciais.
+    return toStudySessions({ data: rows, error })
   } catch (err) {
     console.error("[ESTATISTICAS] Falha em study_history:", err)
-    return []
+    return null
   }
 }
 
-async function loadAttempts(supabase: Supabase, effectiveUserId: string): Promise<QuestionAttemptRecord[]> {
-  // 2. Tentativas de questões (disciplina vem do join com questions).
-  let attempts: QuestionAttemptRecord[] = []
+/**
+ * 2. Tentativas de questões (disciplina vem do join com questions).
+ *
+ * Fase I.8: devolve `null` quando a leitura falha. Antes, o erro era registrado
+ * no console e a função devolvia `[]` — a página mostrava "Sem questões
+ * registradas no período" e a acurácia sumia, exatamente como para quem nunca
+ * respondeu questão. `[]` agora significa só: o banco respondeu e não há
+ * tentativa registrada.
+ */
+async function loadAttempts(
+  supabase: Supabase,
+  effectiveUserId: string,
+): Promise<QuestionAttemptRecord[] | null> {
+  let attempts: QuestionAttemptRecord[] | null = null
   try {
     // Fase F.1: `.limit(ATTEMPTS_LIMIT)` não passava de 1.000 (corte do
     // PostgREST). Agora paginado até o teto pretendido, mais recentes primeiro.
@@ -256,13 +308,25 @@ async function loadAttempts(supabase: Supabase, effectiveUserId: string): Promis
   return attempts
 }
 
+/**
+ * 3. Registro de disciplinas + user_disciplines (status do edital).
+ *
+ * Fase I.8: `null` quando a leitura falha — e as duas listas falham juntas
+ * porque saem da mesma consulta. Antes, o erro devolvia duas listas vazias e a
+ * cobertura do edital dizia "Adicione um concurso (edital)" a quem já tem
+ * edital cadastrado.
+ *
+ * A falha NÃO derruba a página: os nomes de disciplina exibidos nas demais
+ * seções vêm do join das próprias sessões, então só a seção que é sobre o
+ * edital fica indisponível.
+ */
 async function loadDisciplines(
   supabase: Supabase,
   effectiveUserId: string,
-): Promise<{ userDisciplines: UserDisciplineInput[]; disciplines: DisciplineMeta[] }> {
-  // 3. Registro de disciplinas + user_disciplines (status do edital).
+): Promise<{ userDisciplines: UserDisciplineInput[]; disciplines: DisciplineMeta[] } | null> {
   let userDisciplines: UserDisciplineInput[] = []
   let disciplines: DisciplineMeta[] = []
+  let lida = false
   try {
     // Concurso ativo e user_disciplines são independentes: saem juntos.
     const loadActiveTargetId = async (): Promise<string | null> => {
@@ -304,30 +368,47 @@ async function loadDisciplines(
           })
         })
         .filter((d): d is DisciplineMeta => d !== null)
+      lida = true
     } else {
       console.error("[ESTATISTICAS] Erro ao carregar user_disciplines:", udError)
     }
   } catch (err) {
     console.error("[ESTATISTICAS] Falha em user_disciplines:", err)
   }
-  return { userDisciplines, disciplines }
+  return lida ? { userDisciplines, disciplines } : null
 }
 
-async function loadReviewItems(supabase: Supabase, effectiveUserId: string): Promise<ReviewItemRow[]> {
+async function loadReviewItems(
+  supabase: Supabase,
+  effectiveUserId: string,
+): Promise<ReviewItemRow[] | null> {
   // 4. Itens de revisão (estágio da memória) e itens concluídos em 30 dias.
-  let reviewItems: ReviewItemRow[] = []
+  //
+  // Fase I.6 (M3): `null` quando a consulta não responde. Erro aqui não pode
+  // virar "nenhum item de revisão" — é a mesma regra que a Fase I.5 aplicou na
+  // página de Revisões, agora neste módulo, que é independente.
+  let reviewItems: ReviewItemRow[] | null = null
   try {
     // Fase F.1: paginado (antes 1 requisição cortada em 1.000 linhas).
+    //
+    // Fase I.3: só itens ATIVOS, pela mesma regra da fila de Revisões
+    // (activeReviewItemsOnly). Antes daqui a consulta trazia tudo, então um
+    // tópico suspenso ou arquivado saía da fila de Revisões mas continuava
+    // contando como "revisão pendente" nas Estatísticas — dois números
+    // diferentes para a mesma pergunta. A regra vive num único lugar
+    // (review.repository.ts); aqui ela é aplicada, não repetida.
     const { data: reviewRows, error: reviewError } = await fetchAllRowsPaged<{
       id: string
       discipline_id: string | null
       next_review_at: string | null
     }>(
       (withCount) =>
-        supabase
-          .from("review_items")
-          .select("id, discipline_id, next_review_at", countOption(withCount))
-          .eq("user_id", effectiveUserId),
+        activeReviewItemsOnly(
+          supabase
+            .from("review_items")
+            .select("id, discipline_id, next_review_at", countOption(withCount))
+            .eq("user_id", effectiveUserId),
+        ),
       [{ column: "id", ascending: true }],
     )
 
@@ -350,42 +431,76 @@ async function loadReviewItems(supabase: Supabase, effectiveUserId: string): Pro
   return reviewItems
 }
 
-async function loadReviewsCompletedLast30(supabase: Supabase, effectiveUserId: string): Promise<number> {
+
+
+/**
+ * Revisões respondidas nos últimos 30 dias. `null` = a contagem falhou.
+ *
+ * Fase I.6 (M3): esta função nem conferia o `error` do PostgREST — qualquer falha
+ * saía como `0` e a página exibia "Concluídas 30d: 0", indistinguível de um aluno
+ * que realmente não revisou nada.
+ */
+async function loadReviewsCompletedLast30(
+  supabase: Supabase,
+  effectiveUserId: string,
+): Promise<number | null> {
   const last30 = new Date()
   last30.setDate(last30.getDate() - 30)
-  let reviewsCompletedLast30 = 0
   try {
-    const { count } = await supabase
+    const { count, error } = await supabase
       .from("review_history")
       .select("id", { count: "exact", head: true })
       .eq("user_id", effectiveUserId)
       .gte("review_date", last30.toISOString())
-    reviewsCompletedLast30 = count ?? 0
-  } catch {
-    reviewsCompletedLast30 = 0
+    if (error) {
+      console.error("[ESTATISTICAS] Erro ao contar revisões dos últimos 30 dias:", error)
+      return null
+    }
+    return count ?? 0
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha ao contar revisões dos últimos 30 dias:", err)
+    return null
   }
-  return reviewsCompletedLast30
 }
 
-async function loadActivePlan(supabase: Supabase, effectiveUserId: string): Promise<ActivePlan | null> {
-  // 5. Plano de estudo ativo e preferências do perfil.
-  let activePlan: ActivePlan | null = null
+async function loadActivePlan(
+  supabase: Supabase,
+  effectiveUserId: string,
+): Promise<{ plan: ActivePlan | null } | null> {
+  // 5. Plano de estudo ativo. `null` externo = não foi possível consultar.
   try {
-    activePlan = await fetchActivePlan(supabase, effectiveUserId)
+    return await fetchActivePlan(supabase, effectiveUserId)
   } catch (err) {
     console.error("[ESTATISTICAS] Falha no plano de estudo:", err)
+    return null
   }
-  return activePlan
 }
 
-async function loadWeekStartDay(supabase: Supabase, effectiveUserId: string): Promise<number> {
+/**
+ * Dia em que a semana começa, por preferência do aluno.
+ *
+ * Fase I.8: `null` quando a preferência não pôde ser CONSULTADA. A regra da
+ * semana do produto não mudou — quem nunca configurou continua começando no
+ * domingo (0). O que mudou é que esse mesmo 0 deixou de ser usado para
+ * representar "a consulta falhou": são coisas diferentes, e a tela avisa quando
+ * está exibindo o padrão por falta de leitura, não por escolha do aluno.
+ */
+async function loadWeekStartDay(
+  supabase: Supabase,
+  effectiveUserId: string,
+): Promise<number | null> {
   let weekStartDay = 0
   try {
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("week_start_day, preferences")
       .eq("id", effectiveUserId)
       .maybeSingle()
+
+    if (error) {
+      console.error("[ESTATISTICAS] Erro ao carregar a preferência de início de semana:", error)
+      return null
+    }
 
     const prefs = profile?.preferences as Record<string, unknown> | null
     const firstDayPref = (prefs?.["firstDayOfWeek"] ?? prefs?.["primeiroDia"]) as string | undefined
@@ -401,6 +516,7 @@ async function loadWeekStartDay(supabase: Supabase, effectiveUserId: string): Pr
     }
   } catch (err) {
     console.error("[ESTATISTICAS] Falha ao carregar perfil:", err)
+    return null
   }
   return weekStartDay
 }
@@ -444,7 +560,25 @@ export async function getStatisticsCenterAction(): Promise<{
         loadActivePlan(supabase, effectiveUserId),
         loadWeekStartDay(supabase, effectiveUserId),
       ])
-    const { userDisciplines, disciplines } = disciplineData
+    // Fase I.8: as duas listas de disciplina saem da mesma consulta; `null`
+    // externo é falha de leitura, e nesse caso as duas ficam indisponíveis.
+    const userDisciplines = disciplineData?.userDisciplines ?? null
+    const disciplines = disciplineData?.disciplines ?? null
+
+    // Fase I.7: as sessões de estudo são a fonte primária da página inteira —
+    // horas, sequência, disciplinas, evolução e prioridades saem daí. Se essa
+    // leitura falhou, não existe página de estatísticas verdadeira para montar:
+    // devolvemos erro (a tela já tem o estado "Não foi possível carregar suas
+    // estatísticas" com botão de tentar novamente) em vez de uma página cheia de
+    // números menores do que a realidade. E, principalmente, NÃO gravamos no
+    // cache: um payload de falha ficaria servido por 5 minutos.
+    if (sessions === null) {
+      return {
+        data: null,
+        error: "Não foi possível carregar seu histórico de estudos. Tente novamente.",
+        cached: false,
+      }
+    }
 
     const payload: StatisticsCenterPayload = {
       sessions,
@@ -453,11 +587,25 @@ export async function getStatisticsCenterAction(): Promise<{
       userDisciplines,
       reviewItems,
       reviewsCompletedLast30,
-      activePlan,
+      activePlan: activePlan?.plan ?? null,
+      activePlanError: activePlan === null,
       weekStartDay,
     }
 
-    cache.set(effectiveUserId, { at: nowMs, payload })
+    // Fase I.8: o cache guarda snapshot ÍNTEGRO, nunca degradado. Um payload em
+    // que alguma leitura falhou é entregue ao aluno com os estados de erro
+    // corretos, mas não é gravado: se ficasse no cache, o "Tentar novamente"
+    // devolveria a mesma falha por 5 minutos, mesmo com o banco já respondendo.
+    const integro =
+      payload.attempts !== null &&
+      payload.disciplines !== null &&
+      payload.userDisciplines !== null &&
+      payload.reviewItems !== null &&
+      payload.reviewsCompletedLast30 !== null &&
+      !payload.activePlanError &&
+      payload.weekStartDay !== null
+
+    if (integro) cache.set(effectiveUserId, { at: nowMs, payload })
     return { data: payload, error: null, cached: false }
   } catch (error) {
     return { data: null, error: (error as { message?: string })?.message ?? "Erro inesperado.", cached: false }

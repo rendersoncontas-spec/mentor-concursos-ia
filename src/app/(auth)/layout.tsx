@@ -45,7 +45,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <ul className="space-y-3 border-t border-white/10 pt-6">
             {[
               "Ciclo rotativo de estudos com metas por matéria",
-              "Revisões espaçadas agendadas automaticamente",
+              // Fase H: antes "Revisões espaçadas agendadas automaticamente" —
+              // nenhum fluxo atual cria revisões a partir das sessões.
+              "Histórico completo, com filtros e importação",
               "Edital verticalizado com acompanhamento por tópico",
               "Registro de estudos e análise de desempenho",
             ].map((feature, i) => (

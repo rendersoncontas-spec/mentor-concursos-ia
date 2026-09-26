@@ -188,7 +188,9 @@ export function PublicStudyProfileModal({
                   )}
                 </div>
                 <DialogDescription className="text-xs text-muted-foreground truncate mt-0.5">
-                  {profile?.targetContest || "Concurseiro Focado"}
+                  {/* Fase H: antes `targetContest` — constante "Concurseiro", não o
+                      concurso do aluno. */}
+                  Perfil de estudo
                 </DialogDescription>
               </div>
             </div>

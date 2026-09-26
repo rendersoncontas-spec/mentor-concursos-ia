@@ -22,21 +22,25 @@ function getDashboardLayoutConfig(): WidgetConfigItem[] {
     { widget_id: "tempo_estudo", position_order: 4, col_span: 1 as const, visible: true },
     { widget_id: "constancia", position_order: 5, col_span: 1 as const, visible: true },
     // 3) Próxima ação
-    { widget_id: "revisoes", position_order: 6, col_span: 1 as const, visible: true },
-    { widget_id: "metas_estudo", position_order: 7, col_span: 2 as const, visible: true },
+    // Fase I.2 / decisão D6: o widget "revisoes" saiu do Dashboard — revisões
+    // vivem somente na página /dashboard/reviews. Quem já tinha esse widget
+    // salvo em user_dashboard_layouts / profiles.preferences não precisa de
+    // migração: o id deixou de existir no WIDGET_REGISTRY e o Dashboard
+    // simplesmente não renderiza nada para ele (a linha salva é ignorada).
+    { widget_id: "metas_estudo", position_order: 6, col_span: 2 as const, visible: true },
     // 4) Desempenho
-    { widget_id: "desempenho", position_order: 8, col_span: 2 as const, visible: true },
-    { widget_id: "desempenho_materia", position_order: 9, col_span: 3 as const, visible: true },
-    { widget_id: "questoes", position_order: 10, col_span: 1 as const, visible: true },
-    { widget_id: "ranking", position_order: 11, col_span: 1 as const, visible: true },
+    { widget_id: "desempenho", position_order: 7, col_span: 2 as const, visible: true },
+    { widget_id: "desempenho_materia", position_order: 8, col_span: 3 as const, visible: true },
+    { widget_id: "questoes", position_order: 9, col_span: 1 as const, visible: true },
+    { widget_id: "ranking", position_order: 10, col_span: 1 as const, visible: true },
     // 5) Planejamento
-    { widget_id: "calendario", position_order: 12, col_span: 2 as const, visible: true },
-    { widget_id: "data_prova", position_order: 13, col_span: 1 as const, visible: true },
+    { widget_id: "calendario", position_order: 11, col_span: 2 as const, visible: true },
+    { widget_id: "data_prova", position_order: 12, col_span: 1 as const, visible: true },
     // 6) Informações secundárias
-    { widget_id: "conquistas", position_order: 14, col_span: 1 as const, visible: true },
-    { widget_id: "ultimas_atividades", position_order: 15, col_span: 1 as const, visible: true },
-    { widget_id: "lembretes", position_order: 16, col_span: 1 as const, visible: true },
-    { widget_id: "mensagem_dia", position_order: 17, col_span: 2 as const, visible: true },
+    { widget_id: "conquistas", position_order: 13, col_span: 1 as const, visible: true },
+    { widget_id: "ultimas_atividades", position_order: 14, col_span: 1 as const, visible: true },
+    { widget_id: "lembretes", position_order: 15, col_span: 1 as const, visible: true },
+    { widget_id: "mensagem_dia", position_order: 16, col_span: 2 as const, visible: true },
   ]
 }
 
@@ -134,11 +138,18 @@ export async function saveDashboardLayoutAction(
       updated_at: new Date().toISOString(),
     }))
 
+    // Fase H: o supabase-js devolve `{ error }` em vez de lançar exceção, e
+    // antes nenhum dos dois salvamentos era conferido — a tela dizia "Home
+    // personalizada com sucesso!" mesmo se nada fosse gravado. Agora o layout
+    // conta como salvo quando PELO MENOS UM dos dois destinos confirmou.
+    let savedSomewhere = false
+
     // 1. Tenta salvar na tabela user_dashboard_layouts
     try {
-      await supabase
+      const { error } = await supabase
         .from("user_dashboard_layouts")
         .upsert(recordsToUpsert, { onConflict: "user_id,widget_id" })
+      if (!error) savedSomewhere = true
     } catch {
       // Ignora se tabela não existir
     }
@@ -152,7 +163,7 @@ export async function saveDashboardLayoutAction(
         .maybeSingle()
 
       const currentPrefs = (profile?.preferences as Record<string, unknown>) || {}
-      await supabase
+      const { error } = await supabase
         .from("profiles")
         .update({
           preferences: {
@@ -161,10 +172,15 @@ export async function saveDashboardLayoutAction(
           },
         })
         .eq("id", effectiveUserId)
+      if (!error) savedSomewhere = true
+      else console.warn("Aviso ao salvar layout em profiles.preferences:", error)
     } catch (prefErr) {
       console.warn("Aviso ao salvar layout em profiles.preferences:", prefErr)
     }
 
+    if (!savedSomewhere) {
+      return { success: false, error: "Não foi possível salvar a personalização." }
+    }
     return { success: true }
   } catch (err) {
     console.error("Erro em saveDashboardLayoutAction:", err)

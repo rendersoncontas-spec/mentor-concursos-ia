@@ -31,7 +31,49 @@ export interface ReconcileAvailability {
 const DEFAULT_AVAILABILITY: ReconcileAvailability = {
   studyDays: ["seg", "ter", "qua", "qui", "sex", "sab", "dom"],
   scheduleMode: "normal",
+  // P1.1 — fallback TÉCNICO de compatibilidade (terça=2), não preferência real.
+  // Usado só para montar âncora quando o usuário não configurou nada.
+  // Nunca apresentar "terça-feira" como escolha do usuário.
   firstShiftDay: 2,
+}
+
+/**
+ * P1.1 — default legítimo de produto para o resumo semanal (20h).
+ * Vale SOMENTE para ausência real de meta. Erro de leitura deve propagar
+ * (throw), nunca cair neste default. Na UI, apresentar como "valor sugerido".
+ */
+export const PRODUCT_SUGGESTED_WEEKLY_HOURS = 20
+
+/** P1.1 — espelho documentado do fallback técnico de firstShiftDay. */
+export const TECHNICAL_FALLBACK_FIRST_SHIFT_DAY = 2
+
+/** P1.1 — origem da meta semanal: real configurada vs sugerida pelo produto. */
+export type WeeklyGoalSource = "configured" | "suggested"
+
+/**
+ * P1.1 — resolve a meta semanal separando real/ausência.
+ * Retorna horas + origem. Não trata erro (erro deve fazer throw no chamador).
+ */
+export function resolveWeeklyGoalHours(
+  weeklyStudyHours: number | null | undefined,
+): { hours: number; source: WeeklyGoalSource } {
+  if (typeof weeklyStudyHours === "number" && Number.isFinite(weeklyStudyHours)) {
+    return { hours: weeklyStudyHours, source: "configured" }
+  }
+  return { hours: PRODUCT_SUGGESTED_WEEKLY_HOURS, source: "suggested" }
+}
+
+/**
+ * P1.1 — resolve o primeiro dia de plantão separando real/fallback.
+ * Ausência → fallback técnico (2) com source explícito, nunca como preferência.
+ */
+export function resolveFirstShiftDay(
+  firstShiftDay: number | null | undefined,
+): { value: number; source: "configured" | "technical-fallback" } {
+  if (typeof firstShiftDay === "number" && Number.isFinite(firstShiftDay)) {
+    return { value: firstShiftDay, source: "configured" }
+  }
+  return { value: TECHNICAL_FALLBACK_FIRST_SHIFT_DAY, source: "technical-fallback" }
 }
 
 const WEEKDAY_KEYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"]
@@ -43,6 +85,8 @@ export interface WeeklyStudySummary {
   weekDays: string[]
   weeklyGoalHours: number
   weeklyGoalMinutes: number
+  /** P1.1 — origem da meta: "configured" (real do usuário) ou "suggested" (default de produto). */
+  weeklyGoalSource: WeeklyGoalSource
   realStudiedMinutesThisWeek: number
   remainingMinutesToGoal: number
   remainingAvailableDaysInWeek: string[]
@@ -142,14 +186,20 @@ export async function getWeeklyPlanSummary(
   const todayKey = todayKeyInSaoPaulo()
 
   // 1. Buscar meta semanal e preferência de primeiro dia
-  const { data: profile } = await supabase
+  // P1.1: erro de leitura propaga (throw) — nunca vira default silencioso.
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("weekly_study_hours, week_start_day, preferences")
     .eq("id", userId)
     .maybeSingle()
 
-  const weeklyGoalHours =
-    (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours ?? 20
+  if (profileError) {
+    throw new Error(`weekly-plan-summary-unavailable: ${profileError.message ?? "profile read error"}`)
+  }
+
+  const { hours: weeklyGoalHours, source: weeklyGoalSource } = resolveWeeklyGoalHours(
+    (profile as { weekly_study_hours?: number } | null)?.weekly_study_hours,
+  )
   const weeklyGoalMinutes = weeklyGoalHours * 60
 
   const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
@@ -191,6 +241,7 @@ export async function getWeeklyPlanSummary(
     weekDays: weekRange.weekDays,
     weeklyGoalHours,
     weeklyGoalMinutes,
+    weeklyGoalSource,
     realStudiedMinutesThisWeek,
     remainingMinutesToGoal,
     remainingAvailableDaysInWeek,

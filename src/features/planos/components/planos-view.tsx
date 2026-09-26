@@ -296,10 +296,13 @@ export function PlanosView() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Aderência ao plano</span>
                       <span className="font-medium tabular-nums text-foreground">
-                        {activePlan.adherencePercentage || 0}%
+                        {/* Fase H: sem blocos planejados não há aderência ("—"). */}
+                        {activePlan.adherencePercentage === null
+                          ? "—"
+                          : `${activePlan.adherencePercentage}%`}
                       </span>
                     </div>
-                    <Progress value={activePlan.adherencePercentage || 0} />
+                    <Progress value={activePlan.adherencePercentage ?? 0} />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -558,7 +561,9 @@ export function PlanosView() {
                       Aderência
                     </span>
                     <p className="font-semibold text-lg text-emerald-400">
-                      {selectedPlan.adherencePercentage || 0}%
+                      {selectedPlan.adherencePercentage === null
+                        ? "—"
+                        : `${selectedPlan.adherencePercentage}%`}
                     </p>
                   </div>
                 </div>

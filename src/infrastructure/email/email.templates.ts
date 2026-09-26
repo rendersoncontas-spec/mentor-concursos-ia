@@ -304,7 +304,7 @@ export function getWelcomeEmailTemplate({
         <li><strong>Montar seu Plano de Estudos:</strong> Planeje sua rotina semanal com ciclos personalizados.</li>
         <li><strong>Registrar Sessões:</strong> Acompanhe tempo real, questões resolvidas e percentual de acertos.</li>
         <li><strong>Importar Histórico:</strong> Traga seus dados de outras plataformas (Aprovado, etc.) em segundos.</li>
-        <li><strong>Revisões Inteligentes:</strong> Fixe o conteúdo com algoritmos de repetição espaçada.</li>
+        <li><strong>Revisões:</strong> Fixe o conteúdo com repetição espaçada — o intervalo de cada tópico é calculado pelas suas respostas.</li>
       </ul>
     </div>
 
@@ -505,8 +505,20 @@ export function getStudyReminderEmailTemplate({
   let ctaUrl = `${appUrl}/dashboard/study-session`
 
   if (details.reason === "pending_review") {
-    subject = `📚 Você tem ${details.pendingCount || "revisões"} pendentes no NomeIA`
-    message = `Você possui <strong>${details.pendingCount ?? "alguns"} flashcards/tópicos</strong> aguardando revisão hoje para fixação na memória de longo prazo.`
+    // Fase I.3: este texto prometia cartões de memorização, recurso que o
+    // produto não tem — a revisão cobre tópicos e subtópicos do edital, e é essa
+    // a terminologia da página de Revisões. Sem contagem conhecida, o texto não
+    // inventa número nem promete recurso inexistente.
+    const pending = details.pendingCount
+    const pendingLabel =
+      pending === undefined
+        ? "tópicos do edital"
+        : `${pending} ${pending === 1 ? "tópico do edital" : "tópicos do edital"}`
+    subject =
+      pending === undefined
+        ? "📚 Você tem revisões pendentes no NomeIA"
+        : `📚 Você tem ${pending} ${pending === 1 ? "revisão pendente" : "revisões pendentes"} no NomeIA`
+    message = `Você tem <strong>${pendingLabel}</strong> aguardando revisão hoje, para fixação na memória de longo prazo.`
     ctaText = "Fazer Revisões Agora"
     ctaUrl = `${appUrl}/dashboard/reviews`
   } else if (details.reason === "streak_protection") {

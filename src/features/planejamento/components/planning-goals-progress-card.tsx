@@ -179,7 +179,7 @@ export function PlanningGoalsProgressCard({
             </h3>
             <p className="text-xs text-muted-foreground font-medium">
               {periodGoal
-                ? `Meta: ${formatHoursMinutesShort(periodGoal.goalMinutes)} • Estudado: ${formatHoursMinutesShort(periodGoal.studiedMinutes)} • Falta: ${formatHoursMinutesShort(periodGoal.remainingMinutes)}`
+                ? `${periodGoal.goalSource === "suggested" ? "Meta sugerida" : "Meta"}: ${formatHoursMinutesShort(periodGoal.goalMinutes)} • Estudado: ${formatHoursMinutesShort(periodGoal.studiedMinutes)} • Falta: ${formatHoursMinutesShort(periodGoal.remainingMinutes)}`
                 : "Acompanhamento de horas definidas vs estudadas por disciplina"}
             </p>
           </div>
@@ -253,7 +253,7 @@ export function PlanningGoalsProgressCard({
                 : `Falta: ${formatHoursMinutesShort(totalMissingMinutes)}`}
             </div>
             <div className="text-muted-foreground">
-              Meta definida: <strong>{formatHoursMinutesShort(totalTargetMinutes)}</strong>
+              {periodGoal?.goalSource === "suggested" ? "Meta sugerida" : "Meta definida"}: <strong>{formatHoursMinutesShort(totalTargetMinutes)}</strong>
             </div>
           </div>
         </div>

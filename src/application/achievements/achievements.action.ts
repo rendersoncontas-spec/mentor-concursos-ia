@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs"
 import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { createClient } from "@/infrastructure/supabase/server"
+import { getEditalTopicCoverage } from "@/application/disciplines/disciplines.service"
 import { computeStreak, localDateKey } from "@/utils/study-streak"
 import { getDayInSaoPaulo, daysAgoKeyInSaoPaulo, dayOfWeekForDateKey, getHourInSaoPaulo } from "@/lib/sao-paulo"
 
@@ -30,7 +31,32 @@ export interface AchievementsFacts {
   planDaysTotal: number
   planDaysDone: number
   adherencePercentage: number
+  /**
+   * Fase H: sempre 0 — o app não registra se um bloco redistribuído pelo
+   * replanejamento foi de fato estudado, então não há como contar
+   * "pendências recuperadas". Mantido para as conquistas REPLAN_* ficarem
+   * honestamente bloqueadas em vez de desbloquearem pela sequência.
+   */
   replanRecoveredCount: number
+  /** Fase H: cobertura do edital com a regra da página Disciplinas. */
+  editalTopicsTotal: number
+  editalTopicsStudied: number
+}
+
+/** Percentual de um simulado registrado: `score_percentage` ou acertos ÷ questões. */
+function simuladoPercentage(s: {
+  total_questions: number | null
+  total_correct: number | null
+  score_percentage: number | string | null
+}): number | null {
+  if (s.score_percentage !== null && s.score_percentage !== undefined && s.score_percentage !== "") {
+    const v = Number(s.score_percentage)
+    if (Number.isFinite(v)) return v
+  }
+  if (s.total_questions && s.total_questions > 0) {
+    return (Number(s.total_correct || 0) / s.total_questions) * 100
+  }
+  return null
 }
 
 export async function getAchievementsAction(): Promise<{
@@ -47,7 +73,7 @@ export async function getAchievementsAction(): Promise<{
       return { data: null, error: "Usuário não autenticado" }
     }
 
-    const [historyRes, attemptsRes, reviewsRes, simuladosRes, plansRes, profileRes] =
+    const [historyRes, attemptsRes, reviewsRes, simuladosRes, plansRes, profileRes, coverage] =
       await Promise.all([
         // Fase F.1: paginados (antes 1 requisição cada, cortada em 1.000 linhas
         // → conquistas calculadas sobre um recorte arbitrário do histórico).
@@ -69,17 +95,27 @@ export async function getAchievementsAction(): Promise<{
             { column: "id", ascending: true },
           ],
         ).then(({ data, error }) => ({ data: error ? null : data, error })),
-        fetchAllRowsPaged<{ is_correct: boolean | null }>(
-          (withCount) => supabase.from("question_attempts").select("is_correct", countOption(withCount)).eq("user_id", user.id),
+        // Fase H: a coluna é `correct` (confirmado no banco). Com `is_correct`
+        // a consulta falhava em silêncio e as questões respondidas eram ignoradas.
+        fetchAllRowsPaged<{ correct: boolean | null }>(
+          (withCount) => supabase.from("question_attempts").select("correct", countOption(withCount)).eq("user_id", user.id),
           [{ column: "id", ascending: true }],
         ).then(({ data, error }) => ({ data: error ? null : data, error })),
+        // Fonte canônica das revisões (M7): um evento = uma resposta de revisão.
         supabase
           .from("review_history")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id),
-        supabase.from("simulados").select("id, pontuacao, total_questoes").eq("user_id", user.id),
+        // Fase H: colunas reais da tabela (antes `pontuacao, total_questoes`,
+        // que não existem — a consulta falhava, simulados registrados nunca
+        // contavam e a média ficava sempre 0).
+        supabase
+          .from("simulados")
+          .select("id, total_questions, total_correct, score_percentage")
+          .eq("user_id", user.id),
         supabase.from("study_plans").select("id, active").eq("user_id", user.id),
         supabase.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle(),
+        getEditalTopicCoverage(supabase, user.id).catch(() => ({ topicsTotal: 0, topicsStudied: 0 })),
       ])
 
     const facts: AchievementsFacts = {
@@ -106,6 +142,8 @@ export async function getAchievementsAction(): Promise<{
       planDaysDone: 0,
       adherencePercentage: 0,
       replanRecoveredCount: 0,
+      editalTopicsTotal: coverage.topicsTotal,
+      editalTopicsStudied: coverage.topicsStudied,
     }
 
     const days = new Map<string, number>()
@@ -137,9 +175,16 @@ export async function getAchievementsAction(): Promise<{
       facts.totalQuestions += qAnswered
       facts.totalCorrect += qCorrect
 
-      if (row.study_type === "REVISAO" && (reviewsRes.count ?? 0) === 0) {
-        facts.reviews += 1
-      }
+      // Fase I.6 (achado M7): NÃO existe mais fallback aqui.
+      //
+      // Quando `review_history` estava vazio, sessões de estudo com
+      // `study_type = "REVISAO"` passavam a ser contadas como "revisões
+      // concluídas". São duas coisas diferentes: uma é o aluno registrando que
+      // estudou revisando; a outra é uma resposta de revisão no motor de
+      // repetição espaçada. Misturar as duas fazia o número mudar de base sozinho
+      // na primeira resposta real.
+      //
+      // A fonte canônica passou a ser uma só: os eventos de `review_history`.
       if (row.study_type === "SIMULADO" && (simuladosRes.data?.length ?? 0) === 0) {
         facts.simulados += 1
       }
@@ -181,7 +226,7 @@ export async function getAchievementsAction(): Promise<{
     // Questões de question_attempts
     if (attemptsRes.data && attemptsRes.data.length > 0) {
       const attemptsCount = attemptsRes.data.length
-      const correctCount = attemptsRes.data.filter((a) => a.is_correct).length
+      const correctCount = attemptsRes.data.filter((a) => a.correct).length
       // Se não foram registradas via study_history, somar
       if (facts.totalQuestions < attemptsCount) {
         facts.totalQuestions = Math.max(facts.totalQuestions, attemptsCount)
@@ -203,8 +248,9 @@ export async function getAchievementsAction(): Promise<{
       let totalSimPct = 0
       let validSims = 0
       for (const s of simuladosRes.data) {
-        if (s.total_questoes && s.total_questoes > 0) {
-          totalSimPct += (Number(s.pontuacao || 0) / Number(s.total_questoes)) * 100
+        const pct = simuladoPercentage(s)
+        if (pct !== null) {
+          totalSimPct += pct
           validSims += 1
         }
       }

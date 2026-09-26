@@ -5,7 +5,6 @@ import { getHeatmap } from "./heatmap"
 import { getDisciplineRanking, getAreaRanking } from "./rankings"
 import { getEvolutionTimeSeries } from "./evolution"
 import { getWeeklyGoalProgress, getDailyGoalProgress } from "./goals"
-import { getAiInsights } from "./insights"
 import { fetchAllPagesInParallel } from "@/lib/parallel-pagination"
 
 const ANALYTICS_FETCH_LIMIT = 50_000
@@ -129,7 +128,6 @@ export const AnalyticsEngine = {
     getWeeklyGoalProgress,
     getDailyGoalProgress
   },
-  ai: {
-    getInsights: getAiInsights
-  }
+  // Fase H: o grupo "ai" (getAiInsights) foi removido — regras com scores fixos
+  // (ex.: "85% de chance de burnout"), sem IA, e nunca exibidas.
 }

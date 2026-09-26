@@ -30,6 +30,7 @@ import {
   isDutyShiftDate,
   WEEKDAY_KEYS,
 } from "@/features/planejamento/lib/study-plan-shared"
+import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { type StudyCycleBlock } from "./planning-view"
@@ -105,6 +106,9 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
   })
 
   useEffect(() => {
+    // P1.5: banco é a fonte oficial; sincroniza uma vez (down-sync ou lazy
+    // migration) e o evento mentor_scale_updated atualiza este estado.
+    void syncPlanningPreferencesFromServer()
     const handleUpdate = () => {
       const savedScale = localStorage.getItem("mentor_user_work_scale")
       if (isScheduleMode(savedScale)) setScheduleMode(savedScale)

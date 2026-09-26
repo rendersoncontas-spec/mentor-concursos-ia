@@ -50,9 +50,21 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
       weekly_questions_goal: profile?.weekly_questions_goal ?? 100,
       weekly_revisions_goal: profile?.weekly_revisions_goal ?? 5,
       weekly_study_days_goal: profile?.weekly_study_days_goal ?? 6,
-      week_start_day: profile?.week_start_day ?? 1,
+      // Fase H: mesmo padrão usado no cálculo da semana (resolveWeekStartDay:
+      // sem configuração → Domingo). Antes o modal mostrava Segunda enquanto
+      // as metas eram contadas a partir de Domingo.
+      week_start_day: profile?.week_start_day ?? 0,
     },
   })
+
+  // Fase H: campos sem meta salva vêm preenchidos com SUGESTÕES — avisar, para
+  // não parecerem metas já definidas pelo aluno.
+  const hasUnsetGoals = [
+    profile?.weekly_study_hours,
+    profile?.weekly_questions_goal,
+    profile?.weekly_revisions_goal,
+    profile?.weekly_study_days_goal,
+  ].some((v) => v === null || v === undefined)
 
   async function onSubmit(data: WeeklyGoalsInput) {
     setIsSubmitting(true)
@@ -89,6 +101,12 @@ export function WeeklyGoalsModal({ open, onOpenChange, profile }: WeeklyGoalsMod
             onSubmit={form.handleSubmit(onSubmit)} 
             className="space-y-4 pt-4"
           >
+            {hasUnsetGoals && (
+              <p className="text-xs text-muted-foreground">
+                Metas ainda não definidas aparecem com valores sugeridos. Nada é salvo até você
+                clicar em salvar.
+              </p>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <FormField

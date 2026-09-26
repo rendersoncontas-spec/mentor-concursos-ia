@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 
 import { reconcileWeeklyPlan } from "@/application/study-plan/weekly-planner.service"
+import { resolveServerAvailability } from "@/application/study-plan/planning-preferences.action"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { createClient } from "@/infrastructure/supabase/server"
 
@@ -33,6 +34,11 @@ export interface ReplanAvailabilityInput {
   anchorShiftDate?: string | undefined
 }
 
+/**
+ * P1.5: normalização legada só-cliente (sem banco). As actions usam
+ * resolveServerAvailability (banco > input válido > default). Mantida para
+ * compatibilidade de chamadas que não têm acesso ao servidor.
+ */
 function normalizeAvailability(input?: ReplanAvailabilityInput): ReplanAvailability {
   const result: ReplanAvailability = {
     studyDays:
@@ -64,7 +70,7 @@ export async function getReplanInfoAction(
     const effectiveUserId = await getEffectiveUserId(supabase)
     if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
-    const availability = normalizeAvailability(availabilityInput)
+    const availability = await resolveServerAvailability(supabase, effectiveUserId, availabilityInput)
     const autoEnabled = await getAutoReplanPreference(supabase, effectiveUserId)
 
     // REGRA 0 — manutenção: não disparar o replanejamento em leitura
@@ -73,7 +79,15 @@ export async function getReplanInfoAction(
       await runAdaptiveReplanning(supabase, effectiveUserId, { trigger: "AUTO", autoEnabled, availability })
     }
 
-    await reconcileWeeklyPlan(supabase, effectiveUserId, availability).catch(() => null)
+    // P1.1: reconciliação é best-effort — falha NÃO é "nada a reconciliar".
+    // Registra no Sentry e segue retornando o info (leitura não quebra).
+    try {
+      await reconcileWeeklyPlan(supabase, effectiveUserId, availability)
+    } catch (reconcileError) {
+      Sentry.captureException(reconcileError, {
+        extra: { feature: "adaptive-planning", step: "get_replan_info_reconcile" },
+      })
+    }
 
     const info = await getReplanInfo(supabase, effectiveUserId, availability, autoEnabled)
     return { data: info, error: null }
@@ -94,14 +108,21 @@ export async function runReplanningAction(
     const effectiveUserId = await getEffectiveUserId(supabase)
     if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
-    const availability = normalizeAvailability(availabilityInput)
+    const availability = await resolveServerAvailability(supabase, effectiveUserId, availabilityInput)
     const summary = await runAdaptiveReplanning(supabase, effectiveUserId, {
       trigger: "MANUAL",
       autoEnabled: true,
       availability,
     })
 
-    await reconcileWeeklyPlan(supabase, effectiveUserId, availability).catch(() => null)
+    // P1.1: mesmo contrato — falha de reconciliação é registrada, não some.
+    try {
+      await reconcileWeeklyPlan(supabase, effectiveUserId, availability)
+    } catch (reconcileError) {
+      Sentry.captureException(reconcileError, {
+        extra: { feature: "adaptive-planning", step: "run_replanning_reconcile" },
+      })
+    }
 
     for (const path of REPLAN_PATHS) revalidatePath(path)
     return { data: summary, error: null }
@@ -176,7 +197,11 @@ export async function setAutoReplanPreferenceAction(
     if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
     const result = await setAutoReplanPreference(supabase, effectiveUserId, enabled)
-    for (const path of REPLAN_PATHS) revalidatePath(path)
+    // P1.1: só revalida como concluído quando a operação teve efeito.
+    // Falha (ok:false) não revalida — evita refresh de dado antigo como se novo fosse.
+    if (result.ok) {
+      for (const path of REPLAN_PATHS) revalidatePath(path)
+    }
     return { ok: result.ok, error: result.error ?? null }
   } catch (error) {
     Sentry.captureException(error, {
@@ -220,7 +245,7 @@ export async function pullPendingToTodayAction(
     if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
     const { pullPendingToToday } = await import("./adaptive-replan.service")
-    const availability = normalizeAvailability(availabilityInput)
+    const availability = await resolveServerAvailability(supabase, effectiveUserId, availabilityInput)
     const result = await pullPendingToToday(supabase, effectiveUserId, disciplineId, availability)
 
     if (result.ok) {

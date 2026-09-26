@@ -44,6 +44,8 @@ import {
   isShiftDayForScale,
   LS_SHIFT_ANCHOR_DATE,
 } from "@/features/planejamento/lib/planning-form"
+import { REPLAN_UNAVAILABLE_MESSAGE } from "@/features/planejamento/lib/study-plan-shared"
+import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 import { cn } from "@/lib/utils"
 
@@ -136,6 +138,9 @@ export function DailyPlanningView({
   }, [])
 
   useEffect(() => {
+    // P1.5: banco é a fonte oficial; sincroniza uma vez (down-sync ou lazy
+    // migration) e o evento mentor_scale_updated atualiza este estado.
+    void syncPlanningPreferencesFromServer()
     const handleUpdate = () => {
       const savedScale = localStorage.getItem("mentor_user_work_scale")
       if (savedScale) setScheduleMode(savedScale)
@@ -170,6 +175,8 @@ export function DailyPlanningView({
       return true
     }
   })
+  // P1.1: erro de leitura do ReplanInfo ≠ lista vazia. Mantém cache + avisa.
+  const [replanError, setReplanError] = useState(false)
   const [showPendencies, setShowPendencies] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -180,6 +187,8 @@ export function DailyPlanningView({
   // Conclusão manual do dia ("Marcar como concluído hoje")
   const [blockToClose, setBlockToClose] = useState<DayTask | null>(null)
   const [closingBlock, setClosingBlock] = useState(false)
+  // P1.1: [] aqui é fallback técnico de localStorage (ausente/corrompido),
+  // não erro de servidor — chaves fechadas são reconstruídas do histórico.
   const [closedBlockKeys, setClosedBlockKeys] = useState<string[]>(() => {
     if (typeof window === "undefined") return []
     try {
@@ -222,12 +231,19 @@ export function DailyPlanningView({
         const res = await getReplanInfoAction(availability)
         if (res.data) {
           setReplanInfo(res.data)
+          setReplanError(false)
           try {
             localStorage.setItem("mentor_replan_info_cache", JSON.stringify(res.data))
           } catch {
             /* noop */
           }
+        } else if (res.error) {
+          // P1.1: erro explícito do servidor — não confundir com "sem plano".
+          setReplanError(true)
         }
+      } catch {
+        // P1.1: falha de rede — mantém último valor exibido + aviso discreto.
+        setReplanError(true)
       } finally {
         setLoadingReplan(false)
         if (replanInFlightRef.current?.token === token) replanInFlightRef.current = null
@@ -493,6 +509,9 @@ export function DailyPlanningView({
 
   // Seleciona os blocos do dia: prioriza a janela persistida (replanejada)
   // pelo servidor; cai na seleção local quando não houver janela.
+  // P1.1: cada `return []` abaixo é vazio REAL (sem plano / plantão / fora da
+  // escala), exceto quando replanError=true — nesse caso o banner acima avisa
+  // que os dados podem estar desatualizados em vez de "sem planejamento".
   const dayBlocks: PlannedBlockForView[] = (() => {
     if (blocks.length === 0 && !replanInfo?.hasPlan) return []
 
@@ -713,6 +732,12 @@ export function DailyPlanningView({
         className,
       )}
     >
+      {/* P1.1: erro de leitura ≠ "sem planejamento". Aviso discreto, resto segue. */}
+      {replanError && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+          {REPLAN_UNAVAILABLE_MESSAGE}
+        </div>
+      )}
       {/* Linha 1: Controles de Data e Navegação */}
       <div className="flex items-start justify-between gap-3 border-b pb-2.5">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -894,7 +919,7 @@ export function DailyPlanningView({
         {/* Meta (semanal) */}
         <div className="px-3 py-2 flex flex-col min-w-0">
           <span className="text-xs text-muted-foreground truncate">
-            Meta
+            {periodGoal?.goalSource === "suggested" ? "Meta sugerida" : "Meta"}
           </span>
           <span className="text-sm font-semibold text-foreground tabular-nums truncate mt-0.5">
             {periodGoal

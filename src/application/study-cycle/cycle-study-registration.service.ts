@@ -52,6 +52,12 @@ export interface SkipCurrentCycleItemResult {
   rebuild?: RebuildResult | undefined
 }
 
+export interface ConcludeCycleRoundResult {
+  success: boolean
+  error?: string | undefined
+  rebuild?: RebuildResult | undefined
+}
+
 type HistoryRow = {
   id: string
   discipline_id: string | null
@@ -178,6 +184,21 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
       roundNumber: row.round_number as number,
     }))
 
+    // Eventos duráveis de "concluir volta" (administrativos, nunca derivados
+    // de study_history — ver migration 20260926_cycle_round_conclusions.sql).
+    // Cada um é ordenado no tempo (occurredAt) junto com os estudos reais
+    // para que o fechamento da rodada nunca "roube" progresso já registrado
+    // nela nem seja aplicado fora de ordem.
+    const { data: roundConclusionRows, error: roundConclusionError } = await supabase
+      .from("study_cycle_round_conclusions")
+      .select("round_number, concluded_at")
+      .eq("cycle_id", cycle.id)
+    if (roundConclusionError) throw new Error(`Erro ao buscar conclusões de rodada do ciclo ${cycle.name}: ${roundConclusionError.message}`)
+    const roundConclusions = (roundConclusionRows || []).map((row) => ({
+      roundNumber: row.round_number as number,
+      occurredAt: row.concluded_at as string,
+    }))
+
     const byId = new Map(items.map((item) => [item.discipline_id, item]))
     const byName = new Map(items.map((item) => [normalizeText(itemDiscipline(item)?.name || ""), item]))
     const matchBySimilarity = (name: string) => {
@@ -193,7 +214,7 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
       return score >= 0.8 ? best : null
     }
 
-    const matchedStudies: { id: string; cycleItemId: string; disciplineId: string | null; seconds: number }[] = []
+    const matchedStudies: { id: string; cycleItemId: string; disciplineId: string | null; seconds: number; startedAt: string | undefined }[] = []
     const statsByItem = new Map(items.map((item) => [item.id, { studies: 0 }]))
 
     for (const { row, seconds } of validHistory) {
@@ -215,7 +236,7 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
       else if (exact) matchedByName += 1
       else matchedBySimilarity += 1
 
-      matchedStudies.push({ id: row.id, cycleItemId: item.id, disciplineId: row.discipline_id, seconds })
+      matchedStudies.push({ id: row.id, cycleItemId: item.id, disciplineId: row.discipline_id, seconds, startedAt: row.started_at ?? undefined })
       const stat = statsByItem.get(item.id)
       if (stat) stat.studies += 1
     }
@@ -224,6 +245,7 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
       items.map((item) => ({ id: item.id, disciplineId: item.discipline_id, disciplineName: itemDiscipline(item)?.name || item.id, targetSeconds: Math.max(1, item.planned_minutes) * 60 })),
       matchedStudies,
       skips,
+      roundConclusions,
     )
     const sessionRows = reconciled.sessions.map((session) => ({
       cycle_id: cycle.id,
@@ -333,6 +355,91 @@ export async function skipCurrentCycleItem(cycleId: string): Promise<SkipCurrent
     { onConflict: "cycle_item_id,round_number", ignoreDuplicates: true },
   )
   if (skipError) return { success: false, error: `Erro ao registrar o pulo: ${skipError.message}` }
+
+  const rebuild = await rebuildActiveCycleProgress()
+  return { success: rebuild.success, error: rebuild.errors[0], rebuild }
+}
+
+/**
+ * Sole authority for "concluir volta" (encerrar administrativamente a rodada
+ * atual e iniciar a próxima do zero). Esta é uma decisão do usuário, NUNCA
+ * estudo real:
+ * - não cria study_history;
+ * - não cria sessão fictícia;
+ * - não adiciona minutos;
+ * - não marca nenhuma matéria como estudada (o percentual real de cada item
+ *   continua refletindo só o tempo realmente estudado).
+ *
+ * IMPORTANTE — por que isto NÃO reaproveita study_cycle_item_skips: a
+ * primeira implementação tentou marcar TODAS as matérias da rodada atual
+ * como "puladas" de uma vez, reaproveitando o marcador atemporal já usado por
+ * "pular matéria". Testes automatizados (cycle-reconciliation.engine.test.ts,
+ * casos "Concluir volta") provaram que isso é estruturalmente incorreto:
+ * como isSatisfied() é atemporal (não importa QUANDO o marcador foi criado
+ * relativo aos estudos reais), marcar todos os itens de uma vez faz o motor
+ * fechar a rodada ANTES de processar estudo real que já pertencia a ela,
+ * atribuindo esse tempo à rodada errada. Isso é seguro apenas para o uso
+ * original (pular UM item por vez, com os demais ainda dependendo de
+ * progresso real).
+ *
+ * Por isso "concluir volta" grava um EVENTO NO TEMPO em
+ * study_cycle_round_conclusions (migration
+ * 20260926_cycle_round_conclusions.sql) — não um marcador atemporal. O motor
+ * (reconcileCycleFromStudies) intercala esse evento cronologicamente entre os
+ * estudos reais e só o aplica se a rodada nele registrada ainda for a rodada
+ * corrente no momento em que o replay o alcança — isso é o que impede um
+ * clique redundante de fechar duas rodadas de uma vez (ex.: a rodada já
+ * fechou sozinha por estudo real antes do clique chegar ao servidor). A
+ * transição de rodada em si (advanceCompletedRounds, dentro do motor) continua
+ * sendo a MESMA usada quando uma volta termina naturalmente por estudo real —
+ * nenhuma lógica paralela de avanço de rodada foi criada.
+ *
+ * Concorrência (duplo clique / duas abas): a leitura de `current_round` é
+ * sempre feita no servidor no momento da chamada (nunca aceita do cliente).
+ * O upsert do evento é idempotente (`UNIQUE(cycle_id, round_number)` +
+ * `ignoreDuplicates`) — duas chamadas quase simultâneas para a mesma rodada
+ * produzem no máximo UM evento gravado. O rebuild em si é puro/determinístico
+ * a partir de study_history + skips + conclusões — chamá-lo várias vezes com
+ * o mesmo conjunto de eventos produz sempre o mesmo estado final, e
+ * `rebuildActiveCycleProgress` já colapsa chamadas concorrentes do mesmo
+ * usuário numa única promise em voo (`rebuildsByUser`). Nenhum guard de
+ * concorrência novo foi criado — o existente já cobre este caso.
+ */
+export async function concludeCurrentCycleRound(cycleId: string): Promise<ConcludeCycleRoundResult> {
+  const supabase = await createClient()
+  const userId = await getEffectiveUserId(supabase)
+  if (!userId) return { success: false, error: "Não autenticado" }
+
+  const { data: cycle, error: cycleError } = await supabase
+    .from("study_cycles")
+    .select("id, current_round, status")
+    .eq("id", cycleId)
+    .eq("user_id", userId)
+    .maybeSingle()
+  if (cycleError) return { success: false, error: cycleError.message }
+  if (!cycle) return { success: false, error: "Ciclo não encontrado." }
+  if (cycle.status !== "ACTIVE") {
+    return { success: false, error: "Este ciclo não está ativo — não é possível concluir a volta." }
+  }
+
+  const { data: items, error: itemsError } = await supabase
+    .from("study_cycle_items")
+    .select("id")
+    .eq("cycle_id", cycleId)
+  if (itemsError) return { success: false, error: itemsError.message }
+  if (!items || items.length === 0) return { success: false, error: "Ciclo sem matérias." }
+
+  const roundNumber = cycle.current_round || 1
+
+  const { error: conclusionError } = await supabase.from("study_cycle_round_conclusions").upsert(
+    {
+      cycle_id: cycleId,
+      round_number: roundNumber,
+      user_id: userId,
+    },
+    { onConflict: "cycle_id,round_number", ignoreDuplicates: true },
+  )
+  if (conclusionError) return { success: false, error: `Erro ao concluir a volta: ${conclusionError.message}` }
 
   const rebuild = await rebuildActiveCycleProgress()
   return { success: rebuild.success, error: rebuild.errors[0], rebuild }

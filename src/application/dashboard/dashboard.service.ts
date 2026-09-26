@@ -1,10 +1,10 @@
 import { type SupabaseClient } from "@supabase/supabase-js"
 import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
-import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
+import { readOrFlag, resolveMaybeSingle } from "@/application/dashboard/dashboard-read-outcome"
+import { type DashboardDataIssues, type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 import { getTodayStudyItems, getCycleOverviewData } from "@/application/study-plan/study-plan.service"
 import { getUserDisciplines } from "@/application/disciplines/disciplines.service"
 import { getStudyHistoryForAnalytics, AnalyticsEngine } from "@/application/study-analytics/study-analytics.service"
-import { getPendingReviewsSummary } from "@/application/review-engine/review-engine.service"
 import { getRecentActivities } from "@/application/study-history/study-history.service"
 import { getDayInSaoPaulo, startOfDayInSaoPauloMs } from "@/lib/sao-paulo"
 import { getSaoPauloWeekRange, resolveWeekStartDay } from "@/lib/study-time-calculator"
@@ -18,11 +18,10 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     const [
       profileResult,
       targetResult,
-      cycleOverview,
-      todayPlanItems,
-      rawHistory,
-      reviewsSummary,
-      recentActivities,
+      cycleOverviewOutcome,
+      todayPlanItemsOutcome,
+      rawHistoryOutcome,
+      recentActivitiesOutcome,
       questionAttemptsResult
     ] = await Promise.all([
       supabase
@@ -39,19 +38,15 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         .limit(1)
         .maybeSingle(),
 
-      getCycleOverviewData(supabase, userId).catch(() => null),
-      getTodayStudyItems(supabase, userId).catch(() => []),
+      readOrFlag(getCycleOverviewData(supabase, userId), null),
+      readOrFlag(getTodayStudyItems(supabase, userId), []),
       // Fase F.2: o Dashboard só lê questions_answered/questions_correct do
       // metadata (acertos por período e por disciplina) — pede só essas chaves.
-      getStudyHistoryForAnalytics(supabase, userId, 0, { metadataKeys: DASHBOARD_METADATA_KEYS }).catch(() => []),
-      getPendingReviewsSummary(supabase, userId).catch(() => ({
-        count: 0,
-        overdue: 0,
-        today: 0,
-        highPriority: 0,
-        nextReview: null
-      })),
-      getRecentActivities(supabase, userId, 5).catch(() => []),
+      readOrFlag(
+        getStudyHistoryForAnalytics(supabase, userId, 0, { metadataKeys: DASHBOARD_METADATA_KEYS }),
+        [],
+      ),
+      readOrFlag(getRecentActivities(supabase, userId, 5), []),
       // Fase F.1: paginado (question_attempts cresce 1 linha por questão
       // respondida; 1 requisição era cortada em 1.000). Mesmo formato
       // { data } de antes; erro → data null, como antes.
@@ -72,10 +67,47 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       ).then(({ data, error }) => ({ data: error ? null : data })),
     ])
 
-    const profile = profileResult?.data || null;
-    const rawTarget = targetResult?.data || null;
+    // Fase I.8: `profiles`/`user_targets` usam `.maybeSingle()`, que nunca
+    // lança — PostgREST devolve `{ data: null, error }` em erro de leitura.
+    // Antes, esse `error` não era checado: uma falha virava silenciosamente
+    // "sem perfil"/"sem meta ativa" (exatamente o mesmo shape de quando a
+    // linha genuinamente não existe). `resolveMaybeSingle` separa os casos.
+    const profileOutcome = resolveMaybeSingle(profileResult)
+    const profile = profileOutcome.value
+    const profileError = profileOutcome.failed
+
+    const targetOutcome = resolveMaybeSingle(targetResult)
+    const rawTarget = targetOutcome.value
+    const targetError = targetOutcome.failed
+
+    const cycleOverview = cycleOverviewOutcome.value
+    const cycleError = cycleOverviewOutcome.failed
+    const todayPlanItems = todayPlanItemsOutcome.value
+    const todayPlanError = todayPlanItemsOutcome.failed
+    const rawHistory = rawHistoryOutcome.value
+    const historyError = rawHistoryOutcome.failed
+    const recentActivities = recentActivitiesOutcome.value
+    const activitiesError = recentActivitiesOutcome.failed
+    // A leitura paginada de question_attempts já devolve `data: null` em
+    // erro (Fase F.1) — só precisamos preservar essa informação em vez de
+    // colapsar `null` em `[]` sem registrar que a leitura falhou.
+    const attemptsError = questionAttemptsResult?.data === null
+
     // Fetch disciplines now that rawTarget is known
-    const disciplines = await getUserDisciplines(supabase, userId, rawTarget?.id).catch(() => []);
+    const disciplinesOutcome = await readOrFlag(getUserDisciplines(supabase, userId, rawTarget?.id), [])
+    const disciplines = disciplinesOutcome.value
+    const disciplinesError = disciplinesOutcome.failed
+
+    const dataIssues: DashboardDataIssues = {
+      profile: profileError,
+      target: targetError,
+      cycle: cycleError,
+      todayPlan: todayPlanError,
+      history: historyError,
+      activities: activitiesError,
+      attempts: attemptsError,
+      disciplines: disciplinesError,
+    }
 
     let exam_date = rawTarget?.exam_date || null
     let exam_time = rawTarget?.exam_time || null
@@ -336,6 +368,9 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         averageFocus: baseStats.averageFocus,
         averageEnergy: baseStats.averageEnergy,
         averageDifficulty: baseStats.averageDifficulty,
+        // Fase H: total real (todo o histórico), usado pelo widget Conquistas &
+        // marcos — antes ele usava os minutos da semana e "retrancava".
+        totalMinutes: baseStats.totalMinutes,
         totalQuestions,
         correctQuestions,
         wrongQuestions,
@@ -380,8 +415,8 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
           accuracyPercentage,
         }
       }),
-      reviews: reviewsSummary,
       recentActivities,
+      dataIssues,
       analytics: {
         stats: {
           dailyMinutes: baseStats.dailyMinutes,
@@ -422,10 +457,18 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
             remaining: targetDays && targetDays > 0 ? Math.max(0, targetDays - weeklyStudyDays) : null,
           }
         },
-        insights: AnalyticsEngine.ai.getInsights(ctx)
+        // Fase H: "insights" (AnalyticsEngine.ai) saiu — eram calculados a cada
+        // carga com scores fixos (95/85/60…) e nenhum widget os exibia.
       }
     }
   } catch (error) {
+    // Fase I.8: cada leitura individual (perfil, meta, ciclo, plano de hoje,
+    // histórico, atividades recentes, tentativas, disciplinas) já tem seu
+    // próprio tratamento de erro acima (`resolveMaybeSingle`/`readOrFlag`) e
+    // não deveria mais chegar aqui. Este catch agora cobre só uma falha
+    // verdadeiramente inesperada (ex.: um bug no processamento síncrono) — daí
+    // marcar as 8 leituras como indisponíveis: não é uma leitura isolada que
+    // falhou, é o processamento inteiro que não pôde ser concluído.
     console.error("Erro ao carregar Dashboard:", error)
     return {
       user: null,
@@ -440,6 +483,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
         averageFocus: null,
         averageEnergy: null,
         averageDifficulty: null,
+        totalMinutes: 0,
         totalQuestions: 0,
         correctQuestions: 0,
         wrongQuestions: 0,
@@ -451,8 +495,17 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       disciplinesStats: { total: 0, completed: 0, revising: 0, studying: 0 },
       todayPlanItems: [],
       rawDisciplines: [],
-      reviews: { count: 0, overdue: 0, today: 0, highPriority: 0, nextReview: null },
       recentActivities: [],
+      dataIssues: {
+        profile: true,
+        target: true,
+        cycle: true,
+        todayPlan: true,
+        history: true,
+        activities: true,
+        attempts: true,
+        disciplines: true,
+      },
       analytics: {
         stats: {
           dailyMinutes: 0,
@@ -475,7 +528,6 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
           revisions: { target: null, achieved: 0, percentage: null, remaining: null },
           studyDays: { target: null, achieved: 0, percentage: null, remaining: null }
         },
-        insights: []
       }
     }
   }

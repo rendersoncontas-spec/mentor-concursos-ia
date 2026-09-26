@@ -94,9 +94,6 @@ describe("Fase F.1 — study_history / review_items / question_attempts paginado
     ["src/application/admin/admin.actions.ts", "export async function getUserDetailsAdminAction", "question_attempts"],
     ["src/application/import-history/import-history.actions.ts", "export async function listImportsAction", "study_history"],
     ["src/application/dashboard/dashboard.service.ts", "export async function getDashboardData", "question_attempts"],
-    ["src/application/review-engine/review-engine.service.ts", "export async function getPendingReviewsSummary", "review_items"],
-    ["src/application/review-engine/review.service.ts", "export async function loadItemsBundle", "review_items"],
-    ["src/application/review-engine/review.service.ts", "export async function getReviewDashboardSummary", "review_history"],
   ]
   for (const [file, sig, table] of cases) {
     it(`${sig.replace("export async function ", "")} lê ${table} com fetchAllRowsPaged`, () => {
@@ -112,17 +109,71 @@ describe("Fase F.1 — study_history / review_items / question_attempts paginado
     const src = code("src/application/study-analytics/statistics-center.action.ts")
     assert.equal(src.includes(".limit(ATTEMPTS_LIMIT)"), false)
     assert.ok(src.includes("maxRows: ATTEMPTS_LIMIT"))
-    assert.ok(/fetchAllRowsPaged<[\s\S]{0,200}?>\(\s*\(withCount\) =>\s*supabase\s*\.from\("review_items"\)/.test(src))
+    // Fase I.3: a leitura de review_items continua paginada, agora envolvida por
+    // activeReviewItemsOnly() — a regra única de "item ativo" (não suspenso, não
+    // arquivado), a mesma da fila de Revisões. O que este teste trava é a
+    // paginação; o filtro em si tem teste próprio
+    // (statistics-review-items-active.test.ts).
+    assert.ok(
+      /fetchAllRowsPaged<[\s\S]{0,200}?>\(\s*\(withCount\) =>\s*(activeReviewItemsOnly\(\s*)?supabase\s*\.from\("review_items"\)/.test(
+        src,
+      ),
+      "review_items nas Estatísticas precisa continuar sendo lido com fetchAllRowsPaged",
+    )
   })
 
-  it("página de Revisões lê review_items paginado", () => {
+  // Fase I.1: o módulo de revisões foi reescrito e trocou a leitura paginada
+  // "carrega tudo e filtra em memória" por leituras limitadas na origem —
+  // contagens com `head: true` (que não trazem linha nenhuma) e listas com
+  // `.limit()` explícito. A garantia da Fase F.1 continua valendo, só muda a
+  // forma de cumpri-la: NENHUMA leitura de review_items/review_history pode ser
+  // ilimitada, porque o teto de 1.000 linhas do PostgREST corta em silêncio.
+  it("página de Revisões não consulta o banco direto: delega ao serviço", () => {
     const src = read("src/app/(protected)/dashboard/reviews/page.tsx")
-    assert.ok(/fetchAllRowsPaged<[\s\S]{0,400}?>\(\s*\(withCount\) =>\s*supabase\s*\.from\("review_items"\)/.test(src))
+    assert.ok(src.includes("getReviewsOverview("), "a página deve usar getReviewsOverview")
+    assert.equal(src.includes('.from("review_items")'), false)
+    assert.equal(src.includes('.from("review_history")'), false)
+  })
+
+  it("toda leitura de review_items/review_history no repositório é limitada (head:true, .limit(), .maybeSingle() ou paginada)", () => {
+    const src = code("src/application/review-engine/review.repository.ts")
+    const offenders: string[] = []
+    for (const table of ["review_items", "review_history", "review_sessions"]) {
+      const re = new RegExp(`\\.from\\("${table}"\\)([\\s\\S]{0,700})`, "g")
+      let match: RegExpExecArray | null
+      while ((match = re.exec(src))) {
+        const tail = match[1] ?? ""
+        // corta no início da próxima consulta, para não "emprestar" o limite dela
+        const chain = tail.split(/\.from\("/)[0] ?? ""
+        if (/^\s*\.(insert|update|upsert|delete)\(/.test(chain)) continue
+        const before = src.slice(Math.max(0, match.index - 400), match.index)
+        const bounded =
+          /head:\s*true/.test(chain) ||
+          /\.limit\(/.test(chain) ||
+          /\.maybeSingle\(\)/.test(chain) ||
+          before.includes("fetchAllRowsPaged")
+        if (!bounded) offenders.push(`${table}: ${chain.slice(0, 120).replace(/\s+/g, " ")}`)
+      }
+    }
+    assert.deepEqual(offenders, [], "leitura sem limite explícito seria cortada em 1.000 linhas sem aviso")
+  })
+
+  it("o repositório de revisões é a única camada que fala com as tabelas de revisão", () => {
+    for (const file of [
+      "src/application/review-engine/review.service.ts",
+      "src/application/review-engine/review.actions.ts",
+    ]) {
+      const src = code(file)
+      for (const table of ["review_items", "review_history"]) {
+        assert.equal(src.includes(`.from("${table}")`), false, `${file} não pode consultar ${table} direto`)
+      }
+    }
   })
 
   it("nenhum .limit() acima de 1.000 sobrou nessas leituras (seria cortado em silêncio)", () => {
     for (const file of [
       "src/application/review-engine/review.service.ts",
+      "src/application/review-engine/review.repository.ts",
       "src/application/study-analytics/statistics-center.action.ts",
     ]) {
       const src = code(file)

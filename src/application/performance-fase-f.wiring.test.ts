@@ -108,9 +108,13 @@ describe("Fase F — Histórico", () => {
 
 describe("Fase F — Revisões", () => {
   it("fim da sessão de revisão atualiza via router.refresh, sem recarregar o app inteiro", () => {
-    const tabs = readSource("src/features/reviews/components/review-tabs.tsx")
-    assert.equal(tabs.includes("window.location.reload()"), false)
-    assert.ok(tabs.includes("router.refresh()"))
+    // Fase I.1: review-tabs.tsx saiu com a reescrita do módulo; a mesma
+    // garantia passou para a view da página de Revisões.
+    const view = readSource("src/features/reviews/components/reviews-view.tsx")
+    assert.equal(view.includes("window.location.reload()"), false)
+    assert.ok(view.includes("router.refresh()"))
+    const modal = readSource("src/features/reviews/components/review-session-modal.tsx")
+    assert.equal(modal.includes("window.location.reload()"), false)
   })
 })
 
