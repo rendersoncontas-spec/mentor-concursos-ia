@@ -1,4 +1,8 @@
 import { buildIsoFromSaoPauloDateTime } from "@/lib/sao-paulo"
+import {
+  studyMinutesFromMinutesInput,
+  studyMinutesFromMs,
+} from "@/domain/study-session/study-duration"
 import type { StudyHistory } from "@/domain/study-history/study-history.types"
 
 /**
@@ -24,20 +28,33 @@ export type PendingStudySession = StudyHistory & {
   _operationId: string
 }
 
+/**
+ * G2.3 — instante em que a sessão efetivamente terminou (Encerrar
+ * pressionado). A tela de avaliação mantém o timer pausado; sem isso, o
+ * tempo parado na avaliação inflava `paused` (foco% salvo menor que o
+ * exibido). Válido só quando é um passado próximo e posterior ao início.
+ */
+function resolveEndTimeMs(payload: Record<string, unknown>, startTime: number): number {
+  const now = Date.now()
+  const raw = Number(payload["evaluationStartedAt"] ?? payload["evaluation_started_at"] ?? NaN)
+  if (Number.isFinite(raw) && raw > startTime && raw <= now) return raw
+  return now
+}
+
 function resolveMinutes(payload: Record<string, unknown>): {
   activeMinutes: number
   pausedMinutes: number
 } {
   if (payload["is_manual_mode"]) {
     return {
-      activeMinutes: Math.round(Number(payload["activeMinutes"]) || 0),
-      pausedMinutes: Math.round(Number(payload["pausedMinutes"]) || 0),
+      activeMinutes: studyMinutesFromMinutesInput(payload["activeMinutes"]),
+      pausedMinutes: studyMinutesFromMinutesInput(payload["pausedMinutes"]),
     }
   }
 
   if (payload["sessionStartTime"]) {
-    const now = Date.now()
     const startTime = Number(payload["sessionStartTime"])
+    const now = resolveEndTimeMs(payload, startTime)
     let totalPausedMs = Number(payload["sessionTotalPausedMs"] || 0)
     const lastPauseStartTime = Number(payload["sessionLastPauseStartTime"])
     if (lastPauseStartTime > 0) {
@@ -46,15 +63,15 @@ function resolveMinutes(payload: Record<string, unknown>): {
     const totalElapsedMs = now - startTime
     const activeMs = Math.max(0, totalElapsedMs - totalPausedMs)
     return {
-      activeMinutes: Math.round(activeMs / 60000),
-      pausedMinutes: Math.round(totalPausedMs / 60000),
+      activeMinutes: studyMinutesFromMs(activeMs),
+      pausedMinutes: studyMinutesFromMs(totalPausedMs),
     }
   }
 
   // Fallback: snapshot já trazia os minutos calculados (activeSeconds/60).
   return {
-    activeMinutes: Math.round(Number(payload["activeMinutes"]) || 0),
-    pausedMinutes: Math.round(Number(payload["pausedMinutes"]) || 0),
+    activeMinutes: studyMinutesFromMinutesInput(payload["activeMinutes"]),
+    pausedMinutes: studyMinutesFromMinutesInput(payload["pausedMinutes"]),
   }
 }
 
@@ -66,7 +83,7 @@ function resolveTimestamps(
     const startTime = Number(payload["sessionStartTime"])
     return {
       startedAt: new Date(startTime).toISOString(),
-      finishedAt: new Date().toISOString(),
+      finishedAt: new Date(resolveEndTimeMs(payload, startTime)).toISOString(),
     }
   }
 

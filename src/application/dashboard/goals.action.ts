@@ -11,7 +11,7 @@ export async function saveWeeklyGoalsAction(data: WeeklyGoalsInput) {
     const validatedData = weeklyGoalsSchema.parse(data)
     const supabase = await createClient()
 
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "SAVE_WEEKLY_GOALS" })
     
     if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }

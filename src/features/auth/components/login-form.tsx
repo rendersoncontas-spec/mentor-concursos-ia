@@ -11,6 +11,8 @@ import { toast } from "sonner"
 
 import { loginAction } from "@/application/auth/login.action"
 import { resendConfirmationAction } from "@/application/auth/resend-confirmation.action"
+import { getGuardUserId, purgeOnUserSwitch } from "@/infrastructure/offline/user-switch-guard"
+import { clearServerActionCache } from "@/lib/server-action-cache"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -69,6 +71,17 @@ export function LoginForm({ next }: { next?: string | null } = {}) {
       }
 
       toast.success("Login realizado com sucesso!")
+      // G1.1 (G-30): login por senha é SPA (sem reload) — invalida o cache do
+      // contexto JS anterior para o novo usuário nunca herdar dado alheio.
+      clearServerActionCache()
+      // G1.7 (G-31): troca de usuário sem logout canônico prévio (expiração,
+      // cookie removido, aba compartilhada). Purga o estado do anterior e
+      // recarrega para matar timers/contexto ainda vivos no JS.
+      const { switched } = await purgeOnUserSwitch(await getGuardUserId())
+      if (switched) {
+        window.location.replace("/dashboard")
+        return
+      }
       router.push("/dashboard")
       router.refresh()
     })
@@ -127,6 +140,7 @@ export function LoginForm({ next }: { next?: string | null } = {}) {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                     tabIndex={-1}
                   >

@@ -18,19 +18,20 @@ import {
   Trash2,
   Trophy,
   User,
-  Volume2,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { sendTestEmailAction } from "@/application/email/email.action"
 import { getProfileAction, updateProfileAction, uploadAvatarAction } from "@/application/profile/profile.action"
+import { TIMER_SOUND_PREFERENCE_EVENT, normalizeTimerSoundOption } from "@/features/study-session/hooks/use-focus-sound"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/infrastructure/supabase/client"
 import { clearUserLocalData } from "@/utils/user-data"
+import { clearOfflinePrivateDataForLogout } from "@/infrastructure/offline"
 
 interface AccountSettingsModalProps {
   open: boolean
@@ -188,7 +189,7 @@ export function AccountSettingsModal({
                 ? "Domingo"
                 : prefsValue<string>(prefs, "firstDayOfWeek", "Domingo")
           setPrimeiroDia(initialFirstDay)
-          setSomTimer(prefsValue<string>(prefs, "timerSound", "Melodia 1"))
+          setSomTimer(normalizeTimerSoundOption(prefsValue<string>(prefs, "timerSound", "Melodia 1")))
           setFusoHorario(prefsValue<string>(prefs, "timezone", "(UTC-03:00) Brasília"))
 
           const perfThresholds = prefsValue<{ ruimMax?: number; regularMax?: number }>(
@@ -303,6 +304,8 @@ export function AccountSettingsModal({
       toast.error("Aguarde o carregamento terminar antes de salvar.")
       return
     }
+    // G1.16: trava de reentrância — duplo clique salvava perfil + avatar 2x.
+    if (isSaving) return
     setIsSaving(true)
     try {
       const fullName = [nome.trim(), sobrenome.trim()].filter(Boolean).join(" ")
@@ -376,6 +379,11 @@ export function AccountSettingsModal({
       } else {
         toast.success("Alterações salvas com sucesso!")
       }
+      // G2.1 FASE 3 — propaga a preferência de som ao player (StudyProvider
+      // aplica via selectSound; "Sino"/legados resultam em no-op).
+      try {
+        window.dispatchEvent(new CustomEvent(TIMER_SOUND_PREFERENCE_EVENT, { detail: somTimer }))
+      } catch { /* ambiente sem window: sem player para avisar */ }
       router.refresh()
       onOpenChange(false)
     } catch {
@@ -544,6 +552,7 @@ export function AccountSettingsModal({
             <button
               onClick={async () => {
                 clearUserLocalData()
+                await clearOfflinePrivateDataForLogout()
                 await logoutAction()
                 window.location.replace("/login")
               }}
@@ -746,25 +755,11 @@ export function AccountSettingsModal({
                       </div>
                     </div>
 
-                    {/* Período das Revisões */}
-                    <div className="space-y-1.5">
-                      <label className="type-label block">
-                        PERÍODO DAS REVISÕES
-                      </label>
-                      <div className="flex items-center gap-2">
-                        {["1d", "7d", "30d", "60d", "120d"].map((r) => (
-                          <span
-                            key={r}
-                            className="px-3 py-1 rounded-md border text-xs font-semibold text-muted-foreground bg-muted/20"
-                          >
-                            {r}
-                          </span>
-                        ))}
-                        <button className="p-1 rounded-md border text-xs font-semibold hover:text-primary">
-                          +
-                        </button>
-                      </div>
-                    </div>
+                    {/* G1.17: bloco "PERÍODO DAS REVISÕES" removido — eram
+                        chips/‘+’ sem handler, estado ou backend (UI morta
+                        que parecia filtro funcional). Não existe modelo de
+                        filtro por período nas reviews; reintroduzir somente
+                        com contrato de produto. */}
 
                     {/* Primeiro dia da semana & Som do Timer */}
                     <div className="grid grid-cols-2 gap-4">
@@ -789,16 +784,15 @@ export function AccountSettingsModal({
                         <div className="flex items-center gap-2">
                           <select
                             value={somTimer}
-                            onChange={(e) => setSomTimer(e.target.value)}
+                            onChange={(e) => setSomTimer(normalizeTimerSoundOption(e.target.value))}
                             className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
                           >
                             <option value="Melodia 1">Melodia 1</option>
-                            <option value="Sino">Sino</option>
                             <option value="Silencioso">Silencioso</option>
                           </select>
-                          <button className="p-2 text-muted-foreground hover:text-foreground">
-                            <Volume2 className="h-4 w-4" />
-                          </button>
+                          {/* G2.2: "Sino" removido — sem ID correspondente no
+                              sistema (só loops ambientes). Legado normaliza
+                              para "Melodia 1" na leitura. */}
                         </div>
                       </div>
                     </div>

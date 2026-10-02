@@ -148,6 +148,8 @@ test("buildPlanningPayload: inclui todas as disciplinas com default 2.5", () => 
   assert.equal(res.importanceMap["Direito Constitucional"], 2.5)
   assert.equal(res.knowledgeMap["Língua Portuguesa"], 2.5)
   assert.equal(Object.keys(res.importanceMap).length, 2)
+  // G2.1: o ritmo viaja no payload (antes era descartado aqui).
+  assert.deepEqual(res.ritmo, { style: "equilibradas", minMinutes: 45, maxMinutes: 90 })
 })
 
 test("planningReason: create gera reason manual e edit gera replan", () => {

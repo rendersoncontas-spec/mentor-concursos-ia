@@ -38,8 +38,11 @@ const REVIEWS_PATH = "/dashboard/reviews"
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
-async function requireUser(supabase: Supabase): Promise<{ id: string } | null> {
-  const effectiveUserId = await getEffectiveUserId(supabase)
+async function requireUser(
+  supabase: Supabase,
+  auditContext?: Parameters<typeof getEffectiveUserId>[1],
+): Promise<{ id: string } | null> {
+  const effectiveUserId = await getEffectiveUserId(supabase, auditContext)
   return effectiveUserId ? { id: effectiveUserId } : null
 }
 
@@ -99,7 +102,7 @@ export async function addTopicToReviewAction(input: {
     if (!input.sourceId) return { data: null, error: "Conteúdo não informado." }
 
     const supabase = await createClient()
-    const user = await requireUser(supabase)
+    const user = await requireUser(supabase, { action: "ADD_TOPIC_TO_REVIEW", resource: input.sourceId })
     if (!user) return { data: null, error: "Não autenticado." }
 
     const result = await addEditalContentToReview(
@@ -124,7 +127,7 @@ export async function setReviewItemFlagAction(
   if (isMaintenanceMode()) return { data: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const user = await requireUser(supabase)
+    const user = await requireUser(supabase, { action: "SET_REVIEW_ITEM_FLAG", resource: itemId })
     if (!user) return { data: false, error: "Não autenticado." }
     const result = await setReviewItemFlag(supabase, user.id, itemId, action)
     if (!result.ok) return { data: false, error: result.error }
@@ -143,7 +146,7 @@ export async function startReviewSessionAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const user = await requireUser(supabase)
+    const user = await requireUser(supabase, { action: "START_REVIEW_SESSION" })
     if (!user) return { data: null, error: "Não autenticado." }
     return await startReviewSession(supabase, user.id, { itemId: itemId ?? null })
   } catch (err: unknown) {
@@ -182,7 +185,7 @@ export async function answerReviewCardAction(input: {
     if (!input.clientOperationId) return { data: null, error: "Operação sem identificador." }
 
     const supabase = await createClient()
-    const user = await requireUser(supabase)
+    const user = await requireUser(supabase, { action: "ANSWER_REVIEW_CARD", resource: input.itemId })
     if (!user) return { data: null, error: "Não autenticado." }
 
     const outcome = await answerReviewCard(supabase, user.id, {
@@ -213,7 +216,7 @@ export async function finalizeReviewSessionAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const user = await requireUser(supabase)
+    const user = await requireUser(supabase, { action: "FINALIZE_REVIEW_SESSION", resource: sessionId })
     if (!user) return { data: null, error: "Não autenticado." }
 
     const result = await finishReviewSession(supabase, user.id, sessionId)
@@ -232,7 +235,7 @@ export async function discardReviewSessionAction(
   if (isMaintenanceMode()) return { data: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const user = await requireUser(supabase)
+    const user = await requireUser(supabase, { action: "DISCARD_REVIEW_SESSION", resource: sessionId })
     if (!user) return { data: false, error: "Não autenticado." }
     const { discarded } = await discardReviewSession(supabase, user.id, sessionId)
     revalidatePath(REVIEWS_PATH)

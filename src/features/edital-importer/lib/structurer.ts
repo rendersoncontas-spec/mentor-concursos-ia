@@ -322,7 +322,7 @@ export function structureEditalText(rawText: string): EditalDraft {
 }
 
 // ---------------------------------------------------------------------------
-// Deduplicação por nome normalizado (mantém a primeira ocorrência)
+// Deduplicação por nome normalizado (mantém a ÚLTIMA ocorrência)
 // ---------------------------------------------------------------------------
 
 function filterDuplicates<T>(items: T[], keyOf: (t: T) => string): number[] {

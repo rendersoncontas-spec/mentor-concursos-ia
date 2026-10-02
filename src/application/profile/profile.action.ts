@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/infrastructure/supabase/server"
+import { extensionForAvatarMime, validateAvatarUpload } from "./avatar-validation"
 
 export interface ProfileData {
   id: string
@@ -118,10 +119,21 @@ export async function uploadAvatarAction(
         const meta = parts[0] ?? ""
         const base64Data = parts[1] ?? ""
         const mimeMatch = meta.match(/data:(.*?);/)
-        const mime = mimeMatch?.[1] || "image/jpeg"
-        const ext = mime.split("/")[1] || "jpg"
+        const declaredMime = mimeMatch?.[1] || ""
 
         const buffer = Buffer.from(base64Data, "base64")
+
+        // Fase G2.6.1 (segurança): nunca confia isoladamente no MIME declarado
+        // pelo cliente — exige allowlist (JPEG/PNG/WebP) E que os magic bytes
+        // do conteúdo real correspondam a esse tipo. Mantém o bucket/path
+        // existentes (avatars/${user.id}/avatar.<ext>); só a validação do
+        // tipo de arquivo é nova.
+        const validation = validateAvatarUpload(declaredMime, buffer)
+        if (!validation.ok || !validation.mime) {
+          return { success: false, error: validation.error ?? "Tipo de imagem não permitido." }
+        }
+        const mime = validation.mime
+        const ext = extensionForAvatarMime(mime)
         const filePath = `${user.id}/avatar.${ext}`
 
         const { error: uploadError } = await supabase.storage

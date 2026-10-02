@@ -3,7 +3,7 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 
-import { fetchWithCache, hasServerValue, readFreshCache, seedCache } from "@/lib/server-action-cache"
+import { buildScopedCacheKey, fetchWithCache, hasServerValue, readFreshCache, seedCache } from "@/lib/server-action-cache"
 
 const DEFAULT_TTL = 5 * 60 * 1000 // 5 min
 
@@ -48,26 +48,36 @@ export function InitialServerDataProvider({
  * @param key - Chave única do cache (ex: "monthlyStats:2026:9")
  * @param fetcher - Função async que retorna os dados
  * @param ttl - Tempo de vida do cache em ms (padrão: 5 min)
+ * @param scope - G1.1 (G-30): identidade/escopo do resultado (ex: userId ou
+ *   `operador:target`). Quando informado, TODAS as operações usam a chave com
+ *   escopo — o mesmo `key` com escopos diferentes nunca compartilha dado.
+ *   Omitir SOMENTE para resultados globais (documentar `// GLOBAL:` no call).
  */
 export function useCachedServerAction<T>(
   key: string,
   fetcher: () => Promise<T>,
   ttl = DEFAULT_TTL,
+  scope?: string | null,
 ) {
+  const effectiveKey = scope ? buildScopedCacheKey(scope, key) : key
   const initial = useContext(InitialServerDataContext)
   const hasInitial = hasServerValue(initial, key)
 
   // O estado guarda a chave a que o dado pertence: se a chave mudar (ex.: o
   // calendário vai para outro mês), o dado antigo não é exibido como se fosse
   // do novo mês — volta a "carregando" até chegar o dado da chave nova.
+  // G1.1 (G-30): o estado e o cache usam a chave COM escopo; o dado inicial
+  // do servidor continua indexado pela chave crua.
   const [state, setState] = useState<{ key: string; data: T | null; loaded: boolean }>(() => {
     if (hasInitial) {
       const value = (initial as Record<string, unknown>)[key] as T
-      seedCache(key, value)
-      return { key, data: value, loaded: true }
+      seedCache(effectiveKey, value)
+      return { key: effectiveKey, data: value, loaded: true }
     }
-    const cached = readFreshCache<T>(key, ttl)
-    return cached ? { key, data: cached.data, loaded: true } : { key, data: null, loaded: false }
+    const cached = readFreshCache<T>(effectiveKey, ttl)
+    return cached
+      ? { key: effectiveKey, data: cached.data, loaded: true }
+      : { key: effectiveKey, data: null, loaded: false }
   })
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -85,8 +95,8 @@ export function useCachedServerAction<T>(
     setSeenInitial(initial)
     if (hasInitial) {
       const value = (initial as Record<string, unknown>)[key] as T
-      seedCache(key, value)
-      setState({ key, data: value, loaded: true })
+      seedCache(effectiveKey, value)
+      setState({ key: effectiveKey, data: value, loaded: true })
     }
   }
 
@@ -99,12 +109,12 @@ export function useCachedServerAction<T>(
   const load = useCallback(
     async (force = false) => {
       if (!force) {
-        const cached = readFreshCache<T>(key, ttl)
+        const cached = readFreshCache<T>(effectiveKey, ttl)
         if (cached) {
           setState((prev) =>
-            prev.key === key && prev.loaded && prev.data === cached.data
+            prev.key === effectiveKey && prev.loaded && prev.data === cached.data
               ? prev
-              : { key, data: cached.data, loaded: true },
+              : { key: effectiveKey, data: cached.data, loaded: true },
           )
           return
         }
@@ -113,15 +123,15 @@ export function useCachedServerAction<T>(
       setFetching(true)
       setError(null)
       try {
-        const result = await fetchWithCache<T>(key, () => fetcherRef.current(), { ttl, force })
-        setState({ key, data: result, loaded: true })
+        const result = await fetchWithCache<T>(effectiveKey, () => fetcherRef.current(), { ttl, force })
+        setState({ key: effectiveKey, data: result, loaded: true })
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erro ao carregar dados")
       } finally {
         setFetching(false)
       }
     },
-    [key, ttl],
+    [effectiveKey, ttl],
   )
 
   useEffect(() => {
@@ -130,7 +140,7 @@ export function useCachedServerAction<T>(
 
   const refresh = useCallback(() => load(true), [load])
 
-  const current = state.key === key && state.loaded
+  const current = state.key === effectiveKey && state.loaded
   // `loading` só é true enquanto ainda não há dado para a chave atual (e não
   // houve erro); um refresh mantém o conteúdo atual na tela.
   const loading = !current && (fetching || !error)

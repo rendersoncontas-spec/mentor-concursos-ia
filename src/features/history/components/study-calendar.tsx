@@ -350,6 +350,7 @@ export function StudyCalendar({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        aria-label="Editar sessão"
                         onClick={() => {
                           setSelectedDate(null)
                           onEditSession(session)
@@ -361,6 +362,7 @@ export function StudyCalendar({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                        aria-label="Excluir sessão"
                         onClick={() => {
                           onDeleteSession(session.id)
                           if (selectedDaySessions.length === 1) {

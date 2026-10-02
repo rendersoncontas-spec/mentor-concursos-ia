@@ -38,20 +38,60 @@ export default async function StudySessionPage({ searchParams }: PageProps) {
       `,
       )
       .eq("id", planId)
-      .single()
+      .maybeSingle()
 
-    if (item) {
-      const discipline = Array.isArray(item.disciplines) ? item.disciplines[0] : item.disciplines
+    // G2.3 — a visão diária envia `task.itemId ?? task.id`: quando o bloco
+    // não tem item vinculado, chega o id do bloco diário (não é um
+    // study_plan_items). Resolve para o item real em vez de cair na tela
+    // vazia "Nenhum estudo iniciado".
+    let resolvedItem = item
+    if (!resolvedItem) {
+      const { data: block } = await supabase
+        .from("study_plan_daily_blocks")
+        .select("item_id")
+        .eq("id", planId)
+        .maybeSingle()
+      const refId =
+        block && typeof (block as { item_id?: unknown }).item_id === "string"
+          ? (block as { item_id: string }).item_id
+          : null
+      if (refId) {
+        const { data: refItem } = await supabase
+          .from("study_plan_items")
+          .select(
+            `
+            id, study_plan_id, discipline_id, day_of_week,
+            duration_minutes, priority, priority_score, recommended_sessions, created_at,
+            disciplines ( id, name, area, color_hex )
+          `,
+          )
+          .eq("id", refId)
+          .maybeSingle()
+        resolvedItem = refItem
+      }
+    }
+
+    if (resolvedItem) {
+      const discipline = Array.isArray(resolvedItem.disciplines)
+        ? resolvedItem.disciplines[0]
+        : resolvedItem.disciplines
       if (discipline) {
         planItem = {
-          ...item,
+          ...resolvedItem,
           discipline,
           duration_minutes:
             customDurationMinutes && !isNaN(customDurationMinutes) && customDurationMinutes > 0
               ? customDurationMinutes
-              : item.duration_minutes,
+              : resolvedItem.duration_minutes,
         }
       }
+    }
+
+    // G2.3 — planId explícito que não resolve em nada (ex.: linha manual
+    // `cb-xxx`, URL adulterada): volta ao planejamento em vez da tela vazia
+    // silenciosa que parecia bug.
+    if (!planItem) {
+      redirect("/planejamento")
     }
   } else if (disciplineId) {
     const { data: disc } = await supabase

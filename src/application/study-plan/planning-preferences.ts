@@ -14,6 +14,7 @@ import {
   isScheduleMode,
   type ScheduleMode,
 } from "@/features/planejamento/lib/planning-form"
+import type { ExperienceLevel } from "@/domain/onboarding/onboarding.types"
 
 export const PLANNING_WEEKDAY_KEYS = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const
 export type PlanningWeekday = (typeof PLANNING_WEEKDAY_KEYS)[number]
@@ -108,6 +109,24 @@ export const PLANNING_DEFAULTS = {
   firstShiftDay: 2,
   shiftAnchorDate: "",
   studyDays: ["seg", "ter", "qua", "qui", "sex", "sab"] as PlanningWeekday[],
+}
+
+/**
+ * P1.6.2 — normaliza o nível para o enum canônico do banco
+ * (profiles_experience_level_check: BEGINNER|INTERMEDIATE|ADVANCED,
+ * tipo ExperienceLevel em domain/onboarding).
+ * Aceita os rótulos PT legados; qualquer outro valor cai em BEGINNER
+ * (default de produto, sem inventar nível). Nunca retorna "iniciante",
+ * que viola o CHECK e fazia o UPDATE do perfil falhar em silêncio.
+ */
+export function normalizeExperienceLevel(raw: unknown): ExperienceLevel {
+  if (raw === "INTERMEDIATE" || raw === "ADVANCED" || raw === "BEGINNER") return raw
+  if (typeof raw === "string") {
+    const v = raw.trim().toLowerCase()
+    if (v === "intermediário" || v === "intermediario") return "INTERMEDIATE"
+    if (v === "avançado" || v === "avancado") return "ADVANCED"
+  }
+  return "BEGINNER"
 }
 
 /**

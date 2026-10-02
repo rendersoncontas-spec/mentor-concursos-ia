@@ -24,6 +24,22 @@ export type Supabase = SupabaseClient
 
 /** Erro de violação de unicidade no Postgres. */
 const UNIQUE_VIOLATION = "23505"
+/**
+ * G1.6 (G-36): só é "duplicata idempotente" o conflito no índice de
+ * idempotência (user_id, client_operation_id). Qualquer outro 23505
+ * (ex.: PK) é erro real e deve aparecer como erro, nunca como replay
+ * silencioso — mesmo padrão do lado study (`study-session-idempotency`).
+ */
+const REVIEW_OPERATION_INDEX = "uq_review_history_user_operation"
+
+export function isReviewOperationConflict(error: unknown): boolean {
+  const err = error as { code?: string; message?: string }
+  return (
+    err?.code === UNIQUE_VIOLATION &&
+    typeof err?.message === "string" &&
+    err.message.includes(REVIEW_OPERATION_INDEX)
+  )
+}
 
 /**
  * REGRA DESTA CAMADA (Fase I.5, achados A2/A3 da auditoria): consulta que FALHOU
@@ -451,6 +467,7 @@ export async function nextDueAfter(
   )
     .gt("next_review_at", afterIso)
     .order("next_review_at", { ascending: true })
+    .order("id", { ascending: true })
     .limit(1)
     .maybeSingle()
   if (error) return null
@@ -569,8 +586,8 @@ export async function insertEvent(
     client_operation_id: input.clientOperationId,
   })
   if (error) {
-    const duplicate = (error as { code?: string }).code === UNIQUE_VIOLATION
-    return { duplicate, error: duplicate ? null : error.message }
+    const duplicate = isReviewOperationConflict(error)
+    return { duplicate, error: duplicate ? null : (error as { message?: string }).message ?? "Erro desconhecido" }
   }
   return { duplicate: false, error: null }
 }
@@ -619,6 +636,7 @@ export async function listSessionAnswers(
     .eq("user_id", userId)
     .eq("session_id", sessionId)
     .order("review_date", { ascending: true })
+    .order("id", { ascending: true })
     .limit(limit)
   if (error) return null
   return (data ?? []).map((row) => ({
@@ -640,6 +658,7 @@ export async function recentGrades(
     .eq("user_id", userId)
     .gte("review_date", sinceIso)
     .order("review_date", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit)
   if (error) return null
   return (data ?? []).map((row) => Math.round(num((row as Record<string, unknown>)["grade"], 0)))
@@ -691,6 +710,7 @@ export async function findActiveSession(
     .eq("user_id", userId)
     .eq("status", "ACTIVE")
     .order("started_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(1)
     .maybeSingle()
   return data ? mapSession(data as Record<string, unknown>) : null
@@ -708,6 +728,29 @@ export async function findSessionById(
     .eq("id", sessionId)
     .maybeSingle()
   return data ? mapSession(data as Record<string, unknown>) : null
+}
+
+/**
+ * G1.3 (G-34) — localiza o estudo que uma sessão de revisão gerou.
+ * O vínculo é `study_history.metadata.review_session_id = sessionId`.
+ * Retorna null quando não há linha OU a leitura falha (quem chama decide
+ * entre "recuperar" e "reportar erro" — nunca presume ausência em erro).
+ */
+export async function findStudyHistoryByReviewSession(
+  supabase: Supabase,
+  userId: string,
+  sessionId: string,
+): Promise<{ id: string } | null> {
+  const { data, error } = await supabase
+    .from("study_history")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("metadata->>review_session_id", sessionId)
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  const id = (data as { id?: unknown }).id
+  return typeof id === "string" && id ? { id } : null
 }
 
 /** Cria a sessão. O índice único (um ACTIVE por usuário) resolve a corrida. */

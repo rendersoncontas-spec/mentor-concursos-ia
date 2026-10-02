@@ -92,10 +92,21 @@ export async function getUserDisciplines(
   userId: string,
   targetId?: string,
 ): Promise<UserDisciplineWithDetails[]> {
-  let query = supabase
-    .from("user_disciplines")
-    .select(
-      `
+  // G1.1 (G-02): colunas pessoais podem ainda não existir (migration
+  // pendente) — nesse caso o select completo falha e repetimos sem elas.
+  const FULL_SELECT = `
+      id,
+      user_id,
+      discipline_id,
+      target_id,
+      status,
+      mastery_level,
+      custom_name,
+      custom_color_hex,
+      created_at,
+      disciplines ( id, name, area, created_at )
+    `
+  const LEGACY_SELECT = `
       id,
       user_id,
       discipline_id,
@@ -104,15 +115,22 @@ export async function getUserDisciplines(
       mastery_level,
       created_at,
       disciplines ( id, name, area, created_at )
-    `,
-    )
-    .eq("user_id", userId)
+    `
 
-  if (targetId) {
-    query = query.eq("target_id", targetId)
+  async function runQuery(columns: string) {
+    let query = supabase.from("user_disciplines").select(columns).eq("user_id", userId)
+
+    if (targetId) {
+      query = query.eq("target_id", targetId)
+    }
+
+    return query.order("created_at")
   }
 
-  const { data, error } = await query.order("created_at")
+  let { data, error } = await runQuery(FULL_SELECT)
+  if (error && /custom_name|custom_color_hex/.test(error.message)) {
+    ;({ data, error } = await runQuery(LEGACY_SELECT))
+  }
 
   if (error) {
     console.error("Error fetching user disciplines:", error)
@@ -126,6 +144,8 @@ export async function getUserDisciplines(
     target_id: string | null
     status: DisciplineStatus
     mastery_level: number
+    custom_name: string | null
+    custom_color_hex: string | null
     created_at: string
     disciplines: {
       id: string
@@ -143,9 +163,28 @@ export async function getUserDisciplines(
     target_id: row.target_id,
     status: row.status,
     mastery_level: row.mastery_level ?? 0,
+    custom_name: row.custom_name ?? null,
+    custom_color_hex: row.custom_color_hex ?? null,
     created_at: row.created_at,
     discipline: row.disciplines,
   }))
+}
+
+/**
+ * G1.1 (G-02) — display efetivo de uma disciplina para o usuário:
+ * preferência pessoal (`custom_*`) vence o catálogo global; NULL/"" volta
+ * ao global. Centraliza a regra para todas as telas.
+ */
+export function resolveUserDisciplineDisplay(
+  userDiscipline: { custom_name?: string | null; custom_color_hex?: string | null } | null | undefined,
+  discipline: { name: string; color_hex?: string | null } | null | undefined,
+): { name: string; colorHex: string | null } {
+  const customName = (userDiscipline?.custom_name ?? "").trim()
+  const customColor = (userDiscipline?.custom_color_hex ?? "").trim()
+  return {
+    name: customName !== "" ? customName : (discipline?.name ?? "Disciplina"),
+    colorHex: customColor !== "" ? customColor : (discipline?.color_hex ?? null),
+  }
 }
 
 // Seed automático de user_disciplines ao finalizar onboarding
@@ -190,27 +229,29 @@ export async function getExamEdital(
   supabase: SupabaseClient,
   examId: string,
 ): Promise<EditalTree | null> {
-  const { data: exam, error: examError } = await supabase
-    .from("exams")
-    .select("*")
-    .eq("id", examId)
-    .single()
+  // G1.8: as duas leituras só dependem de examId — em paralelo.
+  const [{ data: exam, error: examError }, { data: mappings, error: mappingError }] = await Promise.all([
+    supabase
+      .from("exams")
+      .select("*")
+      .eq("id", examId)
+      .single(),
+    supabase
+      .from("exam_subjects")
+      .select(
+        `
+      weight,
+      subjects ( id, name, slug ),
+      disciplines ( id, name, area )
+    `,
+      )
+      .eq("exam_id", examId),
+  ])
 
   if (examError || !exam) {
     console.error("Error fetching exam:", examError)
     return null
   }
-
-  const { data: mappings, error: mappingError } = await supabase
-    .from("exam_subjects")
-    .select(
-      `
-      weight,
-      subjects ( id, name, slug ),
-      disciplines ( id, name, area )
-    `,
-    )
-    .eq("exam_id", examId)
 
   if (mappingError || !mappings) {
     console.error("Error fetching exam mappings:", mappingError)
@@ -439,7 +480,9 @@ export async function getDisciplinesPageData(
 
   const disciplineCards = userDisciplines.map((ud) => {
     const discId = ud.discipline_id
-    const discName = ud.discipline?.name || "Disciplina"
+    // G1.1 (G-02): preferência pessoal vence o catálogo global.
+    const display = resolveUserDisciplineDisplay(ud, ud.discipline)
+    const discName = display.name
 
     const discAttempts = attempts.filter((a) => a.discipline_id === discId)
     let correctCount = discAttempts.filter((a) => a.correct).length
@@ -476,8 +519,8 @@ export async function getDisciplinesPageData(
       questionsSolved: totalCount,
       accuracy: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : null,
       totalMinutes,
-      color: disciplineColorHex(discId, ud.discipline?.color_hex ?? null),
-      colorHex: ud.discipline?.color_hex ?? null,
+      color: disciplineColorHex(discId, display.colorHex),
+      colorHex: display.colorHex,
       status: ud.status,
       area: ud.discipline?.area || null,
     }

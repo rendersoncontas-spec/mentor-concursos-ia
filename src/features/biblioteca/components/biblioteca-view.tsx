@@ -13,6 +13,7 @@ import {
   deleteLibraryMaterialAction,
   listLibraryMaterialsAction,
 } from "@/application/library/library.action"
+import { classifyLibraryUrl, isSafeHref } from "@/domain/library/library-url"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -82,6 +83,11 @@ export function BibliotecaView({ initialMaterials }: { initialMaterials?: Librar
     e.preventDefault()
     if (!titleInput.trim()) {
       toast.error("Informe o título do material.")
+      return
+    }
+    // G1.1 (G-28): checagem local por UX — o servidor decide (fail-closed).
+    if (classifyLibraryUrl(urlInput) === "invalid") {
+      toast.error("URL inválida. Use um link http:// ou https://.")
       return
     }
 
@@ -211,11 +217,12 @@ export function BibliotecaView({ initialMaterials }: { initialMaterials?: Librar
               className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_110px_100px_96px] items-center gap-x-4 gap-y-0.5 px-4 py-2.5 hover:bg-muted/30 transition-colors"
             >
               <div className="min-w-0">
-                {item.url ? (
+                {/* G1.1 (G-28): linhas legadas com URL insegura não viram link. */}
+                {isSafeHref(item.url) ? (
                   <a
                     href={item.url}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="text-sm font-medium text-foreground hover:text-primary hover:underline underline-offset-2 line-clamp-1"
                   >
                     {item.title}
@@ -238,12 +245,12 @@ export function BibliotecaView({ initialMaterials }: { initialMaterials?: Librar
               </span>
 
               <div className="flex items-center justify-end gap-0.5">
-                {item.url ? (
+                {isSafeHref(item.url) ? (
                   <>
                     <a
                       href={item.url}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       title="Abrir material"
                       aria-label={`Abrir ${item.title}`}
@@ -254,7 +261,7 @@ export function BibliotecaView({ initialMaterials }: { initialMaterials?: Librar
                       href={item.url}
                       download={item.type === "PDF" || item.type === "Resumo"}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       title="Baixar"
                       aria-label={`Baixar ${item.title}`}

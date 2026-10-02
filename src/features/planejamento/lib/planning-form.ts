@@ -255,11 +255,13 @@ export function validatePlanningForm(values: PlanningFormValues): PlanningFormVa
 /**
  * Monta o payload enviado à Server Action. Garante que TODAS as disciplinas
  * selecionadas entrem no mapa (com default 2.5 quando o slider não foi tocado).
+ * G2.1: inclui o ritmo (style + min/max) — antes era validado e descartado.
  */
 export function buildPlanningPayload(values: PlanningFormValues): {
   horasSemana: number
   importanceMap: Record<string, number>
   knowledgeMap: Record<string, number>
+  ritmo: { style: SessionStyle; minMinutes: number; maxMinutes: number }
 } {
   const importanceMap: Record<string, number> = {}
   const knowledgeMap: Record<string, number> = {}
@@ -273,6 +275,7 @@ export function buildPlanningPayload(values: PlanningFormValues): {
     horasSemana: values.weeklyHours,
     importanceMap,
     knowledgeMap,
+    ritmo: { style: values.sessionStyle, minMinutes: values.minMinutes, maxMinutes: values.maxMinutes },
   }
 }
 

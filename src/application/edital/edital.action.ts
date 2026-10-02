@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache"
 
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
+import {
+  canonicalDisciplineKey,
+  isValidDisciplineDisplayName,
+  normalizeDisciplineDisplay,
+} from "@/domain/disciplines/discipline-naming"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export async function addCustomDisciplineAction(
@@ -16,26 +21,67 @@ export async function addCustomDisciplineAction(
     } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "Não autenticado." }
 
-    const discName = name.trim()
-    if (!discName) return { success: false, error: "Nome da matéria é obrigatório." }
+    // G1.1 (G-17/G-27): nome validado + resolução canônica. A linha global só
+    // é criada quando o nome canônico é genuinamente novo.
+    if (!isValidDisciplineDisplayName(name)) {
+      return { success: false, error: "Nome da matéria é obrigatório." }
+    }
+    const discName = normalizeDisciplineDisplay(name)
+    const discKey = canonicalDisciplineKey(discName)
 
-    // 1. Procurar disciplina global
-    let { data: d } = await supabase
-      .from("disciplines")
-      .select("id, name")
-      .ilike("name", discName)
-      .maybeSingle()
+    // 1. Procurar disciplina global (name_key primeiro, legado depois)
+    let d: { id: string; name: string } | null = null
+    try {
+      const { data, error } = await supabase
+        .from("disciplines")
+        .select("id, name")
+        .eq("name_key", discKey)
+        .maybeSingle()
+      if (!error && data) d = data
+    } catch {
+      // Coluna ainda não existe → legado abaixo.
+    }
+    if (!d) {
+      const { data } = await supabase
+        .from("disciplines")
+        .select("id, name")
+        .ilike("name", discName)
+        .order("name")
+        .order("id")
+        .limit(1)
+        .maybeSingle()
+      d = data ?? null
+    }
 
     // 2. Se não existe, cria global (com cor automática da paleta central)
     if (!d) {
       const color = await pickNextDisciplineColor(supabase)
-      const res = await supabase
+      const base = { name: discName, area: "Geral", ...(color ? { color_hex: color } : {}) }
+      const withKey = await supabase
         .from("disciplines")
-        .insert({ name: discName, area: "Geral", ...(color ? { color_hex: color } : {}) })
+        .insert({ ...base, name_key: discKey })
         .select("id, name")
-        .single()
-      if (res.error) return { success: false, error: "Erro ao criar matéria global." }
-      d = res.data
+        .maybeSingle()
+      if (!withKey.error && withKey.data) {
+        d = withKey.data
+      } else {
+        // Coluna ausente (pré-migration) ou corrida: tenta sem name_key e
+        // resolve de novo antes de desistir.
+        const legacy = await supabase.from("disciplines").insert(base).select("id, name").maybeSingle()
+        if (!legacy.error && legacy.data) {
+          d = legacy.data
+        } else {
+          const { data: retry } = await supabase
+            .from("disciplines")
+            .select("id, name")
+            .ilike("name", discName)
+            .order("name")
+            .order("id")
+            .limit(1)
+            .maybeSingle()
+          d = retry ?? null
+        }
+      }
     }
 
     if (!d) return { success: false, error: "Não foi possível resolver a matéria." }
@@ -86,7 +132,9 @@ export async function saveCustomTopicsAction(
 
     if (!targetData) return { success: false, error: "Concurso não encontrado." }
 
-    // 2. Fazer o parser do JSON e injetar as novas topics
+    // 2. Fazer o parser do JSON e injetar as novas topics.
+    // G1.6 (G-42): JSON corrompido NÃO pode virar `{}` e ser sobrescrito —
+    // isso apagava silenciosamente examDate/examName/etc. Erro honesto.
     let meta: { customEdital?: Record<string, { id: string }[]> } = {}
     if (targetData.main_study_source) {
       if (typeof targetData.main_study_source === "object") {
@@ -98,7 +146,7 @@ export async function saveCustomTopicsAction(
         try {
           meta = JSON.parse(targetData.main_study_source)
         } catch {
-          meta = {}
+          return { success: false, error: "Dados do concurso inválidos. Não foi possível salvar." }
         }
       }
     }
@@ -125,13 +173,40 @@ export async function saveCustomTopicsAction(
 export async function searchDisciplinesAction(query: string) {
   try {
     const supabase = await createClient()
-    const { data } = await supabase
-      .from("disciplines")
-      .select("name")
-      .ilike("name", `%${query}%`)
-      .limit(10)
+    const trimmed = query.trim()
+    if (!trimmed) return { success: true, data: [] as string[] }
+    // G1.1 (G-27): busca pelo display e pela chave canônica (mesma regra do
+    // resolve/insert). name_key pode não existir ainda → fallback só display.
+    const key = canonicalDisciplineKey(trimmed)
+    // Sanitiza curingas/reservados do PostgREST antes de interpolar no .or().
+    const safe = (s: string) => s.replace(/[%*,()"]/g, " ").trim()
+    const safeName = safe(trimmed)
+    const safeKey = safe(key)
+    let rows: { name: string }[] | null = null
+    try {
+      const res = await supabase
+        .from("disciplines")
+        .select("name")
+        .or(`name.ilike.%${safeName}%,name_key.ilike.%${safeKey}%`)
+        .order("name")
+        .order("id")
+        .limit(10)
+      if (!res.error) rows = res.data
+    } catch {
+      rows = null
+    }
+    if (rows === null) {
+      const { data } = await supabase
+        .from("disciplines")
+        .select("name")
+        .ilike("name", `%${trimmed}%`)
+        .order("name")
+        .order("id")
+        .limit(10)
+      rows = data ?? []
+    }
 
-    return { success: true, data: data?.map((d) => d.name) || [] }
+    return { success: true, data: rows?.map((d) => d.name) || [] }
   } catch {
     return { success: false, data: [] }
   }
@@ -240,7 +315,9 @@ export async function removeCustomTopicAction(
         try {
           meta = JSON.parse(targetData.main_study_source)
         } catch {
-          meta = {}
+          // G1.6 (G-42): mesmo contrato de saveCustomTopicsAction — JSON
+          // corrompido vira erro honesto, nunca overwrite com `{}`.
+          return { success: false, error: "Dados do concurso inválidos. Não foi possível salvar." }
         }
       }
     }

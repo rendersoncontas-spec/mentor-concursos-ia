@@ -126,6 +126,8 @@ export async function getCatalogDisciplineByName(
     .from("disciplines")
     .select("id, name, area, created_at")
     .ilike("name", name.trim())
+    .order("name")
+    .order("id")
     .limit(1)
     .maybeSingle()
 

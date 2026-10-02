@@ -1,4 +1,4 @@
-# Mentor Concursos IA
+# NomeIA (Mentor Concursos IA)
 
 A melhor plataforma de mentoria inteligente para concursos públicos do Brasil.
 
@@ -45,6 +45,21 @@ O projeto utiliza **Clean Architecture** dividida em 5 camadas principais:
    ```
 
 4. Acesse [http://localhost:3000](http://localhost:3000) no seu navegador.
+
+## ✅ Testes e Build
+
+```bash
+npm test            # suíte completa (1766 testes, 315 suites)
+npx tsc --noEmit    # typecheck
+npm run build       # build de produção
+```
+
+## 📲 PWA / Offline
+
+- Manifest instalável (`src/app/manifest.ts`) + ícones em `public/`.
+- Offline via IndexedDB (`nomeia-offline`) + fila de sincronização com `operationId`.
+- **Não há Service Worker**: não chamar de "offline completo via SW".
+- Detalhes do release em `docs/release-readiness.md` e `docs/release-notes-g1.md`.
 
 ## 🔒 Qualidade de Código
 

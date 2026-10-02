@@ -85,6 +85,7 @@ export async function getUserAttempts(
     `)
     .eq('user_id', userId)
     .order('answered_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(limit)
 
   if (error) return []

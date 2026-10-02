@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache"
 
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
+import {
+  canonicalDisciplineKey,
+  normalizeDisciplineDisplay,
+} from "@/domain/disciplines/discipline-naming"
 import type {
   CreateCycleInput,
   CycleItemDifficulty,
@@ -21,9 +25,9 @@ import {
   skipCurrentCycleItem,
 } from "./cycle-study-registration.service"
 
-async function getUser() {
+async function getUser(auditContext?: Parameters<typeof getEffectiveUserId>[1]) {
   const supabase = await createClient()
-  const effectiveUserId = await getEffectiveUserId(supabase)
+  const effectiveUserId = await getEffectiveUserId(supabase, auditContext)
   if (!effectiveUserId) throw new Error("Usuário não autenticado.")
   return { supabase, userId: effectiveUserId }
 }
@@ -116,6 +120,9 @@ export async function createCycleAction(input: CreateCycleInput) {
           .from("disciplines")
           .select("id")
           .ilike("name", discName)
+          .order("name")
+          .order("id")
+          .limit(1)
           .maybeSingle()
 
         if (existingDisc) {
@@ -291,24 +298,31 @@ export async function createCycleAction(input: CreateCycleInput) {
  */
 export async function activateCycleAction(cycleId: string) {
   try {
-    const { supabase, userId } = await getUser()
+    const { supabase, userId } = await getUser({ action: "ACTIVATE_CYCLE", resource: cycleId })
+
+    // G1.15 — ativa o ALVO primeiro e só pausa os demais depois (mesma
+    // ordem de activatePlanAction). Antes: pausava tudo e só então ativava —
+    // alvo inválido deixava o usuário sem nenhum ciclo ativo.
+    const { data: activated, error: activateError } = await supabase
+      .from("study_cycles")
+      .update({ status: "ACTIVE" })
+      .eq("id", cycleId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle()
+
+    if (activateError) {
+      console.error("[activateCycleAction] Erro:", activateError)
+      return { success: false, error: "Erro ao ativar ciclo." }
+    }
+    if (!activated) return { success: false, error: "Ciclo não encontrado." }
 
     await supabase
       .from("study_cycles")
       .update({ status: "PAUSED" })
       .eq("user_id", userId)
       .eq("status", "ACTIVE")
-
-    const { error } = await supabase
-      .from("study_cycles")
-      .update({ status: "ACTIVE" })
-      .eq("id", cycleId)
-      .eq("user_id", userId)
-
-    if (error) {
-      console.error("[activateCycleAction] Erro:", error)
-      return { success: false, error: "Erro ao ativar ciclo." }
-    }
+      .neq("id", cycleId)
 
     revalidatePath("/ciclos")
     revalidatePath("/dashboard")
@@ -324,7 +338,7 @@ export async function activateCycleAction(cycleId: string) {
  */
 export async function pauseCycleAction(cycleId: string) {
   try {
-    const { supabase, userId } = await getUser()
+    const { supabase, userId } = await getUser({ action: "PAUSE_CYCLE", resource: cycleId })
 
     const { error } = await supabase
       .from("study_cycles")
@@ -351,7 +365,11 @@ export async function pauseCycleAction(cycleId: string) {
  */
 export async function deleteCycleAction(cycleId: string) {
   try {
-    const { supabase, userId } = await getUser()
+    // Fase G2.6.1: auditoria de modo suporte agora é automática via
+    // getEffectiveUserId(supabase, auditContext) — substitui o bloco manual
+    // que existia só aqui (cookie + support_sessions + auditSupportAction),
+    // que era a ÚNICA mutação de todo o app com essa checagem.
+    const { supabase, userId } = await getUser({ action: "DELETE_CYCLE", resource: cycleId })
 
     const { error } = await supabase
       .from("study_cycles")
@@ -362,34 +380,6 @@ export async function deleteCycleAction(cycleId: string) {
     if (error) {
       console.error("[deleteCycleAction] Erro:", error)
       return { success: false, error: "Erro ao excluir ciclo." }
-    }
-
-    // Audita se executado sob impersonation (modo suporte)
-    try {
-      const { cookies } = await import("next/headers")
-      const { SUPPORT_SESSION_COOKIE_NAME } = await import("@/application/admin/auth-guard")
-      const token = (await cookies()).get(SUPPORT_SESSION_COOKIE_NAME)?.value
-      if (token) {
-        const { data: supportSession } = await supabase
-          .from("support_sessions")
-          .select("id, moderator_id, target_user_id")
-          .eq("session_token", token)
-          .eq("status", "ACTIVE")
-          .maybeSingle()
-        if (supportSession) {
-          const { auditSupportAction } = await import("@/application/admin/admin.actions")
-          await auditSupportAction(supabase, {
-            supportSessionId: supportSession.id,
-            moderatorId: supportSession.moderator_id,
-            targetUserId: supportSession.target_user_id,
-            action: "DELETE_CYCLE",
-            resource: cycleId,
-            result: "success",
-          })
-        }
-      }
-    } catch {
-      // Auditoria nunca quebra a ação principal
     }
 
     revalidatePath("/ciclos")
@@ -409,7 +399,7 @@ export async function updateCycleAction(
   data: { name?: string; contest_name?: string | null; edital_name?: string | null }
 ) {
   try {
-    const { supabase, userId } = await getUser()
+    const { supabase, userId } = await getUser({ action: "UPDATE_CYCLE", resource: cycleId })
 
     const { error } = await supabase
       .from("study_cycles")
@@ -434,7 +424,7 @@ export async function updateCycleAction(
  */
 export async function reorderCycleItemsAction(cycleId: string, orderedItemIds: string[]) {
   try {
-    const { supabase, userId } = await getUser()
+    const { supabase, userId } = await getUser({ action: "REORDER_CYCLE_ITEMS", resource: cycleId })
 
     const { data: cycle } = await supabase
       .from("study_cycles")
@@ -595,7 +585,7 @@ export async function concludeCycleRoundAction(cycleId: string) {
  */
 export async function updateFullCycleAction(input: UpdateCycleInput) {
   try {
-    const { supabase, userId } = await getUser()
+    const { supabase, userId } = await getUser({ action: "UPDATE_FULL_CYCLE", resource: input.id })
 
     if (!input.name || !input.name.trim()) {
       return { success: false, error: "Nome do ciclo é obrigatório." }
@@ -643,29 +633,55 @@ export async function updateFullCycleAction(input: UpdateCycleInput) {
 
       let finalDisciplineId = item.disciplineId
 
-      // Criar/identificar disciplina se necessário
+      // Criar/identificar disciplina se necessário (G1.3/G-08: resolução
+      // canônica — name_key primeiro para não duplicar por case/espaço).
       if (!finalDisciplineId && item.disciplineName) {
-        const discName = item.disciplineName.trim()
-        const { data: existingDisc } = await supabase
-          .from("disciplines")
-          .select("id")
-          .ilike("name", discName)
-          .maybeSingle()
+        const discName = normalizeDisciplineDisplay(item.disciplineName)
+        const discKey = canonicalDisciplineKey(discName)
+        let existingDisc: { id: string } | null = null
+        try {
+          const found = await supabase
+            .from("disciplines")
+            .select("id")
+            .eq("name_key", discKey)
+            .maybeSingle()
+          if (found.data) existingDisc = found.data as { id: string }
+        } catch {
+          // Coluna ainda ausente: legado abaixo.
+        }
+        if (!existingDisc) {
+          const { data } = await supabase
+            .from("disciplines")
+            .select("id")
+            .ilike("name", discName)
+            .order("name")
+            .order("id")
+            .limit(1)
+            .maybeSingle()
+          existingDisc = (data as { id: string } | null) ?? null
+        }
 
         if (existingDisc) {
           finalDisciplineId = existingDisc.id
         } else {
           const color = await pickNextDisciplineColor(supabase)
-          const { data: newDisc } = await supabase
+          const base = {
+            name: discName,
+            area: "Geral",
+            ...(color ? { color_hex: color } : {}),
+          }
+          const withKey = await supabase
             .from("disciplines")
-            .insert({
-              name: discName,
-              area: "Geral",
-              ...(color ? { color_hex: color } : {}),
-            })
+            .insert({ ...base, name_key: discKey })
             .select("id")
-            .single()
-          if (newDisc) finalDisciplineId = newDisc.id
+            .maybeSingle()
+          const created =
+            !withKey.error && withKey.data
+              ? (withKey.data as { id: string })
+              : (
+                  await supabase.from("disciplines").insert(base).select("id").maybeSingle()
+                ).data as { id: string } | null
+          if (created) finalDisciplineId = created.id
         }
       }
 
@@ -701,39 +717,25 @@ export async function updateFullCycleAction(input: UpdateCycleInput) {
       }
     }
 
-    // 3. Ajuste de segurança do índice atual se a quantidade de matérias mudou
-    const { data: remainingItems } = await supabase
-      .from("study_cycle_items")
-      .select("id")
-      .eq("cycle_id", input.id)
-      .order("order", { ascending: true })
-
-    const totalCount = (remainingItems || []).length
-    if (totalCount > 0) {
-      const { data: cycleData } = await supabase
-        .from("study_cycles")
-        .select("current_item_index")
-        .eq("id", input.id)
-        .single()
-
-      if (cycleData && cycleData.current_item_index >= totalCount) {
-        await supabase
-          .from("study_cycles")
-          .update({
-            current_item_index: Math.max(0, totalCount - 1),
-            current_item_progress_min: 0,
-          })
-          .eq("id", input.id)
+    // 3. Reconciliação canônica (G1.3/G-08): a composição mudou, então o
+    // cursor/progresso/round são refeitos pelo Cycle Engine a partir do
+    // histórico real — nunca por clamp manual de índice. Sem isso, o cursor
+    // podia apontar para item removido ou zerar progresso indevidamente.
+    const reconcile = await reconcileCycleProgress()
+    if (!reconcile.success) {
+      return {
+        success: false,
+        error: "Ciclo atualizado, mas a reconciliação falhou. Recarregue e confira o ciclo.",
       }
     }
 
     revalidatePath("/ciclos")
     revalidatePath("/dashboard")
+    revalidatePath("/dashboard/history")
     return { success: true }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Erro ao atualizar ciclo."
-    console.error("[updateFullCycleAction] Erro:", err)
-    return { success: false, error: message }
+  } catch (err) {
+    console.error("updateFullCycleAction:", err)
+    return { success: false, error: "Erro interno ao atualizar ciclo." }
   }
 }
 

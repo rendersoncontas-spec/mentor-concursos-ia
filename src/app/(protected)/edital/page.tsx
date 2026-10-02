@@ -521,7 +521,9 @@ async function getActiveConcursoData() {
 
     // 2. Transforma no formato DisciplineData esperado pelo Accordion
     const editalData: DisciplineData[] = userDisciplines.map((ud, idx) => {
-      const name = ud.discipline?.name || "Desconhecida"
+      // G1.1 (G-02): preferência pessoal de nome vence o catálogo global.
+      const customName = (ud.custom_name ?? "").trim()
+      const name = customName !== "" ? customName : (ud.discipline?.name || "Desconhecida")
       const discId = ud.discipline_id || `disc-${idx}`
 
       const customTopics = customEdital[discId] || getPreRegisteredTopics(name)

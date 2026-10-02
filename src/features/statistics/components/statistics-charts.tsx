@@ -292,7 +292,7 @@ export function HeatmapCalendar({
                   return (
                     <div
                       key={d}
-                      className={`h-[13px] w-[13px] rounded-[3px] ${HEAT_LEVELS[level]} ${minutes > 0 ? "cursor-pointer" : ""}`}
+                      className={`h-[13px] w-[13px] rounded-[3px] ${HEAT_LEVELS[level]}`}
                       onMouseEnter={() => setHover({ date: d, minutes })}
                       onMouseLeave={() => setHover(null)}
                       title={`${formatBRDate(d)} — ${minutes > 0 ? `${minutes}min` : "sem estudo"}`}

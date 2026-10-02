@@ -64,19 +64,44 @@ describe("finalizeSession: trava de idempotencia via UPDATE condicional (compare
     assert.ok(/\.select\(("id"|'id')\)/.test(updateChain), "o UPDATE deve pedir .select(\"id\") de volta para saber se afetou alguma linha")
     assert.ok(updateChain.includes(".maybeSingle()"), "deve usar .maybeSingle() para obter null quando nenhuma linha foi afetada")
 
+    // G1.3 (G-34): quem perde a corrida verifica se o vencedor já registrou o
+    // estudo (findStudyHistoryByReviewSession) antes do no-op — nunca afirma
+    // "concluído" sem estudo, nunca duplica.
     assert.ok(
-      /if\s*\(!claimedSession\)\s*return\s*\{\s*cycleSyncError:\s*null\s*\}/.test(body),
-      "deve retornar cedo, sem duplicar o insert em study_history, quando nenhuma linha foi afetada (outra chamada ja finalizou a sessao)",
+      /if\s*\(!claimedSession\)/.test(body),
+      "deve tratar a derrota no compare-and-swap",
+    )
+    const loserIdx = body.indexOf("if (!claimedSession)")
+    const loserBlock = body.slice(loserIdx, loserIdx + 600)
+    assert.ok(
+      loserBlock.includes("findStudyHistoryByReviewSession"),
+      "quem perde a corrida confere o estudo do vencedor antes de responder",
     )
   })
 
-  it("so grava study_history/reconcilia o ciclo DEPOIS de confirmar que esta chamada venceu a corrida", () => {
+  it("so grava study_history DEPOIS de confirmar claim vencido ou recuperação checada", () => {
     const source = readSource(SERVICE_PATH)
     const body = extractFinalizeSessionBody(source)
 
-    const guardIdx = body.indexOf("if (!claimedSession) return")
-    const historyInsertIdx = body.indexOf('supabase.from("study_history").insert(')
-    assert.ok(guardIdx !== -1 && historyInsertIdx !== -1, "ambos devem existir")
-    assert.ok(guardIdx < historyInsertIdx, "a guarda de idempotencia deve vir ANTES do insert em study_history")
+    // Caminho claim: a guarda do perdedor vem antes de qualquer gravação.
+    const guardIdx = body.indexOf("if (!claimedSession)")
+    assert.ok(guardIdx !== -1, "a guarda de idempotência deve existir")
+    // Caminho recuperação: sessão não-ACTIVE passa por recover antes de concluir.
+    assert.ok(
+      body.includes("recoverCompletedReviewSession("),
+      "sessão já encerrada passa por recuperação, não por sucesso cego",
+    )
+    // Ambos os caminhos de gravação mapeiam falha de insert para erro
+    // (nunca completed:true falso): um no corpo do finalize, outro no helper
+    // de recuperação.
+    const inBody = body.match(/if \(!inserted\.ok\)/g) ?? []
+    const helperStart = source.indexOf("async function recoverCompletedReviewSession(")
+    const helperEnd = source.indexOf("\nexport async function", helperStart + 1)
+    const helper = source.slice(helperStart, helperEnd === -1 ? source.length : helperEnd)
+    const inHelper = helper.match(/if \(!inserted\.ok\)/g) ?? []
+    assert.ok(
+      inBody.length >= 1 && inHelper.length >= 1,
+      "claim vencido e recuperação devem mapear falha de insert para erro (nunca completed:true falso)",
+    )
   })
 })

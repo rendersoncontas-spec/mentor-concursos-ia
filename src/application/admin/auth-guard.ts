@@ -107,13 +107,58 @@ export const getEffectiveSessionUser = cache(async function getEffectiveSessionU
 })
 
 /**
- * Retorna o ID do usuário efetivo para operações (próprio usuário ou estudante em suporte).
+ * Contexto de auditoria para uma mutação sob possível sessão de suporte.
+ * `resource` é um identificador útil do registro afetado quando disponível
+ * (id da linha, chave composta como string etc.) — nunca dado sensível.
+ */
+export interface SupportAuditContext {
+  action: string
+  resource?: string
+}
+
+/**
+ * Retorna o ID do usuário efetivo para operações (próprio usuário ou
+ * estudante em suporte).
+ *
+ * Fase G2.6.1 (auditoria de segurança — achado ALTO "trilha de auditoria do
+ * modo suporte incompleta"): quando `auditContext` é informado e a chamada
+ * ocorre durante uma sessão de suporte ativa, esta função registra
+ * automaticamente em `audit_logs` quem fez o quê a quem — sem que cada
+ * Server Action precise reimplementar a leitura de cookie/sessão de suporte
+ * (o padrão manual que existia só em `deleteCycleAction`, e só ali).
+ *
+ * Chamadas de LEITURA continuam passando sem `auditContext` (comportamento
+ * idêntico ao anterior, nenhuma auditoria é gerada). Só mutações
+ * (insert/update/delete/upsert) alcançáveis em modo suporte devem passar um
+ * `auditContext`.
+ *
+ * Importante: a auditoria roda FORA de `getEffectiveSessionUser` (que é
+ * memorizada por requisição via `cache()`) propositalmente — se o insert de
+ * auditoria estivesse dentro da função memorizada, a segunda chamada na
+ * mesma requisição (ex.: uma leitura seguida de uma mutação, com contextos
+ * de auditoria diferentes) reaproveitaria o resultado em cache e nunca
+ * executaria de novo, perdendo o registro da mutação.
  */
 export async function getEffectiveUserId(
   supabase: SupabaseClient,
+  auditContext?: SupportAuditContext,
 ): Promise<string | null> {
   const effectiveUser = await getEffectiveSessionUser(supabase)
-  return effectiveUser ? effectiveUser.id : null
+  if (!effectiveUser) return null
+
+  if (auditContext && effectiveUser.isSupportMode && effectiveUser.supportSession) {
+    const { auditSupportAction } = await import("./admin-audit")
+    await auditSupportAction(supabase, {
+      supportSessionId: effectiveUser.supportSession.id,
+      moderatorId: effectiveUser.operatorId,
+      targetUserId: effectiveUser.id,
+      action: auditContext.action,
+      resource: auditContext.resource ?? "",
+      result: "success",
+    })
+  }
+
+  return effectiveUser.id
 }
 
 /**
@@ -160,6 +205,131 @@ export async function requireAdmin(
   if (role !== "admin") {
     throw new Error("Acesso negado: operação restrita a administradores.")
   }
+}
+
+/**
+ * G1.1 (G-01/G-03) — resolução canônica do papel do ALVO para decisões de
+ * autorização.
+ *
+ * Por que não `getUserRole` direto: ela lê `user_roles` com o JWT do operador.
+ * Se a RLS expuser só a própria linha, ler o papel de OUTRO usuário retorna
+ * 0 linhas e o fallback "user" permitiria `moderator → admin` (bypass de
+ * hierarquia). Este resolvedor usa a RPC `get_user_role` (SECURITY DEFINER,
+ * contorna a RLS) e é FAIL-CLOSED:
+ *
+ * - RPC ok com papel válido → o papel real (mesmo que o operador não possa
+ *   ler a tabela diretamente).
+ * - RPC com erro, valor inesperado ou alvo sem papel resolvível → `null`.
+ *   Quem chama NUNCA pode interpretar `null` como "user".
+ *
+ * Compatibilidade: se a RPC ainda não existir no banco (base sem a migration
+ * de moderação), tenta a leitura direta legada; se ela trouxer uma linha
+ * real, usa; senão, `null` (fail-closed).
+ */
+export type TargetRoleResolution = UserRole | null
+
+function asUserRole(value: unknown): UserRole | null {
+  if (value === "admin" || value === "moderator" || value === "user") return value
+  return null
+}
+
+export async function resolveTargetRoleForAuthorization(
+  supabase: SupabaseClient,
+  targetUserId: string,
+): Promise<TargetRoleResolution> {
+  if (!targetUserId) return null
+
+  try {
+    const { data, error } = await supabase.rpc("get_user_role", {
+      target_user_id: targetUserId,
+    })
+    if (!error) {
+      const role = asUserRole(data)
+      // `null` (função endurecida pós-G-04) = alvo inexistente ou papel
+      // desconhecido → fail-closed. Valor válido (incluindo "user" para
+      // usuário real) → decisão pela matriz.
+      return role
+    }
+  } catch {
+    // RPC ausente/falha de transporte → tenta o caminho legado abaixo.
+  }
+
+  // Legado (somente compatibilidade): leitura direta. Só vale se trouxer
+  // UMA LINHA REAL — ausência de linha para outro usuário NÃO é "user",
+  // é "desconhecido" (a RLS pode estar ocultando um admin).
+  try {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", targetUserId)
+      .maybeSingle()
+    if (error || !data?.role) return null
+    return asUserRole(data.role)
+  } catch {
+    return null
+  }
+}
+
+export interface AccessDecision {
+  allowed: boolean
+  reason: string
+}
+
+/**
+ * G1.1 (G-01) — decisão única para INICIAR suporte/impersonação.
+ * Matriz (contrato preservado): user→ninguém; moderator→user;
+ * moderator→moderator/admin negados; admin→user/moderator; admin→admin negado.
+ * `targetRole === null` (falha de resolução) → NEGADO (fail-closed).
+ */
+export function decideSupportAccess(
+  operatorRole: UserRole,
+  targetRole: TargetRoleResolution,
+): AccessDecision {
+  if (targetRole === null) {
+    return {
+      allowed: false,
+      reason: "Não foi possível verificar o papel do usuário alvo. Acesso negado por segurança.",
+    }
+  }
+  if (canOperatorAccessTarget(operatorRole, targetRole)) {
+    return { allowed: true, reason: "ok" }
+  }
+  if (operatorRole === "user") {
+    return { allowed: false, reason: "Operação não permitida para este perfil." }
+  }
+  return {
+    allowed: false,
+    reason: "Operação não permitida: moderadores não podem acessar contas de administradores.",
+  }
+}
+
+/**
+ * G1.1 (G-03) — decisão única para LEITURAS administrativas
+ * (`searchUsers`, `getUserDetails`). Regra: moderator lê user/moderator,
+ * NUNCA admin; admin lê todos. `null` → negado (fail-closed).
+ * (Suporte continua mais restrito: moderator→moderator é negado lá.)
+ */
+export function decideAdminReadAccess(
+  operatorRole: UserRole,
+  targetRole: TargetRoleResolution,
+): AccessDecision {
+  if (targetRole === null) {
+    return {
+      allowed: false,
+      reason: "Não foi possível verificar o papel do usuário alvo. Acesso negado por segurança.",
+    }
+  }
+  if (operatorRole === "admin") return { allowed: true, reason: "ok" }
+  if (operatorRole === "moderator") {
+    if (targetRole === "admin") {
+      return {
+        allowed: false,
+        reason: "Operação não permitida: moderadores não podem acessar contas de administradores.",
+      }
+    }
+    return { allowed: true, reason: "ok" }
+  }
+  return { allowed: false, reason: "Acesso negado: operação restrita à equipe de moderação e administração." }
 }
 
 /**

@@ -497,13 +497,144 @@ async function sessionState(
  */
 export interface FinalizeSessionResult {
   cycleSyncError: string | null
-  /** `true` quando ESTA chamada encerrou a sessão (a segunda chamada devolve `false`). */
+  /**
+   * G1.3 (G-34): `true` significa "sessão encerrada E estudo registrado"
+   * (por esta chamada ou recuperado de tentativa anterior). Nunca `true`
+   * com estudo ausente.
+   */
   completed?: boolean
   /**
-   * Erro controlado: a sessão continua ACTIVE e pode ser encerrada de novo.
-   * Nunca é usado para "sessão já encerrada" — isso é caminho normal.
+   * Erro controlado: a sessão continua ACTIVE (tente de novo) OU está
+   * COMPLETED mas o estudo ainda não foi registrado (tente de novo — a
+   * repetição recupera em vez de duplicar). Nunca é usado para "sessão já
+   * encerrada com estudo ok" — isso é caminho normal.
    */
   error?: string | null
+}
+
+/**
+ * G1.3 (G-34) — grava o estudo de uma sessão de revisão em study_history.
+ * Retorna ok:false quando o INSERT falha (quem chama reporta erro recuperável
+ * em vez de "sucesso" falso).
+ */
+async function insertReviewStudyHistory(
+  supabase: Supabase,
+  userId: string,
+  session: { id: string; startedAt: string },
+  answers: { reviewItemId: string }[],
+  mainDiscipline: string,
+  nowIso: string,
+): Promise<{ ok: boolean }> {
+  // Fase I.6 (M8): uma regra só de duração, em domain/reviews/session-duration.
+  const totalSeconds = reviewSessionSeconds(session.startedAt, nowIso)
+  const durationMinutes = reviewSessionMinutes(totalSeconds)
+
+  const { error: historyError } = await supabase.from("study_history").insert({
+    user_id: userId,
+    discipline_id: mainDiscipline,
+    study_source: "REVIEW",
+    study_type: "REVISAO",
+    technique: null,
+    active_minutes: durationMinutes,
+    paused_minutes: 0,
+    duration_minutes: durationMinutes,
+    completed: true,
+    interrupted: false,
+    started_at: session.startedAt,
+    finished_at: nowIso,
+    notes: `Sessão de revisão — ${answers.length} ${answers.length === 1 ? "item" : "itens"}`,
+    metadata: {
+      duration_seconds: totalSeconds,
+      review_session_id: session.id,
+      reviews_completed: answers.length,
+    },
+  })
+
+  if (historyError) {
+    console.error("[Revisões] Erro ao gravar o estudo da sessão de revisão:", historyError)
+    return { ok: false }
+  }
+  return { ok: true }
+}
+
+/** Disciplina do estudo = a mais revisada na sessão (empate: id menor). */
+function mainDisciplineOf(disciplineIds: string[]): string | null {
+  if (disciplineIds.length === 0) return null
+  const countByDiscipline = new Map<string, number>()
+  disciplineIds.forEach((id) => countByDiscipline.set(id, (countByDiscipline.get(id) ?? 0) + 1))
+  return (
+    [...countByDiscipline.entries()].sort(
+      (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1),
+    )[0]?.[0] ?? null
+  )
+}
+
+/**
+ * G1.3 (G-34) — recupera sessão COMPLETED cujo estudo pode não ter sido
+ * registrado (CAS venceu, INSERT falhou): tenta registrar agora em vez de
+ * declarar sucesso falso. Idempotente: se o estudo já existe, só confirma.
+ */
+async function recoverCompletedReviewSession(
+  supabase: Supabase,
+  userId: string,
+  session: { id: string; startedAt: string },
+  nowIso: string,
+): Promise<FinalizeSessionResult> {
+  const answers = await repo.listSessionAnswers(supabase, userId, session.id)
+  if (answers === null) {
+    return {
+      cycleSyncError: null,
+      completed: false,
+      error: "Não foi possível verificar o estudo desta sessão. Tente encerrar novamente.",
+    }
+  }
+  if (answers.length === 0) return { cycleSyncError: null }
+
+  const existing = await repo.findStudyHistoryByReviewSession(supabase, userId, session.id)
+  // Estudo já registrado por tentativa anterior: confirma sem duplicar e sem
+  // reinscrever no ciclo (o ciclo converge no próximo estudo real).
+  if (existing) return { cycleSyncError: null, completed: true }
+
+  const disciplineIds = await repo.disciplinesOfItems(
+    supabase,
+    userId,
+    [...new Set(answers.map((a) => a.reviewItemId))],
+  )
+  if (disciplineIds === null) {
+    return {
+      cycleSyncError: null,
+      completed: false,
+      error: "Não foi possível identificar a disciplina desta sessão. Tente encerrar novamente.",
+    }
+  }
+  const mainDiscipline = mainDisciplineOf(disciplineIds)
+  if (!mainDiscipline) return { cycleSyncError: null }
+
+  const inserted = await insertReviewStudyHistory(
+    supabase,
+    userId,
+    session,
+    answers,
+    mainDiscipline,
+    nowIso,
+  )
+  if (!inserted.ok) {
+    return {
+      cycleSyncError: null,
+      completed: false,
+      error: "A revisão foi encerrada, mas o estudo ainda não foi registrado. Tente encerrar novamente para concluir o registro.",
+    }
+  }
+
+  let cycleSyncError: string | null = null
+  const cycleResult = await registerStudyToCycle()
+  for (const path of HISTORY_PATHS) revalidatePath(path)
+  await invalidateStatisticsCenterCache(userId)
+  if (!cycleResult.success) {
+    cycleSyncError = cycleResult.error || "Estudo salvo, mas o ciclo não foi atualizado."
+    console.error("[Revisões] Sessão salva, mas o ciclo não foi atualizado:", cycleResult.error)
+  }
+  return { cycleSyncError, completed: true }
 }
 
 export async function finalizeSession(
@@ -513,7 +644,13 @@ export async function finalizeSession(
   nowIso: string = new Date().toISOString(),
 ): Promise<FinalizeSessionResult> {
   const session = await repo.findSessionById(supabase, userId, sessionId)
-  if (!session || session.status !== "ACTIVE") return { cycleSyncError: null }
+  if (!session) return { cycleSyncError: null }
+  if (session.status === "DISCARDED") return { cycleSyncError: null }
+  // G1.3 (G-34): sessão já encerrada não é "sucesso cego" — recupera o estudo
+  // quando ele ainda não foi registrado (replay após falha parcial).
+  if (session.status !== "ACTIVE") {
+    return recoverCompletedReviewSession(supabase, userId, session, nowIso)
+  }
 
   // ── Fase I.5 (achado A3): TUDO o que precisa ser lido é lido ANTES de encerrar.
   //
@@ -560,58 +697,53 @@ export async function finalizeSession(
     .select("id")
     .maybeSingle()
 
-  if (!claimedSession) return { cycleSyncError: null }
+  if (!claimedSession) {
+    // G1.3 (G-34): perdeu a corrida — o vencedor registra o estudo. Só afirma
+    // "concluído" se o estudo já existe; nunca duplica, nunca inventa.
+    if (answers.length > 0) {
+      const existing = await repo.findStudyHistoryByReviewSession(supabase, userId, sessionId)
+      if (existing) return { cycleSyncError: null, completed: true }
+    }
+    return { cycleSyncError: null }
+  }
 
   let cycleSyncError: string | null = null
 
   if (answers.length > 0) {
-    const countByDiscipline = new Map<string, number>()
-    disciplineIds.forEach((id) => countByDiscipline.set(id, (countByDiscipline.get(id) ?? 0) + 1))
     // Disciplina do estudo = a mais revisada na sessão (empate: id menor, para
     // ser determinístico). Nunca uma disciplina inventada.
-    const mainDiscipline = [...countByDiscipline.entries()].sort(
-      (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1),
-    )[0]?.[0]
+    const mainDiscipline = mainDisciplineOf(disciplineIds)
 
     if (mainDiscipline) {
-      const startedAt = session.startedAt
-      // Fase I.6 (M8): uma regra só de duração, em domain/reviews/session-duration.
-      const totalSeconds = reviewSessionSeconds(startedAt, nowIso)
-      const durationMinutes = reviewSessionMinutes(totalSeconds)
+      const inserted = await insertReviewStudyHistory(
+        supabase,
+        userId,
+        session,
+        answers,
+        mainDiscipline,
+        nowIso,
+      )
 
-      const { error: historyError } = await supabase.from("study_history").insert({
-        user_id: userId,
-        discipline_id: mainDiscipline,
-        study_source: "REVIEW",
-        study_type: "REVISAO",
-        technique: null,
-        active_minutes: durationMinutes,
-        paused_minutes: 0,
-        duration_minutes: durationMinutes,
-        completed: true,
-        interrupted: false,
-        started_at: startedAt,
-        finished_at: nowIso,
-        notes: `Sessão de revisão — ${answers.length} ${answers.length === 1 ? "item" : "itens"}`,
-        metadata: {
-          duration_seconds: totalSeconds,
-          review_session_id: sessionId,
-          reviews_completed: answers.length,
-        },
-      })
-
-      if (!historyError) {
-        // Todo estudo real passa pelo mecanismo central do ciclo — revisão não
-        // é exceção (decisão D4). A falha é reportada, nunca engolida.
-        const cycleResult = await registerStudyToCycle()
-        for (const path of HISTORY_PATHS) revalidatePath(path)
-        await invalidateStatisticsCenterCache(userId)
-        if (!cycleResult.success) {
-          cycleSyncError = cycleResult.error || "Estudo salvo, mas o ciclo não foi atualizado."
-          console.error("[Revisões] Sessão salva, mas o ciclo não foi atualizado:", cycleResult.error)
+      // G1.3 (G-34): INSERT falhou APÓS o claim — a sessão está COMPLETED, mas
+      // declarar `completed: true` perderia o estudo em silêncio. Retorna erro
+      // recuperável: a próxima chamada cai em recoverCompletedReviewSession e
+      // registra sem duplicar.
+      if (!inserted.ok) {
+        return {
+          cycleSyncError: null,
+          completed: false,
+          error: "A revisão foi encerrada, mas o estudo ainda não foi registrado. Tente encerrar novamente para concluir o registro.",
         }
-      } else {
-        console.error("[Revisões] Erro ao gravar o estudo da sessão de revisão:", historyError)
+      }
+
+      // Todo estudo real passa pelo mecanismo central do ciclo — revisão não
+      // é exceção (decisão D4). A falha é reportada, nunca engolida.
+      const cycleResult = await registerStudyToCycle()
+      for (const path of HISTORY_PATHS) revalidatePath(path)
+      await invalidateStatisticsCenterCache(userId)
+      if (!cycleResult.success) {
+        cycleSyncError = cycleResult.error || "Estudo salvo, mas o ciclo não foi atualizado."
+        console.error("[Revisões] Sessão salva, mas o ciclo não foi atualizado:", cycleResult.error)
       }
     }
   }

@@ -58,6 +58,9 @@ export function EditDisciplineModal({
   const [newTopicText, setNewTopicText] = useState("")
   const [showAddTopicInput, setShowAddTopicInput] = useState(false)
 
+  // G1.10: trava de reentrância — duplo clique não dispara dois saves.
+  const [isSaving, setIsSaving] = useState(false)
+
   useEffect(() => {
     if (!open) return
     const timer = setTimeout(() => {
@@ -69,37 +72,43 @@ export function EditDisciplineModal({
   }, [disciplineName, storedColorHex, initialTopics, open])
 
   const handleSave = async () => {
+    if (isSaving) return
     if (!name.trim()) {
       toast.error("Informe o nome da disciplina.")
       return
     }
-    if (disciplineId) {
-      const res = await updateDisciplineAppearanceAction(disciplineId, {
-        name: name.trim(),
-        colorHex,
-      })
-      if (!res.success) {
-        toast.error(res.error || "Erro ao salvar disciplina.")
+    setIsSaving(true)
+    try {
+      if (disciplineId) {
+        const res = await updateDisciplineAppearanceAction(disciplineId, {
+          name: name.trim(),
+          colorHex,
+        })
+        if (!res.success) {
+          toast.error(res.error || "Erro ao salvar disciplina.")
+          return
+        }
+        if (onSave) {
+          onSave({
+            name: name.trim(),
+            color: disciplineColorHex(disciplineId, colorHex),
+            topics,
+          })
+        } else {
+          toast.success(`Disciplina "${name.trim()}" salva com sucesso!`)
+        }
+        onOpenChange(false)
         return
       }
       if (onSave) {
-        onSave({
-          name: name.trim(),
-          color: disciplineColorHex(disciplineId, colorHex),
-          topics,
-        })
+        onSave({ name: name.trim(), color: disciplineColorHex("", colorHex), topics })
       } else {
-        toast.success(`Disciplina "${name.trim()}" salva com sucesso!`)
+        toast.success(`Disciplina "${name}" salva com sucesso!`)
       }
       onOpenChange(false)
-      return
+    } finally {
+      setIsSaving(false)
     }
-    if (onSave) {
-      onSave({ name: name.trim(), color: disciplineColorHex("", colorHex), topics })
-    } else {
-      toast.success(`Disciplina "${name}" salva com sucesso!`)
-    }
-    onOpenChange(false)
   }
 
   const handleRemoveDiscipline = () => {
@@ -325,6 +334,7 @@ export function EditDisciplineModal({
                       }}
                       className="p-1 hover:text-primary"
                       title="Editar tópico"
+                      aria-label="Editar tópico"
                     >
                       <SquarePen className="h-3.5 w-3.5" />
                     </button>
@@ -334,6 +344,7 @@ export function EditDisciplineModal({
                       onClick={() => handleRemoveTopic(t.id)}
                       className="p-1 hover:text-rose-500"
                       title="Excluir tópico"
+                      aria-label="Excluir tópico"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -349,6 +360,7 @@ export function EditDisciplineModal({
               type="button"
               variant="outline"
               onClick={handleRemoveDiscipline}
+              disabled={isSaving}
               className="border-primary text-primary hover:bg-primary/10 font-semibold text-xs px-6 h-9 rounded-xl"
             >
               Remover
@@ -357,6 +369,7 @@ export function EditDisciplineModal({
             <Button
               type="button"
               onClick={handleSave}
+              disabled={isSaving}
             >
               Salvar
             </Button>

@@ -166,7 +166,9 @@ export function suggestDisciplines(
         auto: false,
       }))
       .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score)
+      // G1.5 (G-52): desempate determinístico por id — sem ele, o `auto`
+      // em caso de empate herdava a ordem de entrada do catálogo.
+      .sort((a, b) => b.score - a.score || (a.disciplineId < b.disciplineId ? -1 : a.disciplineId > b.disciplineId ? 1 : 0))
       .slice(0, 3)
 
     const first = ranked[0]

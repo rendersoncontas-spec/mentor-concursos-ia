@@ -123,7 +123,7 @@ export async function startStudySessionAction(data: Omit<StudyHistoryInsert, "us
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "START_STUDY_SESSION" })
 
     if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
@@ -168,7 +168,7 @@ export async function finishStudySessionAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "FINISH_STUDY_SESSION", resource: sessionId })
 
     if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
@@ -205,7 +205,7 @@ export async function updateStudySessionAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "UPDATE_STUDY_SESSION", resource: sessionId })
 
     if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
@@ -239,7 +239,7 @@ export async function deleteStudySessionAction(sessionId: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "DELETE_STUDY_SESSION", resource: sessionId })
 
     if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
@@ -274,7 +274,7 @@ export async function cancelStudySessionAction(sessionId: string) {
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "CANCEL_STUDY_SESSION", resource: sessionId })
 
     if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
@@ -349,6 +349,7 @@ export async function getMonthlyDailyTotalsAction(year: number, month: number) {
         .lte("started_at", queryEndStr)
         .not("duration_minutes", "is", null)
         .order("started_at", { ascending: true })
+        .order("id", { ascending: true })
         .range(offset, offset + pageSize - 1)
 
       if (error) throw new Error("Erro ao buscar totais diários: " + error.message)
@@ -391,7 +392,7 @@ export async function saveManualStudyTimeAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "SAVE_MANUAL_STUDY_TIME", resource: dateStr })
     if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     if (durationMinutes <= 0) {
@@ -454,7 +455,7 @@ export async function deleteManualStudyTimeAction(dateStr: string, sessionId?: s
   if (isMaintenanceMode()) return { error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "DELETE_MANUAL_STUDY_TIME", resource: sessionId ?? dateStr })
     if (!effectiveUserId) return { error: "Usuário não autenticado" }
 
     const startOfDay = buildIsoFromSaoPauloDateTime(dateStr, "00:00")
@@ -573,6 +574,7 @@ export async function getManualEntryForDayAction(dateStr: string): Promise<{
       .eq("study_source", "FREE")
       .contains("metadata", { manual_entry: true })
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(1)
 
     if (error) throw new Error("Erro ao buscar registro: " + error.message)
@@ -745,6 +747,7 @@ export async function getMonthlyStatsAction(year: number, month: number) {
         .lte("started_at", queryEndStr)
         .not("duration_minutes", "is", null)
         .order("started_at", { ascending: true })
+        .order("id", { ascending: true })
         .range(offset, offset + pageSize - 1)
 
       if (error) throw new Error("Erro ao buscar stats mensais: " + error.message)

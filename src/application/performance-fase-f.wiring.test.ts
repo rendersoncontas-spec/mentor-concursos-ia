@@ -19,31 +19,52 @@ function readSource(relativePath: string): string {
 
 describe("Fase F — Dashboard", () => {
   const page = readSource("src/app/(protected)/dashboard/page.tsx")
+  const section = readSource("src/features/dashboard/components/dashboard-widgets-section.tsx")
 
-  it("carrega snapshot, layout e dados dos widgets num único Promise.all", () => {
-    const block = page.slice(page.indexOf("await Promise.all(["), page.indexOf("])", page.indexOf("await Promise.all([")))
+  it("carrega snapshot e layout em paralelo, e manda a área de widgets para trás de um Suspense (Fase F.3)", () => {
+    const fastBlock = page.slice(page.indexOf("await Promise.all(["), page.indexOf("])", page.indexOf("await Promise.all([")))
+    assert.ok(fastBlock.includes("getDashboardData("), "getDashboardData( deveria estar no Promise.all rápido do Dashboard")
+    assert.ok(fastBlock.includes("getDashboardLayoutAction("), "getDashboardLayoutAction( deveria estar no Promise.all rápido do Dashboard")
+    // Os 4 loaders mais lentos NÃO entram mais no Promise.all da página — foram
+    // para dashboard-widgets-section.tsx (ver próximo teste), atrás do Suspense.
+    for (const loader of ["getActiveCycleAction(", "getRecentStudyHistoryAction(14)", "getMonthlyDailyTotalsAction(", "getMonthlyStatsAction("]) {
+      assert.ok(!fastBlock.includes(loader), `${loader} não deveria mais estar no Promise.all rápido do Dashboard (Fase F.3: foi para o Suspense)`)
+    }
+    assert.match(page, /<Suspense fallback=\{<DashboardWidgetsSkeleton \/>\}>[\s\S]*<DashboardWidgetsSection/)
+  })
+
+  it("a área de widgets (atrás do Suspense) carrega os 4 loaders mais lentos num único Promise.all", () => {
+    const block = section.slice(section.indexOf("await Promise.all(["), section.indexOf("])", section.indexOf("await Promise.all([")))
     for (const loader of [
-      "getDashboardData(",
-      "getDashboardLayoutAction(",
       "getActiveCycleAction(",
       "getRecentStudyHistoryAction(14)",
       "getMonthlyDailyTotalsAction(",
       "getMonthlyStatsAction(",
     ]) {
-      assert.ok(block.includes(loader), `${loader} deveria estar no Promise.all do Dashboard`)
+      assert.ok(block.includes(loader), `${loader} deveria estar no Promise.all de DashboardWidgetsSection`)
     }
   })
 
   it("as chaves semeadas no servidor são as mesmas usadas pelos widgets no cliente", () => {
     const cycleWidget = readSource("src/features/study-cycle/components/intelligent-cycle-widget.tsx")
     const catalog = readSource("src/features/dashboard/components/dashboard-widget-catalog.tsx")
-    assert.ok(page.includes("activeCycleOverview:"))
+    assert.ok(section.includes("activeCycleOverview:"))
     assert.ok(cycleWidget.includes('"activeCycleOverview"'))
-    assert.ok(page.includes('"recentStudyHistory:14"'))
+    assert.ok(section.includes('"recentStudyHistory:14"'))
     assert.ok(catalog.includes('"recentStudyHistory:14"'))
-    assert.ok(page.includes("`monthlyCalendar:${calendarYear}:${calendarMonth}`"))
+    assert.ok(section.includes("`monthlyCalendar:${calendarYear}:${calendarMonth}`"))
     assert.ok(catalog.includes("`monthlyCalendar:${"))
-    assert.ok(page.includes("<InitialServerDataProvider data={initialWidgetData}>"))
+    assert.ok(section.includes("<InitialServerDataProvider data={initialWidgetData}>"))
+  })
+
+  it("o cabeçalho (DashboardLayout) não recebe mais initialLayout nem renderiza a grade — isso foi para DashboardWidgetsGrid, do outro lado do Suspense", () => {
+    const layout = readSource("src/features/dashboard/components/dashboard-layout.tsx")
+    assert.ok(!layout.includes("WIDGET_REGISTRY"), "dashboard-layout.tsx não deveria mais importar WIDGET_REGISTRY")
+    assert.ok(layout.includes("children"), "dashboard-layout.tsx deveria renderizar a área de widgets via children")
+    const grid = readSource("src/features/dashboard/components/dashboard-widgets-grid.tsx")
+    assert.ok(grid.includes("WIDGET_REGISTRY"))
+    assert.ok(grid.includes('window.dispatchEvent(new CustomEvent("open-dashboard-goals-modal"))'))
+    assert.ok(layout.includes('"open-dashboard-goals-modal"'), "DashboardLayout deveria escutar o evento open-dashboard-goals-modal para abrir o WeeklyGoalsModal")
   })
 })
 

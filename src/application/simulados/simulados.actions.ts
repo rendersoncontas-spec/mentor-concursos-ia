@@ -129,8 +129,11 @@ function toHeader(row: SimuladoRow): SimuladoHeader {
   }
 }
 
-async function requireUser(supabase: Supabase): Promise<{ user: { id: string } } | { user: null }> {
-  const userId = await getEffectiveUserId(supabase)
+async function requireUser(
+  supabase: Supabase,
+  auditContext?: Parameters<typeof getEffectiveUserId>[1],
+): Promise<{ user: { id: string } } | { user: null }> {
+  const userId = await getEffectiveUserId(supabase, auditContext)
   if (!userId) return { user: null }
   return { user: { id: userId } }
 }
@@ -143,6 +146,7 @@ async function fetchLastAttemptMap(supabase: Supabase, userId: string): Promise<
     .select("question_id, correct")
     .eq("user_id", userId)
     .order("answered_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(50000)
   const map = new Map<string, boolean>()
   ;(data ?? []).forEach((a) => {
@@ -322,7 +326,7 @@ export async function createSimuladoAction(input: SimuladoConfigInput): Promise<
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { user } = await requireUser(supabase)
+    const { user } = await requireUser(supabase, { action: "CREATE_SIMULADO" })
     if (!user) return { data: null, error: "Usuário não autenticado." }
 
     const total = Math.max(1, Math.min(MAX_TOTAL, Math.floor(Number(input.total) || 0)))
@@ -557,7 +561,7 @@ export async function saveSimuladoAnswersAction(
 ): Promise<{ ok: boolean; error: string | null }> {
   try {
     const supabase = await createClient()
-    const { user } = await requireUser(supabase)
+    const { user } = await requireUser(supabase, { action: "SAVE_SIMULADO_ANSWERS", resource: simuladoId })
     if (!user) return { ok: false, error: "Não autenticado." }
 
     const { data: owner } = await supabase
@@ -601,7 +605,7 @@ export async function finishSimuladoAction(
   if (isMaintenanceMode()) return { data: null, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const { user } = await requireUser(supabase)
+    const { user } = await requireUser(supabase, { action: "FINISH_SIMULADO", resource: simuladoId })
     if (!user) return { data: null, error: "Usuário não autenticado." }
 
     const payload = await buildResultPayload(supabase, user.id, simuladoId, opts?.autoTimeout === true)
@@ -930,7 +934,7 @@ export async function getSimuladosHistoryAction(filters?: HistoryFilters): Promi
 export async function deleteSimuladoAction(simuladoId: string): Promise<{ error: string | null }> {
   try {
     const supabase = await createClient()
-    const { user } = await requireUser(supabase)
+    const { user } = await requireUser(supabase, { action: "DELETE_SIMULADO", resource: simuladoId })
     if (!user) return { error: "Usuário não autenticado." }
 
     const { error } = await supabase.from("simulados").delete().eq("id", simuladoId).eq("user_id", user.id)
@@ -945,7 +949,7 @@ export async function deleteSimuladoAction(simuladoId: string): Promise<{ error:
 export async function cancelSimuladoAction(simuladoId: string): Promise<{ error: string | null }> {
   try {
     const supabase = await createClient()
-    const { user } = await requireUser(supabase)
+    const { user } = await requireUser(supabase, { action: "CANCEL_SIMULADO", resource: simuladoId })
     if (!user) return { error: "Não autenticado." }
     const { error } = await supabase.from("simulados").update({ status: "CANCELED" }).eq("id", simuladoId).eq("user_id", user.id)
     if (error) return { error: error.message }
@@ -987,7 +991,7 @@ async function assertOwnsQuestion(supabase: Supabase, userId: string, simuladoId
 export async function addQuestionToStudyListAction(simuladoId: string, questionId: string): Promise<{ error: string | null }> {
   try {
     const supabase = await createClient()
-    const { user } = await requireUser(supabase)
+    const { user } = await requireUser(supabase, { action: "ADD_QUESTION_TO_STUDY_LIST", resource: simuladoId })
     if (!user) return { error: "Não autenticado." }
     if (!(await assertOwnsQuestion(supabase, user.id, simuladoId, questionId))) return { error: "Questão não pertence ao seu simulado." }
 

@@ -15,6 +15,7 @@ export async function getUsedDisciplineColors(supabase: SupabaseClient): Promise
     const { data } = await supabase
       .from("disciplines")
       .select("color_hex")
+      .order("id", { ascending: true })
       .range(offset, offset + PAGE - 1)
     if (!data || data.length === 0) break
     for (const row of data) {

@@ -19,6 +19,11 @@ import path from "node:path"
  * Corrigido: as duas funções agora derivam o usuário via
  * getEffectiveUserId(supabase), como list-plans.action.ts já fazia.
  *
+ * Fase G2.6.1 (auditoria de segurança): as duas passaram a chamar
+ * getEffectiveUserId(supabase, { action: ... }) — segundo argumento opcional
+ * que audita a mutação em audit_logs quando ela ocorre sob sessão de
+ * suporte ativa. Os regexes abaixo toleram esse argumento extra.
+ *
  * Por que teste estático: mesma limitação documentada nos demais
  * *.wiring.test.ts deste projeto — não há infraestrutura de teste com
  * Supabase real nem de renderização React aqui.
@@ -48,7 +53,7 @@ describe("generateStudyPlanAction/deactivateStudyPlanAction respeitam a sessão 
     const source = readSource()
     const fnBody = extractFunctionBody(source, "export async function generateStudyPlanAction")
 
-    assert.match(fnBody, /const effectiveUserId = await getEffectiveUserId\(supabase\)/)
+    assert.match(fnBody, /const effectiveUserId = await getEffectiveUserId\(supabase(?:, \{[^}]*\})?\)/)
     assert.doesNotMatch(
       fnBody,
       /supabase\.auth\.getUser\(\)/,
@@ -66,8 +71,10 @@ describe("generateStudyPlanAction/deactivateStudyPlanAction respeitam a sessão 
     const fnBody = extractFunctionBody(source, "export async function generateStudyPlanAction")
 
     assert.match(fnBody, /\.eq\("user_id", effectiveUserId\)/)
-    assert.match(fnBody, /\.eq\("id", effectiveUserId\)/)
-    assert.match(fnBody, /user_id: effectiveUserId,/)
+    assert.match(fnBody, /computeStudyPlanDraft\(supabase, effectiveUserId,/)
+    assert.match(fnBody, /persistStudyPlanDraftAtomic\(supabase, effectiveUserId,/)
+    // G1.3 (G-21): profile/disciplinas não são mais escritos direto na action
+    // (vão na RPC atômica); o vínculo com o usuário continua via effectiveUserId.
     assert.match(
       fnBody,
       /generateStudyPlan\(supabase, effectiveUserId, reason, rawTarget\.id, targetWeeklyHours\)/,
@@ -78,7 +85,7 @@ describe("generateStudyPlanAction/deactivateStudyPlanAction respeitam a sessão 
     const source = readSource()
     const fnBody = extractFunctionBody(source, "export async function deactivateStudyPlanAction")
 
-    assert.match(fnBody, /const effectiveUserId = await getEffectiveUserId\(supabase\)/)
+    assert.match(fnBody, /const effectiveUserId = await getEffectiveUserId\(supabase(?:, \{[^}]*\})?\)/)
     assert.doesNotMatch(
       fnBody,
       /supabase\.auth\.getUser\(\)/,

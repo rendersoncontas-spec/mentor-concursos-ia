@@ -13,6 +13,7 @@ import React, {
 import * as Sentry from "@sentry/nextjs"
 
 import type { StudyTechnique } from "@/domain/study-history/study-history.types"
+import { studyMinutesFromSeconds } from "@/domain/study-session/study-duration"
 import {
   getClientUserId,
   migrateLegacyActiveSession,
@@ -20,6 +21,7 @@ import {
   saveStudySessionWithOfflineSupport,
   syncPendingStudySessions,
 } from "@/infrastructure/offline"
+import { purgeOnUserSwitch } from "@/infrastructure/offline/user-switch-guard"
 
 import { dispatchStudySessionQueued, type SavedStudySession } from "../lib/study-session-events"
 import {
@@ -27,7 +29,12 @@ import {
   createTriggerStudySessionSync,
 } from "../lib/study-session-sync-bridge"
 
-import { type FocusSoundId, useFocusSound } from "../hooks/use-focus-sound"
+import {
+  focusSoundIdForModalPreference,
+  TIMER_SOUND_PREFERENCE_EVENT,
+  type FocusSoundId,
+  useFocusSound,
+} from "../hooks/use-focus-sound"
 import { ResetTimerDialog } from "./reset-timer-dialog"
 
 /**
@@ -239,6 +246,21 @@ function calculateTimes(state: SessionTiming): {
   }
 }
 
+/**
+ * G2.3 — `pausedSeconds` sem o dwell parado na tela de avaliação (o timer já
+ * estava pausado no Encerrar). Sem `evaluation_started_at` válido, devolve o
+ * valor atual (comportamento anterior preservado).
+ */
+function dwellAwarePausedSeconds(
+  session: Pick<StudySessionState, "pausedSeconds">,
+  formData?: Record<string, unknown>,
+): number {
+  const raw = formData?.["evaluation_started_at"]
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return session.pausedSeconds
+  const dwellSeconds = Math.max(0, (Date.now() - raw) / 1000)
+  return Math.max(0, session.pausedSeconds - dwellSeconds)
+}
+
 export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<StudySessionState | null>(null)
   const [floatingTimerEnabled, setFloatingTimerEnabled] = useState(true)
@@ -270,6 +292,16 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           if (cancelled) return
           setUserId(resolvedUserId)
           if (resolvedUserId) {
+            // G1.7 (G-31): troca de identidade sem logout canônico (OAuth,
+            // expiração + novo login, cookie removido). Purga o estado do
+            // anterior e recarrega para matar timers/contexto ainda vivos —
+            // sem isso, B herdava localStorage/IndexedDB de A e a migração
+            // preguiçosa de prefs chegava a gravar dados de A no perfil de B.
+            const { switched } = await purgeOnUserSwitch(resolvedUserId)
+            if (switched) {
+              if (!cancelled) window.location.reload()
+              return
+            }
             // Migração única do snapshot legado (localStorage -> IndexedDB).
             // Se não houver nada a migrar (caso comum), é um no-op barato.
             await migrateLegacyActiveSession(resolvedUserId)
@@ -305,7 +337,17 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
 
         if (!cancelled) {
           const savedPref = localStorage.getItem(FLOATING_TIMER_PREF_KEY)
-          setFloatingTimerEnabled(savedPref === null ? true : (JSON.parse(savedPref) as boolean))
+          // G1.6 (G-42): valor corrompido não pode derrubar o provider —
+          // JSON.parse fora de try quebrava o useEffect inteiro.
+          let floatingEnabled = true
+          if (savedPref !== null) {
+            try {
+              floatingEnabled = JSON.parse(savedPref) as boolean
+            } catch {
+              floatingEnabled = true
+            }
+          }
+          setFloatingTimerEnabled(floatingEnabled)
         }
       })()
     }, 0)
@@ -331,6 +373,25 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("study-center-opened", handleStudyCenterOpened)
     }
   }, [])
+
+  // G2.1 FASE 3 — aplica a preferência de som do perfil (account modal
+  // dispara o evento após salvar). Usa selectSound existente: persiste,
+  // para ("off") ou inicia. Sem gesto, o resume pode falhar em silêncio
+  // (autoplay policy) e vale na próxima sessão — "off" sempre vale na hora.
+  useEffect(() => {
+    const handleTimerSoundPreference = (e: Event) => {
+      const value = (e as CustomEvent<unknown>).detail
+      const target = focusSoundIdForModalPreference(value, focusSound.selectedSound)
+      if (target && target !== focusSound.selectedSound) {
+        focusSound.selectSound(target)
+      }
+    }
+    window.addEventListener(TIMER_SOUND_PREFERENCE_EVENT, handleTimerSoundPreference)
+    return () => {
+      window.removeEventListener(TIMER_SOUND_PREFERENCE_EVENT, handleTimerSoundPreference)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSound.selectedSound])
 
   useEffect(() => {
     if (!session || !session.isActive || session.phase === "IDLE") {
@@ -609,6 +670,9 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       }
       isFinalizingRef.current = true
       try {
+        // G2.3 — congela o fim da sessão no Encerrar: o dwell parado na
+        // avaliação não entra em `paused` (foco% exibido == salvo).
+        const pausedExDwell = dwellAwarePausedSeconds(session, formData)
         // Capturar snapshot ANTES de qualquer alteração
         const snapshot = {
           // Timestamps para cálculo server-side
@@ -646,16 +710,20 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           // Avaliação (Cronograma)
           energy_level: (formData?.["energy_level"] as number) ?? null,
           interrupted: Boolean(formData?.["interrupted"]),
-          // Tempo calculado
+          // G2.3 — instante do Encerrar (congela fim da sessão p/ foco%).
+          evaluation_started_at:
+            typeof formData?.["evaluation_started_at"] === "number"
+              ? (formData?.["evaluation_started_at"] as number)
+              : null,
+          // Tempo calculado (G1.3/G-35: round canônico — igual ao servidor)
+          // G2.3: exclui o dwell da avaliação (ver evaluation_started_at).
           activeSeconds: session.activeSeconds,
-          pausedSeconds: session.pausedSeconds,
-          activeMinutes: Math.floor(session.activeSeconds / 60),
-          pausedMinutes: Math.floor(session.pausedSeconds / 60),
+          pausedSeconds: pausedExDwell,
+          activeMinutes: studyMinutesFromSeconds(session.activeSeconds),
+          pausedMinutes: studyMinutesFromSeconds(pausedExDwell),
           focusPercentage:
-            session.activeSeconds + session.pausedSeconds > 0
-              ? Math.round(
-                  (session.activeSeconds / (session.activeSeconds + session.pausedSeconds)) * 100,
-                )
+            session.activeSeconds + pausedExDwell > 0
+              ? Math.round((session.activeSeconds / (session.activeSeconds + pausedExDwell)) * 100)
               : null,
           completedCycles: 0,
           // Vínculo com o ciclo de estudo

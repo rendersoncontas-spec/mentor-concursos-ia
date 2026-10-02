@@ -442,7 +442,9 @@ export function evaluateAchievement(
       if (facts.editalTopicsTotal <= 0) {
         currentValue = 0
         unlocked = false
-        progressText = "Sem edital com tópicos cadastrados para medir a cobertura."
+        progressText = facts.editalCoverageUnavailable
+          ? "Cobertura do edital indisponível no momento."
+          : "Sem edital com tópicos cadastrados para medir a cobertura."
         break
       }
       const pct = Math.min(100, Math.round((facts.editalTopicsStudied / facts.editalTopicsTotal) * 100))

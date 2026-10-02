@@ -306,11 +306,13 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
     triggerAutoSave({ color: newColor })
   }
 
+  // G1.16: sem toast prematuro — o autosave com debounce confirma pelo
+  // indicador saveStatus ("Salvo localmente" em falha). O efeito visual
+  // (reordenar) já é o feedback imediato.
   const handleTogglePin = () => {
     const nextPinned = !isPinned
     setIsPinned(nextPinned)
     triggerAutoSave({ is_pinned: nextPinned })
-    toast.success(nextPinned ? "Nota fixada no topo!" : "Nota desfixada.")
   }
 
   const handleCreateNewNote = async () => {
@@ -349,6 +351,14 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
     const idToDelete = activeNoteId
     setIsDeleteDialogOpen(false)
 
+    // G1.16: snapshot para rollback — antes, falha no servidor mantinha a
+    // nota apagada na tela (e ainda criava outra via handleCreateNewNote).
+    const previousNotes = notes
+    const previousActiveId = activeNoteId
+    const previousTitle = noteTitle
+    const previousColor = noteColor
+    const previousContent = editorRef.current?.innerHTML ?? null
+
     setNotes((prev) => {
       const filtered = prev.filter((n) => n.id !== idToDelete)
       try {
@@ -373,8 +383,22 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
     }
 
     const res = await deleteUserNoteAction(idToDelete)
-    if (res.success) toast.success("Nota excluída com sucesso.")
-    else toast.error("Não foi possível excluir a nota no servidor.")
+    if (res.success) {
+      toast.success("Nota excluída com sucesso.")
+    } else {
+      // G1.16: rollback honesto — restaura a lista e a seleção anterior.
+      setNotes(previousNotes)
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CACHE_KEY, JSON.stringify(previousNotes))
+      } catch { /* segue sem o cache local */ }
+      setActiveNoteId(previousActiveId)
+      setNoteTitle(previousTitle)
+      setNoteColor(previousColor)
+      if (editorRef.current && previousContent !== null) {
+        editorRef.current.innerHTML = previousContent
+      }
+      toast.error("Não foi possível excluir a nota no servidor.")
+    }
   }
 
   // Executar comandos de formatação com document.execCommand
@@ -434,6 +458,15 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
           currentTheme.text
         )}
         onClick={() => setIsMinimized(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            setIsMinimized(false)
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Restaurar Bloco de Notas"
         title="Clique para restaurar o Bloco de Notas"
       >
         <SquarePen className="h-4 w-4" />
@@ -446,6 +479,7 @@ export function StickyNotesWidget({ isOpen, onClose }: StickyNotesWidgetProps) {
             e.stopPropagation()
             setIsMinimized(false)
           }}
+          aria-label="Restaurar Bloco de Notas"
           className="p-1 rounded-full hover:bg-black/10 transition-colors"
         >
           <Minus className="h-3 w-3 rotate-90" />

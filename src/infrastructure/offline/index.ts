@@ -91,3 +91,30 @@ export const offlineStore = {
     return { clearedSession: true, pendingSyncOperationsRemaining }
   },
 }
+
+/**
+ * G1.1 (G-31) — higiene de logout no dispositivo.
+ *
+ * DECISÃO DOCUMENTADA (opção B do escopo): a `sync_queue` é MANTIDA, isolada
+ * por `userId` — descartá-la silenciosamente perderia estudo real do usuário
+ * que saiu. O isolamento é garantido em 3 camadas:
+ * 1) toda leitura/escrita da fila é filtrada por `userId` (`sync-queue.ts`);
+ * 2) o worker só coleta e processa operações do usuário corrente, com
+ *    checagem explícita de dono antes de cada item (`sync-worker.ts`);
+ * 3) aqui, sessão ativa + snapshots do usuário que sai são apagados, então
+ *    B nunca vê estado local de A — e a fila de A só volta a sincronizar
+ *    quando A logar de novo (nunca na sessão de B).
+ *
+ * Best-effort com timeout interno: logout nunca pode travar por causa do
+ * IndexedDB; falha aqui não impede o signOut (chamador decide a ordem).
+ */
+export async function clearOfflinePrivateDataForLogout(): Promise<ClearUserDataResult & { cleared: boolean }> {
+  try {
+    const userId = await getClientUserId()
+    if (!userId) return { cleared: false, clearedSession: false, pendingSyncOperationsRemaining: 0 }
+    const result = await offlineStore.clearUserData(userId)
+    return { ...result, cleared: true }
+  } catch {
+    return { cleared: false, clearedSession: false, pendingSyncOperationsRemaining: 0 }
+  }
+}

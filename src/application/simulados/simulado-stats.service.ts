@@ -96,7 +96,8 @@ export function computeSubjects(
 ): SimuladoRecordSubject[] {
   const rule = opts?.scoringRule ?? "PERCENTUAL"
   return subjects.map((s) => {
-    const blank = s.blankCount ?? 0
+    // G1.2 (G-10): blank nunca negativo (compatível com o CHECK do banco).
+    const blank = Math.max(0, s.blankCount ?? 0)
     const wrong = s.wrongCount >= 0 ? s.wrongCount : wrongsOf(s.questionsCount, s.correctCount, blank)
     const questionsCount = Math.max(0, s.questionsCount)
     const correctCount = Math.max(0, s.correctCount)

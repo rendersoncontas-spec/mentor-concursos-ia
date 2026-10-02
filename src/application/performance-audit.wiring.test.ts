@@ -89,9 +89,11 @@ describe("Auditoria de performance (queries redundantes / N+1)", () => {
 
   it("generateStudyPlanAction busca disciplinas existentes em lote (.in) em vez de uma query por nome", () => {
     const source = readSource("src/application/study-plan/generate-study-plan.action.ts")
+    // G1.1 (G-27): o lote usa a chave canônica (name_key) em vez do nome cru —
+    // a propriedade continua sendo UMA query antes do loop, sem N+1.
     assert.ok(
-      source.includes('.in("name", discNames)'),
-      "Deve buscar todas as disciplinas já existentes com .in(\"name\", discNames) numa única query antes do loop",
+      source.includes('.in("name_key", wantedKeys)'),
+      "Deve buscar todas as disciplinas já existentes com .in(\"name_key\", wantedKeys) numa única query antes do loop",
     )
   })
 

@@ -44,6 +44,45 @@ export function isDueNow(item: { dueAt: string; reps: number }, todayKey: string
   return reviewBucketOf(item.dueAt, item.reps, todayKey) !== "UPCOMING"
 }
 
+/** Filtro de período da tela de revisões (G2.1 FASE 2 — client-side). */
+export type ReviewPeriodFilter = "todas" | "atrasadas" | "hoje" | "proximos-7d"
+
+export const REVIEW_PERIOD_FILTERS: Array<{ id: ReviewPeriodFilter; label: string }> = [
+  { id: "todas", label: "Todas" },
+  { id: "atrasadas", label: "Atrasadas" },
+  { id: "hoje", label: "Hoje" },
+  { id: "proximos-7d", label: "Próximos 7 dias" },
+]
+
+/**
+ * Filtra uma lista já ordenada SEM reordenar (preserva a ordem canônica do
+ * servidor). `horizonKey` (YYYY-MM-DD) limita "proximos-7d"; itens sem data
+ * legível nunca passam num filtro com janela (não somem: ficam em "todas").
+ */
+export function filterReviewQueue<T extends { id: string; dueAt: string; reps: number }>(
+  items: T[],
+  filter: ReviewPeriodFilter,
+  todayKey: string,
+  horizonKey?: string,
+): T[] {
+  if (filter === "todas") return items
+  if (filter === "atrasadas") {
+    return items.filter((i) => reviewBucketOf(i.dueAt, i.reps, todayKey) === "OVERDUE")
+  }
+  if (filter === "hoje") {
+    return items.filter((i) => {
+      const b = reviewBucketOf(i.dueAt, i.reps, todayKey)
+      return b === "TODAY" || b === "NEW"
+    })
+  }
+  // proximos-7d: só futuro dentro do horizonte (vencidos/hoje ficam na fila).
+  if (!horizonKey) return items
+  return items.filter((i) => {
+    const dueKey = getDayInSaoPaulo(i.dueAt)
+    return dueKey !== "" && dueKey > todayKey && dueKey <= horizonKey
+  })
+}
+
 /**
  * Texto do intervalo previsto, a partir da distância real entre agora e o
  * vencimento calculado pelo agendador (nunca de uma escada fixa).

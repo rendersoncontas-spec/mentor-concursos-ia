@@ -259,6 +259,8 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
   }, [])
 
   const handleSave = async () => {
+    // G1.16: trava de reentrância — duplo Enter criava dois registros.
+    if (submitting) return
     if (!name.trim()) {
       toast.error("Informe o nome do simulado.")
       return
@@ -713,6 +715,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                               className="h-8 w-8 text-rose-500 hover:text-rose-600"
                               onClick={() => removeSubject(s.key)}
                               title="Remover matéria"
+                              aria-label="Remover matéria"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>

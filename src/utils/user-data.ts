@@ -1,3 +1,5 @@
+import { clearServerActionCache } from "@/lib/server-action-cache"
+
 const PERSONAL_PREFIXES = ["mentor_user_avatar_", "mentor_user_reminders_", "mentor_edital_checked_topics_"]
 
 /**
@@ -28,6 +30,10 @@ const PERSONAL_KEYS = [
   "mentor_user_reminders",
   "mentor_sticky_note",
   "mentor_edital_requests",
+  // G1.1 (G-29): chave legada NÃO escopada do checklist do edital — o prefixo
+  // acima só cobre `..._targetId`; sem esta entrada exata, o progresso de A
+  // sobrevivia ao logout e podia vazar para B.
+  "mentor_edital_checked_topics",
   "mentor_active_study_session",
   "mentor:study_session_state",
   "mentor-study-floating-timer-position-v2",
@@ -49,4 +55,8 @@ export function clearUserLocalData() {
       localStorage.removeItem(key)
     }
   })
+  // G1.1 (G-30): troca de identidade invalida o cache de Server Actions —
+  // sem isso, o próximo usuário do mesmo contexto JS herdaria dados do
+  // anterior até o TTL expirar.
+  clearServerActionCache()
 }

@@ -47,6 +47,12 @@ export interface QuestionAttemptRecord {
   disciplineId: string | null
   correct: boolean
   answeredAt: string | null
+  /**
+   * S1.2 — origem da tentativa (ex. "SIMULADO", "MANUAL"). Único vínculo
+   * existente entre attempts standalone e tipo de estudo; question_attempts
+   * não tem study_type nem sessão. Ausente = não atribuível a um filtro.
+   */
+  attemptSource?: string | null
 }
 
 export interface DisciplineMeta {
@@ -77,6 +83,13 @@ export interface ActivePlan {
   weeklyHours: number | null
   weeklyQuestions: number | null
   weeklyDays: number | null
+  /**
+   * S1.3 — origem da meta (mesmo vocabulário do Planejamento):
+   * "configured" = veio de profiles.weekly_study_hours (valor do usuário);
+   * "suggested" = derivada da soma dos itens do plano (não configurada).
+   * Opcional por compatibilidade com fixtures existentes (ausência = sem info).
+   */
+  weeklyHoursSource?: "configured" | "suggested" | null
   items: PlanItemRow[]
 }
 
@@ -240,6 +253,8 @@ export interface PlanningStatistics {
   weeklyTargetMinutes: number
   weeklyTargetQuestions: number
   weeklyTargetDays: number
+  /** S1.3 — repassa ActivePlan.weeklyHoursSource (null/ausente sem plano). Opcional por compatibilidade. */
+  weeklyTargetSource?: "configured" | "suggested" | null
   actualWeekMinutes: number
   actualWeekQuestions: number
   actualWeekDays: number
@@ -641,6 +656,7 @@ export function sanitizeAttempt(raw: Record<string, unknown>): QuestionAttemptRe
     disciplineId: safeStr(raw["discipline_id"]),
     correct: raw["correct"] === true || raw["correct"] === "true" || raw["correct"] === 1,
     answeredAt,
+    attemptSource: safeStr(raw["attempt_source"]) ?? null,
   }
 }
 
@@ -2021,6 +2037,7 @@ export function computePlanning(
       weeklyTargetMinutes: 0,
       weeklyTargetQuestions: 0,
       weeklyTargetDays: 0,
+      weeklyTargetSource: null,
       actualWeekMinutes: 0,
       actualWeekQuestions: 0,
       actualWeekDays: 0,
@@ -2099,6 +2116,7 @@ export function computePlanning(
     weeklyTargetMinutes,
     weeklyTargetQuestions,
     weeklyTargetDays,
+    weeklyTargetSource: plan.weeklyHoursSource ?? null,
     actualWeekMinutes,
     actualWeekQuestions,
     actualWeekDays,

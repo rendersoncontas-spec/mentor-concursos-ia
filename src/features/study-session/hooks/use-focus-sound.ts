@@ -25,8 +25,7 @@ export const FOCUS_SOUND_OPTIONS: { id: FocusSoundId; label: string }[] = [
   { id: "white_noise", label: "White Noise Suave" },
 ]
 
-export const FOCUS_SOUND_LABELS: Record<FocusSoundId, string> = {
-  off: "",
+export const FOCUS_SOUND_LABELS: Record<FocusSoundId, string> = {  off: "",
   rain: "Chuva Suave",
   library: "Biblioteca",
   cafe: "Cafeteria",
@@ -760,4 +759,43 @@ export function useFocusSound() {
     stopAll,
     activeSoundLabel,
   }
+}
+
+/**
+ * G2.1 FASE 3 (Opção A) — ponte entre a preferência do perfil (`somTimer`:
+ * "Melodia 1" | "Sino" | "Silencioso") e os IDs reais do player.
+ *
+ * - "Silencioso" → "off" (determinável: desabilita).
+ * - "Melodia 1" → primeira opção ambiente ("rain") SOMENTE quando o player
+ *   está desligado (nunca sobrescreve um timbre escolhido no controle real).
+ * - "Sino" → null: não existe ID de sino/evento no sistema (só loops
+ *   ambientes) — PENDENTE de decisão (exigiria sistema de som de evento).
+ * - Desconhecido/legado → null: mantém o estado atual (retrocompatível).
+ */
+export const TIMER_SOUND_PREFERENCE_EVENT = "mentor-timer-sound-preference"
+
+/** Opções reais do select (G2.2: "Sino" removido — sem correspondente). */
+export const TIMER_SOUND_OPTIONS = ["Melodia 1", "Silencioso"] as const
+
+export type TimerSoundOption = (typeof TIMER_SOUND_OPTIONS)[number]
+
+/**
+ * G2.2 — normalização na LEITURA (sem migration, sem apagar nada):
+ * "Sino" legado e qualquer valor estranho viram "Melodia 1" (intenção
+ * determinável: som ligado). "Silencioso" é a única opção de desligar.
+ */
+export function normalizeTimerSoundOption(value: unknown): TimerSoundOption {
+  if (value === "Silencioso") return "Silencioso"
+  return "Melodia 1"
+}
+
+export function focusSoundIdForModalPreference(
+  modalValue: unknown,
+  current: FocusSoundId,
+): FocusSoundId | null {
+  const normalized = normalizeTimerSoundOption(modalValue)
+  if (normalized === "Silencioso") return "off"
+  // "Melodia 1" (incluindo "Sino" legado normalizado): primeira ambiente
+  // ("rain") somente se desligado — nunca sobrescreve timbre explícito.
+  return current === "off" ? "rain" : null
 }

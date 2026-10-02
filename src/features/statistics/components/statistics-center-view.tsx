@@ -7,6 +7,7 @@ import {
   BookOpen,
   Brain,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Download,
   Info,
@@ -39,6 +40,7 @@ import {
   type HourBucket,
   type Insight,
   type MetricComparison,
+  type PriorityItem,
   type TimeOfDayAnalysis,
   type TopicStat,
   buildDayBuckets,
@@ -143,13 +145,16 @@ function formatPlanningSubtitle(planning: {
   weeklyTargetMinutes: number
   weeklyTargetQuestions: number
   weeklyTargetDays: number
+  weeklyTargetSource?: "configured" | "suggested" | null
 }): string {
   const questionTarget =
     planning.weeklyTargetQuestions > 0
       ? `${planning.weeklyTargetQuestions} questões`
       : "sem meta de questões"
   const dayTarget = planning.weeklyTargetDays > 0 ? ` · ${planning.weeklyTargetDays} dias` : ""
-  return `Meta semanal: ${formatDurationRaw(planning.weeklyTargetMinutes)} · ${questionTarget}${dayTarget}`
+  // S1.3 — mesma terminologia do Planejamento: derivada dos itens = sugerida.
+  const goalKind = planning.weeklyTargetSource === "suggested" ? "Meta sugerida" : "Meta semanal"
+  return `${goalKind}: ${formatDurationRaw(planning.weeklyTargetMinutes)} · ${questionTarget}${dayTarget}`
 }
 
 function adherenceClass(adherencePct: number): string {
@@ -297,8 +302,8 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
     [payload, rangeKeys, disciplineId, studyType, isAllRange],
   )
   const filteredAttempts = useMemo(
-    () => filterAttempts(payload?.attempts ?? [], rangeKeys, disciplineId, TIMEZONE, isAllRange),
-    [payload, rangeKeys, disciplineId, isAllRange],
+    () => filterAttempts(payload?.attempts ?? [], rangeKeys, disciplineId, studyType, TIMEZONE, isAllRange),
+    [payload, rangeKeys, disciplineId, studyType, isAllRange],
   )
 
   // ── Cálculos ──────────────────────────────────────────────────────────────
@@ -1154,33 +1159,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
         {priorities.length === 0 ? (
           <EmptyState title="Sem prioridades" message="Sem disciplinas estudadas no período." />
         ) : (
-          <div className="space-y-3">
-            {priorities.map((p, i) => (
-              <div
-                key={p.disciplineId}
-                className="flex items-start gap-3 rounded-lg border bg-card p-3"
-              >
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">
-                  {i + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-xs font-semibold">{p.name}</p>
-                    <span className="text-xs font-semibold tabular-nums text-primary">
-                      {p.score}
-                      <span className="text-muted-foreground font-semibold">/100</span>
-                    </span>
-                  </div>
-                  {p.reasons.length > 0 && (
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {p.reasons.join(" · ")}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-foreground/80 mt-1 font-medium">{p.action}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <PrioritiesList priorities={priorities} />
         )}
       </SectionCard>
 
@@ -1214,7 +1193,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <Metric
-                label="Meta semanal"
+                label={planning.weeklyTargetSource === "suggested" ? "Meta sugerida" : "Meta semanal"}
                 value={formatDurationRaw(planning.weeklyTargetMinutes)}
                 sub="minutos planejados"
               />
@@ -1419,31 +1398,7 @@ function filterSessions(
   })
 }
 
-function filterAttempts(
-  attempts: NonNullable<StatisticsCenterPayload["attempts"]>,
-  rangeKeys: string[],
-  disciplineId: string,
-  timezone: string,
-  isAllRange: boolean,
-) {
-  if (isAllRange) {
-    return attempts.filter((a) => {
-      if (disciplineId !== "all" && a.disciplineId !== disciplineId && a.disciplineId !== null)
-        return false
-      return true
-    })
-  }
-  const min = rangeKeys[0]
-  const max = rangeKeys[rangeKeys.length - 1]
-  return attempts.filter((a) => {
-    if (disciplineId !== "all" && a.disciplineId !== disciplineId && a.disciplineId !== null)
-      return false
-    if (!a.answeredAt) return true
-    const k = dateKeyOf(a.answeredAt, timezone)
-    if (!k || !min || !max) return false
-    return k >= min && k <= max
-  })
-}
+import { filterAttempts } from "@/features/statistics/lib/attempts-filter"
 
 function buildChartData(buckets: DailyBucket[], rangeDays: number, _timezone: string) {
   if (rangeDays > 90) {
@@ -1802,6 +1757,66 @@ function PlanTooltip({ active, payload, label }: ChartTooltipProps) {
   )
 }
 
+// ─── Prioridades (lista compacta: 1 linha por item, máx. 10 + ver todas) ───
+
+const PRIORITIES_VISIBLE = 10
+
+function PrioritiesList({ priorities }: { priorities: PriorityItem[] }) {
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? priorities : priorities.slice(0, PRIORITIES_VISIBLE)
+
+  return (
+    <div>
+      <ol className="divide-y divide-border rounded-lg border">
+        {visible.map((p, i) => (
+          <li
+            key={p.disciplineId}
+            className="flex items-start gap-2.5 px-3 py-2 hover:bg-muted/30"
+          >
+            <span
+              aria-hidden="true"
+              className="text-[11px] font-semibold tabular-nums text-muted-foreground pt-px shrink-0 w-5"
+            >
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-xs font-semibold truncate">{p.name}</span>
+              {p.reasons.length > 0 && (
+                <span className="block text-[10px] text-muted-foreground truncate">
+                  {p.reasons.join(" · ")}
+                </span>
+              )}
+              <span className="block text-[11px] text-foreground/80 font-medium truncate">
+                → {p.action}
+              </span>
+            </span>
+            <span className="shrink-0 text-right">
+              <span className="block text-sm font-semibold tabular-nums text-primary leading-none">
+                {p.score}
+              </span>
+              <span className="block text-[10px] text-muted-foreground tabular-nums">
+                /100
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {priorities.length > PRIORITIES_VISIBLE && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="mt-2 w-full rounded-lg border px-3 py-1.5 text-xs font-semibold text-primary hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-primary cursor-pointer"
+        >
+          {showAll
+            ? "Mostrar menos"
+            : `Ver todas as prioridades (${priorities.length})`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── Disciplinas ────────────────────────────────────────────────────────────
 
 type SortKey = "tempo" | "questoes" | "acuracia" | "prioridade" | "erros"
@@ -1816,6 +1831,10 @@ function DisciplinasSection({
   empty: boolean
 }) {
   const [sort, setSort] = useState<SortKey>("tempo")
+
+  // Reformulação visual: uma linha por disciplina (accordion); só o detalhe
+  // expande. Nenhum dado some — secundários vão para a 2ª linha/detalhe.
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const sorted = useMemo(() => {
     const list = [...stats]
@@ -1856,81 +1875,119 @@ function DisciplinasSection({
       {empty || sorted.length === 0 ? (
         <EmptyState title="Sem sessões" message="Sem sessões no período — estude uma disciplina para vê-la aqui." />
       ) : (
-        <div className="space-y-4">
-          {sorted.map((d) => {
-            const maxMinutes = Math.max(...sorted.map((x) => x.minutes), 1)
-            const pct = (d.minutes / maxMinutes) * 100
-            return (
-              <div key={d.disciplineId} className="rounded-lg border bg-card p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold truncate">{d.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {d.area ?? "Geral"} · {d.sessions} sessões
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ClassificationChip classification={d.classification} />
-                    {d.daysSinceLastStudy !== null && (
-                      <span
-                        className={`font-semibold text-[10px] ${d.daysSinceLastStudy > 30 ? "text-rose-600" : "text-muted-foreground"}`}
-                      >
-                        {d.daysSinceLastStudy === 0 ? "hoje" : `${d.daysSinceLastStudy}d`}
+        <div>
+          {/* Cabeçalho da lista (desktop; mobile usa linha compacta) */}
+          <div
+            aria-hidden="true"
+            className="hidden md:grid grid-cols-[minmax(0,1fr)_5.5rem_4.5rem_4.5rem_4rem_5.5rem_10rem] items-center gap-2 px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            <span>Disciplina</span>
+            <span className="text-right">Tempo</span>
+            <span className="text-right">Quest.</span>
+            <span className="text-right">Acurác.</span>
+            <span className="text-right">Erros</span>
+            <span className="text-right">Tendência</span>
+            <span className="text-right">Situação</span>
+          </div>
+          <ul className="divide-y divide-border rounded-lg border">
+            {sorted.map((d) => {
+              const maxMinutes = Math.max(...sorted.map((x) => x.minutes), 1)
+              const pct = (d.minutes / maxMinutes) * 100
+              const isOpen = openId === d.disciplineId
+              const detailId = `disc-detail-${d.disciplineId}`
+              const lastStudy =
+                d.daysSinceLastStudy === null
+                  ? null
+                  : d.daysSinceLastStudy === 0
+                    ? "hoje"
+                    : `${d.daysSinceLastStudy}d`
+              return (
+                <li key={d.disciplineId}>
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={detailId}
+                    aria-label={`${d.name}: ${formatDurationRaw(d.minutes)}, ${d.questions} questões, ver detalhes`}
+                    onClick={() => setOpenId(isOpen ? null : d.disciplineId)}
+                    className="w-full text-left px-3 py-2 hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-primary cursor-pointer"
+                  >
+                    <span className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_5.5rem_4.5rem_4.5rem_4rem_5.5rem_10rem] items-center gap-x-2 gap-y-0.5">
+                      <span className="min-w-0">
+                        <span className="block text-xs font-semibold truncate">{d.name}</span>
+                        <span className="block text-[10px] text-muted-foreground truncate">
+                          {d.area ?? "Geral"} · {d.sessions} sessões · {Math.round(d.shareOfTotalMinutes)}% do tempo
+                          {lastStudy !== null ? ` · último estudo ${lastStudy === "hoje" ? "hoje" : `há ${lastStudy}`}` : ""}
+                        </span>
+                        {/* Linha compacta mobile: Questões · Acurácia · Erros */}
+                        <span className="block text-[10px] text-muted-foreground md:hidden">
+                          Questões {d.questions} · Acurácia {d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`} · Erros {d.wrong}
+                        </span>
                       </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <ProgressBar pct={pct} height="h-2.5" />
-                  </div>
-                  <span className="text-xs font-semibold tabular-nums whitespace-nowrap">
-                    {formatDurationRaw(d.minutes)}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 text-[11px]">
-                  <div>
-                    <p className="text-muted-foreground">Questões</p>
-                    <p className="font-semibold">{d.questions}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Acurácia</p>
-                    <p className="font-semibold">
-                      {d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Erros</p>
-                    <p className="font-semibold text-rose-600">{d.wrong}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Foco</p>
-                    <p className="font-semibold">
-                      {d.focusAvg === null ? "—" : `${Math.round(d.focusAvg)}%`}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Tendência</p>
-                    <p className="font-semibold">
+                      <span className="md:hidden justify-self-end">
+                        <ClassificationChip classification={d.classification} />
+                      </span>
+                      <span className="hidden md:block text-right text-xs font-semibold tabular-nums whitespace-nowrap">
+                        {formatDurationRaw(d.minutes)}
+                      </span>
+                      <span className="hidden md:block text-right text-xs tabular-nums">
+                        {d.questions}
+                      </span>
+                      <span className="hidden md:block text-right text-xs tabular-nums">
+                        {d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}
+                      </span>
+                      <span className="hidden md:block text-right text-xs font-semibold tabular-nums text-rose-600">
+                        {d.wrong}
+                      </span>
+                      <span className="hidden md:flex md:justify-end">
+                        <TendenciaChip trend={d.trendDirection} delta={d.accuracyTrend} />
+                      </span>
+                      <span className="hidden md:flex md:justify-end">
+                        <ClassificationChip classification={d.classification} />
+                      </span>
+                    </span>
+                    {/* Linha mobile 2: tendência à direita da 2ª linha */}
+                    <span className="mt-0.5 flex items-center justify-between md:hidden">
                       <TendenciaChip trend={d.trendDirection} delta={d.accuracyTrend} />
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>
-                    {Math.round(d.shareOfTotalMinutes)}% do tempo total · atenção {d.attentionScore}
-                    /100
-                  </span>
-                  <span>
-                    páginas {d.pages} · flashcards {d.flashcards}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
+                      <span
+                        aria-hidden="true"
+                        className={`text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </span>
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div
+                      id={detailId}
+                      className="px-3 pb-3 pt-1 border-t border-border/50 bg-muted/20"
+                    >
+                      <div className="flex items-center gap-2 py-1.5">
+                        <div className="flex-1">
+                          <ProgressBar pct={pct} height="h-1.5" />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                          {Math.round(d.shareOfTotalMinutes)}% do tempo total · atenção {d.attentionScore}/100
+                        </span>
+                      </div>
+                      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5 text-[11px]">
+                        <div><dt className="text-muted-foreground">Tempo total</dt><dd className="font-semibold">{formatDurationRaw(d.minutes)}</dd></div>
+                        <div><dt className="text-muted-foreground">Sessões</dt><dd className="font-semibold">{d.sessions}</dd></div>
+                        <div><dt className="text-muted-foreground">Questões</dt><dd className="font-semibold">{d.questions}</dd></div>
+                        <div><dt className="text-muted-foreground">Acurácia</dt><dd className="font-semibold">{d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}</dd></div>
+                        <div><dt className="text-muted-foreground">Erros</dt><dd className="font-semibold text-rose-600">{d.wrong}</dd></div>
+                        <div><dt className="text-muted-foreground">Foco</dt><dd className="font-semibold">{d.focusAvg === null ? "—" : `${Math.round(d.focusAvg)}%`}</dd></div>
+                        <div><dt className="text-muted-foreground">Tendência</dt><dd className="font-semibold"><TendenciaChip trend={d.trendDirection} delta={d.accuracyTrend} /></dd></div>
+                        <div><dt className="text-muted-foreground">Atenção</dt><dd className="font-semibold">{d.attentionScore}/100</dd></div>
+                        <div><dt className="text-muted-foreground">Páginas</dt><dd className="font-semibold">{d.pages}</dd></div>
+                        <div><dt className="text-muted-foreground">Flashcards</dt><dd className="font-semibold">{d.flashcards}</dd></div>
+                        <div><dt className="text-muted-foreground">Último estudo</dt><dd className="font-semibold">{lastStudy === null ? "nunca" : lastStudy === "hoje" ? "hoje" : `há ${lastStudy}`}</dd></div>
+                      </dl>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </div>
       )}
     </SectionCard>

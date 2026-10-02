@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Fase G2.6 — cores derivadas dos tokens reais do app (src/app/globals.css),
+      não inventadas: --primary (172 45% 24% ~= #225951), um tom mais escuro
+      do mesmo verde-petróleo para a status bar (AppCompat.DarkActionBar usa
+      colorPrimaryDark automaticamente aí) e --accent (28 65% 52% ~= #D47F35).
+      Sem edge-to-edge: a status bar simplesmente herda esta cor sólida,
+      sem transparência nem necessidade de ajustar insets no WebView.
+    -->
+    <color name="colorPrimary">#225951</color>
+    <color name="colorPrimaryDark">#163B36</color>
+    <color name="colorAccent">#D47F35</color>
+</resources>

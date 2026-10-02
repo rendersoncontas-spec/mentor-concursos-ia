@@ -74,6 +74,11 @@ export function ReviewSessionModal({
   // Instante em que o card atual apareceu (medida real do tempo de resposta).
   // Fica em ref e é preenchido fora do render, nunca durante ele.
   const shownAtRef = useRef<number | null>(null)
+  // G1.6 (G-36): identidade da tentativa de resposta do card atual. O retry
+  // do MESMO card (ex.: falha de rede + novo clique) reutiliza o ID para o
+  // servidor deduplicar; card novo gera ID novo. Antes, cada clique gerava
+  // um ID novo e o retry virava evento duplicado.
+  const answerOpRef = useRef<{ key: string; id: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -103,57 +108,78 @@ export function ReviewSessionModal({
       onOpenChange(false)
       return
     }
+    // G1.16 (TRAP 2): trava de reentrância + finally — duplo clique não
+    // dispara dois finalizes, e throw nunca deixa loading preso no spinner.
+    if (loading) return
     setLoading(true)
-    const res = await finalizeReviewSessionAction(session.sessionId)
-    setLoading(false)
-    if (res.error) {
-      toast.error(res.error)
-      return
+    try {
+      const res = await finalizeReviewSessionAction(session.sessionId)
+      if (res.error) {
+        toast.error(res.error)
+        return
+      }
+      setReport(res.data)
+      if (res.data?.cycleSyncError) toast.error(res.data.cycleSyncError)
+    } finally {
+      setLoading(false)
     }
-    setReport(res.data)
-    if (res.data?.cycleSyncError) toast.error(res.data.cycleSyncError)
-  }, [session, onOpenChange])
+  }, [session, loading, onOpenChange])
 
   const answer = useCallback(
     async (grade: ReviewGrade) => {
       if (!session?.card || answering) return
       setAnswering(true)
-      const res = await answerReviewCardAction({
-        sessionId: session.sessionId,
-        itemId: session.card.itemId,
-        grade,
-        durationSeconds:
-          shownAtRef.current === null
-            ? 0
-            : Math.max(0, Math.round((Date.now() - shownAtRef.current) / 1000)),
-        clientOperationId: operationId(),
-      })
-      setAnswering(false)
+      try {
+        const opKey = `${session.sessionId}:${session.card.itemId}`
+        if (answerOpRef.current?.key !== opKey) {
+          answerOpRef.current = { key: opKey, id: operationId() }
+        }
+        const res = await answerReviewCardAction({
+          sessionId: session.sessionId,
+          itemId: session.card.itemId,
+          grade,
+          durationSeconds:
+            shownAtRef.current === null
+              ? 0
+              : Math.max(0, Math.round((Date.now() - shownAtRef.current) / 1000)),
+          clientOperationId: answerOpRef.current.id,
+        })
+        if (res.error) {
+          toast.error(res.error)
+          // G1.15 — item suspenso/arquivado no meio da sessão: a resposta é
+          // sempre rejeitada, então o card atual nunca avançaria (sessão
+          // "travada" — só "Encerrar sessão" funcionava). Recarrega a fila sem
+          // o itemId direcionado para seguir no próximo card válido; os
+          // suspensos/arquivados já são excluídos de nextDueItem no servidor.
+          if (res.error.includes("suspenso ou arquivado")) {
+            await load()
+          }
+          return
+        }
+        if (res.data?.conflict) {
+          toast.error("Este item já havia sido respondido em outra aba. Atualizando a fila.")
+        }
+        const next = res.data?.session ?? null
+        setSession(next)
+        setRevealed(false)
+        shownAtRef.current = Date.now()
 
-      if (res.error) {
-        toast.error(res.error)
-        return
-      }
-      if (res.data?.conflict) {
-        toast.error("Este item já havia sido respondido em outra aba. Atualizando a fila.")
-      }
-      const next = res.data?.session ?? null
-      setSession(next)
-      setRevealed(false)
-      shownAtRef.current = Date.now()
-
-      // Fila vazia: encerra a sessão e mostra o resumo real.
-      //
-      // Fase I.5 (A2): `remaining === null` significa que a contagem não pôde ser
-      // lida — nesse caso NÃO encerramos nada. Encerrar por falha de leitura era
-      // como tratar erro igual a "acabou": o aluno perderia a sessão em curso.
-      if (next && !next.card && next.remaining === 0) {
-        const finalize = await finalizeReviewSessionAction(next.sessionId)
-        if (finalize.data) setReport(finalize.data)
-        if (finalize.data?.cycleSyncError) toast.error(finalize.data.cycleSyncError)
+        // Fila vazia: encerra a sessão e mostra o resumo real.
+        //
+        // Fase I.5 (A2): `remaining === null` significa que a contagem não pôde ser
+        // lida — nesse caso NÃO encerramos nada. Encerrar por falha de leitura era
+        // como tratar erro igual a "acabou": o aluno perderia a sessão em curso.
+        if (next && !next.card && next.remaining === 0) {
+          const finalize = await finalizeReviewSessionAction(next.sessionId)
+          if (finalize.data) setReport(finalize.data)
+          if (finalize.data?.cycleSyncError) toast.error(finalize.data.cycleSyncError)
+        }
+      } finally {
+        // G1.16 (TRAP 2): throw nunca deixa os botões de nota desabilitados.
+        setAnswering(false)
       }
     },
-    [session, answering],
+    [session, answering, load],
   )
 
   // Ao reabrir depois de fechar no meio, retoma a sessão que ficou aberta.
@@ -224,6 +250,11 @@ export function ReviewSessionModal({
         {!loading && !report && !card && (
           <div className="space-y-4 py-6 text-center">
             <p className="text-sm text-foreground">Nada para revisar agora.</p>
+            {/* G1.16: o vazio mais fraco do app — dizia só "nada", sem dizer
+                de onde vêm as revisões. */}
+            <p className="text-xs text-muted-foreground">
+              Adicione tópicos do edital às revisões para vê-los aqui.
+            </p>
             <Button variant="outline" onClick={() => void finish()}>
               Encerrar sessão
             </Button>

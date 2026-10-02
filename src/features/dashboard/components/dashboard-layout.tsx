@@ -1,75 +1,51 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
+import type { ReactNode } from "react"
 
-import { toast } from "sonner"
 import { Plus } from "lucide-react"
 
-import {
-  resetDashboardLayoutAction,
-  saveDashboardLayoutAction,
-} from "@/application/dashboard/dashboard-layout.action"
 import { Button } from "@/components/ui/button"
-import { SectionHeader } from "@/components/ui/section-header"
-import { type DashboardSnapshot, type WidgetConfigItem } from "@/domain/dashboard/dashboard.types"
+import { type DashboardSnapshot } from "@/domain/dashboard/dashboard.types"
 import { getDailyMessage } from "@/features/dashboard/components/daily-message-banner"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { UserExamModal } from "@/features/dashboard/components/user-exam-modal"
 import { WeeklyGoalsModal } from "@/features/dashboard/components/weekly-goals-modal"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 
-import { DashboardCustomizationModal } from "./dashboard-customization-modal"
-import { DashboardDndContext } from "./dashboard-dnd-context"
-import { WIDGET_REGISTRY } from "./dashboard-widget-catalog"
-import { SortableWidget } from "./sortable-widget"
-
 export interface DashboardLayoutProps {
   snapshot: DashboardSnapshot
-  initialLayout: WidgetConfigItem[]
   serverDate: string
+  children: ReactNode
 }
 
-// Widgets-âncora: representam "o que preciso fazer agora" e ficam fixos em uma
-// área de destaque acima da grade, fora do fluxo de arrastar-e-soltar. Continuam
-// respeitando visibilidade (hide/show) e persistência do layout do usuário —
-// apenas não participam da reordenação/redimensionamento da grade abaixo.
-const HERO_WIDGET_IDS = new Set(["ciclo_estudo", "estudos_hoje"])
-
-export function DashboardLayout({ snapshot, initialLayout, serverDate }: DashboardLayoutProps) {
-  const [layout, setLayout] = useState<WidgetConfigItem[]>(() => {
-    // Fase F (performance): o layout salvo no servidor tem prioridade (o
-    // efeito abaixo já o aplicava logo após montar). Começar direto com ele
-    // evita um segundo render do Dashboard inteiro logo após a hidratação — e
-    // a divergência entre o HTML do servidor e o primeiro render do cliente.
-    // O localStorage continua como fallback quando o servidor não tem layout.
-    if (initialLayout && initialLayout.length > 0) return initialLayout
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("mentor_dashboard_layout")
-        if (saved) return JSON.parse(saved) as WidgetConfigItem[]
-      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
-    }
-    return initialLayout
-  })
-  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
+/**
+ * Fase F.3 (performance) — cuidava antes também do estado de layout
+ * (`layout`, `isCustomizationOpen`) e da renderização da grade de widgets.
+ * Essas duas coisas foram extraídas para `DashboardWidgetsGrid`
+ * (ver dashboard-widgets-grid.tsx), que agora fica atrás de um <Suspense> em
+ * page.tsx e chega aqui via `children`. Isso deixa o cabeçalho (este
+ * componente) livre para aparecer assim que `snapshot` estiver pronto, sem
+ * esperar os 4 loaders mais lentos dos widgets.
+ *
+ * `onOpenGoalsModal` deixou de ser passado por prop para os widgets daqui —
+ * eles agora disparam o evento global `open-dashboard-goals-modal`, que este
+ * componente escuta abaixo, no mesmo padrão já usado por `header.tsx` para
+ * abrir a personalização (`open-dashboard-customization`, escutado antes em
+ * `DashboardWidgetsGrid`). O comportamento para quem usa o app é idêntico: o
+ * clique no botão "Metas" de um widget continua abrindo o mesmo
+ * `WeeklyGoalsModal`.
+ */
+export function DashboardLayout({ snapshot, serverDate, children }: DashboardLayoutProps) {
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [isExamModalOpen, setIsExamModalOpen] = useState(false)
 
   useEffect(() => {
-    if (initialLayout && initialLayout.length > 0) {
-      setLayout(initialLayout)
-      try {
-        localStorage.setItem("mentor_dashboard_layout", JSON.stringify(initialLayout))
-      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
-    }
-  }, [initialLayout])
-
-  useEffect(() => {
-    const handleOpenCustomization = () => setIsCustomizationOpen(true)
-    window.addEventListener("open-dashboard-customization", handleOpenCustomization)
+    const handleOpenGoalsModal = () => setIsGoalsModalOpen(true)
+    window.addEventListener("open-dashboard-goals-modal", handleOpenGoalsModal)
     return () => {
-      window.removeEventListener("open-dashboard-customization", handleOpenCustomization)
+      window.removeEventListener("open-dashboard-goals-modal", handleOpenGoalsModal)
     }
   }, [])
 
@@ -82,75 +58,6 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
     month: "long",
   }).format(date)
   const capitalizedDate = formattedTodayDate.charAt(0).toUpperCase() + formattedTodayDate.slice(1)
-
-  // A grade arrastável agora só contém os widgets que não são âncora ("Hoje").
-  // Ao reordenar, reconstruímos o layout completo preservando a posição dos
-  // widgets-âncora e de quaisquer itens ocultos, para não perdê-los.
-  const handleReorder = async (newGridOrder: WidgetConfigItem[]) => {
-    const heroIds = new Set(heroWidgets.map((w) => w.widget_id))
-    const gridIds = new Set(newGridOrder.map((w) => w.widget_id))
-    const rest = layout.filter((w) => !heroIds.has(w.widget_id) && !gridIds.has(w.widget_id))
-    const merged = [...heroWidgets, ...newGridOrder, ...rest].map((item, index) => ({
-      ...item,
-      position_order: index + 1,
-    }))
-
-    setLayout(merged)
-    try {
-      localStorage.setItem("mentor_dashboard_layout", JSON.stringify(merged))
-    } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
-    const result = await saveDashboardLayoutAction(merged)
-    if (!result.success) {
-      toast.error("Erro ao salvar ordem dos widgets.")
-    }
-  }
-
-  const handleSaveLayout = async (newLayout: WidgetConfigItem[]) => {
-    setLayout(newLayout)
-    try {
-      localStorage.setItem("mentor_dashboard_layout", JSON.stringify(newLayout))
-    } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
-    const result = await saveDashboardLayoutAction(newLayout)
-    if (result.success) {
-      toast.success("Home personalizada com sucesso!")
-    } else {
-      toast.error(result.error || "Erro ao salvar personalização.")
-    }
-  }
-
-  const handleRestoreDefault = async () => {
-    const result = await resetDashboardLayoutAction()
-    if (result.success && result.data) {
-      setLayout(result.data)
-      try {
-        localStorage.removeItem("mentor_dashboard_layout")
-      } catch { /* localStorage indisponível (modo privado/cota cheia): segue sem o cache local */ }
-      toast.success("Layout restaurado para o padrão.")
-    }
-  }
-
-  // Obter apenas widgets visíveis na grade
-  const hasActivePlan = snapshot?.cycleBlocks && snapshot.cycleBlocks.length > 0
-  const visibleWidgets = layout
-    .filter((item) => item.visible && item.widget_id !== "mensagem_dia" && !(item.widget_id === "estudos_hoje" && !hasActivePlan))
-    .sort((a, b) => a.position_order - b.position_order)
-
-  // Widgets-âncora ("Hoje") ficam fora da grade arrastável, em destaque editorial.
-  // Continuam respeitando visibilidade e ordem entre si — apenas não são
-  // reordenados/redimensionados junto com o restante da grade.
-  const heroWidgets = visibleWidgets.filter((item) => HERO_WIDGET_IDS.has(item.widget_id))
-  const gridWidgets = visibleWidgets.filter((item) => !HERO_WIDGET_IDS.has(item.widget_id))
-
-  const buildCycleBlocks = () =>
-    snapshot?.cycleBlocks?.map((b) => ({
-      id: b.id,
-      disciplineName: b.disciplineName,
-      disciplineId: b.disciplineId,
-      durationMinutes: b.durationMinutes,
-      studiedMinutes: b.studiedMinutes ?? 0,
-      color: b.color || "#2563EB",
-      completed: b.status === "CONCLUIDO",
-    })) || []
 
   return (
     <div className="flex flex-col min-h-full bg-background">
@@ -192,65 +99,12 @@ export function DashboardLayout({ snapshot, initialLayout, serverDate }: Dashboa
           )
         })()}
 
-        {/* 2. Área de destaque: foco de hoje (fora da grade arrastável) */}
-        {heroWidgets.length > 0 && (
-          <section aria-labelledby="foco-de-hoje" className="space-y-2.5">
-            <SectionHeader id="foco-de-hoje" title="Foco de hoje" />
-            {heroWidgets.map((item) => {
-              const widgetInfo = WIDGET_REGISTRY[item.widget_id]
-              if (!widgetInfo) return null
-              const WidgetComponent = widgetInfo.component
-              return (
-                <div
-                  key={item.widget_id}
-                  className="rounded-lg border border-border bg-card overflow-hidden"
-                >
-                  <WidgetComponent
-                    snapshot={snapshot}
-                    colSpan={item.col_span}
-                    cycleBlocks={buildCycleBlocks()}
-                    onOpenGoalsModal={() => setIsGoalsModalOpen(true)}
-                    onOpenExamModal={() => setIsExamModalOpen(true)}
-                  />
-                </div>
-              )
-            })}
-          </section>
-        )}
-
-        {/* 3. Grade personalizável (arrastar-e-soltar, redimensionar, ocultar) */}
-        {gridWidgets.length > 0 && (
-          <SectionHeader title="Visão geral" className="pt-1" />
-        )}
-        <DashboardDndContext items={gridWidgets} onReorder={handleReorder}>
-          {gridWidgets.map((item) => {
-            const widgetInfo = WIDGET_REGISTRY[item.widget_id]
-            if (!widgetInfo) return null
-
-            const WidgetComponent = widgetInfo.component
-
-            return (
-              <SortableWidget key={item.widget_id} id={item.widget_id} colSpan={item.col_span}>
-                <WidgetComponent
-                  snapshot={snapshot}
-                  colSpan={item.col_span}
-                  cycleBlocks={buildCycleBlocks()}
-                  onOpenGoalsModal={() => setIsGoalsModalOpen(true)}
-                  onOpenExamModal={() => setIsExamModalOpen(true)}
-                />
-              </SortableWidget>
-            )
-          })}
-        </DashboardDndContext>
+        {/* 2. Área de widgets: "Foco de hoje" + grade personalizável.
+            Atrás de um <Suspense> em page.tsx (ver dashboard-widgets-section.tsx
+            e dashboard-widgets-grid.tsx) — chega pronta ou em streaming. */}
+        {children}
       </div>
 
-      <DashboardCustomizationModal
-        isOpen={isCustomizationOpen}
-        onClose={() => setIsCustomizationOpen(false)}
-        layout={layout}
-        onSave={handleSaveLayout}
-        onRestoreDefault={handleRestoreDefault}
-      />
       <UserExamModal
         open={isExamModalOpen}
         onOpenChange={setIsExamModalOpen}

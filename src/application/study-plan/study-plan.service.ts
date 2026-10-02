@@ -6,6 +6,7 @@ import {
   type StudyPlanDisciplineSummary,
   type DayOfWeek,
   type AlgorithmInput,
+  type BlockRhythm,
   type CycleOverviewData,
   type CycleBlock,
   type BlockStatus,
@@ -13,7 +14,7 @@ import {
   DAY_SHORT,
 } from "@/domain/study-plan/study-plan.types"
 import { calculateWeeklyDistribution, calculateCycleDistribution, calcDisciplineSummary } from "@/application/study-plan/study-plan.algorithm"
-import { getDayInSaoPaulo } from "@/lib/sao-paulo"
+import { getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 /**
@@ -29,13 +30,57 @@ import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
  */
 export const PRODUCT_SUGGESTED_WEEKLY_HOURS = 25
 
-export async function generateStudyPlan(
+export interface StudyPlanDraftDiscipline {
+  id: string
+  name: string
+  area: string
+}
+
+export interface StudyPlanDraftItem {
+  disciplineId: string
+  dayOfWeek: number
+  durationMinutes: number
+  priority: number
+  priorityScore: number
+  recommendedSessions: number
+}
+
+export interface StudyPlanDraft {
+  targetId: string | null
+  weeklyMinutes: number
+  targetExamName: string
+  items: StudyPlanDraftItem[]
+}
+
+export interface ComputeStudyPlanDraftOptions {
+  reason?: string
+  targetId?: string | undefined
+  overrideWeeklyHours?: number | undefined
+  /**
+   * G1.3 (G-21): conjunto fresco de disciplinas (wizard). Quando presente, o
+   * algoritmo usa EXATAMENTE este conjunto (status STUDYING, peso 5 — igual
+   * ao estado pós-replace que o fluxo antigo lia do banco). Quando ausente,
+   * lê user_disciplines/exam como antes. Nenhum write aqui.
+   */
+  disciplinePool?: StudyPlanDraftDiscipline[] | undefined
+  /**
+   * G2.1 (Opção A) — ritmo do wizard. Molda o tamanho dos blocos gerados.
+   * Ausente = legado (30–60). Segue memória-only (sem coluna/RPC): vale
+   * para esta geração; replan futuro refatia genericamente.
+   */
+  rhythm?: BlockRhythm | undefined
+}
+
+/**
+ * G1.3 (G-21): metade leitora da geração — perfil, target, disciplinas,
+ * algoritmo puro. ZERO writes: pode falhar sem destruir nada. A persistência
+ * atômica vive em persistStudyPlanDraftAtomic (RPC transacional).
+ */
+export async function computeStudyPlanDraft(
   supabase: SupabaseClient,
   userId: string,
-  reason: string = "manual",
-  targetId?: string,
-  overrideWeeklyHours?: number
-): Promise<{ id: string; version: number } | null> {
+  opts: ComputeStudyPlanDraftOptions = {},
+): Promise<StudyPlanDraft | null> {
   // 1a. Buscar perfil — P1.1: distinguir erro de leitura vs ausência real.
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -48,7 +93,7 @@ export async function generateStudyPlan(
     return null
   }
 
-  const targetHours = overrideWeeklyHours || profile?.weekly_study_hours || PRODUCT_SUGGESTED_WEEKLY_HOURS
+  const targetHours = opts.overrideWeeklyHours || profile?.weekly_study_hours || PRODUCT_SUGGESTED_WEEKLY_HOURS
 
   // 1b. Buscar concurso ativo (exam_id pode ser null para concursos customizados)
   const { data: target } = await supabase
@@ -58,6 +103,8 @@ export async function generateStudyPlan(
     .eq("is_active", true)
     .limit(1)
     .maybeSingle()
+
+  const targetId = opts.targetId || target?.id || null
 
   let examDisciplines: Array<{
     id: string
@@ -88,7 +135,18 @@ export async function generateStudyPlan(
     .eq("target_id", targetId || target?.id)
     .limit(30)
 
-  if (userDiscs && userDiscs.length > 0) {
+  if (opts.disciplinePool && opts.disciplinePool.length > 0) {
+    examDisciplines = opts.disciplinePool.map((p, idx) => ({
+      id: `pool:${p.id}`,
+      exam_id: target?.exam_id || null,
+      discipline_id: p.id,
+      weight: 5,
+      display_order: idx,
+      active: true,
+      created_at: new Date().toISOString(),
+      discipline: { id: p.id, name: p.name, area: p.area, created_at: new Date().toISOString() },
+    }))
+  } else if (userDiscs && userDiscs.length > 0) {
     examDisciplines = userDiscs
       .filter(ud => ud.discipline)
       .map((ud, idx) => ({
@@ -167,12 +225,15 @@ export async function generateStudyPlan(
   const algorithmInput: AlgorithmInput = {
     weeklyMinutes,
     availableDays,
+    rhythm: opts.rhythm,
     disciplines: examDisciplines.map((ed) => ({
       disciplineId: ed.discipline_id,
       name: ed.discipline?.name || "Desconhecido",
       area: ed.discipline?.area || "Desconhecida",
       weight: ed.weight,
-      status: statusMap.get(ed.discipline_id) ?? "NOT_STARTED",
+      // G1.3 (G-21): no modo pool (wizard), as linhas seriam recém-criadas
+      // como STUDYING (o fluxo antigo lia pós-replace); fora dele, lê o mapa.
+      status: opts.disciplinePool ? "STUDYING" : (statusMap.get(ed.discipline_id) ?? "NOT_STARTED"),
     })),
   }
 
@@ -182,19 +243,6 @@ export async function generateStudyPlan(
     return null
   }
 
-  // 3. Desativar planos anteriores
-  await supabase
-    .from("study_plans")
-    .update({ active: false, status: "ARCHIVED", archived_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .eq("active", true)
-
-  // 4a. Determinar nova versão e nome amigável
-  const { count } = await supabase
-    .from("study_plans")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId)
-
   const { data: activeTarget } = await supabase
     .from("user_targets")
     .select("target_exam")
@@ -203,64 +251,83 @@ export async function generateStudyPlan(
     .limit(1)
     .maybeSingle()
 
-  const targetExamName = activeTarget?.target_exam || "Plano de Estudos"
-  const newVersion = (count ?? 0) + 1
-  const planName = `${targetExamName} — v${newVersion}`
+  return {
+    targetId,
+    weeklyMinutes,
+    targetExamName: activeTarget?.target_exam || "Plano de Estudos",
+    items: algorithmItems.map((item) => ({
+      disciplineId: item.disciplineId,
+      dayOfWeek: item.dayOfWeek,
+      durationMinutes: item.durationMinutes,
+      priority: item.priority,
+      priorityScore: item.priorityScore,
+      recommendedSessions: item.recommendedSessions,
+    })),
+  }
+}
 
-  // 4b. Inserir novo plano
-  const { data: newPlan, error: planError } = await supabase
-    .from("study_plans")
-    .insert({
-      user_id: userId,
-      version: newVersion,
-      name: planName,
-      plan_type: "CRONOGRAMA_SEMANAL",
-      status: "ACTIVE",
-      weekly_minutes: weeklyMinutes,
-      generated_reason: reason,
-      active: true,
-      start_date: new Date().toISOString().split("T")[0],
-    })
-    .select()
-    .single()
+/**
+ * G1.3 (G-21): persiste o draft em UMA transação (RPC `generate_study_plan_atomic`).
+ * Falha → nada foi escrito (sem meio-plano, sem archive prematuro).
+ */
+export async function persistStudyPlanDraftAtomic(
+  supabase: SupabaseClient,
+  userId: string,
+  draft: StudyPlanDraft,
+  opts: {
+    reason?: string
+    profile?: { weekly_study_hours?: number | null; experience_level?: string | null } | null
+    replaceDisciplines?: string[] | null
+  } = {},
+): Promise<{ id: string; version: number } | null> {
+  // G1.5 (G-33): data de início no calendário do aluno (America/Sao_Paulo).
+  // `toISOString` usa UTC e virava o dia errado entre 21h-00h (horário de Brasília).
+  const today = todayKeyInSaoPaulo()
+  const { data, error } = await supabase.rpc("generate_study_plan_atomic", {
+    p_payload: {
+      target_id: draft.targetId,
+      profile: opts.profile ?? null,
+      replace_disciplines: opts.replaceDisciplines
+        ? opts.replaceDisciplines.map((discipline_id) => ({ discipline_id }))
+        : null,
+      plan: {
+        reason: opts.reason || "manual",
+        weekly_minutes: draft.weeklyMinutes,
+        plan_type: "CRONOGRAMA_SEMANAL",
+        start_date: today,
+      },
+      items: draft.items,
+    },
+  })
 
-  if (planError || !newPlan) {
-    console.error("generateStudyPlan: plan insert error", planError)
+  if (error || !data) {
+    console.error("persistStudyPlanDraftAtomic: rpc error", error)
     return null
   }
-
-  // P1.2 — cura otimista de corrida (criação em duas abas): a desativação
-  // acima + este insert não são atômicos; duas abas podem deixar dois ACTIVE.
-  // Garante um único ativo (last-write-wins explícito, sem destruir dados:
-  // o rival vira ARCHIVED). Leitores pegam o mais recente por generated_at.
-  await supabase
-    .from("study_plans")
-    .update({ active: false, status: "ARCHIVED", archived_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .eq("active", true)
-    .neq("id", newPlan.id)
-
-  // 4c. Inserir itens do plano
-  const itemsToInsert = algorithmItems.map((item) => ({
-    study_plan_id: newPlan.id,
-    discipline_id: item.disciplineId,
-    day_of_week: item.dayOfWeek,
-    duration_minutes: item.durationMinutes,
-    priority: item.priority,
-    priority_score: item.priorityScore,
-    recommended_sessions: item.recommendedSessions,
-  }))
-
-  const { error: itemsError } = await supabase
-    .from("study_plan_items")
-    .insert(itemsToInsert)
-
-  if (itemsError) {
-    console.error("generateStudyPlan: items insert error", itemsError)
-    // O plano foi criado mas os itens falharam — ainda retornamos o plano
+  const result = data as { plan_id?: string; version?: number } | null
+  if (!result?.plan_id || typeof result.version !== "number") {
+    console.error("persistStudyPlanDraftAtomic: unexpected rpc result", data)
+    return null
   }
+  return { id: result.plan_id, version: result.version }
+}
 
-  return newPlan as StudyPlan
+export async function generateStudyPlan(
+  supabase: SupabaseClient,
+  userId: string,
+  reason: string = "manual",
+  targetId?: string,
+  overrideWeeklyHours?: number,
+  disciplinePool?: StudyPlanDraftDiscipline[],
+): Promise<{ id: string; version: number } | null> {
+  const draft = await computeStudyPlanDraft(supabase, userId, {
+    reason,
+    targetId,
+    overrideWeeklyHours,
+    disciplinePool,
+  })
+  if (!draft) return null
+  return persistStudyPlanDraftAtomic(supabase, userId, draft, { reason })
 }
 
 /**
@@ -536,7 +603,7 @@ export async function createCycleStudyPlan(
       weekly_minutes: totalCycleMinutes,
       generated_reason: "cycle_wizard",
       active: true,
-      start_date: new Date().toISOString().split("T")[0],
+      start_date: todayKeyInSaoPaulo(),
     })
     .select()
     .single()

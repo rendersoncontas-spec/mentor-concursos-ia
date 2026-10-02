@@ -224,10 +224,10 @@ describe("I.7 — uma sessão nunca gera dois estudos", () => {
     await finalizeIgnoringCycle(sessionId, LATER)
     assert.equal(studyRows().length, 1)
 
-    // Segunda chamada: a sessão já não está ACTIVE, então a trava de
-    // idempotência barra antes de qualquer gravação (e nem chega no ciclo).
+    // G1.3 (G-34): replay encontra o estudo e confirma idempotência
+    // (completed:true) em vez de no-op cego — sem gravar de novo.
     const segunda = await finalizeSession(client(db), USER, sessionId, LATER)
-    assert.equal(segunda.completed ?? false, false)
+    assert.equal(segunda.completed ?? false, true)
     assert.equal(studyRows().length, 1, "nenhum estudo duplicado")
   })
 

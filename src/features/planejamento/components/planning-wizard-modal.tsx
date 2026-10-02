@@ -161,6 +161,10 @@ export function PlanningWizardModal({
   // P1.5: banco é a fonte oficial. weeklySuggested=true → valor exibido é
   // sugestão de produto, não meta configurada pelo usuário.
   const [weeklySuggested, setWeeklySuggested] = useState(false)
+  // P1.6.1: falha de geração (ex. sem concurso ativo/disciplinas) fica visível
+  // e acionável inline — toast sozinho some em segundos e largava a etapa 4 muda.
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [allDbDisciplines, setAllDbDisciplines] = useState<string[]>(ALL_DISCIPLINES)
   const [searchTerm, setSearchTerm] = useState("")
   const [showAutocomplete, setShowAutocomplete] = useState(false)
@@ -487,6 +491,10 @@ export function PlanningWizardModal({
   }
 
   const handleSave = async () => {
+    // P1.6.1: limpa erro anterior a cada tentativa; trava duplo clique.
+    if (isSaving) return
+    setSaveError(null)
+    setIsSaving(true)
     try {
       // Mesma validação usada pelo servidor (planning-form.ts)
       const validation = validatePlanningForm({
@@ -590,19 +598,25 @@ export function PlanningWizardModal({
         onOpenChange(false)
         setCurrentStep(1)
       } else {
-        toast.error(
+        // P1.6.1: causa real da camada de aplicação, persistente e acionável
+        // (ex. sem concurso ativo/disciplinas). Nenhum plano parcial é criado.
+        const message =
           res.error ||
-            (mode === "edit"
-              ? "Erro ao atualizar o planejamento."
-              : "Erro ao criar o planejamento."),
-        )
+          (mode === "edit"
+            ? "Erro ao atualizar o planejamento."
+            : "Erro ao criar o planejamento.")
+        setSaveError(message)
+        toast.error(message)
       }
     } catch {
-      toast.error(
+      const message =
         mode === "edit"
           ? "Erro interno ao atualizar o planejamento."
-          : "Erro interno ao criar o planejamento.",
-      )
+          : "Erro interno ao criar o planejamento."
+      setSaveError(message)
+      toast.error(message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -648,13 +662,14 @@ export function PlanningWizardModal({
       <DialogContent
         className={cn(
           "flex flex-col gap-0 p-0 border-0 max-w-none max-w-[100vw]",
-          "fixed inset-0 h-[100dvh] w-full overflow-y-auto sm:overflow-hidden",
+          "fixed inset-0 h-[100dvh] w-full",
           "rounded-none sm:rounded-xl sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:right-auto",
           "translate-x-0 translate-y-0 sm:translate-x-[-50%] sm:translate-y-[-50%]",
           "sm:w-[min(900px,94vw)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:border",
+          "sm:flex sm:flex-col",
         )}
       >
-        {/* ─────────────── HEADER (compacto) ─────────────── */}
+        {/* ─────────────── HEADER (compacto, fixo) ─────────────── */}
         <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b bg-card">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="min-w-0">
@@ -719,8 +734,8 @@ export function PlanningWizardModal({
           </div>
         </div>
 
-        {/* ─────────────── BODY (sem scroll interno) ─────────────── */}
-        <div className="flex-1 px-4 sm:px-6 py-4 min-w-0">
+        {/* ─────────────── BODY (rolável) ─────────────── */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 pb-6 min-w-0">
           <div
             key={currentStep}
             className="space-y-3.5 animate-in fade-in slide-in-from-bottom-2 duration-200"
@@ -1533,6 +1548,13 @@ export function PlanningWizardModal({
                         {formatMinutesLabel(maxMinutes)}.
                       </p>
                     )}
+                    {/* G2.1 (Opção A): o ritmo escolhido molda o tamanho dos
+                        blocos gerados (fatiamento 30–60/45–90/60–120 ou
+                        personalizado). Dias/escala continuam definindo
+                        disponibilidade, não tamanho de bloco. */}
+                    <p className="text-[11px] text-muted-foreground">
+                      O ritmo escolhido define o tamanho dos blocos do cronograma gerado.
+                    </p>
                   </div>
 
                   {/* Previsão da semana */}
@@ -1609,9 +1631,27 @@ export function PlanningWizardModal({
           </div>
         </div>
 
+        {/* P1.6.1: erro de salvamento persistente e acionável (não só toast).
+            Mostra a causa real (ex. sem concurso ativo/disciplinas) e permite
+            tentar de novo após corrigir o pré-requisito. */}
+        {saveError && (
+          <div className="mx-4 sm:mx-6 mb-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+              Não foi possível gerar o planejamento. {saveError} Selecione um concurso
+              ativo e tenha disciplinas cadastradas para continuar.
+            </p>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => void handleSave()}
+              className="shrink-0 text-[11px] font-semibold text-primary hover:underline cursor-pointer disabled:opacity-50"
+            >
+              {isSaving ? "Salvando…" : "Tentar novamente"}
+            </button>
+          </div>
+        )}
         {/* ─────────────── FOOTER (sempre visível) ─────────────── */}
-        <div className="shrink-0 px-4 sm:px-6 py-3 border-t bg-card flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 sticky bottom-0">
-          {currentStep > 1 ? (
+        <div className="shrink-0 px-4 sm:px-6 py-3 border-t bg-card flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 sticky bottom-0">          {currentStep > 1 ? (
             <Button
               variant="outline"
               onClick={handlePrevStep}
@@ -1627,10 +1667,10 @@ export function PlanningWizardModal({
 
           <Button
             onClick={() => void handleNextStep()}
-            disabled={!canProceed}
+            disabled={!canProceed || isSaving}
             className="cursor-pointer w-full sm:w-auto whitespace-normal"
           >
-            {currentStep === 4 ? "Salvar planejamento" : "Próximo"}
+            {currentStep === 4 ? (isSaving ? "Salvando…" : "Salvar planejamento") : "Próximo"}
           </Button>
         </div>
       </DialogContent>

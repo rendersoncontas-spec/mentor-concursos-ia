@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { daysAgoKeyInSaoPaulo, getDayInSaoPaulo, startOfDayInSaoPauloMs, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 import { createAnalyticsContext } from "./context"
 import { getBaseAggregations } from "./aggregations"
 import { getHeatmap } from "./heatmap"
@@ -26,6 +27,16 @@ export interface AnalyticsHistoryRow {
 }
 
 /**
+ * S1.2 — início da janela em dia civil de São Paulo (não fuso do runtime).
+ * `now` injetável para testes determinísticos. periodDays <= 0 → null (tudo).
+ */
+export function analyticsSinceIso(periodDays: number, now: Date = new Date()): string | null {
+  if (periodDays <= 0) return null
+  const refKey = getDayInSaoPaulo(now) || todayKeyInSaoPaulo()
+  return new Date(startOfDayInSaoPauloMs(daysAgoKeyInSaoPaulo(periodDays, refKey))).toISOString()
+}
+
+/**
  * Busca os dados brutos no banco otimizados para Analytics.
  * @param periodDays Quantos dias de histórico puxar. Use 0 para "Tudo" (sem filtro de data).
  */
@@ -47,12 +58,12 @@ export async function getStudyHistoryForAnalytics(
   // Fase F: a leitura era página a página em sequência (≈2.800 sessões = 3
   // idas e voltas em fila, e o Dashboard lê TODO o histórico). Agora a 1ª
   // página traz a contagem e as demais saem em paralelo. Mesmo filtro, mesma
-  // ordem (com "id" desempatando started_at iguais), mesmo limite de segurança
-  // e mesma semântica de erro: registra e devolve o que já foi lido.
-  const since = periodDays > 0 ? new Date() : null
-  if (since) since.setDate(since.getDate() - periodDays)
+  // ordem (com "id" desempatando started_at iguais), mesmo limite de segurança.
+  // S1.2: janela `since` em dia civil SP (analyticsSinceIso) e erro parcial
+  // lançado (nunca parcial silencioso — ver abaixo).
+  const sinceIso = analyticsSinceIso(periodDays)
 
-  const { data } = await fetchAllPagesInParallel<AnalyticsHistoryRow>(
+  const { data, error } = await fetchAllPagesInParallel<AnalyticsHistoryRow>(
     async (from, to, withCount) => {
       let query = supabase
         .from("study_history")
@@ -76,8 +87,8 @@ export async function getStudyHistoryForAnalytics(
         .order("started_at", { ascending: true })
         .order("id", { ascending: true })
 
-      if (since) {
-        query = query.gte("started_at", since.toISOString())
+      if (sinceIso) {
+        query = query.gte("started_at", sinceIso)
       }
 
       const { data, error, count } = await query.range(from, to)
@@ -106,6 +117,13 @@ export async function getStudyHistoryForAnalytics(
     },
     { pageSize: 1000, maxRows: ANALYTICS_FETCH_LIMIT, perfLabel: "study_history.analytics_dashboard" },
   )
+
+  // S1.2: erro em qualquer página → lança (indisponibilidade). Consumidores:
+  // dashboard envolve em readOrFlag; actions têm try/catch próprio; serviço de
+  // IA propaga como erro de serviço. Nunca parcial silencioso.
+  if (error) {
+    throw new Error(`Falha ao ler study_history para analytics: ${error.message}`)
+  }
 
   return data
 }

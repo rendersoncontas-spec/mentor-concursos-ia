@@ -29,6 +29,8 @@ import { PlanningGoalsProgressCard } from "./planning-goals-progress-card"
 import { PlanningWizardModal } from "./planning-wizard-modal"
 import { StudyCalendarView } from "./study-calendar-view"
 import { WeeklyPlanningView } from "./weekly-planning-view"
+import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
+import { isUuid } from "@/domain/study-session/study-input"
 
 export interface StudyCycleBlock {
   id: string
@@ -82,6 +84,11 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   const [activeBlockId, setActiveBlockId] = useState<string | null>(() => blocks[0]?.id ?? null)
 
   // Sync state with server-side props
+  // P1.6: a aba "ciclo" (default) não monta weekly/daily/calendar — sem este
+  // sync, o down-sync do banco nunca rodaria aqui. Fonte oficial = banco.
+  useEffect(() => {
+    void syncPlanningPreferencesFromServer()
+  }, [])
   useEffect(() => {
     const timer = setTimeout(() => {
       if (initialData?.blocks && initialData.blocks.length > 0) {
@@ -158,9 +165,12 @@ export function PlanningView({ initialData }: PlanningViewProps) {
     return `${h}h${m < 10 ? "0" : ""}${m}min`
   }
 
+  // G1.14 — rascunho LOCAL: zera só o estado em tela (study_history
+  // intacto). O toast anterior afirmava persistência ("Ciclo recomeçado do
+  // zero!") e evaporava no refresh.
   const handleResetCycle = () => {
     setBlocks(blocks.map((b) => ({ ...b, studiedMinutes: 0, completed: false })))
-    toast.success("Ciclo recomeçado do zero!")
+    toast.info("Visualização zerada localmente. O histórico real não foi alterado.")
   }
 
   const handleRemovePlan = async () => {
@@ -191,12 +201,25 @@ export function PlanningView({ initialData }: PlanningViewProps) {
     }
   }
 
+  // G1.16: sem toast prematuro — a navegação para a sessão é o feedback;
+  // afirmar "iniciando" antes do push mente se a navegação falhar.
+  // G2.3: linhas manuais têm id sintético (`cb-xxx`, sem entidade no
+  // banco): com disciplina válida, abre estudo livre honesto (FREE, sem
+  // vínculo falso de plan item); sem disciplina, a página redireciona ao
+  // planejamento em vez da tela vazia silenciosa.
   const handleStartStudy = (block: StudyCycleBlock) => {
-    toast.success(`Iniciando sessão de estudo para ${block.disciplineName}!`)
     const targetDuration =
       block.durationMinutes > 0
         ? Math.max(1, block.durationMinutes - block.studiedMinutes)
         : block.durationMinutes
+    if (!isUuid(block.id)) {
+      if (isUuid(block.disciplineId)) {
+        router.push(`/dashboard/study-session?disciplineId=${block.disciplineId}&duration=${targetDuration}`)
+      } else {
+        router.push(`/dashboard/study-session?planId=${block.id}&duration=${targetDuration}`)
+      }
+      return
+    }
     router.push(`/dashboard/study-session?planId=${block.id}&duration=${targetDuration}`)
   }
 
@@ -214,6 +237,10 @@ export function PlanningView({ initialData }: PlanningViewProps) {
     toast.success("Nova linha adicionada ao planejamento!")
   }
 
+  // G1.14 — rascunho LOCAL (modo manual): não há persistência de blocos
+  // no servidor neste fluxo; o toast anterior afirmava "salvo com sucesso"
+  // e evaporava no refresh. Para persistir de verdade, use o assistente
+  // (wizard) que gera o plano via RPC atômica.
   const handleSaveChanges = () => {
     if (blocks.length === 0) {
       toast.error("Adicione ao menos uma disciplina antes de salvar.")
@@ -222,7 +249,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
     setIsEditMode(false)
     setIsManualCreation(false)
     setHasPlanning(true)
-    toast.success("Planejamento salvo com sucesso!")
+    toast.info("Rascunho local atualizado. Para salvar no servidor, gere o plano pelo assistente.")
   }
 
   const visibleBlocks = showCompletedOnly ? blocks.filter((b) => b.completed) : blocks

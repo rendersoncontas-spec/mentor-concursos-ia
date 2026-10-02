@@ -19,8 +19,10 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { resetPasswordSchema, type ResetPasswordInput } from "@/domain/auth/auth.schemas"
+import { logoutAction } from "@/application/auth/logout.action"
 import { createClient } from "@/infrastructure/supabase/client"
 import { clearUserLocalData } from "@/utils/user-data"
+import { clearOfflinePrivateDataForLogout } from "@/infrastructure/offline"
 
 /**
  * Completa o fluxo de "esqueci minha senha" iniciado em
@@ -74,8 +76,11 @@ export function UpdatePasswordForm() {
       toast.success("Senha redefinida com sucesso! Faça login com a nova senha.")
       // P1.4: mesmo fluxo canônico de logout — limpa dados pessoais locais
       // antes de encerrar a sessão, sem duplicar removeItem aqui.
+      // G1.1 (G-31): limpa também sessão/snapshots offline do usuário.
+      // G1.7: usa a action canônica (também remove o cookie de support).
       clearUserLocalData()
-      await supabase.auth.signOut()
+      await clearOfflinePrivateDataForLogout()
+      await logoutAction()
       router.push("/login")
     })
   }

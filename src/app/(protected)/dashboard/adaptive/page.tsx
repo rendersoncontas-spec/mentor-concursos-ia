@@ -36,6 +36,7 @@ export default async function AdaptiveDashboardPage() {
     )
     .eq("user_id", effectiveUser.id)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(10)
 
   const displayHistory = history || []

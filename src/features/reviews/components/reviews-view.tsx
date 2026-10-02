@@ -10,7 +10,12 @@ import {
   getReviewsOverviewAction,
   setReviewItemFlagAction,
 } from "@/application/review-engine/review.actions"
-import { reviewItemLabel } from "@/application/review-engine/review-queue"
+import {
+  filterReviewQueue,
+  REVIEW_PERIOD_FILTERS,
+  reviewItemLabel,
+  type ReviewPeriodFilter,
+} from "@/application/review-engine/review-queue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -24,7 +29,7 @@ import {
 } from "@/domain/reviews/models"
 import { AddToReviewModal } from "@/features/reviews/components/add-to-review-modal"
 import { ReviewSessionModal } from "@/features/reviews/components/review-session-modal"
-import { formatStudyDateInSaoPaulo } from "@/lib/sao-paulo"
+import { formatStudyDateInSaoPaulo, getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 /** Data/hora de vencimento em texto curto, no fuso do aluno. */
 function dueLabel(iso: string): string {
@@ -69,6 +74,9 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
   const [sessionItemId, setSessionItemId] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  // G2.1 FASE 2 — filtro de período client-side (apresentação; o cache e os
+  // dados canônicos não mudam). Sem persistência em URL nesta fase.
+  const [periodFilter, setPeriodFilter] = useState<ReviewPeriodFilter>("todas")
 
   const refresh = useCallback(async () => {
     const res = await getReviewsOverviewAction()
@@ -143,6 +151,21 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
 
   const dueTotal = counts.overdue + counts.today + counts.newItems
 
+  // Filtro aplicado sobre as listas já ordenadas do servidor (ordem canônica
+  // preservada). Resumo/contagens seguem globais (verdade do servidor).
+  const todayKey = todayKeyInSaoPaulo()
+  const horizonKey = getDayInSaoPaulo(new Date(Date.now() + 7 * 86400_000))
+  const visibleDue =
+    periodFilter === "proximos-7d" ? [] : filterReviewQueue(due, periodFilter, todayKey, horizonKey)
+  const visibleUpcoming =
+    periodFilter === "todas"
+      ? upcoming
+      : periodFilter === "proximos-7d"
+        ? filterReviewQueue(upcoming, periodFilter, todayKey, horizonKey)
+        : []
+  const isFiltered = periodFilter !== "todas"
+  const globallyEmpty = due.length === 0 && upcoming.length === 0
+
   return (
     <div className="space-y-6">
       {/* Resumo: só números medidos. Sem revisões respondidas, a retenção é "—". */}
@@ -203,17 +226,43 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
           title="Para revisar agora"
           description="Atrasadas primeiro, depois as de hoje e as novas"
         />
+        {/* G2.1 FASE 2 — filtro por período (estado da página, sem URL). */}
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar revisões por período">
+          {REVIEW_PERIOD_FILTERS.map((f) => {
+            const active = periodFilter === f.id
+            return (
+              <Button
+                key={f.id}
+                type="button"
+                variant={active ? "default" : "outline"}
+                size="sm"
+                aria-pressed={active}
+                onClick={() => setPeriodFilter(f.id)}
+              >
+                {f.label}
+              </Button>
+            )
+          })}
+        </div>
         <div className="rounded-lg border border-border bg-card">
-          {due.length === 0 ? (
+          {visibleDue.length === 0 ? (
             <EmptyState
-              title="Nenhuma revisão para agora"
+              title={
+                periodFilter === "atrasadas"
+                  ? "Nenhuma revisão atrasada"
+                  : periodFilter === "hoje"
+                    ? "Nada vencendo hoje"
+                    : "Nenhuma revisão para agora"
+              }
               description={
-                counts.upcoming > 0
-                  ? "Os itens agendados aparecem em “Próximas”."
-                  : "Adicione um tópico ou subtópico do seu edital para começar a revisar."
+                isFiltered && !globallyEmpty
+                  ? "Nenhum item neste período. Troque o filtro para ver o restante da fila."
+                  : counts.upcoming > 0
+                    ? "Os itens agendados aparecem em “Próximas”."
+                    : "Adicione um tópico ou subtópico do seu edital para começar a revisar."
               }
               action={
-                counts.upcoming === 0 ? (
+                globallyEmpty ? (
                   <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
                     Adicionar tópico
                   </Button>
@@ -222,7 +271,7 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
             />
           ) : (
             <ul className="divide-y divide-border">
-              {due.map((item) => (
+              {visibleDue.map((item) => (
                 <ItemRow
                   key={item.id}
                   item={item}
@@ -243,12 +292,16 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
         </div>
       </section>
 
-      {upcoming.length > 0 && (
+      {visibleUpcoming.length > 0 && (
         <section aria-label="Próximas revisões" className="space-y-3">
-          <SectionHeader as="h2" title="Próximas" description="Datas calculadas pelas suas respostas" />
+          <SectionHeader
+            as="h2"
+            title={periodFilter === "proximos-7d" ? "Próximos 7 dias" : "Próximas"}
+            description="Datas calculadas pelas suas respostas"
+          />
           <div className="rounded-lg border border-border bg-card">
             <ul className="divide-y divide-border">
-              {upcoming.map((item) => (
+              {visibleUpcoming.map((item) => (
                 <ItemRow
                   key={item.id}
                   item={item}

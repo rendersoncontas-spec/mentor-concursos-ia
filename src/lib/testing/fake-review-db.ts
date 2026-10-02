@@ -175,6 +175,19 @@ class FakeReviewQuery
     return this
   }
   eq(col: string, v: unknown) {
+    // G1.3 (G-34): operador JSON do PostgREST (ex.: "metadata->>review_session_id").
+    if (col.includes("->")) {
+      const parts = col.split(/->>?/)
+      this.filters.push((r) => {
+        let cur: unknown = r
+        for (const p of parts) {
+          if (cur === null || cur === undefined || typeof cur !== "object") return false
+          cur = (cur as Row)[p]
+        }
+        return cur === v
+      })
+      return this
+    }
     this.filters.push((r) => r[col] === v)
     return this
   }

@@ -14,6 +14,7 @@
 import {
   getPlanningPreferencesAction,
   savePlanningPreferencesAction,
+  type PlanningPreferencesResult,
 } from "@/application/study-plan/planning-preferences.action"
 import type { ResolvedPlanningPrefs } from "@/application/study-plan/planning-preferences"
 import {
@@ -56,10 +57,10 @@ export function mirrorPrefsToLocal(prefs: ResolvedPlanningPrefs): void {
   }
 }
 
-let syncInFlight: Promise<ResolvedPlanningPrefs | null> | null = null
+let syncInFlight: Promise<PlanningPreferencesResult | null> | null = null
 
 /** P1.5 — sincroniza uma vez por sessão; chamadas simultâneas compartilham. */
-export function syncPlanningPreferencesFromServer(): Promise<ResolvedPlanningPrefs | null> {
+export function syncPlanningPreferencesFromServer(): Promise<PlanningPreferencesResult | null> {
   if (syncInFlight) return syncInFlight
   syncInFlight = (async () => {
     try {

@@ -123,7 +123,7 @@ export async function getUserTargetsAction(): Promise<{ success: boolean; target
 export async function switchActiveTargetAction(targetId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "SWITCH_ACTIVE_TARGET", resource: targetId })
 
     if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }

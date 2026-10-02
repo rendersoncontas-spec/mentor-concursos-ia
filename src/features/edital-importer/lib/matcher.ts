@@ -16,22 +16,19 @@ type MatchScore = { id: string; score: number }
 function bestMatch(name: string, candidates: { id: string; name: string }[]): MatchScore | null {
   const target = normalizeForMatch(name)
   if (!target) return null
-  let best: MatchScore | null = null
+  // G1.14 — somente igualdade normalizada exata marca "existente".
+  // A persistência (resolveDiscipline/ensureTopic) resolve por igualdade
+  // exata (sameNormalized/name_key); a antiga regra de substring marcava
+  // "existente" no preview e a confirmação inseria uma linha NOVA
+  // (ex.: "Direito Penal" vs "Direito Penal – Parte Geral").
   for (const c of candidates) {
     const candidate = normalizeForMatch(c.name)
     if (!candidate) continue
     if (candidate === target) {
-      best = { id: c.id, score: 1 }
-      break
-    }
-    const [shorter, longer] =
-      candidate.length <= target.length ? [candidate, target] : [target, candidate]
-    if (shorter.length >= 6 && longer.includes(shorter)) {
-      const score = Math.max(0.85, 1 - 0.1 * (longer.length - shorter.length) / longer.length)
-      if (!best || score > best.score) best = { id: c.id, score }
+      return { id: c.id, score: 1 }
     }
   }
-  return best
+  return null
 }
 
 export function matchDraftToCatalog(

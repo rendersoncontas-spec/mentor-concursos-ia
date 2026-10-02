@@ -9,7 +9,7 @@ import { z } from "zod"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { matchDraftToCatalog } from "@/features/edital-importer/lib/matcher"
-import { mergeCustomTopics, persistEditalImport, DuplicateEditalError } from "@/features/edital-importer/lib/persist"
+import { buildConfirmEditalPayload, ensureEditalCatalogRows } from "@/features/edital-importer/lib/persist"
 import { structureEditalText } from "@/features/edital-importer/lib/structurer"
 import {
   extractTextFromFile,
@@ -190,39 +190,71 @@ export async function confirmEditalImportAction(
       .maybeSingle()
     if (!target) return { success: false, error: "Concurso alvo não encontrado." }
 
-    const persisted = await persistEditalImport(supabase, user.id, valid.targetId, {
+    // G1.2 (G-26) — Fase 1 (idempotente, só catálogo global): resolve/cria
+    // disciplines/topics/subtopics sem escrever dado de usuário.
+    const catalog = await ensureEditalCatalogRows(supabase, valid.structure)
+    if (catalog.structure.length === 0) {
+      return { success: false, error: "Nenhuma disciplina válida para importar." }
+    }
+
+    // G1.2 (G-26) — Fase 2 (atômica): links + user_editais + merge no target
+    // dentro de UMA transação na RPC. Falha → rollback total, sem meio-import.
+    const rpcPayload = buildConfirmEditalPayload({
       fileName: valid.fileName,
       fileHash: valid.fileHash,
       metadata: valid.metadata,
-      structure: valid.structure,
+      structure: catalog.structure,
     })
 
-    const structureWithIds = persisted.structureForMerge
+    const { data: result, error: rpcError } = await supabase.rpc("confirm_edital_import", {
+      p_target_id: valid.targetId,
+      p_payload: rpcPayload as unknown as Record<string, never>,
+    })
 
-    await mergeCustomTopics(supabase, user.id, valid.targetId, structureWithIds)
+    if (rpcError) {
+      const message = rpcError.message || ""
+      if (message.includes("g12_target_not_found")) {
+        return { success: false, error: "Concurso alvo não encontrado." }
+      }
+      if (message.includes("g12_invalid_payload")) {
+        return { success: false, error: "Dados inválidos para importação." }
+      }
+      throw new Error(message || "Falha na confirmação do edital.")
+    }
+
+    const outcome = result as { ok: boolean; code?: string; edital_id?: string } | null
+    if (outcome && outcome.ok === false && outcome.code === "duplicate") {
+      return {
+        success: false,
+        alreadyImported: true,
+        ...(outcome.edital_id ? { editalId: outcome.edital_id } : {}),
+        error: "Este edital já foi importado anteriormente.",
+      }
+    }
+    if (!outcome || outcome.ok !== true || !outcome.edital_id) {
+      throw new Error("Resposta inesperada da confirmação do edital.")
+    }
+
+    const stats = {
+      disciplines: catalog.structure.length,
+      topics: catalog.structure.reduce((acc, d) => acc + d.topics.length, 0),
+      newDisciplines: catalog.newDisciplines,
+    }
 
     revalidatePath("/edital")
     revalidatePath("/planejamento")
     revalidatePath("/dashboard")
 
     Sentry.captureMessage("Edital importado", {
-      extra: { feature: FEATURE, step: "confirm", stats: persisted.stats },
+      extra: { feature: FEATURE, step: "confirm", stats },
     })
 
     return {
       success: true,
-      editalId: persisted.editalId,
-      stats: persisted.stats,
+      editalId: outcome.edital_id,
+      stats,
     }
   } catch (error) {
-    if (error instanceof DuplicateEditalError) {
-      return {
-        success: false,
-        alreadyImported: true,
-        editalId: error.editalId,
-        error: "Este edital já foi importado anteriormente.",
-      }
-    }
     Sentry.captureException(error, { extra: { feature: FEATURE, step: "confirm" } })
     return { success: false, error: "Erro ao importar o edital. Tente novamente." }
   }

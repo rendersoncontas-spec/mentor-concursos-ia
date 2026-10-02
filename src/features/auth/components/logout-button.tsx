@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { logoutAction } from "@/application/auth/logout.action"
 import { Button } from "@/components/ui/button"
 import { clearUserLocalData } from "@/utils/user-data"
+import { clearOfflinePrivateDataForLogout } from "@/infrastructure/offline"
 
 export function LogoutButton() {
   const [isPending, startTransition] = useTransition()
@@ -16,6 +17,7 @@ export function LogoutButton() {
   function handleLogout() {
     startTransition(async () => {
       clearUserLocalData()
+      await clearOfflinePrivateDataForLogout()
       const result = await logoutAction()
       if (result.success) {
         toast.success("Desconectado com sucesso!")

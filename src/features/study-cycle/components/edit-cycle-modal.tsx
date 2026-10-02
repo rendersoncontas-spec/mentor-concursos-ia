@@ -226,6 +226,8 @@ export function EditCycleModal({
 
   const handleSave = async () => {
     if (!overview) return
+    // G1.16: trava de reentrância.
+    if (isSubmitting) return
     if (!cycleName.trim()) {
       toast.error("Informe o nome do ciclo.")
       return
@@ -426,6 +428,7 @@ export function EditCycleModal({
                         onClick={() => handleMinutesChange(index, -15)}
                         disabled={item.plannedMinutes <= 15}
                         className="h-6 w-6"
+                        aria-label="Diminuir 15 minutos"
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
@@ -439,6 +442,7 @@ export function EditCycleModal({
                         onClick={() => handleMinutesChange(index, 15)}
                         disabled={item.plannedMinutes >= 360}
                         className="h-6 w-6"
+                        aria-label="Aumentar 15 minutos"
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
@@ -454,6 +458,7 @@ export function EditCycleModal({
                         disabled={index === 0}
                         className="h-7 w-7"
                         title="Mover para cima"
+                        aria-label="Mover para cima"
                       >
                         <ArrowUp className="h-3.5 w-3.5" />
                       </Button>
@@ -465,6 +470,7 @@ export function EditCycleModal({
                         disabled={index === items.length - 1}
                         className="h-7 w-7"
                         title="Mover para baixo"
+                        aria-label="Mover para baixo"
                       >
                         <ArrowDown className="h-3.5 w-3.5" />
                       </Button>
@@ -475,6 +481,7 @@ export function EditCycleModal({
                         onClick={() => handleRemove(index)}
                         className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                         title="Remover matéria"
+                        aria-label="Remover matéria"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

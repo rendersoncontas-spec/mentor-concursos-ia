@@ -525,6 +525,18 @@ export function DisciplinesView({ initialData }: DisciplinesViewProps) {
               icon={Folder}
               title="Nenhuma disciplina encontrada"
               description="Adicione uma disciplina ou ajuste os filtros para ver as matérias do seu edital."
+              action={
+                <Button
+                  onClick={() => {
+                    setEditingDisc(null)
+                    setDisciplineNameInput("")
+                    setIsModalOpen(true)
+                  }}
+                >
+                  <Plus aria-hidden className="h-4 w-4" />
+                  Nova disciplina
+                </Button>
+              }
             />
           </div>
         ) : (

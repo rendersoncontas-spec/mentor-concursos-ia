@@ -11,6 +11,8 @@ import {
   type AlgorithmInput,
   type AlgorithmItem,
   type DayOfWeek,
+  LEGACY_RHYTHM_BOUNDS,
+  resolveRhythmBounds,
 } from "@/domain/study-plan/study-plan.types"
 import { getDayInSaoPaulo, dayOfWeekForDateKey } from "@/lib/sao-paulo"
 
@@ -92,10 +94,18 @@ function normalizeWeights<T extends { priorityScore: number }>(disciplines: T[])
 
 /**
  * Fatiar as horas da semana em sessões de blocos ideais (ex: 30 a 60 min).
+ * `bounds` (G2.1) parametriza o tamanho dos blocos pelo ritmo escolhido —
+ * default = legado 30/60. A soma total e a distribuição por pesos não mudam.
  */
-function generateWeeklySessions(disciplines: Array<AlgorithmDisciplineInput & { priorityScore: number; normalizedScore: number }>, weeklyMinutes: number): InternalSession[] {
+function generateWeeklySessions(
+  disciplines: Array<AlgorithmDisciplineInput & { priorityScore: number; normalizedScore: number }>,
+  weeklyMinutes: number,
+  bounds: { min: number; max: number } = { ...LEGACY_RHYTHM_BOUNDS },
+): InternalSession[] {
   const sessions: InternalSession[] = []
-  
+  const minBlock = Math.max(1, Math.floor(bounds.min))
+  const maxBlock = Math.max(minBlock, Math.floor(bounds.max))
+
   // 1. Calcular fatias de tempo para cada disciplina atenta à soma total
   const allocated = disciplines.map(d => {
     if (d.normalizedScore <= 0) return { ...d, targetMins: 0 }
@@ -119,8 +129,8 @@ function generateWeeklySessions(disciplines: Array<AlgorithmDisciplineInput & { 
     if (remaining <= 0) return
 
     while (remaining > 0) {
-      if (remaining >= MIN_BLOCK_MINUTES) {
-        const blockDuration = Math.min(MAX_BLOCK_MINUTES, remaining)
+      if (remaining >= minBlock) {
+        const blockDuration = Math.min(maxBlock, remaining)
         sessions.push({
           type: "study",
           disciplineId: d.disciplineId,
@@ -132,7 +142,7 @@ function generateWeeklySessions(disciplines: Array<AlgorithmDisciplineInput & { 
         })
         remaining -= blockDuration
       } else {
-        // Se sobrou um resto menor que 30 min (ex: 15 ou 20 min):
+        // Se sobrou um resto menor que o mínimo (ex: 15 ou 20 min):
         // Se a disciplina já tem blocos criados, adicionamos ao último bloco para não perder os minutos
         const lastSession = sessions.filter(s => s.disciplineId === d.disciplineId).pop()
         if (lastSession) {
@@ -370,6 +380,10 @@ export function calculateWeeklyDistribution(input: AlgorithmInput, now: Date = n
     return []
   }
 
+  // G2.1 — ritmo parametriza o fatiamento; ausente = legado 30/60.
+  // Ritmo inválido aqui (só chega validado pelo boundary) cai no legado.
+  const bounds = resolveRhythmBounds(input.rhythm) ?? { ...LEGACY_RHYTHM_BOUNDS }
+
   // Manter weeklyMinutes exatamente como configurado pelo usuário para garantir a meta de horas
 
   // Pipeline Inteligente: 
@@ -404,12 +418,32 @@ export function calculateWeeklyDistribution(input: AlgorithmInput, now: Date = n
   const normalized = normalizeWeights(withPriorities)
 
   // 3. Geração Semanal com Reserva para Revisões (garante que soma final das aulas + revisões = weeklyMinutes)
-  const estimatedSessionsCount = Math.floor(weeklyMinutes / 60)
-  const estimatedReviewsCount = Math.floor(estimatedSessionsCount / 4)
-  const reviewMinutesReserve = estimatedReviewsCount * REVIEW_BLOCK_MINUTES
-  const studyMinutes = Math.max(MIN_BLOCK_MINUTES, weeklyMinutes - reviewMinutesReserve)
-
-  const baseSessions = generateWeeklySessions(normalized, studyMinutes)
+  // G2.1: blocos de revisão mantêm 20 min (regra própria, fora do ritmo).
+  // A reserva precisa convergir com o fatiamento real: a estimativa inicial
+  // assume blocos de 60min (legado); com outro ritmo, o nº real de sessões
+  // (e de reviews = 1 a cada 4) difere do estimado. Sem convergência, o
+  // ajuste de precisão despejava a diferença no último bloco. O caminho
+  // legado (sem ritmo) é single-pass bit-idêntico ao anterior.
+  let studyMinutes: number
+  let baseSessions: InternalSession[]
+  if (input.rhythm === undefined) {
+    const estimatedSessionsCount = Math.floor(weeklyMinutes / 60)
+    const estimatedReviewsCount = Math.floor(estimatedSessionsCount / 4)
+    const reviewMinutesReserve = estimatedReviewsCount * REVIEW_BLOCK_MINUTES
+    studyMinutes = Math.max(MIN_BLOCK_MINUTES, weeklyMinutes - reviewMinutesReserve)
+    baseSessions = generateWeeklySessions(normalized, studyMinutes)
+  } else {
+    let reserve = Math.floor(Math.floor(weeklyMinutes / 60) / 4) * REVIEW_BLOCK_MINUTES
+    baseSessions = []
+    studyMinutes = weeklyMinutes
+    for (let pass = 0; pass < 5; pass++) {
+      studyMinutes = Math.max(bounds.min, weeklyMinutes - reserve)
+      baseSessions = generateWeeklySessions(normalized, studyMinutes, bounds)
+      const actualReserve = Math.floor(baseSessions.length / 4) * REVIEW_BLOCK_MINUTES
+      if (actualReserve === reserve) break
+      reserve = actualReserve
+    }
+  }
 
   // 4. Balanceamento Anti-Repetição (Interleaving Auditado)
   const balancedSessions = balanceSequence(baseSessions, input.isFinalSprint)
@@ -424,7 +458,7 @@ export function calculateWeeklyDistribution(input: AlgorithmInput, now: Date = n
     const studySessions = sessionsWithReviews.filter(s => s.type === "study")
     const targetSession = studySessions[studySessions.length - 1] || sessionsWithReviews[sessionsWithReviews.length - 1]
     if (targetSession) {
-      targetSession.durationMinutes = Math.max(MIN_BLOCK_MINUTES, targetSession.durationMinutes + diffMins)
+      targetSession.durationMinutes = Math.max(bounds.min, targetSession.durationMinutes + diffMins)
     }
   }
 

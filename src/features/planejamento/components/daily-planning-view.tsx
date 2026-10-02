@@ -678,8 +678,36 @@ export function DailyPlanningView({
     showPendencies &&
     !replanInfo?.sanityInvalid
 
+  // G2.3 — plantão tem estado próprio: antes caía no mesmo "Dia de
+  // descanso programado" do dia livre, e o plantonista achava que o
+  // planejamento estava vazio/quebrado (weekly e calendário já distinguem).
+  const isDutyDay = scheduleMode !== "normal" && isShiftDay(dateNum)
+
   const renderEmptyState = () => {
     if (blocks.length > 0) {
+      if (isDutyDay) {
+        return (
+          <div className="py-12 text-center space-y-4">
+            <Coffee aria-hidden className="w-5 h-5 mx-auto text-muted-foreground/70" />
+            <div className="space-y-1 max-w-sm mx-auto">
+              <h4 className="text-sm font-medium text-foreground">Dia de plantão — sem estudos agendados</h4>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">
+                Pela sua escala, hoje é dia de trabalho: os blocos foram
+                remanejados para os dias de folga. Bom plantão!
+              </p>
+            </div>
+            {onSwitchToCiclo && (
+              <Button
+                onClick={onSwitchToCiclo}
+                variant="outline"
+                size="sm"
+              >
+                Ver sequência do ciclo
+              </Button>
+            )}
+          </div>
+        )
+      }
       return (
         <div className="py-12 text-center space-y-4">
           <Coffee aria-hidden className="w-5 h-5 mx-auto text-muted-foreground/70" />
@@ -1140,7 +1168,7 @@ export function DailyPlanningView({
                             )}
                             <Button
                               onClick={() => {
-                                toast.success(`Iniciando estudo de ${task.disciplineName}`)
+                                // G1.16: sem toast prematuro — a navegação é o feedback.
                                 const targetDuration =
                                   task.durationMinutes > 0
                                     ? Math.max(1, task.durationMinutes - task.studiedMinutes)

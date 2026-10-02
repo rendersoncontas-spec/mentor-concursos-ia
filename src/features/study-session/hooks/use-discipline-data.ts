@@ -7,6 +7,7 @@ import {
   type DisciplineSuggestion,
   getStudyCenterData,
 } from "@/application/study-session/get-disciplines.action"
+import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 interface DisciplineCache {
   planDisciplines: DisciplineOption[]
@@ -77,6 +78,17 @@ export function useDisciplineData() {
     if (_cache && Date.now() - _lastFetchAt >= STALE_MS) {
       void load(true)
     }
+  }, [load])
+
+  // G2.3 — a Central repetia a sugestão antiga por até 5min após salvar
+  // (único consumidor sem listener). Este dado nunca vem do servidor da
+  // página (sempre busca via action), então atualiza em todo save.
+  useEffect(() => {
+    const onSaved = () => {
+      void load(true)
+    }
+    window.addEventListener(STUDY_SESSION_SAVED_EVENT, onSaved)
+    return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, onSaved)
   }, [load])
 
   return { data, loading, error, refresh: () => load(true) }

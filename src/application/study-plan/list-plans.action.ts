@@ -59,6 +59,7 @@ export async function listPlansAction(): Promise<{ data: PlanCardData[] | null; 
       .select("*")
       .eq("user_id", effectiveUserId)
       .order("generated_at", { ascending: false })
+      .order("id", { ascending: false })
 
     if (error) return { data: null, error: error.message }
     if (!rawPlans || rawPlans.length === 0) return { data: [], error: null }
@@ -100,6 +101,28 @@ export async function listPlansAction(): Promise<{ data: PlanCardData[] | null; 
     // 1. Processar cada plano individualmente
     const processedMap = new Map<string, PlanCardData>()
 
+    // G1.8 — N+1 eliminado: antes, 1 query de itens POR plano (N versões =
+    // N idas ao banco). Agora 1 única query com IN + agrupamento em memória.
+    // Mesmas colunas, mesma agregação, mesma ordenação de exibição.
+    const planIds = rawTyped.map((plan) => String(plan["id"]))
+    const { data: allItems } = await supabase
+      .from("study_plan_items")
+      .select("id, study_plan_id, discipline_id, duration_minutes, disciplines ( id, name, area )")
+      .in("study_plan_id", planIds)
+      .order("id", { ascending: true })
+    type CardItemRow = {
+      id: string
+      discipline_id: string
+      duration_minutes: number
+      disciplines: { id: string; name: string; area: string | null } | { id: string; name: string; area: string | null }[]
+    }
+    const itemsByPlan = new Map<string, CardItemRow[]>()
+    for (const row of ((allItems ?? []) as unknown as (CardItemRow & { study_plan_id: string })[])) {
+      const list = itemsByPlan.get(row.study_plan_id)
+      if (list) list.push(row)
+      else itemsByPlan.set(row.study_plan_id, [row])
+    }
+
     for (const plan of rawTyped) {
       const planId = String(plan["id"])
       const version = Number(plan["version"]) || 1
@@ -131,18 +154,8 @@ export async function listPlansAction(): Promise<{ data: PlanCardData[] | null; 
       const startDate = plan["start_date"] ? String(plan["start_date"]) : null
       const endDate = plan["end_date"] ? String(plan["end_date"]) : null
 
-      // Buscar itens do plano
-      const { data: items } = await supabase
-        .from("study_plan_items")
-        .select("id, discipline_id, duration_minutes, disciplines ( id, name, area )")
-        .eq("study_plan_id", planId)
-
-      const itemRows = (items ?? []) as unknown as {
-        id: string
-        discipline_id: string
-        duration_minutes: number
-        disciplines: { id: string; name: string; area: string | null } | { id: string; name: string; area: string | null }[]
-      }[]
+      // Itens do plano (lote único buscado antes do loop — sem N+1).
+      const itemRows = itemsByPlan.get(planId) ?? []
 
       const byDiscipline = new Map<string, PlanDisciplineSummary>()
       let itemMinutes = 0
@@ -269,20 +282,35 @@ export async function activatePlanAction(planId: string): Promise<{ success: boo
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "ACTIVATE_PLAN", resource: planId })
     if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
-    // 1. Desativa todos
-    await supabase.from("study_plans").update({ active: false, status: "ARCHIVED" }).eq("user_id", effectiveUserId)
-
-    // 2. Ativa o plano selecionado
-    const { error } = await supabase
+    // G1.15 — ativa o ALVO primeiro e só desativa os demais depois.
+    // Antes: desativava tudo e só então ativava o alvo — se o alvo fosse
+    // inválido (ou a ativação falhasse), o usuário ficava com ZERO planos
+    // ativos. Agora, alvo inexistente aborta antes de mudar qualquer coisa.
+    // Concorrência entre abas continua protegida pelo índice único parcial
+    // uq_study_plans_single_active (o perdedor recebe 23505 e erro honesto).
+    // 1. Ativa o plano selecionado
+    const { data: activated, error } = await supabase
       .from("study_plans")
       .update({ active: true, status: "ACTIVE" })
       .eq("id", planId)
       .eq("user_id", effectiveUserId)
+      .select("id")
+      .maybeSingle()
 
     if (error) return { success: false, error: error.message }
+    if (!activated) return { success: false, error: "Plano não encontrado." }
+
+    // 2. Desativa os demais
+    const { error: deactivateError } = await supabase
+      .from("study_plans")
+      .update({ active: false, status: "ARCHIVED" })
+      .eq("user_id", effectiveUserId)
+      .neq("id", planId)
+
+    if (deactivateError) return { success: false, error: deactivateError.message }
 
     // BUG CORRIGIDO (QA 2026-09): esta mutacao muda qual plano esta ativo,
     // exatamente como generateStudyPlanAction (que ja revalida estas 4
@@ -310,28 +338,46 @@ export async function togglePausePlanAction(planId: string, currentStatus: PlanS
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "TOGGLE_PAUSE_PLAN", resource: planId })
     if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     const nextStatus: PlanStatus = currentStatus === "PAUSED" ? "ACTIVE" : "PAUSED"
     const isActive = nextStatus === "ACTIVE"
 
-    // Se for reativar, desativa outros ativos primeiro
+    // G1.15 — mesma ordem de activatePlanAction: ativa o alvo primeiro
+    // (aborta sem mudar nada se ele não existir) e só então desativa os
+    // demais. O índice uq_study_plans_single_active protege a concorrência.
+    // Se for reativar, ativa o alvo antes de desativar os outros
     if (isActive) {
-      await supabase.from("study_plans").update({ active: false, status: "ARCHIVED" }).eq("user_id", effectiveUserId)
+      const { data: reactivated, error: reactivateError } = await supabase
+        .from("study_plans")
+        .update({ active: true, status: nextStatus, paused_at: null })
+        .eq("id", planId)
+        .eq("user_id", effectiveUserId)
+        .select("id")
+        .maybeSingle()
+      if (reactivateError) return { success: false, error: reactivateError.message }
+      if (!reactivated) return { success: false, error: "Plano não encontrado." }
+
+      const { error: deactivateError } = await supabase
+        .from("study_plans")
+        .update({ active: false, status: "ARCHIVED" })
+        .eq("user_id", effectiveUserId)
+        .neq("id", planId)
+      if (deactivateError) return { success: false, error: deactivateError.message }
+    } else {
+      const { error } = await supabase
+        .from("study_plans")
+        .update({
+          active: false,
+          status: nextStatus,
+          paused_at: new Date().toISOString(),
+        })
+        .eq("id", planId)
+        .eq("user_id", effectiveUserId)
+
+      if (error) return { success: false, error: error.message }
     }
-
-    const { error } = await supabase
-      .from("study_plans")
-      .update({
-        active: isActive,
-        status: nextStatus,
-        paused_at: nextStatus === "PAUSED" ? new Date().toISOString() : null,
-      })
-      .eq("id", planId)
-      .eq("user_id", effectiveUserId)
-
-    if (error) return { success: false, error: error.message }
 
     // BUG CORRIGIDO (QA 2026-09): esta mutacao muda qual plano esta ativo,
     // exatamente como generateStudyPlanAction (que ja revalida estas 4
@@ -359,7 +405,7 @@ export async function duplicatePlanAction(planId: string, newName?: string): Pro
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "DUPLICATE_PLAN", resource: planId })
     if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     // 1. Buscar plano original
@@ -432,7 +478,7 @@ export async function deletePlanAction(planId: string): Promise<{ success: boole
   if (isMaintenanceMode()) return { success: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "DELETE_PLAN", resource: planId })
     if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     // CASCADE exclui automaticamente os study_plan_items (via FK)

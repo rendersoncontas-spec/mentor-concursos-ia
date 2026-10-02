@@ -451,14 +451,15 @@ async function fetchCycleDisciplines(
 
     if (!items || items.length === 0) return []
 
-    // Fase F.1: leitura paginada de study_cycle_sessions (antes cortada em 1.000).
-    const { data: sessions } = await fetchAllCycleSessions(supabase, { cycleId: cycle.id })
-
-    const { data: skipRows } = await supabase
-      .from("study_cycle_item_skips")
-      .select("cycle_item_id")
-      .eq("cycle_id", cycle.id)
-      .eq("round_number", cycle.current_round || 1)
+    // G1.8: sessions e skips só dependem de cycle.id — em paralelo.
+    const [{ data: sessions }, { data: skipRows }] = await Promise.all([
+      fetchAllCycleSessions(supabase, { cycleId: cycle.id }),
+      supabase
+        .from("study_cycle_item_skips")
+        .select("cycle_item_id")
+        .eq("cycle_id", cycle.id)
+        .eq("round_number", cycle.current_round || 1),
+    ])
 
     const overview = buildCycleOverview(
       cycle as unknown as StudyCycle,

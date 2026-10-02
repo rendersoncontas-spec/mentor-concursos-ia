@@ -109,6 +109,8 @@ class FakeQuery
   private withCount = false
   private columns: string | null = null
   private single = false
+  private payload: Row | Row[] | undefined = undefined
+  private upsertConflict: string | null = null
 
   constructor(
     private readonly db: FakePostgrest,
@@ -121,9 +123,18 @@ class FakeQuery
     this.columns = cols ?? null
     return this
   }
-  insert() { this.method = "insert"; return this }
-  update() { this.method = "update"; return this }
-  upsert() { this.method = "upsert"; return this }
+  // A1.3 — escritas aplicam o payload nas tabelas em memória (antes os
+  // argumentos eram ignorados e nada persistia, o que impedia testar fluxos
+  // com escrita, ex. support_sessions/upsert de roles). Somente leitura nos
+  // testes existentes → nenhum comportamento anterior muda para eles.
+  insert(row?: Row | Row[]) { this.method = "insert"; this.payload = row; return this }
+  update(values?: Row) { this.method = "update"; this.payload = values; return this }
+  upsert(row?: Row | Row[], opts?: { onConflict?: string }) {
+    this.method = "upsert"
+    this.payload = row
+    this.upsertConflict = opts?.onConflict ?? null
+    return this
+  }
   delete() { this.method = "delete"; return this }
   eq(col: string, v: unknown) { this.filters.push((r) => r[col] === v); return this }
   neq(col: string, v: unknown) { this.filters.push((r) => r[col] !== v); return this }
@@ -134,9 +145,20 @@ class FakeQuery
   lte(col: string, v: unknown) { this.filters.push((r) => (r[col] !== null && r[col] !== undefined) && cmp(r[col], v) <= 0); return this }
   is(col: string, v: unknown) { this.filters.push((r) => (r[col] ?? null) === v); return this }
   not(col: string, op: string, v: unknown) {
-    if (op !== "is") throw new Error(`fake-postgrest: not.${op} não suportado`)
-    this.filters.push((r) => (r[col] ?? null) !== v)
-    return this
+    if (op === "is") {
+      this.filters.push((r) => (r[col] ?? null) !== v)
+      return this
+    }
+    // A1.3 — espelha `.not("id", "in", "(a,b)")` do PostgREST (usado pela
+    // busca admin com roleFilter=user para excluir papéis elevados).
+    if (op === "in") {
+      const raw = String(v ?? "")
+      const inner = raw.startsWith("(") && raw.endsWith(")") ? raw.slice(1, -1) : raw
+      const excluded = new Set(inner.length > 0 ? inner.split(",") : [])
+      this.filters.push((r) => !excluded.has(String(r[col] ?? "")))
+      return this
+    }
+    throw new Error(`fake-postgrest: not.${op} não suportado`)
   }
   order(col: string, opts?: { ascending?: boolean }) { this.orders.push({ col, asc: opts?.ascending !== false }); return this }
   range(from: number, to: number) { this.rangeFrom = from; this.rangeTo = to; return this }
@@ -152,7 +174,49 @@ class FakeQuery
       ordered: this.orders.length > 0,
       method: this.method,
     })
-    if (this.method !== "select") return { data: null, error: null, count: null }
+    if (this.method !== "select") {
+      const pending = this.db.failures[`${this.table}:write`] ?? 0
+      if (pending > 0) {
+        this.db.failures[`${this.table}:write`] = pending - 1
+        const message = this.db.failureMessages[this.table] ?? `fake-postgrest: falha simulada em ${this.table}`
+        return { data: null, error: { message }, count: null }
+      }
+      const store: Row[] = (this.db.tables[this.table] ??= [])
+      const matched = store.filter((r) => this.filters.every((f) => f(r)))
+      if (this.method === "insert" || this.method === "upsert") {
+        const incoming = (
+          this.payload === undefined ? [] : Array.isArray(this.payload) ? this.payload : [this.payload]
+        ) as Row[]
+        const applied: Row[] = []
+        for (const row of incoming) {
+          const withId: Row =
+            row["id"] === undefined || row["id"] === null
+              ? { ...row, id: `fake-${this.db.nextId++}` }
+              : { ...row }
+          if (this.method === "upsert" && this.upsertConflict) {
+            const key = this.upsertConflict
+            const idx = store.findIndex((r) => r[key] === withId[key])
+            if (idx >= 0) {
+              store[idx] = { ...(store[idx] as Row), ...withId }
+              applied.push(store[idx] as Row)
+              continue
+            }
+          }
+          store.push(withId)
+          applied.push(withId)
+        }
+        return { data: applied, error: null, count: null }
+      }
+      if (this.method === "update") {
+        const values = (this.payload ?? {}) as Row
+        for (const row of matched) Object.assign(row, values)
+        return { data: [...matched], error: null, count: null }
+      }
+      // delete: remove apenas as linhas filtradas.
+      const removed = store.filter((r) => this.filters.every((f) => f(r)))
+      this.db.tables[this.table] = store.filter((r) => !this.filters.every((f) => f(r)))
+      return { data: removed, error: null, count: null }
+    }
     // Fase I.8 — injeção de falha (para testar erro≠ausência): consome uma
     // falha pendente da tabela, se houver, e devolve `error` como o PostgREST
     // devolveria — nenhum dado. Sem falha marcada, o comportamento é o mesmo
@@ -210,6 +274,8 @@ export class FakePostgrest {
    */
   readonly failures: Record<string, number> = {}
   readonly failureMessages: Record<string, string> = {}
+  /** A1.3 — contador de ids gerados para inserts sem id explícito. */
+  nextId = 1
   constructor(
     readonly tables: Record<string, Row[]>,
     readonly maxRows = 1000,
@@ -224,9 +290,20 @@ export class FakePostgrest {
    * Marca `table` para responder com `{ data: null, error }` nas próximas
    * `times` leituras (`select`), depois volta a responder normalmente. Serve
    * para testar que um erro de leitura vira estado de erro, não ausência.
+   * Para escritas, use `failWriteOn` (mesma semântica para insert/update/delete).
    */
   failOn(table: string, times = 1, message?: string): void {
     this.failures[table] = (this.failures[table] ?? 0) + times
+    if (message) this.failureMessages[table] = message
+  }
+
+  /**
+   * Como `failOn`, mas para escritas (insert/update/delete) na tabela.
+   * Chave separada (`tabela:write`) para não interferir nas falhas de leitura.
+   */
+  failWriteOn(table: string, times = 1, message?: string): void {
+    const key = `${table}:write`
+    this.failures[key] = (this.failures[key] ?? 0) + times
     if (message) this.failureMessages[table] = message
   }
 }

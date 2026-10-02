@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { AccountSettingsModal } from "@/features/profile/components/account-settings-modal"
 import { clearUserLocalData } from "@/utils/user-data"
+import { clearOfflinePrivateDataForLogout } from "@/infrastructure/offline"
 import { StudyHeaderControl } from "@/components/study/study-header-control"
 import { ConnectionStatusIndicator } from "@/components/layout/connection-status-indicator"
 
@@ -317,6 +318,7 @@ useEffect(() => {
                 onClick={async () => {
                   setIsUserMenuOpen(false)
                   clearUserLocalData()
+                  await clearOfflinePrivateDataForLogout()
                   await logoutAction()
                   window.location.replace("/login")
                 }}

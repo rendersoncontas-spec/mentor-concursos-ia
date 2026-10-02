@@ -51,15 +51,17 @@ describe("finalizeSession: invalidacao do cache de estatisticas apos gravar stud
     const fnEnd = source.indexOf("\nexport async function", fnStart + 1)
     const fnBody = source.slice(fnStart, fnEnd === -1 ? source.length : fnEnd)
 
-    // Precisa estar dentro do bloco "if (!historyError)" (so quando o insert
-    // realmente aconteceu), nao incondicionalmente antes dele.
-    const guardIdx = fnBody.indexOf("if (!historyError)")
-    assert.ok(guardIdx !== -1, "deve existir a guarda if (!historyError)")
-    const afterGuard = fnBody.slice(guardIdx)
-
+    // G1.3 (G-34): a gravação vive em insertReviewStudyHistory; o sucesso é
+    // `inserted.ok` (falha vira erro recuperável, nunca sucesso falso). A
+    // invalidação acontece nos dois caminhos de gravação (claim e recuperação).
     assert.ok(
-      /await invalidateStatisticsCenterCache\(userId\)/.test(afterGuard),
-      "deve chamar await invalidateStatisticsCenterCache(userId) dentro do bloco if (!historyError)",
+      fnBody.includes("insertReviewStudyHistory("),
+      "a gravação do estudo passa pelo helper dedicado",
+    )
+    const invalidations = source.match(/await invalidateStatisticsCenterCache\(userId\)/g) ?? []
+    assert.ok(
+      invalidations.length >= 2,
+      "claim vencido e recuperação invalidam o cache após gravar (nunca no caminho de falha)",
     )
   })
 

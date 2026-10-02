@@ -348,7 +348,10 @@ describe("A3 — a ordem do fluxo está travada no código", () => {
   it("o compare-and-swap e a guarda de idempotência continuam de pé", () => {
     assert.match(body, /\.eq\("status", "ACTIVE"\)/)
     assert.match(body, /\.select\("id"\)\s*\n?\s*\.maybeSingle\(\)/)
-    assert.match(body, /if \(!claimedSession\) return \{ cycleSyncError: null \}/)
+    // G1.3 (G-34): a guarda do perdedor confere o estudo do vencedor
+    // (findStudyHistoryByReviewSession) em vez de retornar cego.
+    assert.match(body, /if \(!claimedSession\)/)
+    assert.match(body, /findStudyHistoryByReviewSession/)
   })
 
   it("nenhuma leitura da sessão volta a mascarar erro como vazio", () => {

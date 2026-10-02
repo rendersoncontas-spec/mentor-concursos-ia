@@ -36,13 +36,18 @@ export interface ExamDisciplineWithDetails extends ExamDiscipline {
   discipline: Discipline
 }
 
-// Progresso do aluno em uma disciplina global
+// Progresso do aluno em uma disciplina global.
+// G1.1 (G-02): `custom_name`/`custom_color_hex` são a APARÊNCIA PESSOAL do
+// usuário (nunca afetam o catálogo global). NULL = segue o global.
 export interface UserDiscipline {
   id: string
   user_id: string
   discipline_id: string
+  target_id?: string | null
   status: DisciplineStatus
   mastery_level: number
+  custom_name?: string | null
+  custom_color_hex?: string | null
   created_at: string
 }
 

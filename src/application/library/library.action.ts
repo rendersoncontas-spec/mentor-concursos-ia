@@ -1,5 +1,6 @@
 "use server"
 
+import { classifyLibraryUrl, normalizeLibraryUrlInput } from "@/domain/library/library-url"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export interface LibraryMaterialItem {
@@ -29,6 +30,7 @@ export async function listLibraryMaterialsAction(): Promise<{
       .select("id, title, discipline_name, type, url, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
 
     if (error) {
       console.error("Erro ao listar materiais da biblioteca:", error)
@@ -70,12 +72,19 @@ export async function createLibraryMaterialAction(input: {
       return { success: false, error: "Informe o título do material." }
     }
 
+    // G1.1 (G-28): somente http(s) no SERVIDOR. "" = sem link (permitido).
+    const urlKind = classifyLibraryUrl(input["url"])
+    if (urlKind === "invalid") {
+      return { success: false, error: "URL inválida. Use um link http:// ou https://." }
+    }
+    const url = urlKind === "empty" ? "" : normalizeLibraryUrlInput(input["url"])
+
     const { error } = await supabase.from("library_materials").insert({
       user_id: user.id,
       title,
       discipline_name: input["disciplineName"]?.trim() || null,
       type: input["type"],
-      url: input["url"]?.trim() || "",
+      url,
     })
 
     if (error) {

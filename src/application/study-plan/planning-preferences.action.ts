@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
+import { resolveWeekStartDay } from "@/lib/study-time-calculator"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
@@ -21,6 +22,13 @@ import { DEFAULT_AVAILABILITY } from "./replan/adaptive-replan.service"
 
 export type PlanningPreferencesResult = ResolvedPlanningPrefs & {
   weeklyGoalHours: number | null
+  /**
+   * P1.6.1 — primeiro dia da semana canônico (0 = Domingo, 1 = Segunda),
+   * resolvido por resolveWeekStartDay(preferences → week_start_day → 0).
+   * "configured" = banco; "default" = ausência real (preserva Domingo).
+   */
+  weekStartDay: number
+  weekStartDaySource: "configured" | "default"
 }
 
 /**
@@ -38,7 +46,7 @@ export async function getPlanningPreferencesAction(
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("work_scale, first_shift_day, shift_anchor_date, study_days, weekly_study_hours")
+      .select("work_scale, first_shift_day, shift_anchor_date, study_days, weekly_study_hours, week_start_day, preferences")
       .eq("id", effectiveUserId)
       .maybeSingle()
 
@@ -73,7 +81,21 @@ export async function getPlanningPreferencesAction(
         ? (row["weekly_study_hours"] as number)
         : null
 
-    return { data: { ...resolved, weeklyGoalHours: weekly }, error: null }
+    // P1.6.1 — resolução canônica do primeiro dia da semana (mesma usada pelo
+    // servidor em weekly-planner/replan/dashboard). Banco vence; ausência = default.
+    const prefsFirstDay = (row["preferences"] as Record<string, unknown> | null)?.["firstDayOfWeek"]
+    const weekStartDay = resolveWeekStartDay(
+      prefsFirstDay,
+      typeof row["week_start_day"] === "number" ? (row["week_start_day"] as number) : null,
+    )
+    const weekStartDaySource: PlanningPreferencesResult["weekStartDaySource"] =
+      prefsFirstDay === "Domingo" ||
+      prefsFirstDay === "Segunda-feira" ||
+      typeof row["week_start_day"] === "number"
+        ? "configured"
+        : "default"
+
+    return { data: { ...resolved, weeklyGoalHours: weekly, weekStartDay, weekStartDaySource }, error: null }
   } catch {
     return { data: null, error: "Erro ao carregar preferências." }
   }
@@ -98,7 +120,7 @@ export async function savePlanningPreferencesAction(
   if (isMaintenanceMode()) return { ok: false, error: "Sistema temporariamente indisponível." }
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "SAVE_PLANNING_PREFERENCES" })
     if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado." }
 
     const updateData: Record<string, unknown> = {}

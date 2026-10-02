@@ -51,7 +51,7 @@ test("marca disciplina desconhecida como nova", () => {
   assert.equal(matched.disciplines[0]?.isNew, true)
 })
 
-test("corresponde por semelhança quando o nome do edital é mais curto", () => {
+test("nome parcial NÃO é marcado como existente (preview segue a regra da persistência)", () => {
   const draft = makeDraft([
     {
       name: "PORTUGUÊS",
@@ -62,8 +62,10 @@ test("corresponde por semelhança quando o nome do edital é mais curto", () => 
   ])
   const matched = matchDraftToCatalog(draft, CATALOG_DISCIPLINES, [], [])
 
-  assert.equal(matched.disciplines[0]?.disciplineId, "d1")
-  assert.equal(matched.disciplines[0]?.isNew, false)
+  // G1.14: a persistência resolve por igualdade exata — "PORTUGUÊS" vira uma
+  // disciplina NOVA, então o preview não pode exibir "existente".
+  assert.equal(matched.disciplines[0]?.disciplineId, null)
+  assert.equal(matched.disciplines[0]?.isNew, true)
 })
 
 test("corresponde tópico dentro da disciplina certa", () => {

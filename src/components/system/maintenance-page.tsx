@@ -20,7 +20,7 @@ export function MaintenancePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground animate-in fade-in duration-500">
       <header className="flex h-16 items-center px-4 md:px-6">
-        <Logo href="#" />
+        <Logo href="/" />
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 space-y-8 text-center animate-in slide-in-from-bottom-8 duration-700">

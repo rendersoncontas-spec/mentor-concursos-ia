@@ -91,22 +91,35 @@ function finalizeSessionBody(): string {
 }
 
 describe("D4 — a revisão é registrada como estudo real", () => {
+  // G1.3 (G-34): a gravação vive em insertReviewStudyHistory (helper dedicado,
+  // chamado após claim vencido ou em recuperação checada). Estes testes travam
+  // o MESMO contrato na nova estrutura.
+  function helperBody(): string {
+    const src = source()
+    const start = src.indexOf("async function insertReviewStudyHistory(")
+    assert.notEqual(start, -1, "insertReviewStudyHistory deve existir")
+    const end = src.indexOf("\nexport async function", start + 1)
+    return src.slice(start, end === -1 ? src.length : end)
+  }
+
   it("grava em study_history com study_source REVIEW e study_type REVISAO", () => {
-    const body = finalizeSessionBody()
+    const body = helperBody()
     assert.ok(body.includes('supabase.from("study_history").insert('), "deve inserir em study_history")
     assert.ok(body.includes('study_source: "REVIEW"'), 'study_source deve ser "REVIEW"')
     assert.ok(body.includes('study_type: "REVISAO"'), 'study_type deve ser "REVISAO"')
+    const fn = finalizeSessionBody()
+    assert.ok(fn.includes("insertReviewStudyHistory("), "finalize deve gravar pelo helper")
   })
 
   it("a duração vem do tempo real da sessão, não de um número fixo", () => {
-    const body = finalizeSessionBody()
+    const body = helperBody()
     // Fase I.6 (M8): a subtração das datas deixou de ser inline aqui — ela vive na
     // regra única `reviewSessionSeconds(startedAt, nowIso)`, usada TAMBÉM pelo
     // resumo mostrado ao aluno. O que este teste trava continua sendo o mesmo: a
     // duração vem do início da sessão e do instante do encerramento, nunca de uma
     // constante.
     assert.ok(
-      /reviewSessionSeconds\(startedAt, nowIso\)/.test(body),
+      /reviewSessionSeconds\(session\.startedAt, nowIso\)/.test(body),
       "a duração deve ser medida entre o início da sessão e o encerramento",
     )
     assert.ok(
@@ -127,38 +140,41 @@ describe("D4 — a revisão é registrada como estudo real", () => {
   })
 
   it("a quantidade de itens revisados vem das respostas reais da sessão", () => {
-    const body = finalizeSessionBody()
+    const fn = finalizeSessionBody()
     assert.ok(
-      body.includes("repo.listSessionAnswers("),
+      fn.includes("repo.listSessionAnswers("),
       "as respostas da sessão precisam ser lidas do histórico de revisões",
     )
+    const body = helperBody()
     assert.ok(
       body.includes("reviews_completed: answers.length"),
       "reviews_completed deve ser o número real de respostas",
     )
-    assert.ok(body.includes("review_session_id: sessionId"), "o metadata deve apontar para a sessão de origem")
+    assert.ok(body.includes("review_session_id: session.id"), "o metadata deve apontar para a sessão de origem")
   })
 
   it("a disciplina do estudo vem dos itens respondidos", () => {
-    const body = finalizeSessionBody()
-    assert.ok(body.includes("repo.disciplinesOfItems("), "a disciplina deve ser derivada dos itens respondidos")
+    const fn = finalizeSessionBody()
+    assert.ok(fn.includes("repo.disciplinesOfItems("), "a disciplina deve ser derivada dos itens respondidos")
+    assert.ok(fn.includes("mainDisciplineOf(disciplineIds)"), "a escolha segue a regra do mais revisado")
+    const body = helperBody()
     assert.ok(body.includes("discipline_id: mainDiscipline"), "discipline_id deve usar a disciplina derivada")
   })
 
   it("sessão sem resposta nenhuma não gera estudo", () => {
-    const body = finalizeSessionBody()
-    const guard = body.indexOf("if (answers.length > 0)")
-    const insert = body.indexOf('supabase.from("study_history").insert(')
+    const fn = finalizeSessionBody()
+    const guard = fn.indexOf("if (answers.length > 0)")
+    const call = fn.indexOf("insertReviewStudyHistory(")
     assert.ok(guard !== -1, "deve haver a guarda de sessão sem respostas")
-    assert.ok(guard < insert, "a guarda precisa vir antes do insert em study_history")
+    assert.ok(guard < call, "a guarda precisa vir antes da gravação do estudo")
   })
 
   it("a gravação do estudo só acontece depois da trava de idempotência", () => {
-    const body = finalizeSessionBody()
-    const claim = body.indexOf("if (!claimedSession) return")
-    const insert = body.indexOf('supabase.from("study_history").insert(')
-    assert.ok(claim !== -1 && insert !== -1)
-    assert.ok(claim < insert, "o compare-and-swap da sessão precisa vir antes do insert")
+    const fn = finalizeSessionBody()
+    const claim = fn.indexOf("if (!claimedSession)")
+    const call = fn.indexOf("insertReviewStudyHistory(")
+    assert.ok(claim !== -1 && call !== -1)
+    assert.ok(claim < call, "o compare-and-swap da sessão precisa vir antes da gravação")
   })
 
   it("o Cycle Engine não é alterado: a revisão usa o mecanismo central único", () => {

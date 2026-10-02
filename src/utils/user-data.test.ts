@@ -135,7 +135,9 @@ describe("P1.4 — todos os caminhos de logout usam o fluxo central", () => {
     assert.match(updatePwd, /clearUserLocalData\(\)/)
     assert.doesNotMatch(updatePwd, /localStorage\.removeItem/)
     const clearIdx = updatePwd.indexOf("clearUserLocalData()")
-    const signOutIdx = updatePwd.indexOf("auth.signOut()")
+    // G1.7: recovery usa a action canônica (logoutAction faz signOut no
+    // servidor + remove o cookie de support) em vez de signOut direto.
+    const signOutIdx = updatePwd.indexOf("logoutAction()")
     assert.ok(clearIdx > 0 && signOutIdx > clearIdx, "limpeza deve vir antes do signOut")
   })
 })

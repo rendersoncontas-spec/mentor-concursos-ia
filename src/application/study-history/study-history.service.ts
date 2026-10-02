@@ -197,6 +197,7 @@ export async function getUserHistory(
     )
     .eq("user_id", userId)
     .order("started_at", { ascending: false })
+    .order("id", { ascending: false })
     .range(from, to)
 
   if (error) throw new Error("Erro ao buscar histórico: " + error.message)
@@ -357,6 +358,7 @@ export async function getRecentActivities(supabase: SupabaseClient, userId: stri
     .eq("user_id", userId)
     .not("duration_minutes", "is", null)
     .order("started_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit)
 
   if (error || !data) return []
@@ -412,6 +414,7 @@ export async function getMonthlyHistory(
       .gte("started_at", startStr)
       .lt("started_at", nextMonthStartStr)
       .order("started_at", { ascending: false })
+      .order("id", { ascending: false })
       .range(offset, offset + pageSize - 1)
 
     if (error) throw new Error("Erro ao buscar histórico mensal: " + error.message)

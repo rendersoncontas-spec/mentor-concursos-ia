@@ -64,8 +64,24 @@ describe("P1.2 — DAILY_STUDY_CAP_HOURS é heurística, nunca capacidade pessoa
 })
 
 describe("P1.2 — concorrência: sem dois ACTIVE após corrida de criação", () => {
-  it("generateStudyPlan tem cura otimista (desativa outros ACTIVE exceto o novo)", () => {
-    assert.match(gen, /\.neq\("id", newPlan\.id\)/)
+  // G1.3/G1.4: a "cura otimista" em código (.neq) foi substituída por
+  // atomicidade real — persistência só via RPC transacional + índice único
+  // parcial (migration g14). A invariante (nunca 2 ACTIVE) ficou MAIS forte.
+  it("geração persiste só via RPC atômica (sem insert direto de plano)", () => {
+    const start = gen.indexOf("export async function generateStudyPlan(")
+    const end = gen.indexOf("export async function getActiveStudyPlan(")
+    const fn = gen.slice(start, end === -1 ? gen.length : end)
+    assert.match(fn, /persistStudyPlanDraftAtomic\(/)
+    assert.doesNotMatch(fn, /\.from\("study_plans"\)/)
+  })
+
+  it("índice único + archive-first garantem 1 ACTIVE (migration g14)", () => {
+    const g14 = readFileSync(
+      "supabase/migrations/20260929_g14_single_active_plan.sql",
+      "utf8",
+    )
+    assert.match(g14, /uq_study_plans_single_active/)
+    assert.match(g14, /WHERE active IS TRUE/)
   })
 
   it("nenhum study_history é criado pelo planejamento (só leitura)", () => {

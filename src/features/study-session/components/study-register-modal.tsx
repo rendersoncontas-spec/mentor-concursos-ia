@@ -8,16 +8,35 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as Sentry from "@sentry/nextjs"
 import {
+  Brain,
+  BookMarked,
+  BookOpen,
   Calendar,
   CheckCircle2,
+  ClipboardCheck,
   Clock,
   FileText,
+  Gavel,
+  Headphones,
+  Languages,
+  Layers,
+  type LucideIcon,
+  ListChecks,
   Minimize2,
+  MoreHorizontal,
+  Newspaper,
+  NotebookPen,
   Pause,
+  PenLine,
   Play,
+  Radio,
   RotateCcw,
+  Scale,
+  Sparkles,
   ToggleLeft,
   ToggleRight,
+  Users,
+  Video,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -180,6 +199,58 @@ const STUDY_TYPE_LABELS: Record<string, string> = {
   DUOLINGO: "Duolingo",
   OUTRO: "Outro",
 }
+
+// Um ícone por categoria no dropdown "Formato do Estudo" (existia como emoji
+// antes de ser removido sem querer; restaurado aqui com ícones lucide-react
+// para ficar consistente com o resto do app).
+const STUDY_TYPE_ICONS: Record<string, LucideIcon> = {
+  TEORIA: BookOpen,
+  QUESTOES: ListChecks,
+  REVISAO: RotateCcw,
+  LEI_SECA: Scale,
+  JURISPRUDENCIA: Gavel,
+  INFORMATIVOS: Newspaper,
+  DOUTRINA: BookMarked,
+  FLASHCARDS: Layers,
+  RESUMO: NotebookPen,
+  MAPA_MENTAL: Brain,
+  LEITURA: FileText,
+  VIDEOAULA: Video,
+  AUDIO: Headphones,
+  SIMULADO: ClipboardCheck,
+  DISCURSIVA: PenLine,
+  AULA_VIVO: Radio,
+  ESTUDO_IA: Sparkles,
+  MONITORIA: Users,
+  DUOLINGO: Languages,
+  OUTRO: MoreHorizontal,
+}
+
+// Mesma ordem que já era usada manualmente na lista de <SelectItem> do
+// "Formato do Estudo" — centralizada aqui para não precisar manter rótulo,
+// ícone e ordem em três lugares separados.
+const STUDY_TYPE_ORDER = [
+  "AUDIO",
+  "AULA_VIVO",
+  "DISCURSIVA",
+  "DOUTRINA",
+  "DUOLINGO",
+  "ESTUDO_IA",
+  "FLASHCARDS",
+  "INFORMATIVOS",
+  "JURISPRUDENCIA",
+  "LEI_SECA",
+  "LEITURA",
+  "MAPA_MENTAL",
+  "MONITORIA",
+  "QUESTOES",
+  "RESUMO",
+  "REVISAO",
+  "SIMULADO",
+  "TEORIA",
+  "VIDEOAULA",
+  "OUTRO",
+] as const
 
 export function StudyRegisterModal({
   open,
@@ -377,6 +448,9 @@ export function StudyRegisterModal({
   }
 
   const onSubmit = async (data: SessionFormValues) => {
+    // G1.16: trava de reentrância — o submit manual não tem operationId
+    // (P15 G1.14); duplo Enter aplicava a edição duas vezes.
+    if (isSubmitting) return
     setIsSubmitting(true)
     // Fase C (offline-first): true quando o salvamento (cronômetro OU
     // lançamento manual) foi enfileirado localmente em vez de confirmado
@@ -1463,26 +1537,18 @@ export function StudyRegisterModal({
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent className="z-[200] max-h-[300px] overflow-y-auto">
-                                  <SelectItem value="AUDIO">Áudio / Podcast</SelectItem>
-                                  <SelectItem value="AULA_VIVO">Aula ao Vivo</SelectItem>
-                                  <SelectItem value="DISCURSIVA">Discursiva / Redação</SelectItem>
-                                  <SelectItem value="DOUTRINA">Doutrina</SelectItem>
-                                  <SelectItem value="DUOLINGO">Duolingo</SelectItem>
-                                  <SelectItem value="ESTUDO_IA">Estudo com IA</SelectItem>
-                                  <SelectItem value="FLASHCARDS">Flashcards</SelectItem>
-                                  <SelectItem value="INFORMATIVOS">Informativos (STF/STJ)</SelectItem>
-                                  <SelectItem value="JURISPRUDENCIA">Jurisprudência</SelectItem>
-                                  <SelectItem value="LEI_SECA">Lei Seca</SelectItem>
-                                  <SelectItem value="LEITURA">Leitura / PDF</SelectItem>
-                                  <SelectItem value="MAPA_MENTAL">Mapa Mental</SelectItem>
-                                  <SelectItem value="MONITORIA">Monitoria / Mentoria</SelectItem>
-                                  <SelectItem value="QUESTOES">Questões</SelectItem>
-                                  <SelectItem value="RESUMO">Resumo</SelectItem>
-                                  <SelectItem value="REVISAO">Revisão</SelectItem>
-                                  <SelectItem value="SIMULADO">Simulado</SelectItem>
-                                  <SelectItem value="TEORIA">Teoria</SelectItem>
-                                  <SelectItem value="VIDEOAULA">Videoaula</SelectItem>
-                                  <SelectItem value="OUTRO">Outro</SelectItem>
+                                  {STUDY_TYPE_ORDER.map((type) => {
+                                    const Icon = STUDY_TYPE_ICONS[type]
+                                    const label = type === "INFORMATIVOS" ? "Informativos (STF/STJ)" : STUDY_TYPE_LABELS[type]
+                                    return (
+                                      <SelectItem key={type} value={type}>
+                                        <span className="flex items-center gap-2">
+                                          {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                                          {label}
+                                        </span>
+                                      </SelectItem>
+                                    )
+                                  })}
                                 </SelectContent>
                               </Select>
                               <FormMessage />

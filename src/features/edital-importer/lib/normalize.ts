@@ -1,13 +1,10 @@
-export function normalizeForMatch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-export function sameNormalized(a: string, b: string): boolean {
-  return normalizeForMatch(a) === normalizeForMatch(b)
-}
+/**
+ * G1.1 (G-27) — este módulo agora delega ao helper canônico compartilhado
+ * (`@/domain/disciplines/discipline-naming`). A API é preservada para não
+ * quebrar os chamadores existentes; a regra de comparação passa a ser única
+ * em todo o sistema (resolve/busca/insert/dedupe).
+ */
+export {
+  canonicalDisciplineKey as normalizeForMatch,
+  sameCanonicalDisciplineName as sameNormalized,
+} from "@/domain/disciplines/discipline-naming"

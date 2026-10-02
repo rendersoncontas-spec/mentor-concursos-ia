@@ -321,7 +321,7 @@ export async function reconcileCycleProgress(): Promise<RebuildResult> {
  */
 export async function skipCurrentCycleItem(cycleId: string): Promise<SkipCurrentCycleItemResult> {
   const supabase = await createClient()
-  const userId = await getEffectiveUserId(supabase)
+  const userId = await getEffectiveUserId(supabase, { action: "SKIP_CYCLE_ITEM", resource: cycleId })
   if (!userId) return { success: false, error: "Não autenticado" }
 
   const { data: cycle, error: cycleError } = await supabase
@@ -407,7 +407,7 @@ export async function skipCurrentCycleItem(cycleId: string): Promise<SkipCurrent
  */
 export async function concludeCurrentCycleRound(cycleId: string): Promise<ConcludeCycleRoundResult> {
   const supabase = await createClient()
-  const userId = await getEffectiveUserId(supabase)
+  const userId = await getEffectiveUserId(supabase, { action: "CONCLUDE_CYCLE_ROUND", resource: cycleId })
   if (!userId) return { success: false, error: "Não autenticado" }
 
   const { data: cycle, error: cycleError } = await supabase

@@ -5,6 +5,10 @@ import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
+import {
+  buildImportFingerprint,
+  fingerprintField,
+} from "@/domain/study-history/import-fingerprint"
 import type { StudySource, StudyType } from "@/domain/study-history/study-history.types"
 import type { OriginSource } from "@/domain/study-history/study-history.types"
 import {
@@ -38,7 +42,15 @@ function fingerprint(
   correct: string,
   origin: string,
 ): string {
-  return `v2|${epochSeconds}|${disciplineId}|${durationMinutes}|${questions}|${correct}|${origin}`
+  // G1.3 (G-38): identidade única TS = SQL (COALESCE '~null~').
+  return buildImportFingerprint({
+    epochSeconds,
+    disciplineId,
+    durationMinutes,
+    questions,
+    correct,
+    origin,
+  })
 }
 
 function recordFingerprint(
@@ -52,10 +64,10 @@ function recordFingerprint(
   return fingerprint(
     String(epoch),
     disciplineId ?? "",
-    minutes !== null ? String(minutes) : "",
-    record.questions !== null ? String(record.questions) : "",
-    record.correctAnswers !== null ? String(record.correctAnswers) : "",
-    origin,
+    minutes !== null ? String(minutes) : fingerprintField(null),
+    record.questions !== null ? String(record.questions) : fingerprintField(null),
+    record.correctAnswers !== null ? String(record.correctAnswers) : fingerprintField(null),
+    fingerprintField(origin),
   )
 }
 
@@ -69,6 +81,7 @@ async function loadExistingFingerprints(supabase: Supabase, userId: string): Pro
       .select("started_at, discipline_id, duration_minutes, metadata, origin_source")
       .eq("user_id", userId)
       .order("started_at", { ascending: false })
+      .order("id", { ascending: false })
       .range(offset, offset + pageSize - 1)
 
     if (error) break
@@ -84,15 +97,15 @@ async function loadExistingFingerprints(supabase: Supabase, userId: string): Pro
           row.discipline_id ?? "",
           row.duration_minutes !== null && row.duration_minutes !== undefined
             ? String(row.duration_minutes)
-            : "",
+            : fingerprintField(null),
           metadata?.["questions_answered"] !== undefined &&
             metadata?.["questions_answered"] !== null
             ? String(metadata["questions_answered"])
-            : "",
+            : fingerprintField(null),
           metadata?.["questions_correct"] !== undefined && metadata?.["questions_correct"] !== null
             ? String(metadata["questions_correct"])
-            : "",
-          row.origin_source ?? "",
+            : fingerprintField(null),
+          fingerprintField(row.origin_source),
         ),
       )
     }
@@ -150,6 +163,9 @@ async function resolveSubjectDisciplineId(
       .from("disciplines")
       .select("id")
       .ilike("name", trimmed)
+      .order("name")
+      .order("id")
+      .limit(1)
       .maybeSingle()
     if (existing) return { disciplineId: existing.id, created: false, error: null }
 
@@ -168,6 +184,9 @@ async function resolveSubjectDisciplineId(
       .from("disciplines")
       .select("id")
       .ilike("name", trimmed)
+      .order("name")
+      .order("id")
+      .limit(1)
       .maybeSingle()
     if (retry) return { disciplineId: retry.id, created: false, error: null }
     return {
@@ -183,6 +202,9 @@ async function resolveSubjectDisciplineId(
       .from("disciplines")
       .select("id")
       .ilike("name", trimmed)
+      .order("name")
+      .order("id")
+      .limit(1)
       .maybeSingle()
     if (existing) return { disciplineId: existing.id, created: false, error: null }
     const normalizedMatch = await findDisciplineByNormalizedName(supabase, trimmed)
@@ -619,6 +641,7 @@ export async function listImportsAction(): Promise<{
       .select("id, source, source_name, file_name, total_rows, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(100)
     if (error) return { success: false, error: error.message }
 

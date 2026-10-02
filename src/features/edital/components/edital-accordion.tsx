@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 
 import { useRouter } from "next/navigation"
 
-import { Check, ChevronDown, ChevronUp, ExternalLink, Plus, SquarePen } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, ExternalLink, Plus } from "lucide-react"
 import { Loader2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -15,6 +15,13 @@ import {
   saveCustomTopicsAction,
   searchDisciplinesAction,
 } from "@/application/edital/edital.action"
+import {
+  deleteEditalTopicProgressAction,
+  getEditalTopicProgressAction,
+  importEditalTopicProgressAction,
+  setEditalTopicProgressAction,
+} from "@/application/edital/edital-topic-progress.actions"
+import { isSafeHref } from "@/domain/library/library-url"
 import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -27,7 +34,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
-import { EditDisciplineModal } from "@/features/disciplines/components/edit-discipline-modal"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 import {
   TopicAutocomplete,
@@ -72,6 +78,7 @@ export function EditalAccordion({
     data.length > 0 ? (data[0]?.id ?? null) : null,
   )
   const [linkModalTopic, setLinkModalTopic] = useState<TopicItem | null>(null)
+  const [linkModalDiscId, setLinkModalDiscId] = useState<string | null>(null)
   const [inputUrl, setInputUrl] = useState("")
 
   // Estados de criação
@@ -99,11 +106,39 @@ export function EditalAccordion({
 
   // Modais Registro de Estudo e Editar Disciplina
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
-  const [editingDiscipline, setEditingDiscipline] = useState<DisciplineData | null>(null)
 
-  // Carregar do localStorage (escopado por concurso ativo)
+  // G1.1 (G-29): fonte de verdade é o SERVIDOR (`edital_topic_progress`).
+  // localStorage serve SOMENTE para a migração única de dados legados.
+  const storageKeyFor = (targetId?: string) =>
+    targetId ? `mentor_edital_checked_topics_${targetId}` : "mentor_edital_checked_topics"
+
+  const readLegacyChecked = (targetId?: string): Record<string, boolean> | null => {
+    try {
+      const raw = localStorage.getItem(storageKeyFor(targetId))
+      if (!raw) return null
+      const parsed = JSON.parse(raw) as Record<string, boolean>
+      if (!parsed || typeof parsed !== "object") return null
+      return parsed
+    } catch {
+      return null
+    }
+  }
+
+  const removeLegacyChecked = (targetId?: string) => {
+    try {
+      localStorage.removeItem(storageKeyFor(targetId))
+      // Chave legada não-escopada (pré-G1.1): nunca mais usada como fonte.
+      localStorage.removeItem("mentor_edital_checked_topics")
+    } catch {
+      // Modo privado/cota: segue sem cache local.
+    }
+  }
+
+  // Carregar progresso: servidor primeiro; legado só como fallback/migração.
   useEffect(() => {
     if (typeof window === "undefined") return
+    let cancelled = false
+
     // Remove legado não escopado com dados fake de teste para evitar que Raciocínio Lógico inicie em 14%
     const legacyKey = "mentor_edital_checked_topics"
     const legacyData = localStorage.getItem(legacyKey)
@@ -111,41 +146,125 @@ export function EditalAccordion({
       localStorage.removeItem(legacyKey)
     }
 
-    const storageKey = activeTargetId ? `mentor_edital_checked_topics_${activeTargetId}` : legacyKey
-    const savedChecked = localStorage.getItem(storageKey)
-    if (savedChecked) {
-      try {
-        const parsedTopics = JSON.parse(savedChecked) as Record<string, boolean>
-        setTimeout(() => setCompletedTopics(parsedTopics), 0)
-      } catch {
-        setTimeout(() => setCompletedTopics({}), 0)
+    if (!activeTargetId) {
+      const savedChecked = readLegacyChecked(undefined)
+      setTimeout(() => !cancelled && setCompletedTopics(savedChecked ?? {}), 0)
+      return
+    }
+
+    void (async () => {
+      const res = await getEditalTopicProgressAction(activeTargetId)
+      if (cancelled) return
+      if (!res.success && res.storageUnavailable) {
+        // Banco sem a tabela G1.1: comportamento legado até a migration.
+        setServerUnavailable(true)
+        const savedChecked = readLegacyChecked(activeTargetId)
+        setTimeout(() => !cancelled && setCompletedTopics(savedChecked ?? {}), 0)
+        return
       }
-    } else {
-      setTimeout(() => setCompletedTopics({}), 0)
+      if (!res.success) {
+        setTimeout(() => !cancelled && setCompletedTopics({}), 0)
+        return
+      }
+      const serverChecked = res.checked ?? {}
+      // Lazy migration única: LS com dados + servidor vazio → importa e limpa.
+      const legacy = readLegacyChecked(activeTargetId)
+      if (legacy && Object.keys(legacy).length > 0 && Object.keys(serverChecked).length === 0) {
+        const imported = await importEditalTopicProgressAction(activeTargetId, legacy)
+        if (cancelled) return
+        if (imported.success) {
+          removeLegacyChecked(activeTargetId)
+          const trues: Record<string, boolean> = {}
+          for (const [k, v] of Object.entries(legacy)) if (v === true) trues[k] = true
+          setTimeout(() => !cancelled && setCompletedTopics(trues), 0)
+          return
+        }
+      } else if (legacy && Object.keys(serverChecked).length > 0) {
+        // Servidor venceu: descarta o cache local para não ressuscitar stale.
+        removeLegacyChecked(activeTargetId)
+      }
+      setTimeout(() => !cancelled && setCompletedTopics(serverChecked), 0)
+    })()
+
+    return () => {
+      cancelled = true
     }
   }, [activeTargetId])
+
+  const [serverUnavailable, setServerUnavailable] = useState(false)
 
   const toggleCheck = (topicId: string) => {
     const updated = { ...completedTopics, [topicId]: !completedTopics[topicId] }
     setCompletedTopics(updated)
-    const storageKey = activeTargetId
-      ? `mentor_edital_checked_topics_${activeTargetId}`
-      : "mentor_edital_checked_topics"
-    localStorage.setItem(storageKey, JSON.stringify(updated))
+    if (!activeTargetId) {
+      try {
+        localStorage.setItem(storageKeyFor(undefined), JSON.stringify(updated))
+      } catch {
+        // Sem target não há escopo de servidor: mantém só em memória.
+      }
+      return
+    }
+    if (serverUnavailable) {
+      try {
+        localStorage.setItem(storageKeyFor(activeTargetId), JSON.stringify(updated))
+      } catch {
+        // Modo privado/cota: segue sem cache local.
+      }
+      return
+    }
+    // Otimista com reversão honesta em falha (servidor é a verdade).
+    void (async () => {
+      const res = await setEditalTopicProgressAction(activeTargetId, topicId, updated[topicId] === true)
+      if (!res.success) {
+        if (res.storageUnavailable) {
+          setServerUnavailable(true)
+          try {
+            localStorage.setItem(storageKeyFor(activeTargetId), JSON.stringify(updated))
+          } catch {
+            // Segue sem cache local.
+          }
+          return
+        }
+        setCompletedTopics(completedTopics)
+        toast.error(res.error || "Não foi possível salvar o progresso.")
+      }
+    })()
   }
 
+  // G1.14 — o link PERSISTE no backend (saveCustomTopicsAction), como
+  // tópico novo/edição. Antes: só setData + toast de sucesso, reload perdia.
+  // URLs fora de http(s) são rejeitadas com erro honesto (mesma regra da
+  // Biblioteca) e nunca viram <a href> (defesa em profundidade na leitura).
   const handleSaveLink = () => {
-    if (!linkModalTopic) return
+    if (!linkModalTopic || !linkModalDiscId || !activeTargetId) return
+    const trimmed = inputUrl.trim()
+    if (trimmed !== "" && !isSafeHref(trimmed)) {
+      toast.error("URL inválida. Use um link http(s) completo.")
+      return
+    }
+    const discId = linkModalDiscId
+    const topicId = linkModalTopic.id
+    const previousData = data
     const updatedData = data.map((disc) => ({
       ...disc,
       topics: disc.topics.map((t) =>
-        t.id === linkModalTopic.id ? { ...t, link: inputUrl.trim() || null } : t,
+        t.id === topicId ? { ...t, link: trimmed || null } : t,
       ),
     }))
     setData(updatedData)
-    toast.success("Link do caderno de questões salvo!")
     setLinkModalTopic(null)
+    setLinkModalDiscId(null)
     setInputUrl("")
+    void (async () => {
+      const topics = updatedData.find((d) => d.id === discId)?.topics ?? []
+      const res = await saveCustomTopicsAction(activeTargetId, discId, topics)
+      if (res.success) {
+        toast.success("Link do caderno de questões salvo!")
+      } else {
+        setData(previousData)
+        toast.error(res.error || "Não foi possível salvar o link.")
+      }
+    })()
   }
 
   const totalTopicsCount = data.reduce((acc, d) => acc + d.topics.length, 0) || 0
@@ -159,6 +278,8 @@ export function EditalAccordion({
       toast.error("Nenhum concurso ativo.")
       return
     }
+    // G1.16: trava de reentrância — duplo clique criava matérias duplicadas.
+    if (isSaving) return
     setIsSaving(true)
     const res = await addCustomDisciplineAction(newDisciplineName, activeTargetId)
     if (res.success && res.data) {
@@ -184,6 +305,8 @@ export function EditalAccordion({
   const handleAddTopic = async (discId: string, name?: string, source?: TopicCommit["source"]) => {
     const topicName = (name ?? newTopicName).trim()
     if (!topicName || !activeTargetId) return
+    // G1.16: trava de reentrância (id usa Date.now — duplo clique duplicava).
+    if (isSaving) return
     setIsSaving(true)
 
     const disc = data.find((d) => d.id === discId)
@@ -212,13 +335,15 @@ export function EditalAccordion({
     // Atualiza localmente
     setData((prev) => prev.map((d) => (d.id === discId ? { ...d, topics: updatedTopics } : d)))
 
-    // Salva no backend
+    // Salva no backend (com rollback honesto em falha — G1.16)
+    const previousTopics = disc.topics
     const res = await saveCustomTopicsAction(activeTargetId, discId, updatedTopics)
     if (res.success) {
       setNewTopicName("")
       setAddingTopicDiscId(null)
       toast.success("Tópico adicionado!")
     } else {
+      setData((prev) => prev.map((d) => (d.id === discId ? { ...d, topics: previousTopics } : d)))
       toast.error(res.error || "Erro ao salvar tópico")
     }
     setIsSaving(false)
@@ -231,14 +356,35 @@ export function EditalAccordion({
       )
     )
       return
+    // G1.16: trava de reentrância — duplo clique disparava duas exclusões.
+    if (isSaving) return
     setIsSaving(true)
     if (!activeTargetId) {
       toast.error("Nenhum concurso ativo.")
+      // G1.16 (TRAP 1): este return precoce esquecia setIsSaving(false) e
+      // travava todos os botões de add/delete até remontar a página.
+      setIsSaving(false)
       return
     }
     const res = await removeDisciplineAction(discId, activeTargetId)
     if (res.success) {
+      const removedTopicIds =
+        data.find((d) => d.id === discId)?.topics.map((t) => t.id) ?? []
       setData((prev) => prev.filter((d) => d.id !== discId))
+      // G1.14 — progresso dos tópicos da matéria excluída não conta mais.
+      if (removedTopicIds.length > 0) {
+        const removed = new Set(removedTopicIds)
+        setCompletedTopics((prev) => {
+          const next: Record<string, boolean> = {}
+          for (const [k, v] of Object.entries(prev)) if (!removed.has(k)) next[k] = v
+          return next
+        })
+        void Promise.all(
+          removedTopicIds.map((topicId) =>
+            deleteEditalTopicProgressAction(activeTargetId, topicId).catch(() => undefined),
+          ),
+        )
+      }
       toast.success("Matéria removida!")
       // DECISAO DE PRODUTO (Fase 12 -> Fase 13, opcao A): Edital e Ciclo
       // continuam desacoplados de proposito - remover do Edital nunca apaga
@@ -260,6 +406,8 @@ export function EditalAccordion({
   const handleDeleteTopic = async (discId: string, topicId: string) => {
     if (!activeTargetId) return
     if (!confirm("Excluir este tópico?")) return
+    // G1.16: trava de reentrância.
+    if (isSaving) return
     setIsSaving(true)
     const res = await removeCustomTopicAction(activeTargetId, discId, topicId)
     if (res.success) {
@@ -268,6 +416,16 @@ export function EditalAccordion({
           d.id === discId ? { ...d, topics: d.topics.filter((t) => t.id !== topicId) } : d,
         ),
       )
+      // G1.14 — progresso de tópico excluído não conta mais (local + servidor).
+      setCompletedTopics((prev) => {
+        if (!(topicId in prev)) return prev
+        const next = { ...prev }
+        delete next[topicId]
+        return next
+      })
+      void deleteEditalTopicProgressAction(activeTargetId, topicId).catch(() => {
+        // Best-effort: a verdade local já foi corrigida acima.
+      })
       toast.success("Tópico removido!")
       router.refresh()
     } else {
@@ -354,20 +512,12 @@ export function EditalAccordion({
                     <Progress value={progressPercentage} className="w-24 lg:w-32" aria-label={`Progresso em ${disc.name}`} />
                   </div>
 
-                  {/* Ícones de Edição e Expansão */}
+                  {/* Ícone de Expansão — G1.16: o lápis "Editar disciplina"
+                      foi removido porque o modal de edição não tinha
+                      persistência neste contexto (abrir, editar e "salvar"
+                      perdia tudo no refresh com toast de sucesso falso).
+                      Reintroduzir somente com action real de persistência. */}
                   <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditingDiscipline(disc)
-                      }}
-                      className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                      title="Editar disciplina"
-                      aria-label={`Editar ${disc.name}`}
-                    >
-                      <SquarePen className="h-3.5 w-3.5" />
-                    </button>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -507,11 +657,11 @@ export function EditalAccordion({
 
                               {/* Link do Caderno de Questões */}
                               <td className="py-2.5 px-3 text-center">
-                                {topic.link ? (
+                                {topic.link && isSafeHref(topic.link) ? (
                                   <a
                                     href={topic.link}
                                     target="_blank"
-                                    rel="noreferrer"
+                                    rel="noopener noreferrer"
                                     className="text-xs font-semibold text-primary hover:underline flex items-center justify-center gap-1"
                                   >
                                     <span>Abrir</span>
@@ -521,6 +671,7 @@ export function EditalAccordion({
                                   <button
                                     onClick={() => {
                                       setLinkModalTopic(topic)
+                                      setLinkModalDiscId(disc.id)
                                       setInputUrl("")
                                     }}
                                     className="text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
@@ -668,7 +819,13 @@ export function EditalAccordion({
       </div>
 
       {/* Modals */}
-      <Dialog open={!!linkModalTopic} onOpenChange={() => setLinkModalTopic(null)}>
+      <Dialog
+        open={!!linkModalTopic}
+        onOpenChange={() => {
+          setLinkModalTopic(null)
+          setLinkModalDiscId(null)
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold flex items-center gap-2 text-primary">
@@ -694,7 +851,13 @@ export function EditalAccordion({
           </div>
 
           <DialogFooter className="pt-2">
-            <Button variant="outline" onClick={() => setLinkModalTopic(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLinkModalTopic(null)
+                setLinkModalDiscId(null)
+              }}
+            >
               Cancelar
             </Button>
             <Button
@@ -708,22 +871,6 @@ export function EditalAccordion({
 
       {/* Modal Registrar Estudo (Sua Foto 1) */}
       <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />
-
-      {/* Modal Editar Disciplina (Sua Foto 2) */}
-      <EditDisciplineModal
-        open={!!editingDiscipline}
-        onOpenChange={(open: boolean) => !open && setEditingDiscipline(null)}
-        disciplineName={editingDiscipline?.name || ""}
-        disciplineColor={editingDiscipline?.color || "#fef08a"}
-        badgeText="RFB"
-        initialTopics={
-          editingDiscipline?.topics.map((t) => ({
-            id: t.id,
-            title: t.title,
-            badgeText: "RFB",
-          })) || []
-        }
-      />
     </div>
   )
 }

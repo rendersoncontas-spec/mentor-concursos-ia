@@ -50,7 +50,10 @@ describe("getRankingViaDirectQuery usa helpers de fuso de São Paulo para os lim
 
   it("os limites de semana/mês vêm de chaves de calendário em SP, não de getDay()/getFullYear() locais", () => {
     assert.match(source, /const todayKey = getDayInSaoPaulo\(now\)/)
-    assert.match(source, /const weekRange = getSaoPauloWeekRange\(todayKey, 1\)/)
+    // S1.2: início da semana pela preferência canônica do usuário (mesmo
+    // resolver do statistics-center/planejamento); segunda preservada quando
+    // nada configurado. Monday fixo virou variável weekStartDay.
+    assert.match(source, /const weekRange = getSaoPauloWeekRange\(todayKey, weekStartDay\)/)
     assert.doesNotMatch(source, /const day = date\.getDay\(\)/)
     assert.doesNotMatch(source, /const monthStart = new Date\(now\.getFullYear\(\), now\.getMonth\(\), 1\)/)
   })

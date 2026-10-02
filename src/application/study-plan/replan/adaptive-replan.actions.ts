@@ -70,8 +70,11 @@ export async function getReplanInfoAction(
     const effectiveUserId = await getEffectiveUserId(supabase)
     if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
-    const availability = await resolveServerAvailability(supabase, effectiveUserId, availabilityInput)
-    const autoEnabled = await getAutoReplanPreference(supabase, effectiveUserId)
+    // G1.8: independentes entre si (só usam supabase+userId+input) — em paralelo.
+    const [availability, autoEnabled] = await Promise.all([
+      resolveServerAvailability(supabase, effectiveUserId, availabilityInput),
+      getAutoReplanPreference(supabase, effectiveUserId),
+    ])
 
     // REGRA 0 — manutenção: não disparar o replanejamento em leitura
     // (abrir página, dashboard, trocar data, F5, salvar sessão).
@@ -105,7 +108,7 @@ export async function runReplanningAction(
 ): Promise<{ data: ReplanSummary | null; error: string | null }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "RUN_REPLANNING" })
     if (!effectiveUserId) return { data: null, error: "Usuário não autenticado" }
 
     const availability = await resolveServerAvailability(supabase, effectiveUserId, availabilityInput)
@@ -140,7 +143,7 @@ export async function undoReplanningAction(
 ): Promise<{ ok: boolean; error: string | null }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "UNDO_REPLANNING", resource: eventId })
     if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
     const result = await undoLastReplanning(supabase, effectiveUserId, eventId)
@@ -165,7 +168,7 @@ export async function closeBlockManuallyAction(
 ): Promise<{ ok: boolean; error: string | null }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "CLOSE_BLOCK_MANUALLY", resource: blockId })
     if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
     const result = await closeBlockManually(
@@ -193,7 +196,7 @@ export async function setAutoReplanPreferenceAction(
 ): Promise<{ ok: boolean; error: string | null }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "SET_AUTO_REPLAN_PREFERENCE" })
     if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
     const result = await setAutoReplanPreference(supabase, effectiveUserId, enabled)
@@ -241,7 +244,7 @@ export async function pullPendingToTodayAction(
 ): Promise<{ ok: boolean; message?: string; error?: string }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "PULL_PENDING_TO_TODAY" })
     if (!effectiveUserId) return { ok: false, error: "Usuário não autenticado" }
 
     const { pullPendingToToday } = await import("./adaptive-replan.service")

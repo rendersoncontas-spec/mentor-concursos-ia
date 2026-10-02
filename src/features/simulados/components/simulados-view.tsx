@@ -649,7 +649,12 @@ function EvolutionChart({ points }: { points: { simuladoId: string; name: string
 
 function SimuladoDetailModal({ record, onClose }: { record: SimuladoRecord; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Detalhes do simulado ${record.name}`}
+    >
       <div className="bg-card border rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* CABEÇALHO */}
         <div className="p-5 border-b bg-muted/20 flex items-start justify-between gap-3 sticky top-0 z-10">
@@ -661,7 +666,7 @@ function SimuladoDetailModal({ record, onClose }: { record: SimuladoRecord; onCl
               {record.roleName && ` • ${record.roleName}`}
             </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0" aria-label="Fechar detalhes">
             <X className="h-4 w-4" />
           </Button>
         </div>

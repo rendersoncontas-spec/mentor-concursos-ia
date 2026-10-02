@@ -197,7 +197,7 @@ export function DisciplinePopover({
                               : "text-muted-foreground",
                           )}
                         >
-                          {sug.metadata.studiedMinutes ?? 0}/{sug.metadata.plannedMinutes} min
+                          {Math.round(sug.metadata.studiedMinutes ?? 0)}/{sug.metadata.plannedMinutes} min
                         </span>
                       )}
                     </div>

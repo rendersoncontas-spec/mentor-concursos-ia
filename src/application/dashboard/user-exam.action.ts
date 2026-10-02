@@ -14,7 +14,7 @@ export interface SaveUserExamInput {
 export async function saveUserExamAction(input: SaveUserExamInput) {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "SAVE_USER_EXAM" })
 
     if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }
@@ -115,7 +115,7 @@ export async function saveUserExamAction(input: SaveUserExamInput) {
 export async function deleteUserExamAction() {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "DELETE_USER_EXAM" })
 
     if (!effectiveUserId) {
       return { success: false, error: "Usuário não autenticado." }

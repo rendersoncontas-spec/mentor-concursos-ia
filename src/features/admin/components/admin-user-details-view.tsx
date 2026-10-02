@@ -167,22 +167,38 @@ export function AdminUserDetailsView({
           <span className="type-label flex items-center gap-1">
             <Clock className="w-3 h-3 text-primary" /> Total Estudado
           </span>
-          <div className="text-lg font-semibold text-foreground font-mono">
-            {formatHours(detail.stats.totalMinutes)}
-          </div>
-          <p className="text-[11px] text-muted-foreground">{detail.stats.totalSessions} sessões registradas</p>
+          {detail.stats.unavailable.history ? (
+            <div className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+              Histórico indisponível
+            </div>
+          ) : (
+            <>
+              <div className="text-lg font-semibold text-foreground font-mono">
+                {formatHours(detail.stats.totalMinutes)}
+              </div>
+              <p className="text-[11px] text-muted-foreground">{detail.stats.totalSessions} sessões registradas</p>
+            </>
+          )}
         </div>
 
         <div className="bg-card p-4 rounded-xl border space-y-1">
           <span className="type-label flex items-center gap-1">
             <HelpCircle className="w-3 h-3 text-emerald-500" /> Questões
           </span>
-          <div className="text-lg font-semibold text-foreground font-mono">
-            {detail.stats.totalQuestions}
-          </div>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-            {detail.stats.accuracyPercentage}% de acerto ({detail.stats.questionsCorrect} acertos)
-          </p>
+          {detail.stats.unavailable.attempts ? (
+            <div className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+              Questões indisponíveis
+            </div>
+          ) : (
+            <>
+              <div className="text-lg font-semibold text-foreground font-mono">
+                {detail.stats.totalQuestions}
+              </div>
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                {detail.stats.accuracyPercentage}% de acerto ({detail.stats.questionsCorrect} acertos)
+              </p>
+            </>
+          )}
         </div>
 
         <div className="bg-card p-4 rounded-xl border space-y-1">

@@ -123,13 +123,32 @@ describe("Invalidação do cache de Estatísticas (statistics-center.action.ts) 
     )
   })
 
-  it("finalizeReviewSessionAction (review.actions.ts) revalida HISTORY_PATHS e invalida o cache de Estatísticas, já que finalizeSession pode gravar study_history", () => {
-    const source = readSource("src/application/review-engine/review.actions.ts")
+  it("finalizeReviewSessionAction (review.actions.ts) revalida HISTORY_PATHS e invalida o cache de Estatísticas, já que finalizeSession pode gravar study_history", () => {    const source = readSource("src/application/review-engine/review.actions.ts")
     const start = source.indexOf("export async function finalizeReviewSessionAction")
     assert.notEqual(start, -1)
     const end = source.indexOf("\nexport async function", start + 1)
     const body = source.slice(start, end === -1 ? source.length : end)
     assert.ok(body.includes("for (const path of HISTORY_PATHS) revalidatePath(path)"), "deve revalidar HISTORY_PATHS")
     assert.ok(body.includes("await invalidateStatisticsCenterCache(user.id)"), "deve invalidar o cache de Estatísticas")
+  })
+
+  it("saveStudySessionAction (study-session.action.ts) invalida o cache de Estatísticas no onRevalidate — caminho de CRIAÇÃO (G1.14)", () => {
+    // G1.14: o caminho mais comum de escrita em study_history (salvar estudo
+    // no cronômetro/manual) chamava revalidatePath("/estatisticas") mas nunca
+    // invalidateStatisticsCenterCache — e revalidatePath NÃO limpa o Map em
+    // memória (TTL 5min). Estatísticas exibia "Hoje" obsoleto após salvar.
+    const source = readSource("src/application/study-session/study-session.action.ts")
+    assert.ok(
+      source.includes('import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"'),
+      "study-session.action.ts deve importar invalidateStatisticsCenterCache",
+    )
+    const start = source.indexOf("onRevalidate: () => {")
+    assert.notEqual(start, -1, "saveStudySessionAction deve ter onRevalidate")
+    const body = source.slice(start, source.indexOf("},", start) + 2)
+    assert.ok(body.includes('revalidatePath("/estatisticas")'), "deve revalidar /estatisticas")
+    assert.ok(
+      body.includes("invalidateStatisticsCenterCache(user.id)"),
+      "onRevalidate deve invalidar o cache de Estatísticas com o usuário efetivo",
+    )
   })
 })

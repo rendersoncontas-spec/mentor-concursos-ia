@@ -125,7 +125,7 @@ export async function saveDashboardLayoutAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "SAVE_DASHBOARD_LAYOUT" })
     if (!effectiveUserId) return { success: false, error: "Usuário não autenticado." }
 
     const recordsToUpsert = layoutItems.map((item, index) => ({
@@ -195,7 +195,7 @@ export async function resetDashboardLayoutAction(): Promise<{
 }> {
   try {
     const supabase = await createClient()
-    const effectiveUserId = await getEffectiveUserId(supabase)
+    const effectiveUserId = await getEffectiveUserId(supabase, { action: "RESET_DASHBOARD_LAYOUT" })
     if (effectiveUserId) {
       try {
         await supabase.from("user_dashboard_layouts").delete().eq("user_id", effectiveUserId)

@@ -329,6 +329,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               size="icon"
               onClick={handlePrevMonth}
               className="h-9 w-9 rounded-xl"
+              aria-label="Mês anterior"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -345,6 +346,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
               size="icon"
               onClick={handleNextMonth}
               className="h-9 w-9 rounded-xl"
+              aria-label="Próximo mês"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -365,6 +367,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
             <span className="text-[11px] font-semibold">Plantão de referência:</span>
             <input
               type="date"
+              aria-label="Plantão de referência"
               value={
                 anchorShiftDate ||
                 `${year}-${String(month + 1).padStart(2, "0")}-${String(firstShiftDay).padStart(2, "0")}`
@@ -599,8 +602,8 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                           <Button
                             size="sm"
                             onClick={() => {
+                              // G1.16: sem toast prematuro — a navegação é o feedback.
                               setSelectedDayDetail(null)
-                              toast.success(`Iniciando ${disc.disciplineName}`)
                               router.push(
                                 `/dashboard/study-session?planId=${disc.id}&duration=${disc.durationMinutes}`,
                               )

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
+import { canonicalDisciplineKey } from "@/domain/disciplines/discipline-naming"
 import { sameNormalized } from "@/features/edital-importer/lib/normalize"
 
 import type { EditalImportConfirmPayload } from "./types"
@@ -24,6 +25,24 @@ async function resolveDiscipline(
   const exact = known.find((d) => sameNormalized(d.name, name))
   if (exact) return { id: exact.id, isNew: false }
 
+  // G1.1 (G-27): igualdade em `name_key` primeiro (indexada, sem limite de
+  // página — elimina o teto de 500 do dedupe). `sameNormalized` delega à
+  // mesma chave canônica do resto do sistema.
+  const key = canonicalDisciplineKey(name.trim())
+  try {
+    const { data, error } = await supabase
+      .from("disciplines")
+      .select("id, name")
+      .eq("name_key", key)
+      .maybeSingle()
+    if (!error && data) {
+      known.push(data)
+      return { id: data.id, isNew: false }
+    }
+  } catch {
+    // Coluna ainda não existe → legado abaixo.
+  }
+
   const { data: existing } = await supabase
     .from("disciplines")
     .select("id, name")
@@ -36,12 +55,28 @@ async function resolveDiscipline(
   }
 
   const color = await pickNextDisciplineColor(supabase)
-  const { data: inserted } = await supabase
+  const base = { name: name.trim(), area: "Geral", ...(color ? { color_hex: color } : {}) }
+  const withKey = await supabase
     .from("disciplines")
-    .insert({ name, area: "Geral", ...(color ? { color_hex: color } : {}) })
+    .insert({ ...base, name_key: key })
     .select("id, name")
     .maybeSingle()
 
+  if (!withKey.error && withKey.data) {
+    known.push(withKey.data)
+    return { id: withKey.data.id, isNew: true }
+  }
+
+  // Pré-migration (sem name_key) ou corrida: insere sem a chave e resolve.
+  if (withKey.error) {
+    const legacy = await supabase.from("disciplines").insert(base).select("id, name").maybeSingle()
+    if (!legacy.error && legacy.data) {
+      known.push(legacy.data)
+      return { id: legacy.data.id, isNew: true }
+    }
+  }
+
+  const inserted = !withKey.error ? withKey.data : null
   if (inserted) {
     known.push(inserted)
     return { id: inserted.id, isNew: true }
@@ -51,6 +86,9 @@ async function resolveDiscipline(
     .from("disciplines")
     .select("id, name")
     .ilike("name", name)
+    .order("name")
+    .order("id")
+    .limit(1)
     .maybeSingle()
   if (retry) {
     known.push(retry)
@@ -96,6 +134,9 @@ async function ensureTopic(
     .select("id, discipline_id, name")
     .eq("discipline_id", disciplineId)
     .ilike("name", title)
+    .order("name")
+    .order("id")
+    .limit(1)
     .maybeSingle()
   if (retry) {
     known.push({ id: retry.id, disciplineId, name: retry.name })
@@ -139,6 +180,9 @@ async function ensureSubTopic(
     .select("id, topic_id, name")
     .eq("topic_id", topicId)
     .ilike("name", title)
+    .order("name")
+    .order("id")
+    .limit(1)
     .maybeSingle()
   if (retry) {
     known.push({ id: retry.id, topicId, name: retry.name })
@@ -148,43 +192,29 @@ async function ensureSubTopic(
   throw new Error("Falha ao resolver subtópico global")
 }
 
-export type PersistEditalResult = {
-  editalId: string
-  stats: { disciplines: number; topics: number; newDisciplines: number }
-  structureForMerge: {
-    name: string
-    disciplineId: string
-    topics: { title: string; topicId: string }[]
-  }[]
+export interface ResolvedEditalStructure {
+  name: string
+  disciplineId: string
+  topics: { title: string; topicId: string; subtopics: { title: string; subtopicId: string }[] }[]
 }
 
-export async function persistEditalImport(
+/**
+ * G1.2 (G-26) — Fase 1 do import: garante as linhas GLOBAIS de catálogo
+ * (disciplines/topics/subtopics, dedupe-safe) SEM escrever dado de usuário.
+ * Os writes de usuário vão na RPC `confirm_edital_import` (atômica).
+ * Reutilizável e segura para retry: só cria o que ainda não existe.
+ */
+export async function ensureEditalCatalogRows(
   supabase: SupabaseClient,
-  userId: string,
-  targetId: string,
-  payload: EditalImportConfirmPayload,
-): Promise<PersistEditalResult> {
-  const { data: duplicated } = await supabase
-    .from("user_editais")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("file_hash", payload.fileHash)
-    .maybeSingle()
-  if (duplicated) {
-    throw new DuplicateEditalError(duplicated.id)
-  }
-
-  const disciplines = payload.structure.slice(0, MAX_DISCIPLINES)
+  structure: EditalImportConfirmPayload["structure"],
+): Promise<{ structure: ResolvedEditalStructure[]; newDisciplines: number }> {
+  const disciplines = structure.slice(0, MAX_DISCIPLINES)
   const knownDisciplines: { id: string; name: string }[] = []
   const knownTopics: { id: string; disciplineId: string; name: string }[] = []
   const knownSubtopics: { id: string; topicId: string; name: string }[] = []
   let newDisciplines = 0
 
-  const structure: {
-    name: string
-    disciplineId: string
-    topics: { title: string; topicId: string; subtopics: { title: string; subtopicId: string }[] }[]
-  }[] = []
+  const resolved: ResolvedEditalStructure[] = []
 
   for (const discipline of disciplines) {
     const name = discipline.name.trim()
@@ -192,30 +222,14 @@ export async function persistEditalImport(
     const { id: disciplineId, isNew } = await resolveDiscipline(supabase, name, knownDisciplines)
     if (isNew) newDisciplines += 1
 
-    const { error: linkError } = await supabase.from("user_disciplines").upsert(
-      {
-        user_id: userId,
-        target_id: targetId,
-        discipline_id: disciplineId,
-        status: "NOT_STARTED",
-        mastery_level: 0,
-      },
-      { onConflict: "user_id,target_id,discipline_id", ignoreDuplicates: true },
-    )
-    if (linkError) throw linkError
+    const topics = discipline.topics.slice(0, MAX_TOPICS_PER_DISCIPLINE)
+    const topicNodes: ResolvedEditalStructure["topics"] = []
 
-      const topics = discipline.topics.slice(0, MAX_TOPICS_PER_DISCIPLINE)
-      const topicNodes: {
-        title: string
-        topicId: string
-        subtopics: { title: string; subtopicId: string }[]
-      }[] = []
-
-      for (const topic of topics) {
-        const title = topic.title.trim()
-        if (!title) continue
-        const topicId = await ensureTopic(supabase, disciplineId, title, knownTopics)
-        const subtopics = (topic.subtopics ?? []).slice(0, MAX_SUBTOPICS_PER_TOPIC)
+    for (const topic of topics) {
+      const title = topic.title.trim()
+      if (!title) continue
+      const topicId = await ensureTopic(supabase, disciplineId, title, knownTopics)
+      const subtopics = (topic.subtopics ?? []).slice(0, MAX_SUBTOPICS_PER_TOPIC)
       const subNodes: { title: string; subtopicId: string }[] = []
       for (const sub of subtopics) {
         const subTitle = sub.title.trim()
@@ -226,139 +240,68 @@ export async function persistEditalImport(
       topicNodes.push({ title, topicId, subtopics: subNodes })
     }
 
-    structure.push({ name, disciplineId, topics: topicNodes })
+    resolved.push({ name, disciplineId, topics: topicNodes })
   }
 
+  return { structure: resolved, newDisciplines }
+}
+
+export interface ConfirmEditalRpcPayload {
+  file_hash: string
+  file_name: string
+  edital: {
+    name: string
+    organizer: string | null
+    position_name: string | null
+    banca: string | null
+    exam_date: string | null
+    publication_date: string | null
+    registration_date: string | null
+    original_filename: string
+    structure: unknown
+  }
+  links: {
+    discipline_id: string
+    discipline_name: string
+    topics: { topic_id: string; title: string }[]
+  }[]
+}
+
+/**
+ * G1.2 (G-26) — monta o payload da RPC com os MESMOS limites do servidor
+ * (espelha os caps da função; a RPC revalida e nunca confia no cliente).
+ */
+export function buildConfirmEditalPayload(input: {
+  fileName: string
+  fileHash: string
+  metadata: EditalImportConfirmPayload["metadata"]
+  structure: ResolvedEditalStructure[]
+}): ConfirmEditalRpcPayload {
   const editalName =
-    payload.metadata.name?.trim() || payload.fileName.replace(/\.(pdf|docx|txt)$/i, "") || "Edital importado"
-
-  const { data: inserted, error } = await supabase
-    .from("user_editais")
-    .insert({
-      user_id: userId,
-      name: editalName.slice(0, 255),
-      organizer: payload.metadata.organizer?.slice(0, 120) ?? null,
-      position_name: payload.metadata.positionName?.slice(0, 120) ?? null,
-      banca: payload.metadata.banca?.slice(0, 120) ?? null,
-      exam_date: dateBRToISO(payload.metadata.examDate),
-      publication_date: dateBRToISO(payload.metadata.publicationDate),
-      registration_date: dateBRToISO(payload.metadata.registrationDate),
-      source: "edital_import",
-      original_filename: payload.fileName.slice(0, 255),
-      file_hash: payload.fileHash,
-      structure: structure as unknown as object,
-    })
-    .select("id")
-    .single()
-
-  if (error || !inserted) {
-    throw error ?? new Error("Falha ao registrar edital")
-  }
+    input.metadata.name?.trim() || input.fileName.replace(/\.(pdf|docx|txt)$/i, "") || "Edital importado"
 
   return {
-    editalId: inserted.id,
-    stats: {
-      disciplines: structure.length,
-      topics: structure.reduce((acc, d) => acc + d.topics.length, 0),
-      newDisciplines,
+    file_hash: input.fileHash,
+    file_name: input.fileName.slice(0, 255),
+    edital: {
+      name: editalName.slice(0, 255),
+      organizer: input.metadata.organizer?.slice(0, 120) ?? null,
+      position_name: input.metadata.positionName?.slice(0, 120) ?? null,
+      banca: input.metadata.banca?.slice(0, 120) ?? null,
+      exam_date: dateBRToISO(input.metadata.examDate),
+      publication_date: dateBRToISO(input.metadata.publicationDate),
+      registration_date: dateBRToISO(input.metadata.registrationDate),
+      original_filename: input.fileName.slice(0, 255),
+      structure: input.structure as unknown as object,
     },
-    structureForMerge: structure.map((d) => ({
-      name: d.name,
-      disciplineId: d.disciplineId,
-      topics: d.topics.map((t) => ({ title: t.title, topicId: t.topicId })),
+    links: input.structure.map((d) => ({
+      discipline_id: d.disciplineId,
+      discipline_name: d.name,
+      topics: d.topics.map((t) => ({ topic_id: t.topicId, title: t.title })),
     })),
   }
 }
 
-export class DuplicateEditalError extends Error {
-  editalId: string
-  constructor(editalId: string) {
-    super("Edital já importado anteriormente")
-    this.name = "DuplicateEditalError"
-    this.editalId = editalId
-  }
-}
-
-type CustomEditalTopic = {
-  id: string
-  number: number
-  title: string
-  correct: number
-  wrong: number
-  questions: number
-  accuracy: number
-  lastStudy: string | null
-  studyCount: number
-  link: string | null
-}
-
-export async function mergeCustomTopics(
-  supabase: SupabaseClient,
-  userId: string,
-  targetId: string,
-  structure: {
-    name: string
-    disciplineId: string
-    topics: { title: string; topicId: string }[]
-  }[],
-): Promise<void> {
-  const { data: targetData } = await supabase
-    .from("user_targets")
-    .select("main_study_source")
-    .eq("id", targetId)
-    .eq("user_id", userId)
-    .maybeSingle()
-
-  let meta: {
-    customEdital?: Record<string, CustomEditalTopic[]>
-    [key: string]: unknown
-  } = {}
-  if (targetData?.main_study_source) {
-    if (typeof targetData.main_study_source === "object") {
-      meta = { ...(targetData.main_study_source as Record<string, unknown>) }
-    } else if (typeof targetData.main_study_source === "string") {
-      try {
-        const parsed = JSON.parse(targetData.main_study_source) as Record<string, unknown>
-        meta = { ...parsed }
-      } catch {
-        meta = {}
-      }
-    }
-  }
-
-  if (!meta.customEdital) meta.customEdital = {}
-
-  for (const d of structure) {
-    const existing = meta.customEdital[d.disciplineId] ?? []
-    const existingKeys = new Set(
-      existing.map((t) => t.title.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")),
-    )
-    const merged = [...existing]
-    for (const topic of d.topics) {
-      const normalized = topic.title.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      if (existingKeys.has(normalized)) continue
-      existingKeys.add(normalized)
-      merged.push({
-        id: topic.topicId,
-        number: merged.length + 1,
-        title: topic.title.trim(),
-        correct: 0,
-        wrong: 0,
-        questions: 0,
-        accuracy: 0,
-        lastStudy: null,
-        studyCount: 0,
-        link: null,
-      })
-    }
-    meta.customEdital[d.disciplineId] = merged
-  }
-
-  const { error } = await supabase
-    .from("user_targets")
-    .update({ main_study_source: JSON.stringify(meta) })
-    .eq("id", targetId)
-    .eq("user_id", userId)
-
-  if (error) throw error
-}
+// G1.2 (G-26): mergeCustomTopics foi absorvido pela RPC `confirm_edital_import`
+// (passo 3, transacional). Removido para não manter um caminho paralelo sem
+// atomicidade. O merge canônico do JS permanece documentado na RPC.

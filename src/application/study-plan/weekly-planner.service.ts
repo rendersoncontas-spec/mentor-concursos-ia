@@ -11,7 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { isShiftDayForDate } from "@/features/planejamento/lib/planning-form"
-import { getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
+import { dayOfWeekForDateKey, getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 import { getSaoPauloWeekRange, resolveWeekStartDay, type WeekRangeInfo } from "@/lib/study-time-calculator"
 
 import {
@@ -169,8 +169,10 @@ export function isAvailableStudyDate(
     }
   }
 
-  const [year, month, day] = dateKey.split("-").map(Number)
-  const dayOfWeek = new Date(year ?? 2026, (month ?? 1) - 1, day ?? 1).getDay()
+  // G1.5 (G-33): dia da semana da chave de data pelo calendário de São Paulo
+  // (truque do meio-dia UTC). `new Date(y, m-1, d).getDay()` usa o fuso do
+  // runtime e erra em runtimes à frente de UTC.
+  const dayOfWeek = dayOfWeekForDateKey(dateKey)
   const weekdayKey = WEEKDAY_KEYS[dayOfWeek] ?? ""
   return availability.studyDays.includes(weekdayKey)
 }

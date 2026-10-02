@@ -84,7 +84,18 @@ export function WeeklyPlanningView({
   useEffect(() => {
     // P1.5: banco é a fonte oficial; sincroniza uma vez (down-sync ou lazy
     // migration) e o evento mentor_scale_updated atualiza este estado.
-    void syncPlanningPreferencesFromServer()
+    // P1.6.1: primeiro dia da semana canônico — banco vence quando configurado;
+    // ausência real preserva o legado local/default (Domingo).
+    void syncPlanningPreferencesFromServer().then((res) => {
+      if (res?.weekStartDaySource !== "configured") return
+      const label = res.weekStartDay === 1 ? "Segunda-feira" : "Domingo"
+      setFirstDayOfWeek(label)
+      try {
+        localStorage.setItem("mentor_user_first_day_of_week", label)
+      } catch {
+        /* localStorage indisponível: segue sem o cache local */
+      }
+    })
     const handleUpdate = () => {
       setScaleConfig(getSavedScaleConfig())
       const savedFirstDay = localStorage.getItem("mentor_user_first_day_of_week")
@@ -564,9 +575,10 @@ export function WeeklyPlanningView({
             <div className="flex items-center justify-between text-xs font-semibold text-foreground border-b pb-2">
               <span className="type-label">AGO.</span>
               <div className="flex items-center gap-1 tabular-nums text-[11px] text-primary">
-                <ChevronLeft className="h-3.5 w-3.5 cursor-pointer" />
+                {/* G1.16: setas decorativas (sem navegação) — sem cursor-pointer para não prometer interação. */}
+                <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground/40" aria-hidden />
                 <span>02/08 ~ 08/08</span>
-                <ChevronRight className="h-3.5 w-3.5 cursor-pointer" />
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" aria-hidden />
               </div>
             </div>
 

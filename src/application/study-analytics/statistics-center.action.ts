@@ -133,14 +133,24 @@ async function fetchActivePlan(
   supabase: Supabase,
   userId: string,
 ): Promise<{ plan: ActivePlan | null } | null> {
-  const { data: plan, error: planError } = await supabase
-    .from("study_plans")
-    .select("id, active")
-    .eq("user_id", userId)
-    .eq("active", true)
-    .order("generated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // G1.8: o perfil só depende de userId — busca em paralelo com o plano.
+  // Ordem de checagem de erro preservada: plano → itens → perfil.
+  const [{ data: plan, error: planError }, { data: profile, error: profileError }] = await Promise.all([
+    supabase
+      .from("study_plans")
+      .select("id, active")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .order("generated_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("weekly_study_hours, weekly_questions_goal, weekly_study_days_goal")
+      .eq("id", userId)
+      .maybeSingle(),
+  ])
 
   if (planError) {
     console.error("[ESTATISTICAS] Erro ao carregar o plano ativo:", planError)
@@ -170,13 +180,7 @@ async function fetchActivePlan(
   // plano: não há grade para comparar com o realizado.
   if (planItems.length === 0) return { plan: null }
 
-  // Busca as metas configuradas pelo usuário no perfil
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("weekly_study_hours, weekly_questions_goal, weekly_study_days_goal")
-    .eq("id", userId)
-    .maybeSingle()
-
+  // Metas do perfil (vieram em paralelo com o plano acima — G1.8).
   if (profileError) {
     console.error("[ESTATISTICAS] Erro ao carregar as metas do perfil:", profileError)
     return null
@@ -187,13 +191,17 @@ async function fetchActivePlan(
   // Caso contrário, calculamos pela soma dos minutos dos blocos convertida para horas (ex: 1260m / 60 = 21h).
   const totalItemMinutes = planItems.reduce((acc, it) => acc + it.durationMinutes, 0)
   const calculatedHours = totalItemMinutes > 0 ? Math.round(totalItemMinutes / 60) : null
-  const weeklyHours = (profile?.weekly_study_hours && profile.weekly_study_hours > 0)
-    ? profile.weekly_study_hours
+  const hasConfiguredHours = (profile?.weekly_study_hours ?? 0) > 0
+  const weeklyHours = hasConfiguredHours
+    ? profile?.weekly_study_hours
     : calculatedHours
 
   return {
     plan: {
       weeklyHours: weeklyHours && weeklyHours > 0 ? weeklyHours : null,
+      // S1.3 — origem da meta (vocabulário do Planejamento): perfil = configured,
+      // derivada dos itens = suggested. Erro de perfil já retornou null acima.
+      weeklyHoursSource: hasConfiguredHours ? "configured" : "suggested",
       weeklyQuestions: profile?.weekly_questions_goal ?? null,
       weeklyDays: profile?.weekly_study_days_goal ?? null,
       items: planItems,
@@ -205,11 +213,31 @@ async function fetchActivePlan(
 // O corpo de cada função é o bloco que antes ficava em sequência dentro de
 // getStatisticsCenterAction, com o mesmo tratamento de erro.
 
+// Fase F.3 (performance): `mapSessionRow` (study-sessions-read.ts) só usa
+// estas 6 chaves de `metadata` para montar um SessionRecord — o restante do
+// objeto (ex.: linha bruta de importação) nunca é lido pelo motor de
+// estatísticas nem pela tela (conferido: nenhum `.metadata` fora daqui, nenhum
+// `.notes` em src/features/statistics ou no motor). O banco devolve cada
+// chave pelo caminho JSON (`metadata->chave`), em vez do objeto inteiro, e
+// `notes` deixou de ser selecionado — mesmo padrão já usado pelo Dashboard
+// (Fase F.2, `getStudyHistoryForAnalytics` com `metadataKeys`). Nenhum número
+// muda: as mesmas 6 chaves chegam com os mesmos valores a `sanitizeSession`.
+const SESSION_METADATA_KEYS = [
+  "pages_read",
+  "questions_answered",
+  "questions_correct",
+  "flashcards_reviewed",
+  "topic_name",
+  "focus_percentage",
+] as const
+
+const SESSION_METADATA_SELECT = SESSION_METADATA_KEYS.map((k) => `meta_${k}:metadata->${k}`).join(", ")
+
 const SESSION_SELECT = `
         id, discipline_id, started_at, finished_at, duration_minutes,
         active_minutes, paused_minutes, planned_minutes,
         completed, interrupted, energy_level, difficulty, focus_score,
-        study_type, study_source, origin_source, notes, metadata,
+        study_type, study_source, origin_source, ${SESSION_METADATA_SELECT},
         disciplines ( id, name, area )
       `
 
@@ -231,14 +259,31 @@ const SESSION_SELECT = `
 async function loadSessions(supabase: Supabase, userId: string): Promise<SessionRecord[] | null> {
   try {
     const { data: rows, error } = await fetchAllPagesInParallel<Record<string, unknown>>(
-      (from, to, withCount) =>
-        supabase
+      async (from, to, withCount) => {
+        const { data, error, count } = await supabase
           .from("study_history")
           .select(SESSION_SELECT, withCount ? { count: "exact" } : undefined)
           .eq("user_id", userId)
           .order("started_at", { ascending: true })
           .order("id", { ascending: true })
-          .range(from, to) as unknown as PromiseLike<PageResult<Record<string, unknown>>>,
+          .range(from, to)
+        const typedRows = data as Array<Record<string, unknown>> | null
+        // Fase F.3: remonta `metadata` a partir das chaves `meta_*` que o
+        // PostgREST devolveu, no mesmo formato que mapSessionRow já esperava
+        // quando a coluna inteira era selecionada.
+        if (typedRows) {
+          for (const row of typedRows) {
+            const metadata: Record<string, unknown> = {}
+            for (const k of SESSION_METADATA_KEYS) {
+              const value = row[`meta_${k}`]
+              if (value !== null && value !== undefined) metadata[k] = value
+              delete row[`meta_${k}`]
+            }
+            row["metadata"] = metadata
+          }
+        }
+        return { data: typedRows, error, count } as PageResult<Record<string, unknown>>
+      },
       { pageSize: 1000, maxRows: SESSIONS_LIMIT, perfLabel: "study_history.estatisticas" },
     )
     if (error) console.error("[ESTATISTICAS] Erro ao carregar study_history:", error)
@@ -272,12 +317,13 @@ async function loadAttempts(
       id: string
       correct: boolean
       answered_at: string
+      attempt_source: string | null
       questions: { discipline_id: string | null } | { discipline_id: string | null }[] | null
     }>(
       (withCount) =>
         supabase
           .from("question_attempts")
-          .select("id, correct, answered_at, questions ( discipline_id )", countOption(withCount))
+          .select("id, correct, answered_at, attempt_source, questions ( discipline_id )", countOption(withCount))
           .eq("user_id", effectiveUserId),
       [
         { column: "answered_at", ascending: false },
@@ -292,10 +338,14 @@ async function loadAttempts(
           const q = Array.isArray(row.questions) ? row.questions[0] : row.questions
           return sanitizeAttempt({
             id: row.id,
-            question_id: (row as { question_id?: string | null }).question_id ?? null,
+            // S1.3: question_id NÃO é selecionado (nenhum consumidor downstream
+            // de estatísticas o utiliza — engine/view usam id/correct/
+            // answeredAt/disciplineId/attemptSource). Mantido null por contrato.
+            question_id: null,
             discipline_id: q?.discipline_id ?? null,
             correct: row.correct,
             answered_at: row.answered_at,
+            attempt_source: row.attempt_source ?? null,
           })
         })
         .filter((a): a is QuestionAttemptRecord => a !== null)

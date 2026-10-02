@@ -270,6 +270,8 @@ export function CreateCycleModal({
   const totalMinutesPerRound = selectedItems.reduce((acc, i) => acc + i.plannedMinutes, 0)
 
   const handleCreate = async () => {
+    // G1.16: trava de reentrância — duplo clique criava dois ciclos.
+    if (isSubmitting) return
     if (!cycleName.trim()) {
       toast.error("Informe um nome para o ciclo.")
       setStep("identification")
@@ -549,6 +551,7 @@ export function CreateCycleModal({
                             disabled={item.plannedMinutes <= 15}
                             className="h-6 w-6"
                             title="-15 min"
+                            aria-label="Diminuir 15 minutos"
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
@@ -563,6 +566,7 @@ export function CreateCycleModal({
                             disabled={item.plannedMinutes >= 360}
                             className="h-6 w-6"
                             title="+15 min"
+                            aria-label="Aumentar 15 minutos"
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -578,6 +582,7 @@ export function CreateCycleModal({
                             disabled={index === 0}
                             className="h-7 w-7"
                             title="Mover para cima"
+                            aria-label="Mover para cima"
                           >
                             <ArrowUp className="h-3.5 w-3.5" />
                           </Button>
@@ -589,6 +594,7 @@ export function CreateCycleModal({
                             disabled={index === selectedItems.length - 1}
                             className="h-7 w-7"
                             title="Mover para baixo"
+                            aria-label="Mover para baixo"
                           >
                             <ArrowDown className="h-3.5 w-3.5" />
                           </Button>
@@ -599,6 +605,7 @@ export function CreateCycleModal({
                             onClick={() => handleRemoveItem(index)}
                             className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                             title="Remover matéria"
+                            aria-label="Remover matéria"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>

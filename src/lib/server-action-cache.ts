@@ -25,6 +25,28 @@ export interface CacheEntry<T> {
 const cacheStore = new Map<string, CacheEntry<unknown>>()
 const inflight = new Map<string, Promise<unknown>>()
 
+/**
+ * G1.1 (G-30) — isolamento por escopo.
+ *
+ * O `Map` acima é global no contexto JS. Quando o resultado depende de QUEM
+ * chama (quase todas as leituras pessoais), a chave precisa carregar a
+ * identidade/escopo — senão o usuário B recebe o dado cacheado do usuário A.
+ *
+ * - Resultado pessoal → `buildScopedCacheKey(userId, key)` (ou o `scope` do
+ *   `useCachedServerAction`).
+ * - Resultado GLOBAL (catálogo, constantes) → chave crua + comentário
+ *   `// GLOBAL:` no call site documentando que não depende de identidade.
+ * - Troca de identidade (login/logout) → `clearServerActionCache()`.
+ */
+export function buildScopedCacheKey(scope: string, key: string): string {
+  return `${scope}::${key}`
+}
+
+export function clearServerActionCache(): void {
+  cacheStore.clear()
+  inflight.clear()
+}
+
 export function readFreshCache<T>(key: string, ttl: number, now: number = Date.now()): CacheEntry<T> | null {
   const entry = cacheStore.get(key)
   if (!entry) return null

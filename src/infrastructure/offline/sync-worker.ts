@@ -145,6 +145,9 @@ export function createSyncPendingStudySessions(deps: {
       if (operations.length > 0) connectionState.setSyncing()
 
       for (const op of operations) {
+        // G1.1 (G-31): defesa em profundidade — mesmo que a coleta mude um
+        // dia, uma operação de OUTRO usuário nunca é executada nesta sessão.
+        if (op.userId !== userId) continue
         if (!(await isStillEligible(op))) continue
         const result = await processOperation(op, deps.saveFn)
         if (result.ok) {

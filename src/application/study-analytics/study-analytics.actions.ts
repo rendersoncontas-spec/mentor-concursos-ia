@@ -94,13 +94,15 @@ export async function getUserStatisticsAction(periodDays: number = 365) {
   
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // S1.3 (caso B): função estritamente pessoal, sem suporte a moderator/admin
+    // — usa o usuário efetivo como o restante do domínio.
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
     }
 
-    const history = await getStudyHistoryForAnalytics(supabase, user.id, periodDays)
+    const history = await getStudyHistoryForAnalytics(supabase, effectiveUserId, periodDays)
     
     // Calcula agregações
     const context = AnalyticsEngine.createContext(history as unknown as StudyHistory[])
@@ -108,13 +110,26 @@ export async function getUserStatisticsAction(periodDays: number = 365) {
     const disciplineRanking = AnalyticsEngine.rankings.getDisciplineRanking(context)
     const evolution = AnalyticsEngine.visuals.getEvolutionTimeSeries(context, 7) // Ultimos 7 dias
     
-    // Acertos/erros reais (question_attempts)
-    const { data: attemptsRows } = await supabase
-      .from("question_attempts")
-      .select("correct")
-      .eq("user_id", user.id)
-    const attempts = attemptsRows || []
-    const totalCorrect = attempts.filter((a: { correct: boolean }) => a.correct).length
+    // Acertos/erros reais (question_attempts) — S1.1: paginação explícita com
+    // ORDER BY determinístico (answered_at + id) e erro != vazio. Sem limite
+    // bruto: PostgREST cortaria ~1000 e o corte viraria estatística incompleta.
+    const attemptsResult = await fetchAllRowsPaged<{ id: string; correct: boolean | null }>(
+      (withCount) =>
+        supabase
+          .from("question_attempts")
+          .select("id, correct", countOption(withCount))
+          .eq("user_id", effectiveUserId),
+      [
+        { column: "answered_at", ascending: true },
+        { column: "id", ascending: true },
+      ],
+      { maxRows: 50_000, perfLabel: "question_attempts.user_statistics" },
+    )
+    if (attemptsResult.error) {
+      return { data: null, error: "Não foi possível carregar suas tentativas de questões. Tente novamente." }
+    }
+    const attempts = attemptsResult.data
+    const totalCorrect = attempts.filter((a) => a.correct).length
     const totalWrong = attempts.length - totalCorrect
     
     return {
@@ -138,6 +153,9 @@ export async function getGlobalRankingAction(period: RankingPeriod = 'this_week'
   
   try {
     const supabase = await createClient()
+    // S1.3 (caso A — mantido de propósito): a identidade aqui é a do OPERADOR
+    // real ("Você" no placar + p_current_user_id da RPC). Em modo suporte, o
+    // moderador continua se vendo, não o alvo; os dados vêm da RPC/RLS própria.
     const { data: { user: currentUser } } = await supabase.auth.getUser()
 
     // 1. Usar a RPC que bypassa RLS via SECURITY DEFINER
@@ -303,7 +321,38 @@ async function getRankingViaDirectQuery(supabase: Supabase, period: RankingPerio
   // no resto do projeto. O parâmetro `now` é opcional e permite testar de
   // forma determinística.
   const todayKey = getDayInSaoPaulo(now)
-  const weekRange = getSaoPauloWeekRange(todayKey, 1) // semana começa na Segunda (ISO)
+  // S1.2: início da semana pela preferência canônica do usuário
+  // (preferences.firstDayOfWeek > profiles.week_start_day > segunda), mesmo
+  // resolver do statistics-center/planejamento. Preserva segunda em falha de
+  // leitura (comportamento anterior). NOTA: o caminho primário via RPC
+  // get_global_ranking usa date_trunc('week') (segunda fixa, decisão de
+  // produto p/ placar global); mudar a função SQL seria DDL — fora de escopo.
+  // S1.2: início da semana pela preferência canônica do usuário, mesmo
+  // resolver do statistics-center/planejamento. Só muda quando há configuração
+  // explícita (preferences ou coluna); sem ela, preserva segunda (padrão
+  // histórico do ranking + RPC date_trunc('week')). Falha de leitura também
+  // preserva segunda. NOTA: o caminho primário via RPC get_global_ranking usa
+  // date_trunc('week') (segunda fixa, decisão de produto p/ placar global);
+  // mudar a função SQL seria DDL — fora de escopo.
+  let weekStartDay = 1
+  // Sem usuário identificado não há preferência a ler: mantém segunda.
+  if (currentUserId) {
+    try {
+      const { data: weekProfile } = await supabase
+        .from("profiles")
+        .select("week_start_day, preferences")
+        .eq("id", currentUserId)
+        .maybeSingle()
+      const prefsFirst = (weekProfile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
+      const col = (weekProfile as { week_start_day?: number } | null)?.week_start_day
+      if (prefsFirst === "Domingo" || prefsFirst === "Segunda-feira" || typeof col === "number") {
+        weekStartDay = resolveWeekStartDay(prefsFirst, col)
+      }
+    } catch {
+      weekStartDay = 1
+    }
+  }
+  const weekRange = getSaoPauloWeekRange(todayKey, weekStartDay) // semana do usuário
   const thisMondayKey = weekRange.mondayKey
   const lastMondayKey = daysAgoKeyInSaoPaulo(7, thisMondayKey)
   const lastSundayKey = daysAgoKeyInSaoPaulo(1, thisMondayKey)
@@ -548,9 +597,11 @@ export async function getRankingPersonalContextAction(): Promise<{
 
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // S1.3 (caso B): contexto estritamente pessoal (metas + histórico próprios),
+    // sem suporte a moderator/admin — usuário efetivo, como o restante do domínio.
+    const effectiveUserId = await getEffectiveUserId(supabase)
 
-    if (!user) {
+    if (!effectiveUserId) {
       throw new Error("Usuário não autenticado")
     }
 
@@ -558,9 +609,9 @@ export async function getRankingPersonalContextAction(): Promise<{
       supabase
         .from("profiles")
         .select("weekly_study_hours, week_start_day, preferences")
-        .eq("id", user.id)
+        .eq("id", effectiveUserId)
         .maybeSingle(),
-      getStudyHistoryForAnalytics(supabase, user.id, 365),
+      getStudyHistoryForAnalytics(supabase, effectiveUserId, 365),
     ])
 
     const profile = profileResult?.data
@@ -633,18 +684,33 @@ export async function getRecentStudyHistoryAction(
     if (!effectiveUserId) return { data: [], error: null }
 
     const since = new Date(Date.now() - days * 86_400_000).toISOString()
-    const { data: rows, error } = await supabase
-      .from("study_history")
-      .select("discipline_id, duration_minutes, started_at, study_plan_item_id")
-      .eq("user_id", effectiveUserId)
-      .gte("started_at", since)
-      .order("started_at", { ascending: false })
-      .limit(500)
+    // S1.1: sem .limit(500) bruto — o widget "Estudos de Hoje" distribui os
+    // minutos por bloco/dia e precisa do histórico completo da janela. Mesma
+    // disciplina do statistics-center: paginação explícita, ORDER BY
+    // determinístico (started_at desc + id desc, preservando a ordem atual).
+    const historyResult = await fetchAllRowsPaged<{
+      discipline_id: string | null
+      duration_minutes: number | null
+      started_at: string | null
+      study_plan_item_id: string | null
+    }>(
+      (withCount) =>
+        supabase
+          .from("study_history")
+          .select("discipline_id, duration_minutes, started_at, study_plan_item_id", countOption(withCount))
+          .eq("user_id", effectiveUserId)
+          .gte("started_at", since),
+      [
+        { column: "started_at", ascending: false },
+        { column: "id", ascending: false },
+      ],
+      { maxRows: 50_000, perfLabel: "study_history.recent_14d" },
+    )
 
-    if (error) return { data: null, error: error.message }
+    if (historyResult.error) return { data: null, error: historyResult.error.message }
 
     const entries: RecentHistoryEntry[] = []
-    for (const r of rows ?? []) {
+    for (const r of historyResult.data) {
       const startedAt = r.started_at
       if (startedAt === null || startedAt === undefined) continue
       const minutes = Number(r.duration_minutes) || 0

@@ -104,6 +104,9 @@ export function EditalImporter({ targetId }: { targetId: string }) {
 
   const handleConfirm = async () => {
     if (!result || !draft) return
+    // G1.16: trava de reentrância — duplo Enter antes do React desabilitar
+    // o botão disparava dois POSTs de confirmação.
+    if (busy) return
     const structure = editable.map((d) => ({
       name: d.name,
       topics: d.topics.map((t) => ({ title: t.title, subtopics: t.subtopics.map((s) => ({ title: s.title })) })),
@@ -377,13 +380,14 @@ function Preview({
         {editable.map((d, i) => (
           <div key={i} className="overflow-hidden rounded-xl border">
             <div className="flex items-center gap-2 border-b bg-muted/30 px-3 py-2">
-              <button type="button" onClick={() => onToggle(i)} className="text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={() => onToggle(i)} className="text-muted-foreground hover:text-foreground" aria-label={expanded[i] ? `Recolher ${d.name || "disciplina"}` : `Expandir ${d.name || "disciplina"}`}>
                 {expanded[i] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
               {editing?.disc === i && editing.topic === null ? (
                 <input
                   autoFocus
                   defaultValue={d.name}
+                  aria-label="Nome da disciplina"
                   onBlur={(e) => {
                     onRenameDiscipline(i, e.target.value)
                     onEdit(i, null)
@@ -411,6 +415,7 @@ function Preview({
                 onClick={() => onEdit(i, null)}
                 className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title="Renomear"
+                aria-label={`Renomear ${d.name || "disciplina"}`}
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
@@ -419,6 +424,7 @@ function Preview({
                 onClick={() => onRemoveDiscipline(i)}
                 className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 title="Remover disciplina"
+                aria-label={`Remover ${d.name || "disciplina"}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

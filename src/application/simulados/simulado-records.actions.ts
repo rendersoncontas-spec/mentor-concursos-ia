@@ -9,6 +9,7 @@ import {
   netAccuracyOf,
   wrongsOf,
 } from "@/application/simulados/simulado-stats.service"
+import { isValidSimuladoScoringRule, isValidSimuladoSource } from "@/domain/simulados/simulado-rules"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import type {
   SimuladoRecord,
@@ -60,8 +61,8 @@ type SubjectRow = {
   blank_count: number | null
 }
 
-async function requireUser(supabase: Supabase) {
-  return await getEffectiveUserId(supabase)
+async function requireUser(supabase: Supabase, auditContext?: Parameters<typeof getEffectiveUserId>[1]) {
+  return await getEffectiveUserId(supabase, auditContext)
 }
 
 function toSource(value: string | null): SimuladoRecordSource {
@@ -177,7 +178,7 @@ export async function saveSimuladoRecordAction(input: SimuladoRecordInput): Prom
 }> {
   try {
     const supabase = await createClient()
-    const userId = await requireUser(supabase)
+    const userId = await requireUser(supabase, { action: "SAVE_SIMULADO_RECORD", resource: input.id ?? "" })
     if (!userId) return { data: null, error: "Usuário não autenticado." }
 
     if (!input.name?.trim()) return { data: null, error: "Informe o nome do simulado." }
@@ -187,6 +188,14 @@ export async function saveSimuladoRecordAction(input: SimuladoRecordInput): Prom
     const { totalQuestions, totalCorrect, totalBlank, totalWrong } = normalizeInput(input)
     if (totalCorrect + totalWrong + totalBlank !== totalQuestions) {
       return { data: null, error: "Acertos + erros + brancos deve ser igual ao total de questões." }
+    }
+
+    // G1.2 (G-10): allowlist server-side (o banco também impõe via CHECK).
+    if (!isValidSimuladoSource(input.source)) {
+      return { data: null, error: "Fonte do simulado inválida." }
+    }
+    if (input.scoringRule !== undefined && input.scoringRule !== null && !isValidSimuladoScoringRule(input.scoringRule)) {
+      return { data: null, error: "Regra de pontuação inválida." }
     }
 
     const accuracy = accuracyOf(totalCorrect, totalQuestions)
@@ -387,7 +396,7 @@ export async function deleteSimuladoRecordAction(
 ): Promise<{ error: string | null }> {
   try {
     const supabase = await createClient()
-    const userId = await requireUser(supabase)
+    const userId = await requireUser(supabase, { action: "DELETE_SIMULADO_RECORD", resource: simuladoId })
     if (!userId) return { error: "Usuário não autenticado." }
 
     const { error } = await supabase

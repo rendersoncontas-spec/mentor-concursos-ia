@@ -6,6 +6,18 @@ import * as Sentry from "@sentry/nextjs"
 
 import { createClient } from "@/infrastructure/supabase/server"
 import { registerStudyToCycle } from "@/application/study-cycle/cycle-study-registration.service"
+import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
+import {
+  studyMinutesFromMinutesInput,
+  studyMinutesFromMs,
+} from "@/domain/study-session/study-duration"
+import {
+  clampIntOrNull,
+  finiteOrNull,
+  isParsableSaoPauloDateTime,
+  isUuid,
+  nonNegativeIntOrNull,
+} from "@/domain/study-session/study-input"
 import { buildIsoFromSaoPauloDateTime } from "@/lib/sao-paulo"
 import { saveOrReplayStudyHistory } from "./study-session-idempotency"
 
@@ -28,15 +40,33 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     // camada (ex.: chamadas diretas antigas, se existirem) continuam
     // funcionando exatamente como antes: sem operationId, client_operation_id
     // fica NULL e nenhum comportamento muda.
-    const operationId = data["operationId"] ? String(data["operationId"]) : null
+    // G1.6 (G-36/G-41): a coluna é UUID — rejeita formato inválido aqui com
+    // erro claro em vez de deixar o banco devolver 22P02 genérico (que além
+    // de tudo não aciona o caminho de replay idempotente).
+    const rawOperationId = data["operationId"] ? String(data["operationId"]).trim() : null
+    if (rawOperationId !== null && !isUuid(rawOperationId)) {
+      return { success: false, error: "Identificador da operação inválido. Tente salvar novamente." }
+    }
+    const operationId = rawOperationId
 
     // 1. Busca Disciplina (não cria mais - RLS impede INSERT na tabela disciplines)
+    // G1.6 (G-41): ID informado fora do formato UUID é rejeitado aqui com erro
+    // claro, antes de virar erro genérico de FK/UUID no banco.
     let disciplineId = data["discipline_id"]
+    if (disciplineId) {
+      if (!isUuid(disciplineId)) {
+        return { success: false, error: "Disciplina inválida. Selecione novamente a disciplina." }
+      }
+      disciplineId = String(disciplineId).trim()
+    }
     if (!disciplineId && data["discipline_name"]) {
       const { data: existingDisc, error: findError } = await supabase
         .from("disciplines")
         .select("id")
         .ilike("name", String(data["discipline_name"]).trim())
+        .order("name")
+        .order("id")
+        .limit(1)
         .maybeSingle()
 
       if (findError) {
@@ -71,12 +101,9 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       audio_url: data["audio_url"] || null,
       // Foco: só grava quando existe medição REAL. Ausência (null/undefined/string
       // vazia) vira NULL — nunca 0. "Foco 0%" exige medição real de 0%.
-      focus_percentage:
-        data["focusPercentage"] !== undefined &&
-        data["focusPercentage"] !== null &&
-        data["focusPercentage"] !== ""
-          ? Number(data["focusPercentage"])
-          : null,
+      // G1.6: finiteOrNull — "abc"/NaN/Infinity viram NULL em vez de NaN
+      // silencioso (que o driver serializaria como null sem avisar).
+      focus_percentage: finiteOrNull(data["focusPercentage"]),
       completed_cycles: data["completedCycles"] || 0,
       topic_name: data["topic_name"] || null,
       focus_sound: data["focus_sound"] || null,
@@ -94,8 +121,16 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     let finishedAtISO: string | null = null
 
     if (!data["is_manual_mode"] && data["sessionStartTime"]) {
-      const now = Date.now()
       const startTime = Number(data["sessionStartTime"])
+      // G2.3 — congela o fim no Encerrar: o dwell parado na avaliação não
+      // entra em `paused` (foco% exibido == salvo). Inválido/ausente = agora.
+      const rawEvalStart = Number(
+        data["evaluationStartedAt"] ?? data["evaluation_started_at"] ?? NaN,
+      )
+      const now =
+        Number.isFinite(rawEvalStart) && rawEvalStart > startTime && rawEvalStart <= Date.now()
+          ? rawEvalStart
+          : Date.now()
       // Desconta o total de pausas já finalizadas E a pausa em andamento (se houver),
       // espelhando o cálculo do client (calculateTimes).
       let totalPausedMs = Number(data["sessionTotalPausedMs"] || 0)
@@ -108,15 +143,15 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       const activeMs = Math.max(0, totalElapsedMs - totalPausedMs)
 
       // Banco espera integer — arredondar para inteiro
-      activeMinutesFinal = Math.round(activeMs / 60000)
-      pausedMinutesFinal = Math.round(totalPausedMs / 60000)
+      activeMinutesFinal = studyMinutesFromMs(activeMs)
+      pausedMinutesFinal = studyMinutesFromMs(totalPausedMs)
 
       startedAtISO = new Date(startTime).toISOString()
-      finishedAtISO = new Date().toISOString()
+      finishedAtISO = new Date(now).toISOString()
     } else {
       // Modo manual: garantir que sejam inteiros
-      activeMinutesFinal = Math.round(Number(data["activeMinutes"]) || 0)
-      pausedMinutesFinal = Math.round(Number(data["pausedMinutes"]) || 0)
+      activeMinutesFinal = studyMinutesFromMinutesInput(data["activeMinutes"])
+      pausedMinutesFinal = studyMinutesFromMinutesInput(data["pausedMinutes"])
     }
 
     // 4. Mapear studyType → study_source (campo NOT NULL com CHECK constraint)
@@ -152,6 +187,12 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
     // Sessão interrompida (Cronograma): tempo estudado abaixo de 90% do planejado
     const interrupted = Boolean(data["interrupted"])
 
+    // G1.6 (G-41): vínculo com o planejamento validado antes do banco — ID
+    // fora do formato virava erro opaco de FK/UUID no insert.
+    if (data["study_plan_item_id"] && !isUuid(data["study_plan_item_id"])) {
+      return { success: false, error: "Item de planejamento inválido. Tente salvar novamente." }
+    }
+
     // 5. Monta o payload base do study_history
     const insertPayload: Record<string, unknown> = {
       user_id: user.id,
@@ -168,15 +209,10 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       metadata: metadata,
       // Vínculo com o planejamento (quando a sessão veio do Cronograma)
       study_plan_item_id: data["study_plan_item_id"] ? String(data["study_plan_item_id"]) : null,
-      planned_minutes:
-        data["planned_minutes"] !== undefined && data["planned_minutes"] !== null
-          ? Math.max(0, Math.round(Number(data["planned_minutes"])))
-          : null,
-      // Energia é entrada manual do usuário (não existe medição automática)
-      energy_level:
-        data["energy_level"] !== undefined && data["energy_level"] !== null
-          ? Math.max(1, Math.min(5, Math.round(Number(data["energy_level"]))))
-          : null,
+      planned_minutes: nonNegativeIntOrNull(data["planned_minutes"]),
+      // Energia é entrada manual do usuário (não existe medição automática).
+      // G1.6: NaN/"abc" viram NULL em vez de NaN silencioso.
+      energy_level: clampIntOrNull(data["energy_level"], 1, 5),
     }
 
     // Fase C.1: só grava quando fornecido — nunca inventa um operationId no
@@ -190,9 +226,15 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
       insertPayload["started_at"] = startedAtISO
       insertPayload["finished_at"] = finishedAtISO
     } else if (data["study_date"]) {
-      // Manual com data e horário informados
+      // Manual com data e horário informados.
+      // G1.6 (G-41): data informada mas inválida é erro honesto — antes caía
+      // no fallback silencioso de buildIsoFromSaoPauloDateTime e a sessão era
+      // gravada "agora" sem avisar. Ausência continua significando "agora".
       const studyDate = String(data["study_date"]).trim()
       const studyTime = data["study_time"] ? String(data["study_time"]).trim() : null
+      if (!isParsableSaoPauloDateTime(studyDate, studyTime)) {
+        return { success: false, error: "Data de estudo inválida. Verifique dia e horário." }
+      }
       const startedAt = buildIsoFromSaoPauloDateTime(studyDate, studyTime)
       insertPayload["started_at"] = startedAt
       const durationMs = (activeMinutesFinal || 0) * 60 * 1000
@@ -234,6 +276,10 @@ export async function saveStudySessionAction(data: Record<string, unknown>) {
         revalidatePath("/disciplines")
         revalidatePath("/home")
         revalidatePath("/ciclos")
+        // G1.14 — o cache em memória de Estatísticas (TTL 5min) não é
+        // invalidado por revalidatePath; sem isso, salvar estudo mostrava
+        // "Hoje" obsoleto nas Estatísticas por até 5 minutos.
+        void invalidateStatisticsCenterCache(user.id)
       },
       onInsertError: (historyError) => {
         console.error("[STUDY_SAVE] Erro ao inserir study_history:", historyError)

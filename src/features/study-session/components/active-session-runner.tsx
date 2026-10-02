@@ -93,6 +93,13 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   const [questions, setQuestions] = useState(0)
   const [correct, setCorrect] = useState(0)
   const [energyFin, setEnergyFin] = useState(3)
+  // G2.3 — instante do "Encerrar": a avaliação mantém o timer pausado, mas
+  // o tempo parado nela inflava `paused` (foco% salvo menor que o exibido).
+  // Congela aqui; expira ao voltar ao timer ou resetar.
+  const evaluationStartedAtRef = useRef<number | null>(null)
+  // G2.3 — respostas da avaliação sobrevivem a reload/crash: o timer volta
+  // pelo IndexedDB, mas questions/correct/energy eram useState puro.
+  const EVAL_INPUTS_KEY = "nomeia_eval_inputs"
 
   // Salvamento
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -140,6 +147,57 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
     }
   }, [minimizeSession, router])
 
+  // G2.3 — persiste as respostas enquanto avalia (reload/crash no meio da
+  // avaliação não perde questions/correct/energy; o timer volta sozinho).
+  // Expira em 12h para nunca ressuscitar avaliação de outra sessão.
+  const EVAL_INPUTS_TTL_MS = 12 * 60 * 60 * 1000
+  useEffect(() => {
+    if (phase !== "EVALUATION" || typeof window === "undefined") return
+    try {
+      sessionStorage.setItem(
+        EVAL_INPUTS_KEY,
+        JSON.stringify({ questions, correct, energyFin, savedAt: Date.now() }),
+      )
+    } catch {
+      // Sem storage: segue sem recovery.
+    }
+  }, [phase, questions, correct, energyFin])
+
+  // G2.3 — restaura avaliação interrompida por reload: sessão ativa vinda do
+  // restore + respostas guardadas → volta direto à avaliação (sem elas,
+  // segue o fluxo normal: continua ativa ou inicia do bloco).
+  const restoreEvaluationInputs = useCallback(() => {
+    try {
+      const raw = sessionStorage.getItem(EVAL_INPUTS_KEY)
+      if (!raw) return false
+      const parsed = JSON.parse(raw) as {
+        questions?: unknown
+        correct?: unknown
+        energyFin?: unknown
+        savedAt?: unknown
+      }
+      if (
+        typeof parsed.questions !== "number" ||
+        typeof parsed.correct !== "number" ||
+        typeof parsed.energyFin !== "number" ||
+        typeof parsed.savedAt !== "number" ||
+        Date.now() - parsed.savedAt > EVAL_INPUTS_TTL_MS ||
+        parsed.correct > parsed.questions
+      ) {
+        sessionStorage.removeItem(EVAL_INPUTS_KEY)
+        return false
+      }
+      setQuestions(parsed.questions)
+      setCorrect(parsed.correct)
+      setEnergyFin(parsed.energyFin)
+      // G2.3: congela o fim no Encerrar original (o dwell inclui o reload).
+      evaluationStartedAtRef.current = Date.now()
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
   // Uma única fonte de verdade (StudyProvider):
   // - Se já existe sessão ativa (recuperada de refresh/aba), apenas continua.
   // - Caso contrário, inicia vinculada ao bloco do cronograma (nunca duas sessões).
@@ -151,7 +209,11 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       const current = sessionRef.current
       if (current && current.isActive) {
         unminimizeSession()
-        setPhase("ACTIVE")
+        if (restoreEvaluationInputs()) {
+          setPhase("EVALUATION")
+        } else {
+          setPhase("ACTIVE")
+        }
       } else if (hasPlanContext) {
         startNewSession()
       }
@@ -195,6 +257,16 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
   // volta ao estado 00:00:00, mantendo disciplina/bloco/tópico para reiniciar.
   useEffect(() => {
     if (!session) {
+      evaluationStartedAtRef.current = null
+      // G2.3: só limpa após um ciclo de vida real (startedRef) — no primeiro
+      // mount a sessão também é null e os inputs guardados ainda serão lidos.
+      if (startedRef.current) {
+        try {
+          sessionStorage.removeItem(EVAL_INPUTS_KEY)
+        } catch {
+          // Sem storage: nada a limpar.
+        }
+      }
       if (phase === "ACTIVE" || phase === "EVALUATION") {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setQuestions(0)
@@ -218,11 +290,18 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
 
   const handleFinish = useCallback(() => {
     pauseSession()
+    evaluationStartedAtRef.current = Date.now()
     setPhase("EVALUATION")
   }, [pauseSession])
 
   const handleBackToTimer = useCallback(() => {
     if (session?.phase === "PAUSED") resumeSession()
+    evaluationStartedAtRef.current = null
+    try {
+      sessionStorage.removeItem(EVAL_INPUTS_KEY)
+    } catch {
+      // Sem storage: nada a limpar.
+    }
     setPhase("ACTIVE")
   }, [session?.phase, resumeSession])
 
@@ -242,14 +321,21 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       const interrupted =
         current.plannedSeconds > 0 && current.activeSeconds < current.plannedSeconds * 0.9
 
+      // G2.3 — exclui o dwell da avaliação do `paused` (timer já estava
+      // pausado no Encerrar; o exibido na tela congela junto com o salvo).
+      const evalStart = evaluationStartedAtRef.current
+      const dwellSeconds =
+        evalStart !== null ? Math.max(0, (Date.now() - evalStart) / 1000) : 0
+      const pausedExDwell = Math.max(0, current.pausedSeconds - dwellSeconds)
+
       // Snapshot dos dados antes de salvar (a sessão é limpa após o sucesso)
       const stats: FinalStats = {
         disciplineName: current.disciplineName,
         durationSeconds: current.activeSeconds,
         focusPercent:
-          current.activeSeconds + current.pausedSeconds > 0
+          current.activeSeconds + pausedExDwell > 0
             ? Math.round(
-                (current.activeSeconds / (current.activeSeconds + current.pausedSeconds)) * 100,
+                (current.activeSeconds / (current.activeSeconds + pausedExDwell)) * 100,
               )
             : null,
         questions,
@@ -263,6 +349,7 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
         questions_correct: correct,
         energy_level: energyFin,
         interrupted,
+        evaluation_started_at: evalStart,
       })
 
       if (!res.success) {
@@ -271,6 +358,11 @@ export function ActiveSessionRunner({ planItem }: ActiveSessionRunnerProps) {
       }
 
       setFinalStats(stats)
+      try {
+        sessionStorage.removeItem(EVAL_INPUTS_KEY)
+      } catch {
+        // Sem storage: nada a limpar.
+      }
       if (res.pending) {
         toast.success("Estudo salvo offline. Será sincronizado quando a conexão voltar.")
       } else {

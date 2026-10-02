@@ -41,6 +41,12 @@ export interface AchievementsFacts {
   /** Fase H: cobertura do edital com a regra da página Disciplinas. */
   editalTopicsTotal: number
   editalTopicsStudied: number
+  /**
+   * G1.6 (G-42): true quando a leitura de cobertura falhou. Sem isso, a
+   * falha virava "0/0" e a UI dizia "sem edital cadastrado" para quem tem
+   * edital de sobra — erro mascarado de vazio.
+   */
+  editalCoverageUnavailable?: boolean
 }
 
 /** Percentual de um simulado registrado: `score_percentage` ou acertos ÷ questões. */
@@ -115,7 +121,10 @@ export async function getAchievementsAction(): Promise<{
           .eq("user_id", user.id),
         supabase.from("study_plans").select("id, active").eq("user_id", user.id),
         supabase.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle(),
-        getEditalTopicCoverage(supabase, user.id).catch(() => ({ topicsTotal: 0, topicsStudied: 0 })),
+        getEditalTopicCoverage(supabase, user.id).then(
+          (coverage) => ({ ...coverage, unavailable: false as const }),
+          () => ({ topicsTotal: 0, topicsStudied: 0, unavailable: true as const }),
+        ),
       ])
 
     const facts: AchievementsFacts = {
@@ -144,6 +153,7 @@ export async function getAchievementsAction(): Promise<{
       replanRecoveredCount: 0,
       editalTopicsTotal: coverage.topicsTotal,
       editalTopicsStudied: coverage.topicsStudied,
+      editalCoverageUnavailable: coverage.unavailable === true,
     }
 
     const days = new Map<string, number>()
