@@ -94,11 +94,39 @@ const CommandList = React.forwardRef<
       }
     }
 
+    // Quando este Command está dentro de um Popover que, por sua vez, está
+    // dentro de um Dialog (ex.: seletor de disciplina no modal de registro
+    // manual de estudo), o bloqueio de scroll do corpo da página que o
+    // Dialog ativa (via react-remove-scroll) intercepta o evento de "wheel"
+    // antes dele chegar aqui e cancela a rolagem nativa do navegador —
+    // mesmo esta lista tendo seu próprio `overflow-y-auto` com espaço pra
+    // rolar. `preventDefault()` de um evento cancela a ação padrão (rolar)
+    // inteira, não só para quem chamou — por isso a lista fica "travada"
+    // mesmo sendo scrollável. A correção é rolar manualmente via JS
+    // (`scrollTop`), que não depende da ação padrão do navegador e por isso
+    // não é afetado por esse bloqueio externo.
+    const handleWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el
+      const isScrollable = scrollHeight > clientHeight
+      if (!isScrollable) return
+
+      const atTop = scrollTop <= 0 && e.deltaY < 0
+      const atBottom = Math.ceil(scrollTop + clientHeight) >= scrollHeight && e.deltaY > 0
+      // Já no limite: deixa o comportamento padrão seguir (ex.: rolar a
+      // página por trás, se for o caso) em vez de prender o scroll aqui.
+      if (atTop || atBottom) return
+
+      e.preventDefault()
+      el.scrollTop += e.deltaY
+    }
+
     el.addEventListener("touchstart", handleTouchStart, { passive: true })
     el.addEventListener("touchmove", handleTouchMove, { capture: true, passive: true })
+    el.addEventListener("wheel", handleWheel, { passive: false })
     return () => {
       el.removeEventListener("touchstart", handleTouchStart)
       el.removeEventListener("touchmove", handleTouchMove, { capture: true } as EventListenerOptions)
+      el.removeEventListener("wheel", handleWheel)
     }
   }, [])
 

@@ -179,8 +179,8 @@ export function TargetSelectorDropdown({
         disabled={isPending}
         title={buttonLabel}
         className={cn(
-          "w-full justify-between bg-card/90 hover:bg-accent/70 dark:bg-card/70 border border-border/80 hover:border-primary/40 text-foreground font-semibold text-xs sm:text-[13px] gap-2 cursor-pointer transition-all shadow-xs rounded-xl h-9 sm:h-10 px-2.5 sm:px-3 min-w-0 max-w-full group",
-          isOpen && "border-primary/60 ring-2 ring-primary/20 bg-accent/50",
+          "w-full justify-between bg-card/90 hover:bg-muted dark:bg-card/70 border border-border/80 hover:border-primary/40 text-foreground font-semibold text-xs sm:text-[13px] gap-2 cursor-pointer transition-all shadow-xs rounded-xl h-9 sm:h-10 px-2.5 sm:px-3 min-w-0 max-w-full group",
+          isOpen && "border-primary/60 ring-2 ring-primary/20 bg-primary/10",
         )}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">

@@ -188,84 +188,129 @@ export function useFocusSound() {
   }, [])
 
   // 1. CHUVA SUAVE (Som orgânico, aveludado e dinâmico com rajadas calmas)
+  //
+  // Fase F.5 (realismo sonoro) — duas mudanças a pedido do usuário, que
+  // achou o som pouco parecido com chuva real:
+  //
+  // 1) A camada principal usava passa-baixas em 680Hz, cortando justamente
+  //    o agudo responsável pelo "sssh" característico da chuva — o
+  //    resultado lembrava mais vento/zumbido do que chuva. Trocado por
+  //    passa-faixa centrado em ~2.2kHz, deixando esse agudo passar.
+  // 2) As "gotas" eram tons senoidais isolados a cada 450ms — som de
+  //    notificação, não de chuva. Chuva real é uma nuvem densa e irregular
+  //    de micro-impactos de ruído, não tons isolados e espaçados. Trocado
+  //    por estouros de ruído filtrado (não tons), disparados em intervalos
+  //    curtos e aleatórios (a cada ~15–70ms) com posição estéreo
+  //    aleatória — é a densidade e a irregularidade do disparo que faz o
+  //    ouvido reconhecer "chuva" em vez de "efeito sonoro".
   const buildRainGraph = useCallback(
     (ctx: AudioContext, master: GainNode): AudioGraphNode => {
       const sources: (AudioBufferSourceNode | OscillatorNode)[] = []
       const gains: GainNode[] = []
-      const intervals: number[] = []
+      const intervals: number[] = [0]
 
       const pinkBuf = createStereoPinkBuffer(ctx, 8)
       const brownBuf = createStereoBrownBuffer(ctx, 8)
+      // Buffer curto reaproveitado em cada "pingo" — gerar um buffer novo a
+      // cada disparo seria caro em CPU para algo que dispara várias vezes
+      // por segundo.
+      const patterBuf = createStereoPinkBuffer(ctx, 1)
 
-      // Camada 1: Corpo da chuva (Pink Noise com corte passa-baixas quente)
+      // Camada 1: sibilo da chuva — a textura aveludada e aérea que dá a
+      // sensação de água caindo. Passa-faixa (não passa-baixas) para deixar
+      // passar o agudo que faz "chuva" parecer chuva.
       const rainBody = ctx.createBufferSource()
       rainBody.buffer = pinkBuf
       rainBody.loop = true
-      const lpFilter = ctx.createBiquadFilter()
-      lpFilter.type = "lowpass"
-      lpFilter.frequency.value = 680
-      lpFilter.Q.value = 0.7
+      const bpFilter = ctx.createBiquadFilter()
+      bpFilter.type = "bandpass"
+      bpFilter.frequency.value = 2200
+      bpFilter.Q.value = 0.8
 
       const rainGain = ctx.createGain()
-      rainGain.gain.value = 0.45
+      rainGain.gain.value = 0.32
 
-      // LFO lento para oscilação natural da intensidade da chuva
+      // LFO lento para rajadas naturais de intensidade — a chuva "respira"
+      // (varia o centro do filtro e o volume, não só um dos dois).
       const lfo = ctx.createOscillator()
-      lfo.frequency.value = 0.12
-      const lfoGain = ctx.createGain()
-      lfoGain.gain.value = 160
-      lfo.connect(lfoGain)
-      lfoGain.connect(lpFilter.frequency)
+      lfo.frequency.value = 0.09
+      const lfoFreqGain = ctx.createGain()
+      lfoFreqGain.gain.value = 500
+      lfo.connect(lfoFreqGain)
+      lfoFreqGain.connect(bpFilter.frequency)
 
-      rainBody.connect(lpFilter)
-      lpFilter.connect(rainGain)
+      const lfoVolGain = ctx.createGain()
+      lfoVolGain.gain.value = 0.06
+      lfo.connect(lfoVolGain)
+      lfoVolGain.connect(rainGain.gain)
+
+      rainBody.connect(bpFilter)
+      bpFilter.connect(rainGain)
       rainGain.connect(master)
 
       rainBody.start()
       lfo.start()
       sources.push(rainBody, lfo)
-      gains.push(rainGain, lfoGain)
+      gains.push(rainGain, lfoFreqGain, lfoVolGain)
 
-      // Camada 2: Grave da tempestade distante (Brown Noise aveludado)
-      const deepThunder = ctx.createBufferSource()
-      deepThunder.buffer = brownBuf
-      deepThunder.loop = true
+      // Camada 2: corpo grave de fundo (telhado/ambiente) — o peso que a
+      // camada 1, mais aguda, não cobre.
+      const deepBody = ctx.createBufferSource()
+      deepBody.buffer = brownBuf
+      deepBody.loop = true
       const deepFilter = ctx.createBiquadFilter()
       deepFilter.type = "lowpass"
       deepFilter.frequency.value = 220
       const deepGain = ctx.createGain()
-      deepGain.gain.value = 0.35
+      deepGain.gain.value = 0.3
 
-      deepThunder.connect(deepFilter)
+      deepBody.connect(deepFilter)
       deepFilter.connect(deepGain)
       deepGain.connect(master)
 
-      deepThunder.start()
-      sources.push(deepThunder)
+      deepBody.start()
+      sources.push(deepBody)
       gains.push(deepGain)
 
-      // Camada 3: Gotas suaves aleatórias sintetizadas com ressonância limpa
-      const dropInterval = window.setInterval(() => {
-        if (!audioContextRef.current || audioContextRef.current.state !== "running") return
-        try {
-          const osc = ctx.createOscillator()
-          const dropGain = ctx.createGain()
-          const freq = 1200 + Math.random() * 800
-          osc.type = "sine"
-          osc.frequency.setValueAtTime(freq, ctx.currentTime)
-          osc.frequency.exponentialRampToValueAtTime(freq * 0.6, ctx.currentTime + 0.08)
+      // Camada 3: pingos — estouros curtos de ruído filtrado (não tons),
+      // disparados em intervalos curtos e irregulares, com posição estéreo
+      // aleatória, formando a textura de "patter" da chuva real.
+      const schedulePatter = () => {
+        if (audioContextRef.current && audioContextRef.current.state === "running") {
+          try {
+            const src = ctx.createBufferSource()
+            src.buffer = patterBuf
+            const offset = Math.random() * Math.max(0, patterBuf.duration - 0.03)
 
-          dropGain.gain.setValueAtTime(0.02 + Math.random() * 0.02, ctx.currentTime)
-          dropGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08)
+            const dropFilter = ctx.createBiquadFilter()
+            dropFilter.type = "bandpass"
+            dropFilter.frequency.value = 1800 + Math.random() * 2800
+            dropFilter.Q.value = 2 + Math.random() * 3
 
-          osc.connect(dropGain)
-          dropGain.connect(master)
-          osc.start()
-          osc.stop(ctx.currentTime + 0.09)
-        } catch { /* contexto de áudio suspenso/encerrado: este efeito sonoro é só ignorado */ }
-      }, 450)
+            const dropGain = ctx.createGain()
+            const peak = 0.015 + Math.random() * 0.025
+            dropGain.gain.setValueAtTime(0.0001, ctx.currentTime)
+            dropGain.gain.linearRampToValueAtTime(peak, ctx.currentTime + 0.003)
+            dropGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.025 + Math.random() * 0.03)
 
-      intervals.push(dropInterval)
+            const panner = ctx.createStereoPanner()
+            panner.pan.value = Math.random() * 1.6 - 0.8
+
+            src.connect(dropFilter)
+            dropFilter.connect(dropGain)
+            dropGain.connect(panner)
+            panner.connect(master)
+
+            src.start(ctx.currentTime, offset, 0.06)
+          } catch {
+            /* contexto de áudio suspenso/encerrado: este pingo é só ignorado */
+          }
+        }
+        // Intervalo curto e aleatório — a irregularidade é o que faz
+        // parecer chuva de verdade, em vez de um "tique-taque" mecânico.
+        intervals[0] = window.setTimeout(schedulePatter, 14 + Math.random() * 55)
+      }
+      intervals[0] = window.setTimeout(schedulePatter, 10)
 
       return { sources, gains, intervals }
     },
