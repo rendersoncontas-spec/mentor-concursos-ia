@@ -1,6 +1,10 @@
 "use server"
 
 import { activeReviewItemsOnly } from "@/application/review-engine/review.repository"
+import { loadDisciplineIdentity } from "@/application/disciplines/discipline-identity.loader"
+import { readSimuladoRecords } from "@/application/simulados/simulado-records.read"
+import { EMPTY_DISCIPLINE_IDENTITY, type DisciplineIdentitySnapshot } from "@/domain/disciplines/discipline-identity"
+import type { SimuladoRecord } from "@/domain/simulados/types"
 import { createClient } from "@/infrastructure/supabase/server"
 import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
@@ -18,6 +22,7 @@ import {
   type ReviewItemRow,
   type ActivePlan,
 } from "./engine/stats-engine"
+import { canonicalizeStatisticsInput, collectStatisticsDisciplineIds } from "./statistics-identity"
 import { toStudySessions } from "./study-sessions-read"
 
 // ─── Cache em memória (TTL 5 minutos) ──────────────────────────────────────
@@ -68,6 +73,18 @@ export interface StatisticsCenterPayload {
    * domingo padrão do produto.
    */
   weekStartDay?: number | null
+  /**
+   * G2.13 — simulados externos registrados (matérias já na identidade
+   * canônica). `null` = a leitura falhou; `[]` = nenhum simulado.
+   */
+  simulados?: SimuladoRecord[] | null
+  /**
+   * G2.13 — identidade canônica usada para montar o payload (alias → canônica,
+   * nome exibido, aliases somados). Todos os `disciplineId` do payload JÁ estão
+   * na identidade canônica; a tela usa isto só para rótulos e para resolver um
+   * filtro que chegue com id de alias.
+   */
+  identity?: DisciplineIdentitySnapshot
 }
 
 // Limite de segurança: 50.000 sessões carregadas por usuário (muito acima do
@@ -571,6 +588,24 @@ async function loadWeekStartDay(
   return weekStartDay
 }
 
+/**
+ * G2.13 — simulados externos (mesma leitura da tela de Simulados). `null` =
+ * a leitura falhou: a seção de simulados mostra indisponível, o resto segue.
+ */
+async function loadSimulados(supabase: Supabase, effectiveUserId: string): Promise<SimuladoRecord[] | null> {
+  try {
+    const { data, error } = await readSimuladoRecords(supabase, effectiveUserId)
+    if (error) {
+      console.error("[ESTATISTICAS] Erro ao carregar simulados:", error)
+      return null
+    }
+    return data ?? []
+  } catch (err) {
+    console.error("[ESTATISTICAS] Falha em simulados:", err)
+    return null
+  }
+}
+
 export async function getStatisticsCenterAction(): Promise<{
   data: StatisticsCenterPayload | null
   error: string | null
@@ -600,7 +635,7 @@ export async function getStatisticsCenterAction(): Promise<{
     // revisões → contagem de revisões → plano (2–3) → perfil). Agora saem
     // todas juntas. Cada bloco mantém exatamente o mesmo tratamento de erro de
     // antes (registra e segue com o valor padrão), então o payload é o mesmo.
-    const [sessions, attempts, disciplineData, reviewItems, reviewsCompletedLast30, activePlan, weekStartDay] =
+    const [sessions, attempts, disciplineData, reviewItems, reviewsCompletedLast30, activePlan, weekStartDay, simulados] =
       await Promise.all([
         loadSessions(supabase, effectiveUserId),
         loadAttempts(supabase, effectiveUserId),
@@ -609,6 +644,7 @@ export async function getStatisticsCenterAction(): Promise<{
         loadReviewsCompletedLast30(supabase, effectiveUserId),
         loadActivePlan(supabase, effectiveUserId),
         loadWeekStartDay(supabase, effectiveUserId),
+        loadSimulados(supabase, effectiveUserId),
       ])
     // Fase I.8: as duas listas de disciplina saem da mesma consulta; `null`
     // externo é falha de leitura, e nesse caso as duas ficam indisponíveis.
@@ -630,15 +666,40 @@ export async function getStatisticsCenterAction(): Promise<{
       }
     }
 
-    const payload: StatisticsCenterPayload = {
+    // G2.13: identidade canônica de TODAS as disciplinas do payload numa
+    // leitura só (catálogo em lotes + custom_name do aluno), aplicada aqui, na
+    // fronteira — o motor e a tela continuam agrupando por `disciplineId`.
+    const raw = {
       sessions,
       attempts,
       disciplines,
       userDisciplines,
       reviewItems,
-      reviewsCompletedLast30,
       activePlan: activePlan?.plan ?? null,
+      simulados,
+    }
+    const identityResult = await loadDisciplineIdentity(
+      supabase,
+      effectiveUserId,
+      collectStatisticsDisciplineIds(raw),
+    )
+    if (identityResult.error) {
+      console.error("[ESTATISTICAS] Identidade de disciplinas indisponível:", identityResult.error)
+    }
+    const identity = identityResult.error ? EMPTY_DISCIPLINE_IDENTITY : identityResult.data
+    const canonical = canonicalizeStatisticsInput(raw, identity)
+
+    const payload: StatisticsCenterPayload = {
+      sessions: canonical.sessions,
+      attempts: canonical.attempts,
+      disciplines: canonical.disciplines,
+      userDisciplines: canonical.userDisciplines,
+      reviewItems: canonical.reviewItems,
+      reviewsCompletedLast30,
+      activePlan: canonical.activePlan,
       activePlanError: activePlan === null,
+      simulados: canonical.simulados,
+      identity,
       weekStartDay,
     }
 
@@ -653,7 +714,10 @@ export async function getStatisticsCenterAction(): Promise<{
       payload.reviewItems !== null &&
       payload.reviewsCompletedLast30 !== null &&
       !payload.activePlanError &&
-      payload.weekStartDay !== null
+      payload.weekStartDay !== null &&
+      payload.simulados !== null &&
+      // Sem a identidade, aliases saem separados: entrega, mas não guarda.
+      !identityResult.error
 
     if (integro) cache.set(effectiveUserId, { at: nowMs, payload })
     return { data: payload, error: null, cached: false }

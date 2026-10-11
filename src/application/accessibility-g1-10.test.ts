@@ -16,7 +16,9 @@ function src(path: string): string {
 // ---------------------------------------------------------------------------
 
 describe("G-49 — reorder com rollback em falha", () => {
-  const body = src("src/features/dashboard/components/dashboard-layout.tsx")
+  // F.3: o estado de layout e o reorder saíram de dashboard-layout.tsx para
+  // dashboard-widgets-grid.tsx (streaming do Dashboard). Mesma garantia, novo arquivo.
+  const body = src("src/features/dashboard/components/dashboard-widgets-grid.tsx")
 
   it("1. handleReorder fotografa o anterior e reverte estado + cache", () => {
     assert.match(body, /const previous = layout/)
@@ -67,9 +69,13 @@ describe("G-47 — controles de ícone com nome acessível", () => {
       'aria-label="Editar sessão"',
       'aria-label="Excluir sessão"',
     ]],
+    // G2.10: o detalhe do simulado deixou a <div role="dialog"> manual e passou a
+    // usar o Dialog do design system (Radix: role="dialog", aria-labelledby pelo
+    // DialogTitle, botão "Fechar" com rótulo e Esc). Mesma garantia, novo markup.
     ["simulados-view.tsx", "src/features/simulados/components/simulados-view.tsx", [
-      'role="dialog"',
-      'aria-label="Fechar detalhes"',
+      "<DialogContent",
+      "<DialogTitle",
+      "<DialogDescription",
     ]],
     ["simulado-record-modal.tsx", "src/features/simulados/components/simulado-record-modal.tsx", [
       'aria-label="Remover matéria"',

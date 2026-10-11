@@ -584,7 +584,14 @@ export function ImportHistoryModal({ open, onOpenChange, onImported }: ImportHis
                           {column.header || `Coluna ${column.index + 1}`}
                         </span>
                         {isRecognized ? (
-                          <span className="text-[10px] text-muted-foreground shrink-0">
+                          <span
+                            className="text-[10px] text-muted-foreground shrink-0 max-w-[55%] truncate text-right"
+                            title={
+                              column.sample?.[0] !== undefined
+                                ? `${IMPORT_FIELD_LABELS[field]} · ${column.sample[0]}`
+                                : IMPORT_FIELD_LABELS[field]
+                            }
+                          >
                             {IMPORT_FIELD_LABELS[field]}
                             {column.sample?.[0] !== undefined && (
                               <span className="text-muted-foreground/60">

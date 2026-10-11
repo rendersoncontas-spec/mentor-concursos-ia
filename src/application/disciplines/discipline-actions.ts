@@ -5,6 +5,7 @@ import { countOption, fetchAllRowsPaged } from "@/lib/parallel-pagination"
 
 import { getEffectiveUserId, requireAdmin } from "@/application/admin/auth-guard"
 import { pickNextDisciplineColor } from "@/application/disciplines/discipline-color.service"
+import { invalidateStatisticsCenterCache } from "@/application/study-analytics/statistics-center.action"
 import { getCatalogTopicsByDiscipline } from "@/application/topic-catalog/topic-catalog.service"
 import { type CatalogTopicWithSubTopics } from "@/domain/topic-catalog/topic-catalog.types"
 import {
@@ -253,6 +254,8 @@ export async function addUserDisciplineAction(name: string) {
 
     if (error) return { success: false, error: error.message }
 
+    // G2.13: as Estatísticas listam as disciplinas do aluno (edital/identidade).
+    await invalidateStatisticsCenterCache(effectiveUserId)
     revalidatePath("/disciplines")
     revalidatePath("/dashboard")
     revalidatePath("/planejamento")
@@ -279,6 +282,8 @@ export async function removeUserDisciplineAction(id: string) {
 
     if (error) return { success: false, error: error.message }
 
+    // G2.13: as Estatísticas listam as disciplinas do aluno (edital/identidade).
+    await invalidateStatisticsCenterCache(effectiveUserId)
     revalidatePath("/disciplines")
     revalidatePath("/dashboard")
     revalidatePath("/planejamento")
@@ -379,6 +384,8 @@ export async function updateDisciplineAppearanceAction(
 
       if (error) return { success: false, error: error.message }
 
+      // G2.13: nome GLOBAL mudou → vale para todos os alunos.
+      await invalidateStatisticsCenterCache()
       revalidatePath("/disciplines")
       revalidatePath("/dashboard")
       revalidatePath("/estatisticas")
@@ -417,6 +424,8 @@ export async function updateDisciplineAppearanceAction(
       return { success: false, error: personalError.message }
     }
 
+    // G2.13: nome pessoal (custom_name) aparece nas Estatísticas.
+    await invalidateStatisticsCenterCache(effectiveUserId)
     revalidatePath("/disciplines")
     revalidatePath("/dashboard")
     revalidatePath("/estatisticas")

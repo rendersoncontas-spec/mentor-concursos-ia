@@ -289,21 +289,37 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
     return m
   }, [payload?.disciplines, payload?.sessions])
 
+  // G2.13: os ids do payload já estão na identidade canônica; um filtro que
+  // chegue com id de alias é resolvido para a canônica antes de filtrar.
+  const effectiveDisciplineId = useMemo(
+    () => (disciplineId === "all" ? "all" : canonicalIdOf(payload?.identity, disciplineId)),
+    [disciplineId, payload?.identity],
+  )
+
   const filteredSessions = useMemo(
     () =>
       filterSessions(
         payload?.sessions ?? [],
         rangeKeys,
-        disciplineId,
+        effectiveDisciplineId,
         studyType,
         TIMEZONE,
         isAllRange,
       ),
-    [payload, rangeKeys, disciplineId, studyType, isAllRange],
+    [payload, rangeKeys, effectiveDisciplineId, studyType, isAllRange],
   )
   const filteredAttempts = useMemo(
-    () => filterAttempts(payload?.attempts ?? [], rangeKeys, disciplineId, studyType, TIMEZONE, isAllRange),
-    [payload, rangeKeys, disciplineId, studyType, isAllRange],
+    () => filterAttempts(payload?.attempts ?? [], rangeKeys, effectiveDisciplineId, studyType, TIMEZONE, isAllRange),
+    [payload, rangeKeys, effectiveDisciplineId, studyType, isAllRange],
+  )
+  // G2.13: simulados por disciplina (mesmo cálculo da tela de Simulados).
+  const simuladosUnavailable = Boolean(payload) && payload?.simulados === null
+  const simuladoByDiscipline = useMemo(
+    () =>
+      simuladoAnalysisByDiscipline(
+        filterSimuladosForStatistics(payload?.simulados ?? [], rangeKeys, isAllRange, effectiveDisciplineId),
+      ),
+    [payload?.simulados, rangeKeys, isAllRange, effectiveDisciplineId],
   )
 
   // ── Cálculos ──────────────────────────────────────────────────────────────
@@ -924,6 +940,9 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
         stats={disciplineStats}
         totalMinutes={timeCards.totalMinutes}
         empty={filteredSessions.length === 0}
+        simuladoByDiscipline={simuladoByDiscipline}
+        simuladosUnavailable={simuladosUnavailable}
+        mergedNames={payload?.identity?.memberNames ?? {}}
       />
 
       {/* ===================== TÓPICOS ===================== */}
@@ -1399,6 +1418,9 @@ function filterSessions(
 }
 
 import { filterAttempts } from "@/features/statistics/lib/attempts-filter"
+import { filterSimuladosForStatistics, simuladoAnalysisByDiscipline } from "@/features/statistics/lib/simulados-by-discipline"
+import { canonicalIdOf } from "@/domain/disciplines/discipline-identity"
+import type { SimuladoSubjectAnalysis } from "@/domain/simulados/types"
 
 function buildChartData(buckets: DailyBucket[], rangeDays: number, _timezone: string) {
   if (rangeDays > 90) {
@@ -1825,10 +1847,18 @@ function DisciplinasSection({
   stats,
   totalMinutes: _totalMinutes,
   empty,
+  simuladoByDiscipline,
+  simuladosUnavailable,
+  mergedNames,
 }: {
   stats: DisciplineStat[]
   totalMinutes: number
   empty: boolean
+  /** G2.13: análise de simulados por identidade canônica, no período/filtro. */
+  simuladoByDiscipline: Map<string, SimuladoSubjectAnalysis>
+  simuladosUnavailable: boolean
+  /** G2.13: outras entradas do catálogo somadas em cada identidade. */
+  mergedNames: Record<string, string[]>
 }) {
   const [sort, setSort] = useState<SortKey>("tempo")
 
@@ -1982,6 +2012,15 @@ function DisciplinasSection({
                         <div><dt className="text-muted-foreground">Flashcards</dt><dd className="font-semibold">{d.flashcards}</dd></div>
                         <div><dt className="text-muted-foreground">Último estudo</dt><dd className="font-semibold">{lastStudy === null ? "nunca" : lastStudy === "hoje" ? "hoje" : `há ${lastStudy}`}</dd></div>
                       </dl>
+                      <SimuladoDisciplineSummary
+                        analysis={simuladoByDiscipline.get(d.disciplineId)}
+                        unavailable={simuladosUnavailable}
+                      />
+                      {(mergedNames[d.disciplineId] ?? []).length > 0 && (
+                        <p className="mt-1.5 text-[10px] text-muted-foreground">
+                          Inclui também: {(mergedNames[d.disciplineId] ?? []).join(", ")} (mesma matéria no catálogo).
+                        </p>
+                      )}
                     </div>
                   )}
                 </li>
@@ -1991,6 +2030,30 @@ function DisciplinasSection({
         </div>
       )}
     </SectionCard>
+  )
+}
+
+/** G2.13 — simulados da disciplina no período (cálculo de buildSubjectAnalysis). */
+function SimuladoDisciplineSummary({
+  analysis,
+  unavailable,
+}: {
+  analysis: SimuladoSubjectAnalysis | undefined
+  unavailable: boolean
+}) {
+  if (unavailable) {
+    return <p className="mt-1.5 text-[10px] text-muted-foreground">Simulados indisponíveis no momento.</p>
+  }
+  if (!analysis) return null
+  const evolution = analysis.evolutionPp
+  let evolutionLabel = "—"
+  if (evolution !== null) evolutionLabel = `${evolution > 0 ? "+" : ""}${evolution.toFixed(1).replace(".", ",")} p.p.`
+  return (
+    <dl className="mt-2 grid grid-cols-3 gap-x-3 gap-y-1 border-t border-border/40 pt-1.5 text-[11px]">
+      <div><dt className="text-muted-foreground">Simulados</dt><dd className="font-semibold">{analysis.simuladosCount}</dd></div>
+      <div><dt className="text-muted-foreground">Média nos simulados</dt><dd className="font-semibold">{analysis.accuracy === null ? "—" : `${Math.round(analysis.accuracy)}%`}</dd></div>
+      <div><dt className="text-muted-foreground">Evolução</dt><dd className="font-semibold">{evolutionLabel}</dd></div>
+    </dl>
   )
 }
 

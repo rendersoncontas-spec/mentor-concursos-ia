@@ -118,7 +118,10 @@ export async function getAchievementsAction(): Promise<{
         supabase
           .from("simulados")
           .select("id, total_questions, total_correct, score_percentage")
-          .eq("user_id", user.id),
+          .eq("user_id", user.id)
+          // G2.10: só simulados concluídos contam (um simulado em andamento ou
+          // descartado não é "simulado realizado").
+          .eq("status", "FINISHED"),
         supabase.from("study_plans").select("id, active").eq("user_id", user.id),
         supabase.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle(),
         getEditalTopicCoverage(supabase, user.id).then(

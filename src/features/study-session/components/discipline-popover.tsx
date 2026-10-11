@@ -35,6 +35,9 @@ interface DisciplinePopoverProps {
   onSelect: (name: string, id: string) => void
   placeholder?: string
   className?: string
+  /** G2.21: id do botão (para um <label htmlFor>) e nome acessível composto. */
+  id?: string
+  "aria-labelledby"?: string
 }
 
 export function DisciplinePopover({
@@ -42,6 +45,8 @@ export function DisciplinePopover({
   onSelect,
   placeholder = "Escolha uma matéria",
   className,
+  id,
+  "aria-labelledby": ariaLabelledBy,
 }: DisciplinePopoverProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -114,6 +119,9 @@ export function DisciplinePopover({
     >
       <PopoverTrigger asChild>
         <button
+          type="button"
+          id={id}
+          aria-labelledby={ariaLabelledBy}
           className={cn(
             "flex items-center justify-between gap-2 h-9 px-3 rounded-lg border text-sm font-bold transition-colors",
             "bg-background hover:bg-accent/50",

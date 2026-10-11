@@ -5,6 +5,7 @@ import * as React from "react"
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { Toaster } from "sonner"
 
+import { PwaInstallCapture } from "@/components/pwa/pwa-install-capture"
 import { StudyProvider } from "@/features/study-session/components/study-provider"
 
 // @tanstack/react-query foi removido daqui (Fase 6, auditoria de bundle):
@@ -20,6 +21,8 @@ export function Providers({ children, ...props }: React.ComponentProps<typeof Ne
         {children}
       </StudyProvider>
       <Toaster position="top-center" richColors />
+      {/* UX-PWA-01: guarda o prompt de instalação assim que o navegador o oferecer. */}
+      <PwaInstallCapture />
     </NextThemesProvider>
   )
 }

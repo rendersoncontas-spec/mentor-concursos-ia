@@ -11,6 +11,7 @@ import type {
   StudyCycleItemWithDetails,
   StudyCycleSession,
 } from "@/domain/study-cycle/study-cycle.types"
+import { hideCatalogAliases, loadCatalogAliasIds } from "@/application/disciplines/discipline-aliases"
 
 export type DisciplineOption = {
   id: string
@@ -239,7 +240,7 @@ export async function getDisciplinesForAutocomplete(): Promise<{
 
     // Fase F (performance): as duas leituras são independentes — rodam em
     // paralelo (antes: plano ativo → catálogo, em sequência).
-    const [planResult, { data: allDiscs, error: allDiscsError }] = await Promise.all([
+    const [planResult, { data: allDiscs, error: allDiscsError }, aliasIds] = await Promise.all([
       // 1. Disciplinas do plano ativo via service puro
       fetchActivePlanDisciplines(supabase, effectiveUserId),
       // 2. Todas as disciplinas globais do catálogo do banco
@@ -248,6 +249,8 @@ export async function getDisciplinesForAutocomplete(): Promise<{
         .select("id, name, area, color_hex")
         .order("name", { ascending: true })
         .limit(300),
+      // 3. G2.14: aliases comprovados (saem do catálogo de escolha)
+      loadCatalogAliasIds(supabase),
     ])
 
     if (allDiscsError) {
@@ -260,7 +263,12 @@ export async function getDisciplinesForAutocomplete(): Promise<{
       })
     }
 
-    const allDisciplines: DisciplineOption[] = (allDiscs || []).map((d) => ({
+    // G2.14: alias some do catálogo de escolha, exceto se estiver no plano.
+    const allDisciplines: DisciplineOption[] = hideCatalogAliases(
+      allDiscs || [],
+      aliasIds,
+      planResult.disciplines.map((d) => d.id),
+    ).map((d) => ({
       id: d.id,
       name: d.name,
       area: d.area ?? null,
@@ -342,16 +350,22 @@ export async function getStudyCenterData(): Promise<StudyCenterData> {
     }
 
     // FASE 1: Paralelo — plano ativo + catálogo global (2 queries simultâneas)
-    const [planResult, allDiscsResult] = await Promise.all([
+    const [planResult, allDiscsResult, aliasIds] = await Promise.all([
       fetchActivePlanDisciplines(supabase, effectiveUserId),
       supabase
         .from("disciplines")
         .select("id, name, area, color_hex")
         .order("name", { ascending: true })
         .limit(300),
+      loadCatalogAliasIds(supabase),
     ])
 
-    const allDisciplines: DisciplineOption[] = (allDiscsResult.data || []).map((d) => ({
+    // G2.14: alias some do catálogo de escolha, exceto se estiver no plano.
+    const allDisciplines: DisciplineOption[] = hideCatalogAliases(
+      allDiscsResult.data || [],
+      aliasIds,
+      planResult.disciplines.map((d) => d.id),
+    ).map((d) => ({
       id: d.id,
       name: d.name,
       area: d.area ?? null,

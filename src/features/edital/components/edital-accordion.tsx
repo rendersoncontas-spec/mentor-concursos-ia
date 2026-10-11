@@ -605,7 +605,7 @@ export function EditalAccordion({
                                     onClick={() => toggleCheck(topic.id)}
                                     className={`w-4 h-4 rounded-full border shrink-0 mt-0.5 flex items-center justify-center transition-all ${
                                       isChecked
-                                        ? "bg-primary border-primary text-white"
+                                        ? "bg-primary border-primary text-primary-foreground"
                                         : "border-muted-foreground/40 hover:border-primary bg-background"
                                     }`}
                                   >

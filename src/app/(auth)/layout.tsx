@@ -59,7 +59,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </ul>
         </div>
 
-        <div className="text-xs text-white/45 border-t border-white/10 pt-6">
+        {/* G2.21: white/45 dava 4,4:1 sobre o painel escuro (mínimo AA 4,5:1). */}
+        <div className="text-xs text-white/55 border-t border-white/10 pt-6">
           <p>© {new Date().getFullYear()} NomeIA. Todos os direitos reservados.</p>
         </div>
       </div>

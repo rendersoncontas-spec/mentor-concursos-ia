@@ -97,18 +97,21 @@ export function LoginForm({ next }: { next?: string | null } = {}) {
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-sm font-medium">E-mail</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              {/* G2.20: FormControl envolve o PRÓPRIO input (antes envolvia o div),
+                  para o rótulo "E-mail" e a mensagem de erro ficarem ligados a ele. */}
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <FormControl>
                   <Input
                     placeholder="seu.email@exemplo.com"
                     type="email"
+                    autoComplete="email"
                     disabled={isPending}
                     className="pl-9 h-11 bg-background"
                     {...field}
                   />
-                </div>
-              </FormControl>
+                </FormControl>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -127,16 +130,18 @@ export function LoginForm({ next }: { next?: string | null } = {}) {
                   Esqueceu sua senha?
                 </Link>
               </div>
-              <FormControl>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <FormControl>
                   <Input
                     placeholder="••••••••"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
                     disabled={isPending}
                     className="pl-9 pr-10 h-11 bg-background"
                     {...field}
                   />
+                </FormControl>
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -150,8 +155,7 @@ export function LoginForm({ next }: { next?: string | null } = {}) {
                       <Eye className="h-4 w-4" />
                     )}
                   </button>
-                </div>
-              </FormControl>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -162,7 +166,11 @@ export function LoginForm({ next }: { next?: string | null } = {}) {
           disabled={isPending}
         >
           {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {/* G2.20: o botão não fica sem nome acessível durante o envio. */}
+              <span className="sr-only">Entrando…</span>
+            </>
           ) : (
             <>
               Entrar na Plataforma

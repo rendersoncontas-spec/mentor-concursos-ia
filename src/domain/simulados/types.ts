@@ -246,15 +246,21 @@ export const CEBRASPE_DEFAULT_PENALTY = 1
 
 /** Faixas de desempenho configuradas centralizadas. */
 export const PERFORMANCE_BANDS = {
-  EXCELENTE: { min: 85, label: "Excelente", color: "text-emerald-600", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
+  EXCELENTE: { min: 85, label: "Excelente", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
   BOM: { min: 75, label: "Bom", color: "text-primary", bg: "bg-primary/10", border: "border-primary/30" },
-  ATENCAO: { min: 60, label: "Atenção", color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/30" },
-  FRACO: { min: 0, label: "Fraco", color: "text-rose-600", bg: "bg-rose-500/10", border: "border-rose-500/30" },
+  ATENCAO: { min: 60, label: "Atenção", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30" },
+  FRACO: { min: 0, label: "Fraco", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/30" },
 } as const
 
 /** Um simulado registrado manualmente pelo aluno (feito fora do sistema). */
 export interface SimuladoRecordInput {
   id?: string | undefined
+  /**
+   * G2.10: id gerado pelo navegador quando o formulário de NOVO registro abre.
+   * Vira o id do simulado; reenviar o mesmo formulário (duplo clique, retry
+   * depois de timeout) não cria um segundo registro — atualiza o mesmo.
+   */
+  requestId?: string | undefined
   name: string
   examName: string
   roleName: string
@@ -343,6 +349,10 @@ export interface SimuladoPanelStats {
   last5AverageAccuracy: number | null
   worstAccuracy: number | null
   evolutionPp: number | null
+  /** G2.10: primeiro simulado (em ordem cronológica) e a variação até o último. */
+  firstAccuracy: number | null
+  firstToLastPp: number | null
+  /** null quando há menos de MIN_TREND_POINTS simulados — nunca se inventa tendência. */
   trend: "UP" | "STABLE" | "DOWN" | null
   trendMessage: string | null
 }
@@ -365,6 +375,38 @@ export interface SimuladoSubjectAnalysis {
   band: keyof typeof PERFORMANCE_BANDS
   evolutionPp: number | null
   history: { simuladoId: string; name: string; date: string; accuracy: number | null }[]
+  /** G2.10: em quantos simulados a matéria aparece. */
+  simuladosCount: number
+  firstAccuracy: number | null
+  lastAccuracy: number | null
+  bestAccuracy: number | null
+  worstAccuracy: number | null
+  /** null com menos de MIN_TREND_POINTS registros da matéria. */
+  trend: "UP" | "STABLE" | "DOWN" | null
+}
+
+/** G2.10 — motivo determinístico para apontar uma matéria como gargalo. */
+export type SimuladoBottleneckReason = "BELOW_AVERAGE" | "LOW_PERFORMANCE" | "RECENT_DROP"
+
+export interface SimuladoBottleneck {
+  disciplineId: string | null
+  disciplineName: string
+  accuracy: number | null
+  reasons: SimuladoBottleneckReason[]
+  /** Diferença (p.p.) para a média geral; negativa = abaixo. */
+  gapToOverallPp: number | null
+  /** Queda (p.p.) do penúltimo para o último registro da matéria. */
+  recentDropPp: number | null
+  simuladosCount: number
+  /** Menos de 2 simulados com a matéria: o apontamento é preliminar. */
+  lowData: boolean
+}
+
+export interface SimuladoBottleneckReport {
+  overallAccuracy: number | null
+  /** Pior matéria entre as apontadas (null se nenhuma). */
+  primary: SimuladoBottleneck | null
+  items: SimuladoBottleneck[]
 }
 
 /** Comparação entre dois simulados. */

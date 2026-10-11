@@ -253,7 +253,7 @@ export function EditDisciplineModal({
                 <Button
                   size="sm"
                   onClick={handleAddTopic}
-                  className="h-8 bg-primary text-white font-semibold text-xs"
+                  className="h-8 bg-primary text-primary-foreground font-semibold text-xs"
                 >
                   Adicionar
                 </Button>
@@ -280,7 +280,7 @@ export function EditDisciplineModal({
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
                     {(t.badgeText || badgeText) && (
-                      <span className="px-2 py-0.5 rounded-md bg-primary text-white font-semibold text-[10px] shrink-0">
+                      <span className="px-2 py-0.5 rounded-md bg-primary text-primary-foreground font-semibold text-[10px] shrink-0">
                         {t.badgeText || badgeText}
                       </span>
                     )}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState } from "react"
 
 import { useRouter } from "next/navigation"
 
@@ -31,6 +31,7 @@ import { StudyCalendarView } from "./study-calendar-view"
 import { WeeklyPlanningView } from "./weekly-planning-view"
 import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
 import { isUuid } from "@/domain/study-session/study-input"
+import { handleTabListKeyDown } from "@/lib/a11y/tab-keyboard"
 
 export interface StudyCycleBlock {
   id: string
@@ -57,6 +58,10 @@ export function PlanningView({ initialData }: PlanningViewProps) {
     "ciclo" | "diario" | "semanal" | "mensal" | "metas"
   >("ciclo")
   const [isManualCreation, setIsManualCreation] = useState(false)
+  // G2.23: ids das abas de visão e do painel (padrão APG).
+  const viewsId = useId()
+  const tabId = (type: string) => `${viewsId}-aba-${type}`
+  const viewPanelId = `${viewsId}-painel`
 
   // P1.1 (auditoria itens 8): este componente NÃO busca ReplanInfo — recebe
   // initialData via prop do servidor. Os `return []`/`[]` abaixo são vazio REAL
@@ -320,74 +325,103 @@ export function PlanningView({ initialData }: PlanningViewProps) {
           (app/(protected)/planejamento/page.tsx); aqui fica só a barra de
           visões + ações, sem um segundo H1. */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 border-b border-border pb-3">
-        <div role="tablist" aria-label="Visões do planejamento" className="flex items-center gap-0.5 p-0.5 bg-muted rounded-md w-fit flex-wrap">
+        {/* G2.23: padrão APG com ATIVAÇÃO MANUAL — as setas só movem o foco e
+            Enter/Espaço (ou clique) troca a visão: cada visão (Dia, Semana,
+            Mês, Metas) busca dados ao abrir, então ativar a cada seta
+            dispararia leituras em sequência. */}
+        <div
+          role="tablist"
+          aria-label="Visões do planejamento"
+          className="flex items-center gap-0.5 p-0.5 bg-muted rounded-md w-fit flex-wrap"
+          onKeyDown={(event) => handleTabListKeyDown(event, { activation: "manual" })}
+        >
         <button
           onClick={() => setPlanningType("ciclo")}
           role="tab"
+          id={tabId("ciclo")}
           aria-selected={planningType === "ciclo"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+          aria-controls={viewPanelId}
+          tabIndex={planningType === "ciclo" ? 0 : -1}
+          type="button"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             planningType === "ciclo"
               ? "bg-card text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <RotateCcw aria-hidden className="w-3.5 h-3.5" />
           Ciclo
         </button>
 
         <button
           onClick={() => setPlanningType("diario")}
           role="tab"
+          id={tabId("diario")}
           aria-selected={planningType === "diario"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+          aria-controls={viewPanelId}
+          tabIndex={planningType === "diario" ? 0 : -1}
+          type="button"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             planningType === "diario"
               ? "bg-card text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Clock className="w-3.5 h-3.5" />
+          <Clock aria-hidden className="w-3.5 h-3.5" />
           Dia
         </button>
 
         <button
           onClick={() => setPlanningType("semanal")}
           role="tab"
+          id={tabId("semanal")}
           aria-selected={planningType === "semanal"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+          aria-controls={viewPanelId}
+          tabIndex={planningType === "semanal" ? 0 : -1}
+          type="button"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             planningType === "semanal"
               ? "bg-card text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <CalendarDays className="w-3.5 h-3.5" />
+          <CalendarDays aria-hidden className="w-3.5 h-3.5" />
           Semana
         </button>
 
         <button
           onClick={() => setPlanningType("mensal")}
           role="tab"
+          id={tabId("mensal")}
           aria-selected={planningType === "mensal"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+          aria-controls={viewPanelId}
+          tabIndex={planningType === "mensal" ? 0 : -1}
+          type="button"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             planningType === "mensal"
               ? "bg-card text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Calendar className="w-3.5 h-3.5" />
+          <Calendar aria-hidden className="w-3.5 h-3.5" />
           Mês
         </button>
 
         <button
           onClick={() => setPlanningType("metas")}
           role="tab"
+          id={tabId("metas")}
           aria-selected={planningType === "metas"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors ${
+          aria-controls={viewPanelId}
+          tabIndex={planningType === "metas" ? 0 : -1}
+          type="button"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             planningType === "metas"
               ? "bg-card text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Target className="w-3.5 h-3.5" />
+          <Target aria-hidden className="w-3.5 h-3.5" />
           Metas e horas
         </button>
               </div>
@@ -428,7 +462,8 @@ export function PlanningView({ initialData }: PlanningViewProps) {
         </div>
       </div>
 
-      {/* Render selected view */}
+      {/* Render selected view — G2.23: painel das abas acima. */}
+      <div role="tabpanel" id={viewPanelId} aria-labelledby={tabId(planningType)}>
       {planningType === "diario" && (
         <DailyPlanningView
           blocks={blocks}
@@ -700,6 +735,7 @@ export function PlanningView({ initialData }: PlanningViewProps) {
           />
         </div>
       )}
+      </div>
 
       {/* Modal Registrar Estudo Manual */}
       <StudyRegisterModal open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen} />

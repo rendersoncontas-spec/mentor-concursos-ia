@@ -36,6 +36,8 @@ import { clearUserLocalData } from "@/utils/user-data"
 import { clearOfflinePrivateDataForLogout } from "@/infrastructure/offline"
 import { StudyHeaderControl } from "@/components/study/study-header-control"
 import { ConnectionStatusIndicator } from "@/components/layout/connection-status-indicator"
+import { InstallAppDialog } from "@/components/pwa/install-app-dialog"
+import { InstallAppMenuItem, type InstallHelpVariant } from "@/components/pwa/install-app-menu-item"
 
 interface AppHeaderProps {
   userEmail?: string
@@ -61,10 +63,20 @@ export function AppHeader({
   const [isEditalModalOpen, setIsEditalModalOpen] = useState(false)
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
   const [editalRequestInput, setEditalRequestInput] = useState("")
+  // UX-PWA-01: instruções de instalação (fora do menu, que fecha ao tocar no item).
+  const [installHelp, setInstallHelp] = useState<InstallHelpVariant | null>(null)
   // Fonte de verdade: avatar_url do banco ou cache persistente
   const [avatarImg, setAvatarImg] = useState<string | null>(avatarUrl ?? null)
 
   const menuRef = useRef<HTMLDivElement>(null)
+  // G2.20: modais abertos pelo menu devolvem o foco ao botão do menu ao fechar
+  // (o item que os abriu deixa de existir quando o menu fecha).
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const returnFocusToMenuButton = (event: Event) => {
+    if (!menuButtonRef.current) return
+    event.preventDefault()
+    menuButtonRef.current.focus()
+  }
 
 useEffect(() => {
     setMounted(true)
@@ -201,6 +213,7 @@ useEffect(() => {
         {/* Dropdown Menu do Usuário */}
         <div className="relative shrink-0" ref={menuRef}>
           <button
+            ref={menuButtonRef}
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="ml-1 h-8 w-8 rounded-full border border-border bg-muted text-muted-foreground flex items-center justify-center hover:border-foreground/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background overflow-hidden"
             title="Menu do usuário"
@@ -282,6 +295,9 @@ useEffect(() => {
                 Editais cadastrados
               </button>
 
+              {/* UX-PWA-01: Instalar aplicativo (atalho na tela inicial; não é APK) */}
+              <InstallAppMenuItem onCloseMenu={() => setIsUserMenuOpen(false)} onShowInstructions={setInstallHelp} />
+
               {/* Opções mobile: Tema e Ajuda (ocultos do header em telas pequenas) */}
               <div className="border-t border-border my-1 md:hidden" />
               <button
@@ -335,7 +351,7 @@ useEffect(() => {
 
       {/* Modal: Pedir um Edital */}
       <Dialog open={isEditalModalOpen} onOpenChange={setIsEditalModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" onCloseAutoFocus={returnFocusToMenuButton}>
           <DialogHeader>
             <DialogTitle>Solicitar novo edital</DialogTitle>
           </DialogHeader>
@@ -369,6 +385,9 @@ useEffect(() => {
         </DialogContent>
       </Dialog>
 
+      {/* UX-PWA-01: instruções para adicionar à tela inicial */}
+      <InstallAppDialog variant={installHelp} onClose={() => setInstallHelp(null)} onCloseAutoFocus={returnFocusToMenuButton} />
+
       {/* Modal Central: Minha Conta (Configurações Completas do Perfil) */}
       <AccountSettingsModal
         open={isAccountModalOpen}
@@ -377,6 +396,7 @@ useEffect(() => {
         userEmail={userEmail}
         userId={userId}
         logoutAction={logoutAction}
+        onCloseAutoFocus={returnFocusToMenuButton}
       />
     </header>
   )

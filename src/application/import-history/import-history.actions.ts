@@ -28,6 +28,7 @@ import type {
 import { createClient } from "@/infrastructure/supabase/server"
 import { isMaintenanceMode } from "@/lib/maintenance"
 import { registerStudiesToCycleBatch } from "@/application/study-cycle/cycle-study-registration.service"
+import { hideCatalogAliases, loadCatalogAliasIds } from "@/application/disciplines/discipline-aliases"
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -223,13 +224,18 @@ export async function listDisciplinesForImportAction() {
     } = await supabase.auth.getUser()
     if (!user) return { data: null, error: "Usuário não autenticado" }
 
-    const { data, error } = await supabase
-      .from("disciplines")
-      .select("id, name, area")
-      .order("name")
-      .limit(500)
+    // G2.14: aliases comprovados saem das opções/sugestões de mapeamento — a
+    // matéria do arquivo vai para a canônica em vez de criar dado no alias.
+    const [{ data, error }, aliasIds] = await Promise.all([
+      supabase
+        .from("disciplines")
+        .select("id, name, area")
+        .order("name")
+        .limit(500),
+      loadCatalogAliasIds(supabase),
+    ])
     if (error) return { data: null, error: error.message }
-    return { data, error: null }
+    return { data: hideCatalogAliases(data ?? [], aliasIds), error: null }
   } catch (err) {
     return { data: null, error: (err as { message?: string }).message }
   }

@@ -276,6 +276,8 @@ export function DailyPlanningView({
         if (res.data) {
           setPeriodGoal(res.data)
         }
+      } catch {
+        // G2.21: falha de rede — a meta fica "—" (sem promessa rejeitada solta).
       } finally {
         setLoadingGoal(false)
       }
@@ -1132,7 +1134,7 @@ export function DailyPlanningView({
 
                           {/* Line 4: remaining time (only for in-progress) */}
                           {status === "EM_ANDAMENTO" && remaining > 0 && (
-                            <p className="text-[11px] font-medium text-muted-foreground/70">
+                            <p className="text-[11px] font-medium text-muted-foreground">
                               Faltam {remaining} min
                             </p>
                           )}

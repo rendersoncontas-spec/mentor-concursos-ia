@@ -146,36 +146,63 @@ export function similarity(subjectName: string, candidate: string): number {
 
 export const AUTO_MATCH_THRESHOLD = 0.55
 
+function compareIds(a: string, b: string): number {
+  if (a === b) return 0
+  return a < b ? -1 : 1
+}
+/**
+ * G2.12 — margem mínima entre a 1ª e a 2ª sugestão para pré-selecionar
+ * sozinho. Abaixo disso o caso é AMBÍGUO (ex.: "Raciocínio Lógico" ×
+ * "Raciocínio Lógico e Matemático") e a escolha fica explícita para o usuário.
+ */
+export const AUTO_MATCH_MARGIN = 0.1
+
 /**
  * Retorna as top-3 sugestões de disciplina existente para cada matéria do
- * arquivo. A primeira sugestão com score >= AUTO_MATCH_THRESHOLD é marcada
- * como auto (pré-selecionada).
+ * arquivo. Pré-seleção (`auto`) só quando NÃO há dúvida:
+ *   - igualdade exata do nome normalizado sempre vem primeiro (nunca perde
+ *     um empate para um candidato apenas parecido) e é pré-selecionada;
+ *   - sem igualdade exata, a melhor sugestão precisa passar do limiar E ficar
+ *     pelo menos AUTO_MATCH_MARGIN acima da segunda. Empate/quase-empate →
+ *     nada pré-selecionado; as sugestões continuam visíveis para escolha.
+ * `similarity()` não muda (o ciclo também a usa — fora do escopo do G2.12).
  */
 export function suggestDisciplines(
   subjectNames: string[],
   disciplines: DisciplineOption[],
 ): Record<string, SubjectSuggestion[]> {
   const result: Record<string, SubjectSuggestion[]> = {}
+  const normalizedCatalog = disciplines.map((d) => normalizeText(d.name))
 
   for (const name of subjectNames) {
+    const target = normalizeText(name)
     const ranked = disciplines
-      .map((discipline) => ({
-        name,
-        disciplineId: discipline.id,
-        score: similarity(name, discipline.name),
-        auto: false,
+      .map((discipline, index) => ({
+        entry: {
+          name,
+          disciplineId: discipline.id,
+          score: similarity(name, discipline.name),
+          auto: false,
+        },
+        exact: target !== "" && normalizedCatalog[index] === target,
       }))
-      .filter((entry) => entry.score > 0)
-      // G1.5 (G-52): desempate determinístico por id — sem ele, o `auto`
-      // em caso de empate herdava a ordem de entrada do catálogo.
-      .sort((a, b) => b.score - a.score || (a.disciplineId < b.disciplineId ? -1 : a.disciplineId > b.disciplineId ? 1 : 0))
+      .filter((c) => c.entry.score > 0)
+      // Exata primeiro; depois score; desempate determinístico por id (G1.5).
+      .sort(
+        (a, b) =>
+          Number(b.exact) - Number(a.exact) ||
+          b.entry.score - a.entry.score ||
+          compareIds(a.entry.disciplineId, b.entry.disciplineId),
+      )
       .slice(0, 3)
 
     const first = ranked[0]
     if (first) {
-      first.auto = first.score >= AUTO_MATCH_THRESHOLD
+      const second = ranked[1]
+      const clearWinner = second === undefined || first.entry.score - second.entry.score >= AUTO_MATCH_MARGIN
+      first.entry.auto = first.exact || (first.entry.score >= AUTO_MATCH_THRESHOLD && clearWinner)
     }
-    result[name] = ranked
+    result[name] = ranked.map((c) => c.entry)
   }
 
   return result

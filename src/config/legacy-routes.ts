@@ -15,7 +15,8 @@
  * Sem imports: este arquivo é carregado pelo `next.config.ts`.
  *
  * Mantidas (não estão aqui): /dashboard/adaptive (histórico do motor
- * adaptativo, sem substituta) e /dashboard/mentor (feed do Mentor IA).
+ * adaptativo, sem substituta) e /dashboard/mentor — esta, desde a G2.16, é
+ * uma página que só faz redirect("/mentor") (feed antigo aposentado).
  */
 export interface LegacyRouteRedirect {
   source: string

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import * as Sentry from "@sentry/nextjs"
 import {
@@ -18,12 +18,6 @@ import {
 import dynamic from "next/dynamic"
 import { toast } from "sonner"
 
-import {
-  deleteStudySessionAction,
-  getHistoryListAction,
-  getHistorySessionForEditAction,
-  getMonthlyHistoryAction,
-} from "@/application/study-history/study-history.actions"
 import { unpackHistoryList } from "@/application/study-history/history-list-payload"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -38,6 +32,8 @@ import {
 import { ManageImportsModal } from "@/features/importacao/components/manage-imports-modal"
 import { originDisplayName } from "@/features/importacao/lib/origin"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
+import { useHistoryActions } from "@/features/history/history-actions"
+import { handleTabListKeyDown } from "@/lib/a11y/tab-keyboard"
 import {
   STUDY_SESSION_OFFLINE_RESOLVED_EVENT,
   STUDY_SESSION_QUEUED_EVENT,
@@ -171,6 +167,18 @@ function countActiveFilters(f: Filters): number {
 }
 
 export function HistoryView() {
+  // G2.23: Server Actions pela fronteira (padrão = as reais); ref para manter
+  // os callbacks estáveis (mesmas dependências de antes).
+  const actions = useHistoryActions()
+  const actionsRef = useRef(actions)
+  useEffect(() => {
+    actionsRef.current = actions
+  })
+  // G2.23: ids das abas Lista/Calendário e do painel.
+  const tabsId = useId()
+  const listTabId = `${tabsId}-aba-lista`
+  const calendarTabId = `${tabsId}-aba-calendario`
+  const viewPanelId = `${tabsId}-painel`
   const [sessions, setSessions] = useState<HistorySession[]>([])
   const [loading, setLoading] = useState(true)
   const [queryError, setQueryError] = useState(false)
@@ -197,7 +205,7 @@ export function HistoryView() {
     try {
       // Fase F.2: payload enxuto (só o que a lista, os filtros e os totais
       // usam); a linha completa é buscada ao clicar em "Editar".
-      const { data: payload, error } = await getHistoryListAction()
+      const { data: payload, error } = await actionsRef.current.getList()
       const data = payload ? unpackHistoryList(payload) : null
       if (error) {
         setQueryError(true)
@@ -230,13 +238,20 @@ export function HistoryView() {
 
   const loadMonthlyHistory = useCallback(async (year: number, month: number) => {
     setLoadingMonthly(true)
-    const { data, error } = await getMonthlyHistoryAction(year, month)
-    if (error) {
-      toast.error("Erro ao carregar calendário: " + error)
-    } else if (data) {
-      setMonthlySessions(data)
+    // G2.23: chamada rejeitada (rede) deixava o calendário em "carregando"
+    // para sempre e gerava uma promessa rejeitada sem tratamento.
+    try {
+      const { data, error } = await actionsRef.current.getMonthly(year, month)
+      if (error) {
+        toast.error("Erro ao carregar calendário: " + error)
+      } else if (data) {
+        setMonthlySessions(data)
+      }
+    } catch {
+      toast.error("Erro ao carregar calendário. Verifique sua conexão e tente novamente.")
+    } finally {
+      setLoadingMonthly(false)
     }
-    setLoadingMonthly(false)
   }, [])
 
   // Insere/substitui a sessão REAL retornada pelo banco no estado local,
@@ -560,7 +575,13 @@ export function HistoryView() {
   // Busca só aquela sessão; se falhar, não abre o modal com dados parciais
   // (salvar com dados parciais apagaria campos da sessão).
   const handleEditSession = async (session: HistorySession) => {
-    const { data: full, error } = await getHistorySessionForEditAction(session.id)
+    let full: Record<string, unknown> | null = null
+    let error: string | null = null
+    try {
+      ;({ data: full, error } = await actionsRef.current.getSessionForEdit(session.id))
+    } catch {
+      error = "falha de conexão"
+    }
     if (error || !full) {
       toast.error("Não foi possível abrir a sessão para edição: " + (error ?? "sessão não encontrada"))
       return
@@ -590,7 +611,7 @@ export function HistoryView() {
     )
     if (!confirmed) return
     try {
-      const { error } = await deleteStudySessionAction(sessionId)
+      const { error } = await actionsRef.current.deleteSession(sessionId)
       if (error) {
         toast.error("Erro ao excluir: " + error)
       } else {
@@ -615,25 +636,39 @@ export function HistoryView() {
       {/* Top Header Actions */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div role="tablist" aria-label="Visualização do histórico" className="inline-flex items-center bg-muted p-0.5 rounded-md">
+          {/* G2.23: padrão APG com ATIVAÇÃO MANUAL — as setas só movem o foco;
+              Enter/Espaço (ou clique) troca a visão. O Calendário busca o mês
+              no servidor, então trocar de aba a cada seta dispararia leituras. */}
+          <div
+            role="tablist"
+            aria-label="Visualização do histórico"
+            className="inline-flex items-center bg-muted p-0.5 rounded-md"
+            onKeyDown={(event) => handleTabListKeyDown(event, { activation: "manual" })}
+          >
             <button
               type="button"
               onClick={() => setViewMode("list")}
               role="tab"
+              id={listTabId}
               aria-selected={viewMode === "list"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-[5px] transition-colors ${viewMode === "list" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+              aria-controls={viewPanelId}
+              tabIndex={viewMode === "list" ? 0 : -1}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-[5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${viewMode === "list" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <HistoryIcon className="h-3.5 w-3.5" />
+              <HistoryIcon aria-hidden className="h-3.5 w-3.5" />
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("calendar")}
               role="tab"
+              id={calendarTabId}
               aria-selected={viewMode === "calendar"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-[5px] transition-colors ${viewMode === "calendar" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+              aria-controls={viewPanelId}
+              tabIndex={viewMode === "calendar" ? 0 : -1}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-[5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${viewMode === "calendar" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <Clock className="h-3.5 w-3.5" />
+              <Clock aria-hidden className="h-3.5 w-3.5" />
               Calendário
             </button>
           </div>
@@ -935,7 +970,12 @@ export function HistoryView() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div
+        role="tabpanel"
+        id={viewPanelId}
+        aria-labelledby={viewMode === "calendar" ? calendarTabId : listTabId}
+        className="space-y-4"
+      >
         {(() => {
           if (viewMode === "calendar") {
             return (

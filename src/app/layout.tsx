@@ -46,6 +46,14 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/manifest.webmanifest",
+  // UX-PWA-01: no iPhone/iPad, o atalho da tela inicial se chama "NomeIA"
+  // (sem isso o iOS usa o título da página, ex.: "Dashboard | NomeIA") e abre
+  // em tela cheia, como o display "standalone" do manifest.
+  appleWebApp: {
+    capable: true,
+    title: "NomeIA",
+    statusBarStyle: "default",
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",

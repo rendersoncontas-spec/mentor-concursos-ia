@@ -26,11 +26,20 @@ import {
 } from "@/application/simulados/simulados.actions"
 import { formatTimer } from "@/application/simulados/simulado-engine"
 
+// G2.22: tons de texto para positivo/atenção/negativo com contraste AA (≥ 4,5:1)
+// nos dois temas, inclusive sobre os fundos tingidos (bg-*-500/10). Antes:
+// emerald-600/amber-600/rose-600 sem variante escura (3,1–4,2:1).
+const TONE = {
+  positive: "text-emerald-700 dark:text-emerald-400",
+  warning: "text-amber-700 dark:text-amber-400",
+  negative: "text-rose-700 dark:text-rose-400",
+} as const
+
 const SCORE_META: Record<ScoreBand, { label: string; color: string; bg: string }> = {
-  EXCELENTE: { label: "Excelente", color: "text-emerald-600", bg: "bg-emerald-500/10 border-emerald-500/40" },
+  EXCELENTE: { label: "Excelente", color: TONE.positive, bg: "bg-emerald-500/10 border-emerald-500/40" },
   BOM: { label: "Bom", color: "text-primary", bg: "bg-primary/10 border-primary/30" },
-  REGULAR: { label: "Regular", color: "text-amber-600", bg: "bg-amber-500/10 border-amber-500/40" },
-  BAIXO: { label: "Baixo", color: "text-rose-600", bg: "bg-rose-500/10 border-rose-500/40" },
+  REGULAR: { label: "Regular", color: TONE.warning, bg: "bg-amber-500/10 border-amber-500/40" },
+  BAIXO: { label: "Baixo", color: TONE.negative, bg: "bg-rose-500/10 border-rose-500/40" },
 }
 
 interface Props {
@@ -84,8 +93,8 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
 
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-          <StatCard icon={<Check className="h-4 w-4 text-emerald-600" />} label="Acertos" value={header.totalCorrect} />
-          <StatCard icon={<X className="h-4 w-4 text-rose-600" />} label="Erros" value={header.totalWrong} />
+          <StatCard icon={<Check className={`h-4 w-4 ${TONE.positive}`} />} label="Acertos" value={header.totalCorrect} />
+          <StatCard icon={<X className={`h-4 w-4 ${TONE.negative}`} />} label="Erros" value={header.totalWrong} />
           <StatCard icon={<Minus className="h-4 w-4 text-muted-foreground" />} label="Brancos" value={header.totalBlank} />
           <StatCard icon={<Clock className="h-4 w-4 text-muted-foreground" />} label="Tempo" value={header.timeSpentSeconds === null ? "—" : formatTimer(header.timeSpentSeconds)} />
         </div>
@@ -97,7 +106,7 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
               <span>Desempenho</span>
               <span>{answered > 0 ? `${Math.round((header.totalCorrect / Math.max(1, answered)) * 100)}% de respostas corretas` : "Nenhuma resposta"}</span>
             </div>
-            <Progress value={answered > 0 ? (header.totalCorrect / Math.max(1, answered)) * 100 : 0} className="h-2" />
+            <Progress aria-label="Respostas corretas" value={answered > 0 ? (header.totalCorrect / Math.max(1, answered)) * 100 : 0} className="h-2" />
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -113,8 +122,8 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
                   key={i}
                   className={cn(
                     "rounded-lg border px-3 py-2 text-xs font-semibold flex items-center gap-2",
-                    insight.severity === "positive" && "bg-emerald-500/5 border-emerald-500/30 text-emerald-600",
-                    insight.severity === "warning" && "bg-amber-500/5 border-amber-500/30 text-amber-600",
+                    insight.severity === "positive" && `bg-emerald-500/5 border-emerald-500/30 ${TONE.positive}`,
+                    insight.severity === "warning" && `bg-amber-500/5 border-amber-500/30 ${TONE.warning}`,
                     insight.severity === "info" && "bg-muted/40 border-border text-muted-foreground"
                   )}
                 >
@@ -133,7 +142,7 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
           )}
 
           {payload.bests.bestAccuracy && (
-            <p className="text-[11px] text-amber-600 font-semibold flex items-center gap-1.5">
+            <p className={`text-[11px] ${TONE.warning} font-semibold flex items-center gap-1.5`}>
               <Trophy className="h-3.5 w-3.5" />
               Melhor resultado: {Math.round(payload.bests.bestAccuracy.value)}% — {payload.bests.bestAccuracy.name}
             </p>
@@ -156,7 +165,8 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
                     {d.correct}/{d.questions} {d.accuracy !== null ? `· ${Math.round(d.accuracy)}%` : ""}
                   </Badge>
                 </div>
-                <div className="flex gap-1 h-2 rounded-full overflow-hidden">
+                {/* Barra decorativa: os números estão no selo acima. */}
+                <div aria-hidden className="flex gap-1 h-2 rounded-full overflow-hidden">
                   <span className="bg-emerald-500" style={{ width: `${(d.correct / Math.max(1, d.questions)) * 100}%` }} />
                   <span className="bg-rose-500" style={{ width: `${(d.wrong / Math.max(1, d.questions)) * 100}%` }} />
                   <span className="bg-muted-foreground/40" style={{ width: `${(d.blank / Math.max(1, d.questions)) * 100}%` }} />
@@ -207,20 +217,24 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
               <div key={q.questionId} className="rounded-xl border overflow-hidden">
                 <button
                   type="button"
+                  aria-expanded={open}
+                  aria-controls={`questao-${q.questionId}`}
                   onClick={() => setOpenIndex(open ? null : index)}
                   className="w-full p-3 flex items-center gap-3 text-left hover:bg-muted/20 transition-colors"
                 >
                   <span
                     className={cn(
                       "shrink-0 h-7 w-7 rounded-lg flex items-center justify-center font-semibold text-xs",
-                      correct && "bg-emerald-500/15 text-emerald-600",
-                      wrong && "bg-rose-500/15 text-rose-600",
+                      correct && `bg-emerald-500/15 ${TONE.positive}`,
+                      wrong && `bg-rose-500/15 ${TONE.negative}`,
                       !q.answered && "bg-muted text-muted-foreground"
                     )}
                   >
-                    {correct && <Check className="h-4 w-4" />}
-                    {wrong && <X className="h-4 w-4" />}
-                    {!q.answered && <Minus className="h-4 w-4" />}
+                    {correct && <Check aria-hidden className="h-4 w-4" />}
+                    {wrong && <X aria-hidden className="h-4 w-4" />}
+                    {!q.answered && <Minus aria-hidden className="h-4 w-4" />}
+                    {/* G2.22: o estado não depende só da cor/ícone. */}
+                    <span className="sr-only">{questionStatusLabel(correct, wrong)}</span>
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs font-semibold truncate">{q.statement}</span>
@@ -228,12 +242,17 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
                       {q.disciplineName}{q.topicName ? ` · ${q.topicName}` : ""} · {q.orderIndex + 1}ª
                     </span>
                   </span>
-                  {q.isMarked && <Flag className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+                  {q.isMarked && (
+                    <>
+                      <Flag aria-hidden className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      <span className="sr-only">(marcada para revisão)</span>
+                    </>
+                  )}
                   <span className="text-[10px] font-semibold text-muted-foreground shrink-0">ver detalhes</span>
                 </button>
 
                 {open && (
-                  <div className="border-t p-4 space-y-4 bg-muted/10">
+                  <div id={`questao-${q.questionId}`} className="border-t p-4 space-y-4 bg-muted/10">
                     <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{q.statement}</p>
 
                     {!q.isCertoErrado && (
@@ -246,14 +265,16 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
                               key={alt.label}
                               className={cn(
                                 "rounded-lg border px-3 py-2 text-xs font-medium flex items-start gap-2.5",
-                                isCorrectAlt && "border-emerald-500/50 bg-emerald-500/5 text-emerald-700",
-                                isSelected && !isCorrectAlt && "border-rose-500/50 bg-rose-500/5 text-rose-700"
+                                isCorrectAlt && "border-emerald-500/50 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
+                                isSelected && !isCorrectAlt && "border-rose-500/50 bg-rose-500/5 text-rose-700 dark:text-rose-300"
                               )}
                             >
                               <span className="shrink-0 font-semibold">{String.fromCharCode(65 + i)}.</span>
                               <span>{alt.text}</span>
-                              {isCorrectAlt && <Check className="h-3.5 w-3.5 ml-auto shrink-0 mt-0.5" />}
-                              {isSelected && !isCorrectAlt && <X className="h-3.5 w-3.5 ml-auto shrink-0 mt-0.5" />}
+                              {isCorrectAlt && <Check aria-hidden className="h-3.5 w-3.5 ml-auto shrink-0 mt-0.5" />}
+                              {isSelected && !isCorrectAlt && <X aria-hidden className="h-3.5 w-3.5 ml-auto shrink-0 mt-0.5" />}
+                              {isCorrectAlt && <span className="sr-only">(gabarito)</span>}
+                              {isSelected && !isCorrectAlt && <span className="sr-only">(sua resposta, errada)</span>}
                             </div>
                           )
                         })}
@@ -262,11 +283,11 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
 
                     <div className="text-xs space-y-1 font-semibold">
                       <p>
-                        Gabarito: <span className="font-semibold text-emerald-600">{q.correctAnswer}</span>
+                        Gabarito: <span className={`font-semibold ${TONE.positive}`}>{q.correctAnswer}</span>
                         {q.selectedAnswer && (
                           <>
                             {" · "}Sua resposta:{" "}
-                            <span className={cn("font-semibold", correct ? "text-emerald-600" : "text-rose-600")}>{q.selectedAnswer}</span>
+                            <span className={cn("font-semibold", correct ? TONE.positive : TONE.negative)}>{q.selectedAnswer}</span>
                           </>
                         )}
                       </p>
@@ -318,11 +339,11 @@ export function SimuladoResultView({ payload, onNewSimulado, onSeeHistory }: Pro
             <p className="type-label mt-0.5">Por questão</p>
           </div>
           <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-lg font-semibold tabular-nums text-emerald-600">{timeStats.avgPerCorrectSeconds ?? "—"}s</p>
+            <p className={`text-lg font-semibold tabular-nums ${TONE.positive}`}>{timeStats.avgPerCorrectSeconds ?? "—"}s</p>
             <p className="type-label mt-0.5">Por acerto</p>
           </div>
           <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-lg font-semibold tabular-nums text-rose-600">{timeStats.avgPerWrongSeconds ?? "—"}s</p>
+            <p className={`text-lg font-semibold tabular-nums ${TONE.negative}`}>{timeStats.avgPerWrongSeconds ?? "—"}s</p>
             <p className="type-label mt-0.5">Por erro</p>
           </div>
         </div>
@@ -358,8 +379,8 @@ function TrendBadge({ value, label }: { value: "UP" | "STABLE" | "DOWN" | null; 
     <span
       className={cn(
         "inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border",
-        value === "UP" && "bg-emerald-500/10 border-emerald-500/40 text-emerald-600",
-        value === "DOWN" && "bg-rose-500/10 border-rose-500/40 text-rose-600",
+        value === "UP" && `bg-emerald-500/10 border-emerald-500/40 ${TONE.positive}`,
+        value === "DOWN" && `bg-rose-500/10 border-rose-500/40 ${TONE.negative}`,
         value === "STABLE" && "bg-muted border-border text-muted-foreground"
       )}
     >
@@ -368,6 +389,12 @@ function TrendBadge({ value, label }: { value: "UP" | "STABLE" | "DOWN" | null; 
       {trendLabel(value)} · {label}
     </span>
   )
+}
+
+function questionStatusLabel(correct: boolean, wrong: boolean): string {
+  if (correct) return "Correta: "
+  if (wrong) return "Errada: "
+  return "Em branco: "
 }
 
 function trendLabel(value: "UP" | "STABLE" | "DOWN"): string {
@@ -385,7 +412,7 @@ function timeTrendValue(time: TrendSummary["time"]): "UP" | "STABLE" | "DOWN" | 
 
 function accuracyColor(accuracy: number | null): string {
   if (accuracy === null) return "text-muted-foreground"
-  if (accuracy >= 70) return "text-emerald-600"
-  if (accuracy >= 50) return "text-amber-600"
-  return "text-rose-600"
+  if (accuracy >= 70) return TONE.positive
+  if (accuracy >= 50) return TONE.warning
+  return TONE.negative
 }

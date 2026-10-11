@@ -69,7 +69,15 @@ function normalizeRankingList(rows: unknown): RankingEntry[] {
     .filter((row): row is RankingRowLike => !!row && typeof row === 'object')
     .map((row, idx) => {
       const name = firstString(row['name'], row['display_name']) || 'Estudante'
-      const totalMinutes = toNumber(row['total_minutes'])
+      // Bug: userStats.tempo/questoes/paginas da RPC get_global_ranking vêm
+      // com a chave 'totalMinutes' (camelCase), enquanto as listas
+      // rankingTempo/rankingQuestions/rankingPages vêm com 'total_minutes'
+      // (snake_case, de to_jsonb(r) direto). Sem o fallback, o totalMinutes
+      // do PRÓPRIO usuário (userStats.*) sempre virava 0 — o texto "Xh Ymin"
+      // continuava certo (vem pronto do backend em 'hours'), mas qualquer
+      // cálculo numérico com esse valor (vantagem sobre o 2º, % de progresso
+      // nos cards de posição) ficava zerado/errado.
+      const totalMinutes = toNumber(row['total_minutes'] ?? row['totalMinutes'])
       const rawHours = row['hours'] ?? row['hours_formatted']
 
       return {
@@ -587,6 +595,14 @@ export interface RankingPersonalContext {
     consecutiveDays: number
     longestDays: number
   }
+  /** Quantos dias e quantas semanas o usuário já terminou em 1º no ranking
+   * global de TEMPO (via get_ranking_top1_counts, retroativo e sempre
+   * recalculado a partir do histórico real — não é um contador acumulado
+   * salvo). */
+  top1Counts: {
+    daysAtTop: number
+    weeksAtTop: number
+  }
 }
 
 export async function getRankingPersonalContextAction(): Promise<{
@@ -605,13 +621,14 @@ export async function getRankingPersonalContextAction(): Promise<{
       throw new Error("Usuário não autenticado")
     }
 
-    const [profileResult, history] = await Promise.all([
+    const [profileResult, history, top1Result] = await Promise.all([
       supabase
         .from("profiles")
         .select("weekly_study_hours, week_start_day, preferences")
         .eq("id", effectiveUserId)
         .maybeSingle(),
       getStudyHistoryForAnalytics(supabase, effectiveUserId, 365),
+      supabase.rpc("get_ranking_top1_counts", { p_user_id: effectiveUserId }),
     ])
 
     const profile = profileResult?.data
@@ -648,6 +665,10 @@ export async function getRankingPersonalContextAction(): Promise<{
         streak: {
           consecutiveDays: base.consecutiveStreak,
           longestDays: base.longestStreak,
+        },
+        top1Counts: {
+          daysAtTop: toNumber((top1Result?.data as Record<string, unknown> | null)?.["daysAtTop"]),
+          weeksAtTop: toNumber((top1Result?.data as Record<string, unknown> | null)?.["weeksAtTop"]),
         },
       },
       error: null,

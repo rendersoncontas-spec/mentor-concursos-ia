@@ -265,7 +265,7 @@ export function StudyCalendar({
                       <div className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1 truncate">
                         <FileText className="h-3 w-3 shrink-0" /> {totalQuestions} qst{" "}
                         {totalCorrect > 0 && (
-                          <span className="inline-flex items-center gap-0.5 text-emerald-600">
+                          <span className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400">
                             ({totalCorrect} <Check className="h-2.5 w-2.5" />)
                           </span>
                         )}
@@ -305,7 +305,7 @@ export function StudyCalendar({
             </div>
             <div className="bg-muted/30 rounded-lg p-3 text-center border">
               <div className="type-label">Acertos</div>
-              <div className="text-lg font-semibold text-emerald-600">{dayTotalCorrect}</div>
+              <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">{dayTotalCorrect}</div>
             </div>
           </div>
 

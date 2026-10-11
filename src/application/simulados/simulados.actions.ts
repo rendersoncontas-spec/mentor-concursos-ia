@@ -37,6 +37,8 @@ import type {
   SimuladoAlternative,
 } from "@/domain/simulados/types"
 
+import { buildSimuladoAttemptRows, persistSimuladoFinalization } from "./simulado-finalize"
+
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
 const MAX_TOTAL = 200
@@ -238,15 +240,11 @@ export async function getSimuladorConfigAction(): Promise<{
     })
     disciplines.sort((a, b) => a.name.localeCompare(b.name))
 
-    const { data: attempts } = await supabase
-      .from("question_attempts")
-      .select("question_id, correct")
-      .eq("user_id", user.id)
-      .limit(50000)
-    const lastMap = new Map<string, boolean>()
-    ;(attempts ?? []).forEach((a) => {
-      if (!lastMap.has(a.question_id)) lastMap.set(a.question_id, a.correct === true)
-    })
+    // G2.9: mesma leitura (ordenada pela tentativa mais recente) que monta o
+    // pool "só erradas" em fetchEligible. Antes esta consulta não tinha ORDER
+    // BY, então "a primeira tentativa vista" de cada questão era arbitrária e
+    // a contagem mostrada na configuração podia divergir do pool real.
+    const lastMap = await fetchLastAttemptMap(supabase, user.id)
     const wrongCount = [...lastMap.values()].filter((ok) => !ok).length
 
     return {
@@ -612,7 +610,9 @@ export async function finishSimuladoAction(
     if (payload.error) return { data: null, error: payload.error }
     if (!payload.data) return { data: null, error: "Simulado não encontrado." }
 
-    await supabase.from("simulados").update({ finished_at: new Date().toISOString() }).eq("id", simuladoId).eq("user_id", user.id)
+    // G2.9: finished_at já é gravado na transição IN_PROGRESS → FINISHED
+    // (buildResultPayload). Regravar aqui sobrescrevia o horário real de
+    // término a cada nova chamada sobre um simulado já finalizado.
     revalidatePath("/simulados")
     return { data: payload.data, error: null }
   } catch (e) {
@@ -734,53 +734,37 @@ async function buildResultPayload(
     avg_time_per_question_seconds: totals.timeStats.avgPerQuestionSeconds,
   }
   if (spent !== null) update.time_spent_seconds = spent
-  if (finalizing) await supabase.from("simulados").update(update).eq("id", simuladoId).eq("user_id", userId)
 
   if (finalizing) {
-    // Agregação por disciplina (tabela existente simulados_disciplines)
-    await supabase.from("simulado_disciplines").delete().eq("simulado_id", simuladoId).eq("user_id", userId)
-    const discRowsIns = byDiscipline.map((d) => ({
-      simulado_id: simuladoId,
-      user_id: userId,
-      discipline_name: d.disciplineName,
-      discipline_id: d.disciplineId ?? null,
-      weight: 1.0,
-      questions_count: d.questions,
-      correct_count: d.correct,
-      wrong_count: d.wrong,
-      blank_count: d.blank,
-    }))
-    if (discRowsIns.length > 0) await supabase.from("simulado_disciplines").insert(discRowsIns)
-
-    // Fonte oficial de desempenho: question_attempts (attempt_source = SIMULADO)
-    const answered = corrected.filter((c) => c.answered)
-    const attempts = answered.map((c) => ({
-      user_id: userId,
-      question_id: c.questionId,
-      selected_answer: c.selectedAnswer ?? "",
-      correct: c.isCorrect === true,
-      response_time_seconds: c.responseTimeSeconds ?? 0,
-      confidence_level: 3,
-      review_required: c.isCorrect !== true,
-      mistake_type: null,
-      attempt_source: "SIMULADO",
-    }))
-    if (attempts.length > 0) {
-      const { error: attErr } = await supabase.from("question_attempts").insert(attempts)
-      if (attErr) console.error("[SIMULADO] Erro ao registrar tentativas:", attErr)
-    }
+    // G2.9: finalização idempotente (ver simulado-finalize.ts). Só a requisição
+    // que efetivamente muda o simulado de IN_PROGRESS para FINISHED grava as
+    // tentativas em question_attempts; duplo clique, retry, timeout + clique
+    // ou um simulado já cancelado não geram tentativas duplicadas.
+    const outcome = await persistSimuladoFinalization(supabase, {
+      userId,
+      simuladoId,
+      headerStatus: header.status,
+      finishedUpdate: update as typeof update & { status: "FINISHED" },
+      disciplineRows: byDiscipline.map((d) => ({
+        simulado_id: simuladoId,
+        user_id: userId,
+        discipline_name: d.disciplineName,
+        discipline_id: d.disciplineId ?? null,
+        weight: 1.0,
+        questions_count: d.questions,
+        correct_count: d.correct,
+        wrong_count: d.wrong,
+        blank_count: d.blank,
+      })),
+      attempts: buildSimuladoAttemptRows(corrected, userId),
+    })
+    if (outcome.status === "FAILED") return { data: null, error: outcome.error }
 
     // Fase I.1 — decisões D1 e D2: nesta versão o sistema de revisões cobre
     // SOMENTE tópicos e subtópicos do edital, e a criação de item de revisão é
     // manual ("Adicionar à revisão", na página de Revisões). Por isso o
-    // fechamento do simulado NÃO cria mais revisões a partir dos erros.
-    //
-    // O que existia aqui inseria review_items com source_type "QUESTION" — um
-    // tipo que o schema real não aceita mais (CHECK source_type in
-    // ('EDITAL_TOPIC','EDITAL_SUBTOPIC')) e que já falhava em silêncio, só
-    // registrando console.error. As tentativas continuam sendo gravadas em
-    // question_attempts acima; nada do simulado foi perdido.
-    //
+    // fechamento do simulado NÃO cria revisões a partir dos erros (o tipo
+    // "QUESTION" nem é aceito pelo CHECK de review_items.source_type).
     // Revisar erros de questão é item de roadmap (FUTURO), não algo entregue.
   }
 

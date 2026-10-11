@@ -55,6 +55,7 @@ import {
 } from "../lib/ranking-engine"
 
 import { PublicStudyProfileModal } from "./public-study-profile-modal"
+import { top1CountsLabel } from "@/features/ranking/lib/top1-counts-label"
 
 export interface RankingStudent {
   rank: number
@@ -561,6 +562,7 @@ export function RankingView() {
           totalParticipants={totalParticipants}
           isOnlyParticipant={isOnlyParticipant}
           positionCaption={positionCaption}
+          top1Counts={personal?.top1Counts ?? null}
         />
         <ProximoAlvoCard
           student={currentUserStats}
@@ -815,6 +817,7 @@ function SuaPosicaoCard({
   totalParticipants,
   isOnlyParticipant,
   positionCaption,
+  top1Counts,
 }: {
   student: RankingStudent | null
   hasActivity: boolean
@@ -824,6 +827,7 @@ function SuaPosicaoCard({
   totalParticipants: number
   isOnlyParticipant: boolean
   positionCaption: ReactNode
+  top1Counts: { daysAtTop: number; weeksAtTop: number } | null
 }) {
   const rank = student?.rank ?? 0
   const value = student ? metricNumber(student, metric) : 0
@@ -938,6 +942,16 @@ function SuaPosicaoCard({
               </p>
             </div>
           </div>
+          {top1Counts && (top1Counts.daysAtTop > 0 || top1Counts.weeksAtTop > 0) && (
+            // Dois contadores independentes (get_ranking_top1_counts): quantos
+            // DIAS e quantas SEMANAS o aluno fechou em 1º no ranking de tempo.
+            // "40 dias e 7 semanas em 1º lugar" parecia uma duração somada;
+            // agora cada contador aparece como "N vezes" no seu período.
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400 pt-1">
+              <Crown aria-hidden className="h-3.5 w-3.5 shrink-0" />
+              <span>{top1CountsLabel(top1Counts)}</span>
+            </p>
+          )}
         </div>
 
         {positionCaption && <div className="shrink-0">{positionCaption}</div>}

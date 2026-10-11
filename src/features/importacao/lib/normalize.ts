@@ -16,6 +16,35 @@ interface RowValues {
   notes: unknown
 }
 
+/**
+ * Formata um valor de célula bruto para exibição como "amostra" na tela de
+ * revisão da importação (não é usado para parsing real — só preview). Evita
+ * dois problemas visuais:
+ * - Date (SheetJS entrega células de data como Date nativo, cellDates: true)
+ *   vira o Date.toString() completo do JS ("Sat Oct 03 2026 19:21:10
+ *   GMT-0300 (Horário Padrão de Brasília)"), longo demais para a linha.
+ * - número de ponto flutuante calculado (ex.: segundos/60) aparece com a
+ *   dízima inteira (16.620983333333335) em vez de um valor arredondado.
+ */
+function formatSampleValue(cell: unknown): string {
+  if (cell instanceof Date) {
+    if (Number.isNaN(cell.getTime())) return ""
+    const dd = String(cell.getDate()).padStart(2, "0")
+    const mm = String(cell.getMonth() + 1).padStart(2, "0")
+    const yyyy = cell.getFullYear()
+    const hasTime = cell.getHours() !== 0 || cell.getMinutes() !== 0 || cell.getSeconds() !== 0
+    if (!hasTime) return `${dd}/${mm}/${yyyy}`
+    const hh = String(cell.getHours()).padStart(2, "0")
+    const min = String(cell.getMinutes()).padStart(2, "0")
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`
+  }
+  if (typeof cell === "number") {
+    if (!Number.isFinite(cell)) return ""
+    return String(Math.round(cell * 100) / 100)
+  }
+  return String(cell).trim()
+}
+
 function pickSheet(sheets: { name: string; rows: (unknown[])[] }[]): { name: string; rows: (unknown[])[] } {
   if (sheets.length === 0) throw new Error("Arquivo vazio")
 
@@ -110,7 +139,7 @@ export function parseFileSheets(
     const values: string[] = []
     for (let r = headerIndex + 1; r < rows.length && values.length < 3; r++) {
       const cell = rows[r]?.[column.index]
-      const text = cell === null || cell === undefined ? "" : String(cell).trim()
+      const text = cell === null || cell === undefined ? "" : formatSampleValue(cell)
       if (text !== "") values.push(text)
     }
     samples[column.index] = values

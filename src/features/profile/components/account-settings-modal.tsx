@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -27,11 +27,12 @@ import { getProfileAction, updateProfileAction, uploadAvatarAction } from "@/app
 import { TIMER_SOUND_PREFERENCE_EVENT, normalizeTimerSoundOption } from "@/features/study-session/hooks/use-focus-sound"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/infrastructure/supabase/client"
 import { clearUserLocalData } from "@/utils/user-data"
 import { clearOfflinePrivateDataForLogout } from "@/infrastructure/offline"
+import { handleTabListKeyDown } from "@/lib/a11y/tab-keyboard"
 
 interface AccountSettingsModalProps {
   open: boolean
@@ -40,6 +41,8 @@ interface AccountSettingsModalProps {
   userEmail?: string | undefined
   userId?: string | undefined
   logoutAction: () => Promise<void>
+  /** G2.20: para onde o foco volta ao fechar (padrão do Radix quando ausente). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined
 }
 
 type Preferences = Record<string, unknown>
@@ -88,11 +91,16 @@ export function AccountSettingsModal({
   userEmail = "",
   userId = "",
   logoutAction,
+  onCloseAutoFocus,
 }: AccountSettingsModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<
     "DADOS" | "PREFERENCIAS" | "RANKING" | "CATEGORIAS" | "NOTIFICACOES" | "SEGURANCA"
   >("DADOS")
+  // G2.23: seções da conta como abas (lista vertical) ligadas ao painel.
+  const sectionsId = useId()
+  const sectionTabId = (key: string) => `${sectionsId}-aba-${key}`
+  const sectionPanelId = `${sectionsId}-painel`
 
   const [avatarImg, setAvatarImg] = useState<string | null>(null)
   const [avatarDirty, setAvatarDirty] = useState(false)
@@ -413,13 +421,14 @@ export function AccountSettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-xl border shadow-xl">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-xl border shadow-xl" onCloseAutoFocus={onCloseAutoFocus}>
         <div className="flex flex-col sm:flex-row min-h-[520px] bg-card text-foreground">
           {/* Painel Esquerdo (Sidebar de Configurações) */}
           <div className="w-full sm:w-64 bg-muted/40 p-5 border-r flex flex-col justify-between space-y-6">
             <div className="space-y-6">
-              {/* Header Minha Conta */}
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">Minha Conta</h2>
+              {/* Header Minha Conta — G2.23: é o título do modal (antes o
+                  diálogo não tinha nome acessível; o Radix exige um). */}
+              <DialogTitle className="text-xl font-semibold tracking-tight text-foreground">Minha Conta</DialogTitle>
 
               {/* Avatar + Carregar Foto */}
               <div className="flex items-center gap-3">
@@ -472,80 +481,125 @@ export function AccountSettingsModal({
                 </div>
               </div>
 
-              {/* 6 Tabs de Navegação */}
-              <nav className="space-y-1 pt-2">
+              {/* 6 abas das seções — G2.23: eram botões soltos dentro de <nav>,
+                  sem estado selecionado nem relação com o conteúdo. Padrão APG
+                  VERTICAL com ativação automática (as seções são formulários
+                  locais, trocar é imediato): ↑ ↓ Home End. */}
+              <div
+                role="tablist"
+                aria-label="Seções da conta"
+                aria-orientation="vertical"
+                className="space-y-1 pt-2"
+                onKeyDown={(event) => handleTabListKeyDown(event, { activation: "automatic", orientation: "vertical" })}
+              >
                 <button
+                  type="button"
+                  role="tab"
+                  id={sectionTabId("DADOS")}
+                  aria-selected={activeTab === "DADOS"}
+                  aria-controls={sectionPanelId}
+                  tabIndex={activeTab === "DADOS" ? 0 : -1}
                   onClick={() => setActiveTab("DADOS")}
-                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     activeTab === "DADOS"
-                      ? "bg-primary text-white shadow-xs"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <User className="h-4 w-4" />
+                  <User aria-hidden className="h-4 w-4" />
                   <span>Dados Pessoais</span>
                 </button>
 
                 <button
+                  type="button"
+                  role="tab"
+                  id={sectionTabId("PREFERENCIAS")}
+                  aria-selected={activeTab === "PREFERENCIAS"}
+                  aria-controls={sectionPanelId}
+                  tabIndex={activeTab === "PREFERENCIAS" ? 0 : -1}
                   onClick={() => setActiveTab("PREFERENCIAS")}
-                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     activeTab === "PREFERENCIAS"
-                      ? "bg-primary text-white shadow-xs"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <Settings className="h-4 w-4" />
+                  <Settings aria-hidden className="h-4 w-4" />
                   <span>Preferências</span>
                 </button>
 
                 <button
+                  type="button"
+                  role="tab"
+                  id={sectionTabId("RANKING")}
+                  aria-selected={activeTab === "RANKING"}
+                  aria-controls={sectionPanelId}
+                  tabIndex={activeTab === "RANKING" ? 0 : -1}
                   onClick={() => setActiveTab("RANKING")}
-                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     activeTab === "RANKING"
-                      ? "bg-primary text-white shadow-xs"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <Trophy className="h-4 w-4" />
+                  <Trophy aria-hidden className="h-4 w-4" />
                   <span>Ranking</span>
                 </button>
 
                 <button
+                  type="button"
+                  role="tab"
+                  id={sectionTabId("CATEGORIAS")}
+                  aria-selected={activeTab === "CATEGORIAS"}
+                  aria-controls={sectionPanelId}
+                  tabIndex={activeTab === "CATEGORIAS" ? 0 : -1}
                   onClick={() => setActiveTab("CATEGORIAS")}
-                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     activeTab === "CATEGORIAS"
-                      ? "bg-primary text-white shadow-xs"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <Tag className="h-4 w-4" />
+                  <Tag aria-hidden className="h-4 w-4" />
                   <span>Categorias</span>
                 </button>
 
                 <button
+                  type="button"
+                  role="tab"
+                  id={sectionTabId("NOTIFICACOES")}
+                  aria-selected={activeTab === "NOTIFICACOES"}
+                  aria-controls={sectionPanelId}
+                  tabIndex={activeTab === "NOTIFICACOES" ? 0 : -1}
                   onClick={() => setActiveTab("NOTIFICACOES")}
-                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     activeTab === "NOTIFICACOES"
-                      ? "bg-primary text-white shadow-xs"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <Bell className="h-4 w-4" />
+                  <Bell aria-hidden className="h-4 w-4" />
                   <span>Notificações</span>
                 </button>
 
                 <button
+                  type="button"
+                  role="tab"
+                  id={sectionTabId("SEGURANCA")}
+                  aria-selected={activeTab === "SEGURANCA"}
+                  aria-controls={sectionPanelId}
+                  tabIndex={activeTab === "SEGURANCA" ? 0 : -1}
                   onClick={() => setActiveTab("SEGURANCA")}
-                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left ${
+                  className={`font-semibold w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
                     activeTab === "SEGURANCA"
-                      ? "bg-primary text-white shadow-xs"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <Shield className="h-4 w-4" />
+                  <Shield aria-hidden className="h-4 w-4" />
                   <span>Segurança</span>
                 </button>
-              </nav>
+              </div>
             </div>
 
             {/* Botão Sair no Rodapé da Sidebar */}
@@ -565,6 +619,7 @@ export function AccountSettingsModal({
 
           {/* Painel Direito (Conteúdo das Tabs + Botões Cancelar/Salvar) */}
           <div className="flex-1 p-6 flex flex-col justify-between space-y-6 overflow-y-auto">
+            <div role="tabpanel" id={sectionPanelId} aria-labelledby={sectionTabId(activeTab)}>
             {isLoadingProfile ? (
               <div className="flex flex-1 items-center justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -576,33 +631,33 @@ export function AccountSettingsModal({
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-nome">
                           NOME
                         </label>
-                        <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+                        <Input id="conta-nome" value={nome} onChange={(e) => setNome(e.target.value)} />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-sobrenome">
                           SOBRENOME
                         </label>
-                        <Input value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} />
+                        <Input id="conta-sobrenome" value={sobrenome} onChange={(e) => setSobrenome(e.target.value)} />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-apelido">
                           APELIDO
                         </label>
-                        <Input value={apelido} onChange={(e) => setApelido(e.target.value)} />
+                        <Input id="conta-apelido" value={apelido} onChange={(e) => setApelido(e.target.value)} />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-aniversario">
                           ANIVERSÁRIO
                         </label>
-                        <Input
+                        <Input id="conta-aniversario"
                           type="date"
                           value={aniversario}
                           onChange={(e) => setAniversario(e.target.value)}
@@ -612,10 +667,10 @@ export function AccountSettingsModal({
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1 col-span-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-genero">
                           GÊNERO
                         </label>
-                        <select
+                        <select id="conta-genero"
                           value={genero}
                           onChange={(e) => setGenero(e.target.value)}
                           className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
@@ -627,10 +682,10 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1 col-span-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-cidade">
                           CIDADE
                         </label>
-                        <Input
+                        <Input id="conta-cidade"
                           value={cidade}
                           onChange={(e) => setCidade(e.target.value)}
                           placeholder="Ex: Vitória"
@@ -638,10 +693,10 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1 col-span-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-uf">
                           UF
                         </label>
-                        <select
+                        <select id="conta-uf"
                           value={uf}
                           onChange={(e) => setUf(e.target.value)}
                           className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
@@ -657,10 +712,10 @@ export function AccountSettingsModal({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="type-label">
+                      <label className="type-label" htmlFor="conta-e-mail">
                         E-MAIL
                       </label>
-                      <Input
+                      <Input id="conta-e-mail"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -690,7 +745,7 @@ export function AccountSettingsModal({
                       <div className="flex h-6 rounded-md overflow-hidden font-semibold text-[10px] text-white text-center shadow-xs transition-all">
                         <div
                           style={{ width: `${ruimThreshold}%` }}
-                          className="bg-rose-500 flex items-center justify-center transition-all min-w-[36px]"
+                          className="bg-rose-700 flex items-center justify-center transition-all min-w-[36px]"
                           title={`Ruim: 0% a ${ruimThreshold}%`}
                         >
                           Ruim
@@ -704,7 +759,7 @@ export function AccountSettingsModal({
                         </div>
                         <div
                           style={{ width: `${Math.max(0, 100 - regularThreshold)}%` }}
-                          className="bg-emerald-500 flex items-center justify-center transition-all min-w-[36px]"
+                          className="bg-emerald-700 flex items-center justify-center transition-all min-w-[36px]"
                           title={`Bom: ${regularThreshold}% a 100%`}
                         >
                           Bom
@@ -714,11 +769,11 @@ export function AccountSettingsModal({
                       {/* Controles de Porcentagem */}
                       <div className="grid grid-cols-2 gap-3 pt-1">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+                          <label className="text-[10px] font-semibold text-rose-700 dark:text-rose-400" htmlFor="conta-limite-ruim-ate">
                             Limite Ruim (até %)
                           </label>
                           <div className="flex items-center gap-1.5">
-                            <input
+                            <input id="conta-limite-ruim-ate"
                               type="number"
                               min={10}
                               max={regularThreshold - 1}
@@ -734,11 +789,11 @@ export function AccountSettingsModal({
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                          <label className="text-[10px] font-semibold text-amber-700 dark:text-amber-400" htmlFor="conta-limite-regular-ate">
                             Limite Regular (até %)
                           </label>
                           <div className="flex items-center gap-1.5">
-                            <input
+                            <input id="conta-limite-regular-ate"
                               type="number"
                               min={ruimThreshold + 1}
                               max={99}
@@ -764,10 +819,10 @@ export function AccountSettingsModal({
                     {/* Primeiro dia da semana & Som do Timer */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-primeiro-dia-da-semana">
                           PRIMEIRO DIA DA SEMANA
                         </label>
-                        <select
+                        <select id="conta-primeiro-dia-da-semana"
                           value={primeiroDia}
                           onChange={(e) => setPrimeiroDia(e.target.value)}
                           className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
@@ -778,11 +833,11 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1">
-                        <label className="type-label">
+                        <label className="type-label" htmlFor="conta-som-do-timer">
                           SOM DO TIMER
                         </label>
                         <div className="flex items-center gap-2">
-                          <select
+                          <select id="conta-som-do-timer"
                             value={somTimer}
                             onChange={(e) => setSomTimer(normalizeTimerSoundOption(e.target.value))}
                             className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
@@ -799,10 +854,10 @@ export function AccountSettingsModal({
 
                     {/* Fuso Horário */}
                     <div className="space-y-1">
-                      <label className="type-label">
+                      <label className="type-label" htmlFor="conta-fuso-horario">
                         FUSO HORÁRIO
                       </label>
-                      <select
+                      <select id="conta-fuso-horario"
                         value={fusoHorario}
                         onChange={(e) => setFusoHorario(e.target.value)}
                         className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
@@ -891,7 +946,7 @@ export function AccountSettingsModal({
                             className="text-primary"
                           />
                           <div className="w-7 h-7 rounded-full border border-primary text-primary flex items-center justify-center">
-                            <User className="h-4 w-4" />
+                            <User aria-hidden className="h-4 w-4" />
                           </div>
                           <span>Usar minha foto de perfil</span>
                         </label>
@@ -904,7 +959,7 @@ export function AccountSettingsModal({
                             onChange={() => setTipoFoto("iniciais")}
                             className="text-primary"
                           />
-                          <div className="w-7 h-7 rounded-full bg-primary text-white font-semibold text-xs flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground font-semibold text-xs flex items-center justify-center">
                             {nome?.[0] || "?"}
                             {sobrenome?.[0] || ""}
                           </div>
@@ -993,6 +1048,7 @@ export function AccountSettingsModal({
                               onClick={() => handleRemoveCategory(cat)}
                               className="text-muted-foreground hover:text-rose-500 rounded-full p-0.5 transition-colors cursor-pointer"
                               title={`Remover ${cat}`}
+                              aria-label={`Remover ${cat}`}
                             >
                               <X className="h-3 w-3" />
                             </button>
@@ -1017,7 +1073,7 @@ export function AccountSettingsModal({
                             <Button
                               size="sm"
                               onClick={handleAddCategory}
-                              className="bg-primary text-white h-8 text-xs"
+                              className="bg-primary text-primary-foreground h-8 text-xs"
                             >
                               <Check className="h-3.5 w-3.5" />
                             </Button>
@@ -1202,10 +1258,10 @@ export function AccountSettingsModal({
 
                     <div className="space-y-3 max-w-sm">
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground">
+                        <label className="text-xs font-semibold text-muted-foreground" htmlFor="conta-senha-atual">
                           Senha Atual
                         </label>
-                        <Input
+                        <Input id="conta-senha-atual"
                           type="password"
                           value={senhaAtual}
                           onChange={(e) => setSenhaAtual(e.target.value)}
@@ -1213,10 +1269,10 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground">
+                        <label className="text-xs font-semibold text-muted-foreground" htmlFor="conta-nova-senha">
                           Nova Senha
                         </label>
-                        <Input
+                        <Input id="conta-nova-senha"
                           type="password"
                           value={novaSenha}
                           onChange={(e) => setNovaSenha(e.target.value)}
@@ -1224,10 +1280,10 @@ export function AccountSettingsModal({
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground">
+                        <label className="text-xs font-semibold text-muted-foreground" htmlFor="conta-confirmar-nova-senha">
                           Confirmar Nova Senha
                         </label>
-                        <Input
+                        <Input id="conta-confirmar-nova-senha"
                           type="password"
                           value={confirmarSenha}
                           onChange={(e) => setConfirmarSenha(e.target.value)}
@@ -1253,6 +1309,7 @@ export function AccountSettingsModal({
                 )}
               </>
             )}
+            </div>
 
             {/* Botões do Rodapé: Cancelar & Salvar */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t">

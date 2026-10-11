@@ -41,6 +41,7 @@ export const PROTECTED_ROUTE_PREFIXES = [
   "/edital",
   "/pedidos-editais",
   "/study-plan",
+  "/mentor",
 ] as const
 
 export function isProtectedPath(pathname: string): boolean {

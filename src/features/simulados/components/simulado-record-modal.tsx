@@ -14,10 +14,6 @@ import {
 import { toast } from "sonner"
 
 import {
-  getSimuladoFormDisciplinesAction,
-  saveSimuladoRecordAction,
-} from "@/application/simulados/simulado-records.actions"
-import {
   accuracyOf,
   aggregateSubjects,
   computeNetScore,
@@ -27,6 +23,7 @@ import {
 } from "@/application/simulados/simulado-stats.service"
 import type { SimuladoRecord, SimuladoRecordInput, SimuladoRecordSource } from "@/domain/simulados/types"
 import { DisciplineSelector } from "@/components/shared/discipline-selector"
+import { useSimuladosActions } from "@/features/simulados/simulados-actions"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -40,6 +37,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 type EntryMode = "GERAL" | "DETALHADO"
 
@@ -87,11 +85,27 @@ function secondsToDuration(total: number | null): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
+/**
+ * G2.10: id do registro gerado ao abrir o formulário de um NOVO simulado. Se o
+ * envio falhar por rede depois de o servidor já ter salvo, o reenvio usa o
+ * mesmo id e atualiza o mesmo registro em vez de criar um segundo.
+ */
+function newRequestId(): string | undefined {
+  try {
+    return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Props) {
+  const actions = useSimuladosActions()
   const [name, setName] = useState("")
   const [examName, setExamName] = useState("")
   const [roleName, setRoleName] = useState("")
-  const [simuladoDate, setSimuladoDate] = useState(() => new Date().toISOString().slice(0, 10))
+  // G2.10: "hoje" em São Paulo — toISOString() é UTC e, depois das 21h, sugeria a data de amanhã.
+  const [simuladoDate, setSimuladoDate] = useState(() => todayKeyInSaoPaulo())
+  const [requestId, setRequestId] = useState<string | undefined>(undefined)
   const [source, setSource] = useState<SimuladoRecordSource>("TEC")
   const [sourceCustom, setSourceCustom] = useState("")
   const [timeText, setTimeText] = useState("")
@@ -121,7 +135,8 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
       setName(editing.name)
       setExamName(editing.examName || "")
       setRoleName(editing.roleName || "")
-      setSimuladoDate(editing.simuladoDate || new Date().toISOString().slice(0, 10))
+      setSimuladoDate(editing.simuladoDate || todayKeyInSaoPaulo())
+      setRequestId(undefined)
       setSource(editing.source)
       setSourceCustom(editing.sourceCustom || "")
       setExamBoard(editing.exam_board || "CEBRASPE")
@@ -149,7 +164,8 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
       setName("")
       setExamName("")
       setRoleName("")
-      setSimuladoDate(new Date().toISOString().slice(0, 10))
+      setSimuladoDate(todayKeyInSaoPaulo())
+      setRequestId(newRequestId())
       setSource("TEC")
       setSourceCustom("")
       setTimeText("")
@@ -167,10 +183,16 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
 
   useEffect(() => {
     if (!open) return
-    getSimuladoFormDisciplinesAction().then((res) => {
-      if (res.data) setDisciplines(res.data)
-    })
-  }, [open])
+    actions
+      .getFormDisciplines()
+      .then((res) => {
+        if (res.data) setDisciplines(res.data)
+      })
+      .catch(() => {
+        // G2.21: sem a lista de matérias o formulário continua utilizável
+        // (resultado geral ou matéria personalizada) — sem promessa rejeitada solta.
+      })
+  }, [open, actions])
 
   // ▸ RESULTADO CALCULADO DINAMICAMENTE (fonte única de verdade na UI) ------
   // No modo DETALHADO: derivado das matérias.
@@ -269,6 +291,10 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
       toast.error("Informe a data do simulado.")
       return
     }
+    if (simuladoDate > todayKeyInSaoPaulo()) {
+      toast.error("A data do simulado não pode estar no futuro.")
+      return
+    }
 
     const useMode = entryMode
     const finalTotals = computed
@@ -319,6 +345,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
     try {
       const input: SimuladoRecordInput = {
         id: editing ? editing.id : undefined,
+        requestId: editing ? undefined : requestId,
         name: name.trim(),
         examName: examName.trim(),
         roleName: roleName.trim(),
@@ -351,7 +378,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
               }))
             : [],
       }
-      const res = await saveSimuladoRecordAction(input)
+      const res = await actions.saveRecord(input)
       if (res.error || !res.data) {
         toast.error(res.error ?? "Erro ao salvar simulado.")
         return
@@ -434,6 +461,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                   id="sim-date"
                   type="date"
                   value={simuladoDate}
+                  max={todayKeyInSaoPaulo()}
                   onChange={(e) => setSimuladoDate(e.target.value)}
                   className="mt-1"
                 />
@@ -441,9 +469,9 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold">Fonte</Label>
+                <Label htmlFor="sim-source" className="text-xs font-semibold">Fonte</Label>
                 <Select value={source} onValueChange={(v) => setSource(v as SimuladoRecordSource)}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger id="sim-source" className="mt-1">
                     <SelectValue placeholder="Selecione a fonte" />
                   </SelectTrigger>
                   <SelectContent>
@@ -472,7 +500,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
               <div>
                 <Label htmlFor="sim-banca" className="text-xs font-semibold">Banca</Label>
                 <Select value={examBoard} onValueChange={(v) => setExamBoard(v as string)}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger id="sim-banca" className="mt-1">
                     <SelectValue placeholder="Selecione a banca" />
                   </SelectTrigger>
                   <SelectContent>
@@ -537,9 +565,10 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
             </span>
 
             {/* ESCOLHA DO MODO */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div role="group" aria-label="Como lançar o resultado" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="button"
+                aria-pressed={entryMode === "GERAL"}
                 onClick={() => setEntryMode("GERAL")}
                 className={cn(
                   "text-left p-3 rounded-xl border transition-all",
@@ -557,6 +586,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
               </button>
               <button
                 type="button"
+                aria-pressed={entryMode === "DETALHADO"}
                 onClick={() => setEntryMode("DETALHADO")}
                 className={cn(
                   "text-left p-3 rounded-xl border transition-all",
@@ -621,10 +651,11 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-semibold text-muted-foreground">Erros (auto)</Label>
-                    <div className="mt-1 h-9 flex items-center px-3 rounded-lg border bg-muted/40 tabular-nums text-sm font-semibold">
+                    <Label htmlFor="sim-wrong" className="text-xs font-semibold text-muted-foreground">Erros (auto)</Label>
+                    {/* G2.21: <output> (valor calculado) associado ao rótulo — antes era um div sem nome. */}
+                    <output id="sim-wrong" className="mt-1 h-9 flex items-center px-3 rounded-lg border bg-muted/40 tabular-nums text-sm font-semibold">
                       {computed.totalWrong}
-                    </div>
+                    </output>
                   </div>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
@@ -687,6 +718,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                               }
                               className="h-8 text-xs tabular-nums text-center"
                               placeholder="Qtd"
+                              aria-label={`Questões — ${s.disciplineName}`}
                             />
                             <Input
                               type="number"
@@ -697,6 +729,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                               }
                               className="h-8 text-xs tabular-nums text-center"
                               placeholder="Acert"
+                              aria-label={`Acertos — ${s.disciplineName}`}
                             />
                             <Input
                               type="number"
@@ -707,6 +740,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                               }
                               className="h-8 text-xs tabular-nums text-center"
                               placeholder="Bran"
+                              aria-label={`Em branco — ${s.disciplineName}`}
                             />
                             <Button
                               type="button"
@@ -752,8 +786,8 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                       <span className="text-foreground text-sm font-semibold">{computed.totalQuestions}</span>
                     </div>
                     <div>
-                      <span className="block text-[11px] text-emerald-600">Acertos</span>
-                      <span className="text-emerald-600 text-sm font-semibold">{computed.totalCorrect}</span>
+                      <span className="block text-[11px] text-emerald-700 dark:text-emerald-400">Acertos</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 text-sm font-semibold">{computed.totalCorrect}</span>
                     </div>
                     <div>
                       <span className="block text-[11px] text-rose-600">Erros</span>
@@ -770,8 +804,8 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
 
             {/* REGRA DE PONTUAÇÃO */}
             <div className="space-y-2">
-              <Label className="text-xs font-semibold">Regra de pontuação</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Label id="sim-scoring-label" className="text-xs font-semibold">Regra de pontuação</Label>
+              <div role="group" aria-labelledby="sim-scoring-label" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { value: "PERCENTUAL", label: "Apenas percentual de acertos", hint: "Bruto: acertos ÷ questões" },
                   { value: "CEBRASPE", label: "CEBRASPE / CESPE", hint: "Erros descontam pontos" },
@@ -781,6 +815,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                   <button
                     key={opt.value}
                     type="button"
+                    aria-pressed={scoringRule === opt.value}
                     onClick={() => setScoringRule(opt.value as typeof scoringRule)}
                     className={cn(
                       "text-left px-3 py-2 rounded-lg border transition-colors",
@@ -811,7 +846,7 @@ export function SimuladoRecordModal({ open, onOpenChange, editing, onSaved }: Pr
                       Cada erro desconta:
                     </Label>
                     <Select value={penaltyPerWrong} onValueChange={setPenaltyPerWrong}>
-                      <SelectTrigger className="w-[140px] h-8 text-xs tabular-nums">
+                      <SelectTrigger id="sim-penalty-wrong" className="w-[140px] h-8 text-xs tabular-nums">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

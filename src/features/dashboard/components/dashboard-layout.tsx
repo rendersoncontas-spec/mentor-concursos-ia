@@ -82,7 +82,7 @@ export function DashboardLayout({ snapshot, serverDate, children }: DashboardLay
                   style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
                 >
                   &ldquo;{msg.text}&rdquo;
-                  <span className="text-muted-foreground/70 ml-1.5">— {msg.author}</span>
+                  <span className="text-muted-foreground ml-1.5">— {msg.author}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2 w-full md:w-auto shrink-0">

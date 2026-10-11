@@ -41,11 +41,14 @@ export function SortableWidget({ id, colSpan, children }: SortableWidgetProps) {
         colSpan >= 2 && "w-full",
       )}
     >
-      {/* Drag handle */}
+      {/* Drag handle — G2.21: fica sobre a borda superior do card (metade no
+          espaço entre cards). Antes, a 10px do canto, ele cobria parte dos botões
+          do cabeçalho de 5 widgets ("Editar metas semanais", "Criar lembrete",
+          "Ver Todas", "Próximo mês", "Ver Histórico") e roubava o clique. */}
       <div
         {...attributes}
         {...listeners}
-        className="absolute top-2.5 right-2.5 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/70 cursor-grab active:cursor-grabbing z-20 transition-all opacity-30 group-hover:opacity-100 focus-within:opacity-100"
+        className="absolute -top-2.5 right-3 p-1 rounded-md bg-card text-muted-foreground/40 hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing z-20 transition-all opacity-30 group-hover:opacity-100 focus-within:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         title="Arraste para reorganizar"
         aria-label="Arraste para reorganizar"
       >

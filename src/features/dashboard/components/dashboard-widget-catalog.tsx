@@ -44,6 +44,7 @@ import { RemindersWidget } from "@/features/dashboard/components/reminders-widge
 import { ManualStudyTimeModal } from "@/features/dashboard/components/manual-study-time-modal"
 import { DayDetailModal } from "@/features/dashboard/components/day-detail-modal"
 import { DailyPlanningView } from "@/features/planejamento/components/daily-planning-view"
+import { alignHistoryToBlocks } from "@/application/dashboard/dashboard-identity"
 import { type StudyCycleBlock } from "@/features/planejamento/components/planning-view"
 import { STUDY_SESSION_SAVED_EVENT, shouldWidgetRefreshOnSaved } from "@/features/study-session/lib/study-session-events"
 
@@ -245,7 +246,11 @@ function PerformancePeriodSelector({
   className?: string
 }) {
   return (
+    // G2.21: o período escolhido só era indicado pela cor; agora o leitor de
+    // tela ouve "pressionado" (mesmo padrão do seletor de período de Simulados).
     <div
+      role="group"
+      aria-label="Período do desempenho"
       className={cn(
         "inline-flex items-center p-0.5 bg-muted rounded-md text-[11px] font-medium",
         className,
@@ -257,12 +262,13 @@ function PerformancePeriodSelector({
           <button
             key={opt.key}
             type="button"
+            aria-pressed={isActive}
             onClick={(e) => {
               e.stopPropagation()
               onChange(opt.key)
             }}
             className={cn(
-              "px-2 py-1 rounded-[5px] transition-colors duration-150 cursor-pointer select-none",
+              "px-2 py-1 rounded-[5px] transition-colors duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isActive
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground",
@@ -319,7 +325,7 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> Desempenho
           </span>
-          <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-600 tabular-nums">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
             {accuracyText}
           </span>
         </div>
@@ -339,10 +345,10 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
           </div>
           <div className="text-right text-[10px] sm:text-[11px] text-muted-foreground font-medium leading-tight">
             <div>
-              <strong className="text-emerald-600 font-semibold">{correctDisplay}</strong> acertos
+              <strong className="text-emerald-700 dark:text-emerald-400 font-semibold">{correctDisplay}</strong> acertos
             </div>
             <div>
-              <strong className="text-rose-500 font-semibold">{wrongDisplay}</strong> erros
+              <strong className="text-rose-600 dark:text-rose-400 font-semibold">{wrongDisplay}</strong> erros
             </div>
           </div>
         </div>
@@ -361,12 +367,18 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-muted-foreground" /> Desempenho geral
           </span>
-          <div className="flex items-center gap-2">
+          {/* G2.22: em 320 px o seletor + "75% Acurácia" não cabiam na mesma linha e a
+              palavra estourava o card. Agora o par quebra para a linha de baixo,
+              inteiro (sem cortar o valor nem o rótulo). */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 min-w-0">
             <PerformancePeriodSelector
               value={selectedPeriod}
               onChange={setSelectedPeriod}
             />
-            <span className="text-xs font-semibold text-emerald-600 tabular-nums">
+            <span
+              data-testid="desempenho-acuracia"
+              className="whitespace-nowrap text-xs font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums"
+            >
               {accuracyText} Acurácia
             </span>
           </div>
@@ -376,10 +388,10 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
             <span className="text-xl font-semibold text-foreground tabular-nums">{accuracyText}</span>
             <div className="text-xs text-muted-foreground font-medium">
               <div>
-                <strong className="text-emerald-600">{correctDisplay}</strong> acertos
+                <strong className="text-emerald-700 dark:text-emerald-400">{correctDisplay}</strong> acertos
               </div>
               <div>
-                <strong className="text-rose-500">{wrongDisplay}</strong> erros
+                <strong className="text-rose-600 dark:text-rose-400">{wrongDisplay}</strong> erros
               </div>
             </div>
           </div>
@@ -404,12 +416,12 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
         <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
           <Target className="w-3.5 h-3.5 text-muted-foreground" /> Desempenho & taxa de acerto
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 min-w-0">
           <PerformancePeriodSelector
             value={selectedPeriod}
             onChange={setSelectedPeriod}
           />
-          <span className="text-xs font-semibold text-emerald-600 tabular-nums">
+          <span className="whitespace-nowrap text-xs font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
             Aproveitamento: {accuracyText}
           </span>
         </div>
@@ -422,12 +434,12 @@ export function WidgetDesempenho({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-lg font-semibold text-foreground tabular-nums">{totalDisplay}</span>
         </div>
         <div className="p-3 text-center">
-          <span className="text-[11px] text-emerald-600 font-semibold block">Acertos</span>
-          <span className="text-lg font-semibold text-emerald-600 tabular-nums">{correctDisplay}</span>
+          <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold block">Acertos</span>
+          <span className="text-lg font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{correctDisplay}</span>
         </div>
         <div className="p-3 text-center">
-          <span className="text-[11px] text-rose-500 font-semibold block">Erros</span>
-          <span className="text-lg font-semibold text-rose-500 tabular-nums">{wrongDisplay}</span>
+          <span className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold block">Erros</span>
+          <span className="text-lg font-semibold text-rose-600 dark:text-rose-400 tabular-nums">{wrongDisplay}</span>
         </div>
         <div className="p-3 text-center">
           <span className="text-[11px] text-primary font-semibold block">Precisão</span>
@@ -567,7 +579,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
             <Flame className="w-3.5 h-3.5 text-muted-foreground" /> Constância
           </span>
-          <span className="text-[10px] sm:text-[11px] font-semibold text-accent tabular-nums">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-accent-text tabular-nums">
             {streakBadge}
           </span>
         </div>
@@ -579,7 +591,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
             <span className="text-[10px] sm:text-[11px] text-muted-foreground font-semibold ml-1">dias seguidos</span>
           </div>
           <div className="text-right text-[10px] sm:text-[11px] text-muted-foreground font-semibold leading-tight">
-            Recorde: <span className="text-accent font-semibold">{recordeBadge}</span>
+            Recorde: <span className="text-accent-text font-semibold">{recordeBadge}</span>
           </div>
         </div>
         <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-border/50">
@@ -615,7 +627,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
         <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
           <Flame className="w-3.5 h-3.5 text-muted-foreground" /> Constância e sequência ativa
         </span>
-        <span className="text-xs font-semibold text-accent tabular-nums">
+        <span className="text-xs font-semibold text-accent-text tabular-nums">
           {streakConsecutiveLabel}
         </span>
       </div>
@@ -625,7 +637,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
           <span className="text-xs text-muted-foreground font-semibold ml-1">dias seguidos</span>
         </div>
         <div className="text-right text-xs text-muted-foreground font-semibold">
-          Maior Sequência: <span className="text-accent font-semibold">{longestLabel}</span>
+          Maior Sequência: <span className="text-accent-text font-semibold">{longestLabel}</span>
         </div>
       </div>
 
@@ -659,7 +671,7 @@ export function WidgetConstancia({ snapshot, colSpan }: DashboardWidgetProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. WIDGET: Estudos de Hoje (Visão Diária do Ciclo)
 // ─────────────────────────────────────────────────────────────────────────────
-export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
+export function WidgetEstudosHoje({ snapshot, cycleBlocks }: DashboardWidgetProps) {
   const { data: history, refresh, serverBacked } = useCachedServerAction<RecentHistoryEntry[]>(
     "recentStudyHistory:14",
     () => getRecentStudyHistoryAction(14).then((res) => res.data ?? []),
@@ -677,9 +689,17 @@ export function WidgetEstudosHoje({ cycleBlocks }: DashboardWidgetProps) {
     return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, load)
   }, [refresh, serverBacked])
 
+  // G2.14: estudo lançado num alias conta no bloco da mesma identidade
+  // canônica (e vice-versa). Hoje, timezone, duração e distribuição continuam
+  // sendo os do componente do plano — só o id da disciplina é alinhado.
+  const alignedHistory = React.useMemo(
+    () => alignHistoryToBlocks(history ?? [], cycleBlocks.map((b) => b.disciplineId), snapshot?.disciplineIdentity),
+    [history, cycleBlocks, snapshot?.disciplineIdentity],
+  )
+
   return (
     <div className="w-full">
-      <DailyPlanningView blocks={cycleBlocks} history={history ?? []} embedded={true} />
+      <DailyPlanningView blocks={cycleBlocks} history={alignedHistory} embedded={true} />
     </div>
   )
 }
@@ -771,7 +791,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             <span
               className={cn(
                 "text-[10px] sm:text-[11px] font-semibold tabular-nums transition-colors",
-                realPct >= 100 ? "text-emerald-600" : "text-primary",
+                realPct >= 100 ? "text-emerald-700 dark:text-emerald-400" : "text-primary",
               )}
             >
               {realPct}% da meta
@@ -799,8 +819,8 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
                 className={cn(
                   "text-[10px] sm:text-[11px] font-semibold tabular-nums shrink-0",
                   diff >= 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-amber-600 dark:text-amber-400"
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-amber-700 dark:text-amber-400"
                 )}
               >
                 {diff >= 0 ? `+${diff} acima` : `${diff} da meta`}
@@ -833,10 +853,10 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
         {/* Rodapé: Acertos, Erros e Aproveitamento */}
         <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-border/50 text-[10px] font-semibold">
           <div className="flex items-center gap-2">
-            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+            <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5">
               <Check className="w-3 h-3 stroke-[2.5]" /> {correctDisplay} acertos
             </span>
-            <span className="text-rose-500 flex items-center gap-0.5">
+            <span className="text-rose-600 dark:text-rose-400 flex items-center gap-0.5">
               <X className="w-3 h-3 stroke-[2.5]" /> {wrongDisplay} erros
             </span>
           </div>
@@ -868,7 +888,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
           <span
             className={cn(
               "text-xs font-semibold tabular-nums",
-              realPct >= 100 ? "text-emerald-600" : "text-primary",
+              realPct >= 100 ? "text-emerald-700 dark:text-emerald-400" : "text-primary",
             )}
           >
             {realPct}% da Meta
@@ -902,7 +922,7 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             className={cn(
               "text-[10px] font-bold block",
               diff !== null && diff >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-emerald-700 dark:text-emerald-400"
                 : "text-amber-600"
             )}
           >
@@ -923,9 +943,9 @@ export function WidgetQuestoes({ snapshot, colSpan }: DashboardWidgetProps) {
             Acertos / Erros
           </span>
           <div className="flex items-baseline gap-1 text-xl font-semibold tabular-nums">
-            <span className="text-emerald-600 dark:text-emerald-400">{correctDisplay}</span>
+            <span className="text-emerald-700 dark:text-emerald-400">{correctDisplay}</span>
             <span className="text-xs text-muted-foreground font-normal">/</span>
-            <span className="text-rose-500">{wrongDisplay}</span>
+            <span className="text-rose-600 dark:text-rose-400">{wrongDisplay}</span>
           </div>
           <span className="text-[10px] text-muted-foreground font-medium block">
             respostas (total)
@@ -1249,7 +1269,7 @@ export function WidgetRanking({ snapshot, colSpan }: DashboardWidgetProps) {
               className="flex items-center justify-between p-2 rounded-lg bg-muted/30 text-xs font-semibold"
             >
               <div className="flex items-center gap-2 truncate">
-                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 flex items-center justify-center text-[10px] font-semibold shrink-0">
+                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 flex items-center justify-center text-[10px] font-semibold shrink-0">
                   #{idx + 1}
                 </span>
                 <span className="truncate text-foreground">{item.name}</span>
@@ -1371,11 +1391,17 @@ export function WidgetConquistas({ snapshot, colSpan }: DashboardWidgetProps) {
               className={`p-2.5 rounded-xl border text-center space-y-1 transition-all ${
                 b.unlocked
                   ? "bg-primary/10 border-primary/30 text-primary"
-                  : "bg-muted/20 border-muted opacity-50"
+                  : "bg-muted/20 border-muted text-muted-foreground"
               }`}
             >
-              <Award className="w-5 h-5 mx-auto" />
-              <div className="font-semibold text-[11px] truncate" title={b.desc}>{b.title}</div>
+              {/* G2.21: o card bloqueado usava opacity-50 no texto (contraste 3,1:1)
+                  e o estado só era perceptível pela cor; agora o texto fica legível
+                  e o leitor de tela ouve se a conquista foi obtida. */}
+              <Award aria-hidden className={`w-5 h-5 mx-auto${b.unlocked ? "" : " opacity-50"}`} />
+              <div className="font-semibold text-[11px] truncate" title={b.desc}>
+                {b.title}
+                <span className="sr-only">{b.unlocked ? " (conquistada)" : " (ainda bloqueada)"}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -1648,7 +1674,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
             <button
               key={i}
               onClick={() => handleDayClick(day)}
-              aria-label={`${day} de ${monthName} de ${year}${mins > 0 ? `, ${formatDurationMinutes(mins)} estudados` : ""}`}
+              aria-label={`${day} de ${monthName} de ${year}${isToday ? ", hoje" : ""}${mins > 0 ? `, ${formatDurationMinutes(mins)} estudados` : ""}`}
               className={`relative rounded-lg font-medium flex flex-col items-center justify-center gap-0.5
                 ${mins > 0 ? "p-1 sm:p-1.5 min-h-[56px] sm:min-h-[62px]" : "p-0.5 sm:p-1 min-h-[34px] sm:min-h-[38px]"}
                 cursor-pointer transition-all duration-150
@@ -1661,11 +1687,14 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
             >
               {/* Dia */}
               <span
+                // G2.22: "hoje" com estudo usa a cor do dia estudado (text-primary
+                // sobre o verde do calor ficava em 2,5:1 no tema escuro); o
+                // anel continua marcando o dia de hoje.
                 className={`font-semibold text-[11px] sm:text-sm leading-none ${
-                  isToday
-                    ? "text-primary"
-                    : mins > 0
-                      ? "text-emerald-950 dark:text-emerald-50"
+                  mins > 0
+                    ? "text-emerald-950 dark:text-emerald-50"
+                    : isToday
+                      ? "text-primary"
                       : "text-muted-foreground"
                 }`}
               >
@@ -1674,7 +1703,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
 
               {/* Tempo estudado */}
               {mins > 0 && (
-                <span className="text-[10px] sm:text-[10px] leading-none font-semibold text-emerald-900/80 dark:text-emerald-100/80">
+                <span className="text-[10px] sm:text-[10px] leading-none font-semibold text-emerald-900 dark:text-emerald-100">
                   {formatDurationMinutes(mins)}
                 </span>
               )}
@@ -1686,7 +1715,7 @@ export function WidgetCalendario({ snapshot, colSpan: _colSpan }: DashboardWidge
                     "text-[10px] sm:text-[10px] leading-none font-bold",
                     goalPct >= 100
                       ? "text-emerald-900 dark:text-emerald-200"
-                      : "text-emerald-900/70 dark:text-emerald-200/70",
+                      : "text-emerald-900 dark:text-emerald-100",
                   ].join(" ")}
                 >
                   {goalPct}%

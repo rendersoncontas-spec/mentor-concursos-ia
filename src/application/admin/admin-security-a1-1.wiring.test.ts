@@ -18,8 +18,11 @@ const auditModule = readFileSync(
   "src/application/admin/admin-audit.ts",
   "utf8",
 )
-const cycleActions = readFileSync(
-  "src/application/study-cycle/study-cycle.actions.ts",
+// G2.6.1: a auditoria de modo suporte deixou de ser chamada à mão em
+// study-cycle.actions.ts e passou a acontecer dentro de getEffectiveUserId
+// (auth-guard.ts), para TODA mutação que informa auditContext.
+const authGuard = readFileSync(
+  "src/application/admin/auth-guard.ts",
   "utf8",
 )
 
@@ -38,8 +41,8 @@ describe("A1.1-A/B auditSupportAction não é API pública; internos íntegros",
   it("B: implementação vive em módulo sem diretiva de servidor e o caller a usa", () => {
     assert.doesNotMatch(auditModule, /^"use server";?/m)
     assert.match(auditModule, /export async function auditSupportAction/)
-    assert.match(cycleActions, /@\/application\/admin\/admin-audit"/)
-    assert.match(cycleActions, /await auditSupportAction\(supabase, \{/)
+    assert.match(authGuard, /await import\("\.\/admin-audit"\)/)
+    assert.match(authGuard, /await auditSupportAction\(supabase, \{/)
   })
 })
 

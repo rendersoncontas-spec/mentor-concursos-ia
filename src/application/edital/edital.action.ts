@@ -9,6 +9,7 @@ import {
   normalizeDisciplineDisplay,
 } from "@/domain/disciplines/discipline-naming"
 import { createClient } from "@/infrastructure/supabase/server"
+import { hideCatalogAliases, loadCatalogAliasIds } from "@/application/disciplines/discipline-aliases"
 
 export async function addCustomDisciplineAction(
   name: string,
@@ -182,11 +183,13 @@ export async function searchDisciplinesAction(query: string) {
     const safe = (s: string) => s.replace(/[%*,()"]/g, " ").trim()
     const safeName = safe(trimmed)
     const safeKey = safe(key)
-    let rows: { name: string }[] | null = null
+    let rows: { id: string; name: string }[] | null = null
+    // G2.14: aliases comprovados não aparecem como sugestão (a canônica sim).
+    const aliasIdsPromise = loadCatalogAliasIds(supabase)
     try {
       const res = await supabase
         .from("disciplines")
-        .select("name")
+        .select("id, name")
         .or(`name.ilike.%${safeName}%,name_key.ilike.%${safeKey}%`)
         .order("name")
         .order("id")
@@ -198,7 +201,7 @@ export async function searchDisciplinesAction(query: string) {
     if (rows === null) {
       const { data } = await supabase
         .from("disciplines")
-        .select("name")
+        .select("id, name")
         .ilike("name", `%${trimmed}%`)
         .order("name")
         .order("id")
@@ -206,7 +209,8 @@ export async function searchDisciplinesAction(query: string) {
       rows = data ?? []
     }
 
-    return { success: true, data: rows?.map((d) => d.name) || [] }
+    const aliasIds = await aliasIdsPromise
+    return { success: true, data: hideCatalogAliases(rows ?? [], aliasIds).map((d) => d.name) }
   } catch {
     return { success: false, data: [] }
   }

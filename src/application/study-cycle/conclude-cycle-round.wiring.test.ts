@@ -65,7 +65,9 @@ describe("concludeCurrentCycleRound: segurança (usuário efetivo, posse, estado
   )
 
   it("resolve o usuário via getEffectiveUserId — nunca aceita userId do cliente", () => {
-    assert.ok(fn.includes("getEffectiveUserId(supabase)"))
+    // G2.6.1: a chamada ganhou o auditContext do modo suporte
+    // (getEffectiveUserId(supabase, { action: "CONCLUDE_CYCLE_ROUND", ... })).
+    assert.match(fn, /getEffectiveUserId\(supabase(, \{ action: "CONCLUDE_CYCLE_ROUND"[^)]*\})?\)/)
     assert.equal(/function concludeCurrentCycleRound\([^)]*userId/.test(source), false, "não deve receber userId como parâmetro")
   })
 

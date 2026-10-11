@@ -67,6 +67,9 @@ export function DisciplineSelector({
         <Button
           variant="outline"
           role="combobox"
+          // G2.21: role="combobox" não recebe nome do conteúdo — sem isto o
+          // botão ficava sem nome acessível para leitores de tela.
+          aria-label={buttonLabel}
           className={cn(
             "w-full justify-between font-normal h-9 text-xs sm:text-sm rounded-xl border-border/70 hover:border-primary/40",
             buttonClassName,

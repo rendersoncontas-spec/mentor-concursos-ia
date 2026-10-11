@@ -460,7 +460,7 @@ export function WeeklyPlanningView({
                     headerStyle = "bg-rose-600 text-white font-semibold"
                     statusTag = "Incompleta"
                   } else {
-                    headerStyle = "bg-primary text-white font-semibold"
+                    headerStyle = "bg-primary text-primary-foreground font-semibold"
                     statusTag = "Programado"
                   }
                 } else if (isDuty) {
@@ -608,7 +608,7 @@ export function WeeklyPlanningView({
               <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">3</span>
               <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">4</span>
               <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">5</span>
-              <span className="bg-primary text-white font-semibold rounded-md py-0.5 shadow-xs">
+              <span className="bg-primary text-primary-foreground font-semibold rounded-md py-0.5 shadow-xs">
                 6
               </span>
               <span className="bg-primary/10 text-primary font-semibold rounded-md py-0.5">7</span>

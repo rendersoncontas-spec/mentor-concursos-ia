@@ -27,6 +27,7 @@ const REAL_PROTECTED_PAGES = [
   "/doacao",
   "/edital",
   "/estatisticas",
+  "/mentor",
   "/onboarding",
   "/pedidos-editais",
   "/planejamento",

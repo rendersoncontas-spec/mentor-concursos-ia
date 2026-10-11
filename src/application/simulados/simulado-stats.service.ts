@@ -2,8 +2,12 @@
 // Engine de estatísticas de simulados registrados (cálculo puro, sem I/O)
 // ============================================================================
 
+import { subjectIdentityKey } from "@/domain/disciplines/discipline-identity"
 import type {
   PERFORMANCE_BANDS,
+  SimuladoBottleneck,
+  SimuladoBottleneckReason,
+  SimuladoBottleneckReport,
   SimuladoEvolutionPoint,
   SimuladoPanelStats,
   SimuladoRecord,
@@ -139,8 +143,71 @@ function trendFromDelta(delta: number, threshold: number): PanelTrend {
   return "STABLE"
 }
 
-/** Estatísticas agregadas do painel a partir dos registros (já ordenados por data asc). */
-export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats {
+/**
+ * G2.10 — mínimo de pontos para falar em "tendência". Com 2 simulados existe
+ * uma variação (primeiro → último), não uma tendência: 60% → 61% não é
+ * "evolução". Abaixo disso a tendência é null e a tela não a desenha.
+ */
+export const MIN_TREND_POINTS = 3
+/** Variação mínima (p.p.) para deixar de ser "estável". */
+export const TREND_THRESHOLD_PP = 2
+
+const round1 = (n: number) => Math.round(n * 10) / 10
+const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length
+
+/**
+ * Tendência de uma série em ordem cronológica (determinística):
+ *   - menos de MIN_TREND_POINTS valores → null;
+ *   - exatamente 3 → último vs primeiro;
+ *   - 4 ou mais → média dos 3 mais recentes vs média dos anteriores.
+ * Em todos os casos, |Δ| ≤ TREND_THRESHOLD_PP é "estável".
+ */
+export function trendOfSeries(values: number[]): PanelTrend | null {
+  if (values.length < MIN_TREND_POINTS) return null
+  const recent = values.slice(-3)
+  const earlier = values.slice(0, -3)
+  const delta =
+    earlier.length > 0
+      ? mean(recent) - mean(earlier)
+      : (recent[recent.length - 1] as number) - (recent[0] as number)
+  return trendFromDelta(delta, TREND_THRESHOLD_PP)
+}
+
+/**
+ * Ordem cronológica estável: data do simulado, depois momento do registro,
+ * depois id. Sem o desempate, dois simulados no mesmo dia trocavam de lugar
+ * conforme a ordem em que o banco os devolvia, e o "último resultado" e a
+ * tendência mudavam sem nenhum dado novo.
+ */
+export function compareRecordsChronologically(
+  a: Pick<SimuladoRecord, "simuladoDate" | "createdAt" | "id">,
+  b: Pick<SimuladoRecord, "simuladoDate" | "createdAt" | "id">,
+): number {
+  return (
+    (a.simuladoDate ?? "").localeCompare(b.simuladoDate ?? "") ||
+    (a.createdAt ?? "").localeCompare(b.createdAt ?? "") ||
+    a.id.localeCompare(b.id)
+  )
+}
+
+export function sortRecordsChronologically<T extends Pick<SimuladoRecord, "simuladoDate" | "createdAt" | "id">>(records: T[]): T[] {
+  return [...records].sort(compareRecordsChronologically)
+}
+
+/** Mais recente primeiro (lista/histórico), com o mesmo desempate. */
+export function sortRecordsRecentFirst<T extends Pick<SimuladoRecord, "simuladoDate" | "createdAt" | "id">>(records: T[]): T[] {
+  return [...records].sort((a, b) => compareRecordsChronologically(b, a))
+}
+
+/**
+ * Estatísticas agregadas do painel. Ordena internamente (cronológico estável),
+ * então não depende da ordem em que o chamador entrega os registros.
+ *
+ * Média geral = acertos totais ÷ questões totais (ponderada pelo tamanho do
+ * simulado): um simulado de 120 questões pesa mais que um de 10.
+ */
+export function computePanelStats(input: SimuladoRecord[]): SimuladoPanelStats {
+  const records = sortRecordsChronologically(input)
   const totalSimulados = records.length
   if (totalSimulados === 0) {
     return {
@@ -154,6 +221,8 @@ export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats
       last5AverageAccuracy: null,
       worstAccuracy: null,
       evolutionPp: null,
+      firstAccuracy: null,
+      firstToLastPp: null,
       trend: null,
       trendMessage: null,
     }
@@ -170,6 +239,7 @@ export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats
 
   const bestAccuracy = accuracies.length > 0 ? Math.max(...accuracies) : null
   const worstAccuracy = accuracies.length > 0 ? Math.min(...accuracies) : null
+  const firstAccuracy = accuracies.length > 0 ? (accuracies[0] as number) : null
 
   const lastRecord = records[totalSimulados - 1]!
   const lastAccuracy = lastRecord.accuracy ?? null
@@ -179,31 +249,19 @@ export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats
   const last5SumC = last5.reduce((acc, r) => acc + r.totalCorrect, 0)
   const last5AverageAccuracy = accuracyOf(last5SumC, last5SumQ)
 
-  // Evolução: média dos últimos 5 vs média dos anteriores (ou primeiro vs último)
+  // Últimos 5 vs média geral (mantido) e primeiro → último (G2.10). Com um
+  // único simulado não há variação: ambos ficam null, não 0.
   let evolutionPp: number | null = null
-  let trend: SimuladoPanelStats["trend"] = null
-  let trendMessage: string | null = null
-
+  let firstToLastPp: number | null = null
   if (accuracies.length >= 2) {
     if (last5AverageAccuracy !== null && averageAccuracy !== null) {
-      evolutionPp = Math.round((last5AverageAccuracy - averageAccuracy) * 10) / 10
+      evolutionPp = round1(last5AverageAccuracy - averageAccuracy)
     }
-    const recent = accuracies.slice(-3)
-    const earlier = accuracies.slice(0, -3)
-    if (recent.length >= 2) {
-      const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length
-      if (earlier.length > 0) {
-        const earlierAvg = earlier.reduce((a, b) => a + b, 0) / earlier.length
-        const delta = recentAvg - earlierAvg
-        trend = trendFromDelta(delta, 2)
-      } else {
-        const first = recent[0] ?? 0
-        const last = recent[recent.length - 1] ?? 0
-        trend = trendFromDelta(last - first, 0)
-      }
-    }
-    trendMessage = trend === null ? null : TREND_MESSAGES[trend]
+    firstToLastPp = round1((accuracies[accuracies.length - 1] as number) - (accuracies[0] as number))
   }
+
+  const trend = trendOfSeries(accuracies)
+  const trendMessage = trend === null ? null : TREND_MESSAGES[trend]
 
   return {
     totalSimulados,
@@ -216,6 +274,8 @@ export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats
     last5AverageAccuracy,
     worstAccuracy,
     evolutionPp,
+    firstAccuracy,
+    firstToLastPp,
     trend,
     trendMessage,
   }
@@ -223,7 +283,7 @@ export function computePanelStats(records: SimuladoRecord[]): SimuladoPanelStats
 
 /** Pontos do gráfico de evolução (ordenados por data asc). */
 export function buildEvolutionPoints(records: SimuladoRecord[]): SimuladoEvolutionPoint[] {
-  return records
+  return sortRecordsChronologically(records)
     .filter((r) => r.accuracy !== null)
     .map((r) => ({
       simuladoId: r.id,
@@ -233,8 +293,13 @@ export function buildEvolutionPoints(records: SimuladoRecord[]): SimuladoEvoluti
     }))
 }
 
-/** Análise agregada por matéria com evolução e faixa. */
-export function buildSubjectAnalysis(records: SimuladoRecord[]): SimuladoSubjectAnalysis[] {
+/**
+ * Análise agregada por matéria com evolução e faixa. Uma matéria só entra no
+ * histórico dos simulados em que aparece — simulados sem ela não viram 0%.
+ * Média da matéria = acertos ÷ questões somados (ponderada).
+ */
+export function buildSubjectAnalysis(input: SimuladoRecord[]): SimuladoSubjectAnalysis[] {
+  const records = sortRecordsChronologically(input)
   const map = new Map<
     string,
     {
@@ -248,7 +313,9 @@ export function buildSubjectAnalysis(records: SimuladoRecord[]): SimuladoSubject
 
   for (const record of records) {
     for (const subject of record.subjects) {
-      const key = (subject.disciplineId ?? subject.disciplineName).toLowerCase()
+      // G2.12: mesma chave de identidade de todas as análises (id, ou nome
+      // canônico quando a matéria não tem id).
+      const key = subjectIdentityKey(subject)
       const entry =
         map.get(key) ??
         {
@@ -271,14 +338,11 @@ export function buildSubjectAnalysis(records: SimuladoRecord[]): SimuladoSubject
   }
 
   return Array.from(map.values())
-    .map((entry) => {
+    .map((entry): SimuladoSubjectAnalysis => {
       const accuracy = accuracyOf(entry.totalCorrect, entry.totalQuestions)
-      const withAcc = entry.history.filter((h): h is SimuladoEvolutionPoint => h.accuracy !== null)
-      let evolutionPp: number | null = null
-      if (withAcc.length >= 2) {
-        evolutionPp =
-          Math.round(((withAcc[withAcc.length - 1]!.accuracy ?? 0) - (withAcc[0]!.accuracy ?? 0)) * 10) / 10
-      }
+      const values = entry.history.map((h) => h.accuracy).filter((a): a is number => a !== null)
+      const first = values.length > 0 ? (values[0] as number) : null
+      const last = values.length > 0 ? (values[values.length - 1] as number) : null
       return {
         disciplineId: entry.disciplineId,
         disciplineName: entry.disciplineName,
@@ -286,11 +350,21 @@ export function buildSubjectAnalysis(records: SimuladoRecord[]): SimuladoSubject
         totalCorrect: entry.totalCorrect,
         accuracy,
         band: performanceBandOf(accuracy),
-        evolutionPp,
+        evolutionPp: values.length >= 2 && first !== null && last !== null ? round1(last - first) : null,
         history: entry.history,
+        simuladosCount: entry.history.length,
+        firstAccuracy: first,
+        lastAccuracy: last,
+        bestAccuracy: values.length > 0 ? Math.max(...values) : null,
+        worstAccuracy: values.length > 0 ? Math.min(...values) : null,
+        trend: trendOfSeries(values),
       }
     })
-    .sort((a, b) => (a.accuracy ?? 0) - (b.accuracy ?? 0))
+    .sort(
+      (a, b) =>
+        (a.accuracy ?? 0) - (b.accuracy ?? 0) ||
+        a.disciplineName.localeCompare(b.disciplineName, "pt-BR"),
+    )
 }
 
 /** Matérias fracas (band FRACO ou ATENCAO), ordenadas da pior para a melhor. */
@@ -323,6 +397,76 @@ export function findDecliningSubjects(
     }
     return declining
   })
+}
+
+/** G2.10 — limiares dos gargalos (p.p. e mínimos), exportados para teste e documentação. */
+export const BOTTLENECK_BELOW_AVERAGE_PP = 5
+export const BOTTLENECK_RECENT_DROP_PP = 5
+export const BOTTLENECK_LOW_PERFORMANCE = 60
+export const BOTTLENECK_MIN_QUESTIONS = 5
+
+/**
+ * G2.10 — gargalos determinísticos (sem IA). Uma matéria é apontada quando:
+ *   - BELOW_AVERAGE: média da matéria ≥ 5 p.p. abaixo da média geral;
+ *   - LOW_PERFORMANCE: média abaixo de 60% (faixa "Fraco");
+ *   - RECENT_DROP: o último registro caiu ≥ 5 p.p. em relação ao penúltimo.
+ * Matérias com menos de 5 questões somadas não são avaliadas (amostra pequena
+ * demais para dizer qualquer coisa). Com menos de 2 simulados da matéria, o
+ * apontamento vem marcado como preliminar (`lowData`).
+ * O gargalo principal é o de menor média entre os apontados; empate → nome.
+ */
+export function findBottlenecks(
+  analysis: SimuladoSubjectAnalysis[],
+  overallAccuracy: number | null,
+): SimuladoBottleneckReport {
+  const items: SimuladoBottleneck[] = []
+  for (const s of analysis) {
+    if (s.accuracy === null || s.totalQuestions < BOTTLENECK_MIN_QUESTIONS) continue
+    const reasons: SimuladoBottleneckReason[] = []
+    const gap = overallAccuracy === null ? null : round1(s.accuracy - overallAccuracy)
+    if (gap !== null && gap <= -BOTTLENECK_BELOW_AVERAGE_PP) reasons.push("BELOW_AVERAGE")
+    if (s.accuracy < BOTTLENECK_LOW_PERFORMANCE) reasons.push("LOW_PERFORMANCE")
+    const values = s.history.map((h) => h.accuracy).filter((a): a is number => a !== null)
+    let recentDropPp: number | null = null
+    if (values.length >= 2) {
+      const diff = round1((values[values.length - 2] as number) - (values[values.length - 1] as number))
+      if (diff >= BOTTLENECK_RECENT_DROP_PP) {
+        recentDropPp = diff
+        reasons.push("RECENT_DROP")
+      }
+    }
+    if (reasons.length === 0) continue
+    items.push({
+      disciplineId: s.disciplineId,
+      disciplineName: s.disciplineName,
+      accuracy: s.accuracy,
+      reasons,
+      gapToOverallPp: gap,
+      recentDropPp,
+      simuladosCount: s.simuladosCount,
+      lowData: s.simuladosCount < 2,
+    })
+  }
+  items.sort(
+    (a, b) => (a.accuracy ?? 0) - (b.accuracy ?? 0) || a.disciplineName.localeCompare(b.disciplineName, "pt-BR"),
+  )
+  return { overallAccuracy, primary: items[0] ?? null, items }
+}
+
+/** Frase do gargalo principal, só com números calculados. */
+export function describeBottleneck(b: SimuladoBottleneck, overallAccuracy: number | null): string {
+  const acc = b.accuracy === null ? "—" : `${Math.round(b.accuracy)}%`
+  const parts: string[] = []
+  if (b.reasons.includes("BELOW_AVERAGE") && overallAccuracy !== null) {
+    parts.push(`média ${acc}, abaixo da sua média geral de ${Math.round(overallAccuracy)}%`)
+  } else {
+    parts.push(`média ${acc}`)
+  }
+  if (b.reasons.includes("RECENT_DROP") && b.recentDropPp !== null) {
+    parts.push(`caiu ${String(b.recentDropPp).replace(".", ",")} p.p. no último simulado`)
+  }
+  const base = `${b.disciplineName} — ${parts.join("; ")}`
+  return b.lowData ? `${base} (baseado em 1 simulado)` : base
 }
 
 /** Compara dois simulados (geral e por matéria). */

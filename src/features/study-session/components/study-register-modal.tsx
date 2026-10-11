@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { type Resolver, useForm, useWatch } from "react-hook-form"
 
 import { useRouter } from "next/navigation"
@@ -82,6 +82,7 @@ import {
   dispatchStudySessionSaved,
 } from "@/features/study-session/lib/study-session-events"
 import { TopicAutocomplete } from "@/features/topic-catalog/components/topic-autocomplete"
+import { nextTabIndex } from "@/lib/a11y/tab-keyboard"
 import { cn } from "@/lib/utils"
 
 import { FocusSoundControl } from "./focus-sound-control"
@@ -262,6 +263,18 @@ export function StudyRegisterModal({
   initialTimeSeconds,
 }: StudyRegisterModalProps) {
   const router = useRouter()
+  // G2.21: ids para associar rótulos a controles (o modal pode existir em mais
+  // de um lugar da página — ids fixos colidiriam).
+  const a11yId = useId()
+  const durationLabelId = `${a11yId}-duracao`
+  const techniqueId = `${a11yId}-tecnica`
+  const disciplineLabelId = `${a11yId}-disciplina-rotulo`
+  const disciplineTriggerId = `${a11yId}-disciplina`
+  const topicInputId = `${a11yId}-topico`
+  // G2.22: abas Cronômetro/Manual com painel associado e teclado do padrão APG.
+  const timerTabId = `${a11yId}-aba-cronometro`
+  const manualTabId = `${a11yId}-aba-manual`
+  const modePanelId = `${a11yId}-painel-modo`
   const isEditMode = mode === "edit" && !!sessionToEdit
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { data: disciplineData } = useDisciplineData()
@@ -1038,9 +1051,12 @@ export function StudyRegisterModal({
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit, (errors) => {
-                const messages = Object.entries(errors)
-                  .map(([key, err]) => `${key}: ${(err as { message?: string })?.message}`)
-                  .join(", ")
+                // G2.21: só as mensagens (antes saíam também os nomes internos
+                // dos campos, ex.: "discipline_name: Disciplina é obrigatória").
+                const messages = Object.values(errors)
+                  .map((err) => (err as { message?: string } | undefined)?.message)
+                  .filter((m): m is string => !!m)
+                  .join("; ")
                 toast.error(`Verifique os campos obrigatórios: ${messages}`)
               })}
               className="flex flex-col flex-1 overflow-hidden"
@@ -1051,41 +1067,65 @@ export function StudyRegisterModal({
                     ═══════════════════════════════════════════════════════════════ */}
                 <div className="w-full md:w-[280px] lg:w-[300px] xl:w-[320px] shrink-0 flex flex-col gap-2.5">
                   {/* Segmented Mode Switcher */}
-                  <div role="tablist" aria-label="Modo de registro" className="p-0.5 rounded-md bg-muted grid grid-cols-2 gap-0.5 shrink-0">
+                  <div
+                    role="tablist"
+                    aria-label="Modo de registro"
+                    aria-orientation="horizontal"
+                    className="p-0.5 rounded-md bg-muted grid grid-cols-2 gap-0.5 shrink-0"
+                    onKeyDown={(event) => {
+                      // ← → Home End: muda de aba e leva o foco junto (ativação automática).
+                      const next = nextTabIndex(event.key, isManualMode ? 1 : 0, 2)
+                      if (next === null) return
+                      event.preventDefault()
+                      setMode(next === 1)
+                      document.getElementById(next === 1 ? manualTabId : timerTabId)?.focus()
+                    }}
+                  >
                     <button
                       type="button"
                       role="tab"
+                      id={timerTabId}
                       aria-selected={!isManualMode}
+                      aria-controls={modePanelId}
+                      tabIndex={isManualMode ? -1 : 0}
                       onClick={() => setMode(false)}
                       className={cn(
-                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] text-[13px] font-medium transition-colors select-none",
+                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] text-[13px] font-medium transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         !isManualMode
                           ? "bg-card text-foreground shadow-xs"
                           : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      <Clock className="w-3.5 h-3.5" />
+                      <Clock aria-hidden className="w-3.5 h-3.5" />
                       <span>Cronômetro</span>
                     </button>
                     <button
                       type="button"
                       role="tab"
+                      id={manualTabId}
                       aria-selected={isManualMode}
+                      aria-controls={modePanelId}
+                      tabIndex={isManualMode ? 0 : -1}
                       onClick={() => setMode(true)}
                       className={cn(
-                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] text-[13px] font-medium transition-colors select-none",
+                        "flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] text-[13px] font-medium transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         isManualMode
                           ? "bg-card text-foreground shadow-xs"
                           : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      <FileText className="w-3.5 h-3.5" />
+                      <FileText aria-hidden className="w-3.5 h-3.5" />
                       <span>Manual</span>
                     </button>
                   </div>
 
-                  {/* Card da Central de Controle */}
-                  <div className="rounded-lg border border-border bg-card p-3.5 flex flex-col gap-3">
+                  {/* Card da Central de Controle — painel das abas acima. */}
+                  <div
+                    role="tabpanel"
+                    id={modePanelId}
+                    aria-labelledby={isManualMode ? manualTabId : timerTabId}
+                    className="rounded-lg border border-border bg-card p-3.5 flex flex-col gap-3"
+                  >
                     {/* Topo do Card: Status Pill & Disciplina */}
                     <div className="flex flex-col gap-2.5">
                       <div className="flex items-center justify-between">
@@ -1226,15 +1266,15 @@ export function StudyRegisterModal({
                         {/* Técnica & Som de Foco Compactos */}
                         <div className="w-full flex flex-col gap-2 pt-2.5 border-t border-border">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-muted-foreground">
+                            <Label htmlFor={techniqueId} className="text-xs font-normal leading-normal text-muted-foreground">
                               Técnica
-                            </span>
+                            </Label>
                             <FormField
                               control={form.control}
                               name="technique"
                               render={({ field }) => (
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                  <SelectTrigger className="h-7 text-[11px] w-[130px] rounded-lg">
+                                  <SelectTrigger id={techniqueId} className="h-7 text-[11px] w-[130px] rounded-lg">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="z-[200]">
@@ -1262,18 +1302,20 @@ export function StudyRegisterModal({
                       /* ─── MANUAL INPUTS DISPLAY ─── */
                       <div className="flex flex-col gap-3 my-auto py-1">
                         <div>
-                          <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                          <Label id={durationLabelId} className="text-xs font-medium text-muted-foreground mb-1.5 block">
                             Duração Estudada
                           </Label>
-                          {/* Segmented Digital Input */}
-                          <div className="grid grid-cols-3 gap-2">
+                          {/* Segmented Digital Input — G2.21: cada campo tem o próprio rótulo
+                              (Horas/Minutos/Segundos) e o grupo é nomeado por "Duração Estudada".
+                              Antes o FormControl envolvia o <div>, e os inputs ficavam sem nome. */}
+                          <div role="group" aria-labelledby={durationLabelId} className="grid grid-cols-3 gap-2">
                             <FormField
                               control={form.control}
                               name="manual_hours"
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
-                                  <FormControl>
-                                    <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                  <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <FormControl>
                                       <Input
                                         type="number"
                                         min={0}
@@ -1283,11 +1325,11 @@ export function StudyRegisterModal({
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[11px] text-muted-foreground">
-                                        Horas
-                                      </span>
-                                    </div>
-                                  </FormControl>
+                                    </FormControl>
+                                    <FormLabel className="text-[11px] font-normal leading-normal text-muted-foreground">
+                                      Horas
+                                    </FormLabel>
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -1298,8 +1340,8 @@ export function StudyRegisterModal({
                               name="manual_minutes_field"
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
-                                  <FormControl>
-                                    <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                  <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <FormControl>
                                       <Input
                                         type="number"
                                         min={0}
@@ -1309,11 +1351,11 @@ export function StudyRegisterModal({
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[11px] text-muted-foreground">
-                                        Minutos
-                                      </span>
-                                    </div>
-                                  </FormControl>
+                                    </FormControl>
+                                    <FormLabel className="text-[11px] font-normal leading-normal text-muted-foreground">
+                                      Minutos
+                                    </FormLabel>
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -1324,8 +1366,8 @@ export function StudyRegisterModal({
                               name="manual_seconds"
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
-                                  <FormControl>
-                                    <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                  <div className="flex flex-col items-center bg-card border border-border rounded-md p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <FormControl>
                                       <Input
                                         type="number"
                                         min={0}
@@ -1335,11 +1377,11 @@ export function StudyRegisterModal({
                                         {...field}
                                         value={field.value ?? 0}
                                       />
-                                      <span className="text-[11px] text-muted-foreground">
-                                        Segundos
-                                      </span>
-                                    </div>
-                                  </FormControl>
+                                    </FormControl>
+                                    <FormLabel className="text-[11px] font-normal leading-normal text-muted-foreground">
+                                      Segundos
+                                    </FormLabel>
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -1349,24 +1391,25 @@ export function StudyRegisterModal({
 
                         <div className="grid grid-cols-2 gap-2.5">
                           <div>
-                            <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                              Data do Estudo
-                            </Label>
                             <FormField
                               control={form.control}
                               name="study_date"
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
-                                  <FormControl>
-                                    <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
-                                      <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  {/* G2.21: rótulo dentro do FormItem → associado ao input. */}
+                                  <FormLabel className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                                    Data do Estudo
+                                  </FormLabel>
+                                  <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <Calendar aria-hidden className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    <FormControl>
                                       <Input
                                         type="date"
                                         className="h-6 p-0 border-0 text-xs tabular-nums bg-transparent shadow-none focus-visible:ring-0 w-full"
                                         {...field}
                                       />
-                                    </div>
-                                  </FormControl>
+                                    </FormControl>
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -1374,24 +1417,25 @@ export function StudyRegisterModal({
                           </div>
 
                           <div>
-                            <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                              Horário de Início
-                            </Label>
                             <FormField
                               control={form.control}
                               name="study_time"
                               render={({ field }) => (
                                 <FormItem className="space-y-0">
-                                  <FormControl>
-                                    <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
-                                      <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  {/* G2.21: rótulo dentro do FormItem → associado ao input. */}
+                                  <FormLabel className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                                    Horário de Início
+                                  </FormLabel>
+                                  <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                                    <Clock aria-hidden className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    <FormControl>
                                       <Input
                                         type="time"
                                         className="h-6 p-0 border-0 text-xs tabular-nums bg-transparent shadow-none focus-visible:ring-0 w-full"
                                         {...field}
                                       />
-                                    </div>
-                                  </FormControl>
+                                    </FormControl>
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -1475,11 +1519,18 @@ export function StudyRegisterModal({
                         name="discipline_name"
                         render={({ field }) => (
                           <FormItem className="flex flex-col space-y-1.5">
-                            <FormLabel className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <FormLabel
+                              id={disciplineLabelId}
+                              htmlFor={disciplineTriggerId}
+                              className="text-xs font-semibold text-foreground flex items-center gap-1.5"
+                            >
                               <span>Disciplina</span>
-                              <span className="text-destructive">*</span>
+                              <span aria-hidden className="text-destructive">*</span>
+                              <span className="sr-only">(obrigatório)</span>
                             </FormLabel>
                             <DisciplinePopover
+                              id={disciplineTriggerId}
+                              aria-labelledby={`${disciplineLabelId} ${disciplineTriggerId}`}
                               value={field.value ?? ""}
                               onSelect={(name, id) => {
                                 field.onChange(name)
@@ -1499,10 +1550,11 @@ export function StudyRegisterModal({
                         name="topic_name"
                         render={({ field }) => (
                           <FormItem className="flex flex-col space-y-1.5">
-                            <FormLabel className="text-xs font-semibold text-foreground">
+                            <FormLabel htmlFor={topicInputId} className="text-xs font-semibold text-foreground">
                               Tópico
                             </FormLabel>
                             <TopicAutocomplete
+                              inputId={topicInputId}
                               value={field.value ?? ""}
                               onChange={field.onChange}
                               disciplineId={watchDisciplineId}

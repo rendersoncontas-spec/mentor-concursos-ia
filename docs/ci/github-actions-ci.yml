@@ -1,0 +1,103 @@
+# G2.22 — Integração contínua do NomeIA.
+#
+# Roda em push/PR para a main (e manualmente). NÃO publica, NÃO faz deploy,
+# NÃO usa credencial de produção, NÃO liga o Mentor IA e NÃO toca no
+# Supabase real:
+#   - build: variáveis públicas FICTÍCIAS (só para passar a validação de env);
+#   - E2E: o playwright.config.ts sobe o servidor com env isolado (Supabase
+#     inexistente em 127.0.0.1, Sentry descartável, MENTOR_AI_ENABLED=false,
+#     harness ligado só ali) e os testes bloqueiam toda rede externa.
+# Nenhum segredo do repositório é lido por este workflow.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  HUSKY: "0"
+
+jobs:
+  checks:
+    name: Unitários, TypeScript e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências (reprodutível, pelo package-lock)
+        run: npm ci
+
+      - name: Testes unitários
+        run: npm test
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Build de produção
+        run: npm run build
+        env:
+          # Valores FICTÍCIOS, não secretos: só satisfazem src/config/env.ts.
+          # O build não acessa o Supabase. Nunca coloque chaves reais aqui.
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54399
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-sem-valor
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-sem-valor
+          NEXT_PUBLIC_APP_MODE: normal
+
+      - name: Conferir que o build não contém rotas de harness E2E
+        run: |
+          if [ -d .next/server/app/e2e-harness ]; then
+            echo "::error::rotas /e2e-harness apareceram no build normal"
+            exit 1
+          fi
+
+  e2e:
+    name: E2E (Playwright + axe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências (reprodutível, pelo package-lock)
+        run: npm ci
+
+      - name: Instalar o Chromium do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Testes E2E (desktop e mobile)
+        # CI=true (definido pelo GitHub) => 1 worker, 1 nova tentativa,
+        # forbidOnly e servidor nunca reaproveitado (playwright.config.ts).
+        run: npm run test:e2e
+
+      - name: Guardar capturas, traces e relatório (só em falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-resultados
+          path: |
+            e2e/.results
+            e2e/.report
+          retention-days: 7
+          if-no-files-found: ignore

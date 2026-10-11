@@ -43,7 +43,7 @@ function getDayCellClass(isToday: boolean, onShift: boolean): string {
 
 function getDayNumberClass(isToday: boolean, onShift: boolean): string {
   if (isToday) return "bg-primary text-primary-foreground"
-  if (onShift) return "bg-rose-500 text-white"
+  if (onShift) return "bg-rose-700 text-white"
   return "text-foreground group-hover:text-primary"
 }
 
@@ -307,6 +307,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
           <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-xl border">
             <Briefcase className="w-4 h-4 text-primary shrink-0" />
             <select
+              aria-label="Escala de trabalho"
               value={scheduleMode}
               onChange={(e) => {
                 if (isScheduleMode(e.target.value)) handleSelectScale(e.target.value)
@@ -356,7 +357,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
 
       {/* Informação da Escala Selecionada */}
       {scheduleMode !== "normal" && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-semibold text-amber-800 dark:text-amber-300">
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
@@ -402,7 +403,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
             <div
               key={day}
               className={`text-[13px] py-2 font-semibold ${
-                idx === 0 ? "text-rose-500" : "text-muted-foreground"
+                idx === 0 ? "text-rose-700 dark:text-rose-400" : "text-muted-foreground"
               }`}
             >
               {day}
@@ -445,7 +446,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
             }
             if (onShift && scheduleMode !== "normal") {
               dayBadge = (
-                <span className="text-[10px] font-semibold text-rose-500 bg-rose-500/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
                   Plantão
                 </span>
               )
@@ -471,7 +472,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
 
                 <div className="space-y-1 overflow-hidden my-1">
                   {onShift && scheduleMode !== "normal" && (
-                    <div className="text-[10px] font-semibold text-rose-500/80 bg-rose-500/10 p-1 rounded-md text-center">
+                    <div className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 bg-rose-500/10 p-1 rounded-md text-center">
                       Sem estudos (Plantão 24h)
                     </div>
                   )}

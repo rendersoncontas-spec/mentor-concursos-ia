@@ -13,6 +13,7 @@ import {
   CalendarDays,
   CalendarRange,
   CircleDot,
+  Compass,
   FileText,
   GraduationCap,
   Heart,
@@ -75,6 +76,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
         { href: "/dashboard/reviews", label: "Revisões", icon: RefreshCcw },
         { href: "/dashboard/history", label: "Histórico", icon: History },
         { href: "/estatisticas", label: "Estatísticas", icon: BarChart3 },
+        { href: "/mentor", label: "Mentor", icon: Compass },
       ],
     },
     {

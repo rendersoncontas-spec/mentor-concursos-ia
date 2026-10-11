@@ -118,31 +118,51 @@ export function DashboardDndContext({ items, onReorder, children }: DashboardDnd
   const tabletCols = useMemo(() => splitIntoColumns(items, 2), [items])
   const desktopCols = useMemo(() => splitIntoColumns(items, 3), [items])
 
+  // G2.22 — antes de o JS medir a tela (HTML do servidor e primeira
+  // renderização do cliente), a estrutura é a de DESKTOP (3 colunas), porque o
+  // servidor não sabe a largura. Sem CSS próprio, o celular mostrava 3 colunas
+  // espremidas até a hidratação terminar. Agora essa estrutura inicial se
+  // adapta só com CSS: abaixo de xl as colunas viram `display: contents` e cada
+  // card recebe `order` = posição no layout, então o celular já pinta 1 coluna
+  // na ordem certa e o tablet 2 colunas (mesma distribuição índice % 2 da grade
+  // do tablet). Depois da hidratação o efeito abaixo troca para a estrutura do
+  // breakpoint real, que é visualmente a mesma no celular — nada "pula".
+  const order = useMemo(() => new Map(items.map((item, index) => [item.widget_id, index])), [items])
+  const adaptive = breakpoint === "desktop"
+
   const renderColumn = (colItems: WidgetConfigItem[], keyPrefix: string) => (
     <SortableContext
       key={keyPrefix}
       items={colItems.map((i) => i.widget_id)}
       strategy={verticalListSortingStrategy}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div
+        data-dashboard-column=""
+        className={
+          adaptive
+            ? "contents xl:flex xl:min-w-0 xl:flex-1 xl:flex-col xl:gap-3"
+            : "flex min-w-0 flex-1 flex-col gap-3"
+        }
+      >
         {colItems.map((item) => (
-          <React.Fragment key={`${keyPrefix}-${item.widget_id}`}>
+          <div key={`${keyPrefix}-${item.widget_id}`} className="min-w-0" style={{ order: order.get(item.widget_id) }}>
             {byId.get(item.widget_id)}
-          </React.Fragment>
+          </div>
         ))}
       </div>
     </SortableContext>
   )
 
-  const gridClass =
-    "flex w-full max-w-none items-start gap-3"
+  const gridClass = adaptive
+    ? "flex w-full max-w-none flex-col gap-3 md:grid md:grid-cols-2 md:items-start xl:flex xl:flex-row xl:items-start"
+    : "flex w-full max-w-none items-start gap-3"
 
   const activeCols =
     breakpoint === "mobile" ? mobileCols : breakpoint === "tablet" ? tabletCols : desktopCols
   const activePrefix = breakpoint === "mobile" ? "m" : breakpoint === "tablet" ? "t" : "d"
 
   const content = (
-    <div className={gridClass}>
+    <div className={gridClass} data-dashboard-grid={activePrefix}>
       {activeCols.map((col, i) => renderColumn(col, `${activePrefix}-${i}`))}
     </div>
   )

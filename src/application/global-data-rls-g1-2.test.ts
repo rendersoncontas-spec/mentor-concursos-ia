@@ -114,11 +114,21 @@ describe("G-10 — regras de simulado com allowlist server-side + CHECK", () => 
   })
 
   it("10c. action rejeita source/scoring inválidos antes do banco (fail-closed)", () => {
+    // G2.10: a validação passou para um módulo puro chamado pela action
+    // antes de qualquer acesso ao banco.
+    // G2.10: action → saveSimuladoRecord (persistência) → normalizeSimuladoRecordInput
+    // como primeira etapa, antes de qualquer consulta ao banco.
     const rec = src("src/application/simulados/simulado-records.actions.ts")
-    assert.match(rec, /isValidSimuladoSource\(input\.source\)/)
-    assert.match(rec, /isValidSimuladoScoringRule\(input\.scoringRule\)/)
-    assert.match(rec, /Fonte do simulado inválida/)
-    assert.match(rec, /Regra de pontuação inválida/)
+    const per = src("src/application/simulados/simulado-record-persistence.ts")
+    const val = src("src/application/simulados/simulado-record-validation.ts")
+    assert.match(rec, /saveSimuladoRecord\(supabase, userId, input, todayKeyInSaoPaulo\(\)\)/)
+    const body = per.slice(per.indexOf("export async function saveSimuladoRecord"))
+    assert.ok(body.indexOf("normalizeSimuladoRecordInput(input") >= 0)
+    assert.ok(body.indexOf("normalizeSimuladoRecordInput(input") < body.indexOf("supabase.from("))
+    assert.match(val, /isValidSimuladoSource\(input\.source\)/)
+    assert.match(val, /isValidSimuladoScoringRule\(scoringRule\)/)
+    assert.match(val, /Fonte do simulado inválida/)
+    assert.match(val, /Regra de pontuação inválida/)
   })
 
   it("10d. migration contém os CHECKs com os mesmos conjuntos (código = banco)", () => {

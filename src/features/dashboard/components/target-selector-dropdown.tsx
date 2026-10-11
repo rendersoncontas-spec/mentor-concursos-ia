@@ -270,7 +270,7 @@ export function TargetSelectorDropdown({
                         <RenderConcursoIcon iconKey={target.icon} className="h-4 w-4" />
                       </div>
                       {isActive ? (
-                        <div className="w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center shadow-xs">
+                        <div className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
                           <Check className="h-3 w-3 stroke-[3]" />
                         </div>
                       ) : (
@@ -295,7 +295,7 @@ export function TargetSelectorDropdown({
                           className={cn(
                             "px-2 py-0.5 text-[11px] font-bold rounded-full shrink-0",
                             isActive
-                              ? "bg-primary text-white shadow-2xs"
+                              ? "bg-primary text-primary-foreground shadow-2xs"
                               : "bg-muted text-muted-foreground",
                           )}
                         >

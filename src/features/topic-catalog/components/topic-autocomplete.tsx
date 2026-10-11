@@ -33,6 +33,8 @@ interface TopicAutocompleteProps {
   onEnterFallback?: () => void
   onEscapeFallback?: () => void
   className?: string
+  /** G2.21: id do campo, para associar um <label htmlFor>. */
+  inputId?: string
 }
 
 export function TopicAutocomplete({
@@ -46,6 +48,7 @@ export function TopicAutocomplete({
   onEnterFallback,
   onEscapeFallback,
   className,
+  inputId,
 }: TopicAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<TopicSuggestion[]>([])
   const [loading, setLoading] = useState(false)
@@ -160,6 +163,7 @@ export function TopicAutocomplete({
   return (
     <div className={cn("relative", className)}>
       <Input
+        id={inputId}
         type="text"
         value={value}
         autoFocus={autoFocus}

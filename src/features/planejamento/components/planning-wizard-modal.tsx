@@ -700,7 +700,7 @@ export function PlanningWizardModal({
                     className={cn(
                       "w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-semibold transition-all",
                       done || active
-                        ? "bg-primary border-primary text-white"
+                        ? "bg-primary border-primary text-primary-foreground"
                         : "bg-card border-muted text-muted-foreground",
                       active && "ring-4 ring-primary/15 scale-105",
                     )}
@@ -990,7 +990,7 @@ export function PlanningWizardModal({
                         className={cn(
                           "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                           dayConfigMode === "semana"
-                            ? "bg-primary text-white shadow-xs"
+                            ? "bg-primary text-primary-foreground shadow-xs"
                             : "text-muted-foreground hover:text-foreground",
                         )}
                       >
@@ -1002,7 +1002,7 @@ export function PlanningWizardModal({
                         className={cn(
                           "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                           dayConfigMode === "escala"
-                            ? "bg-primary text-white shadow-xs"
+                            ? "bg-primary text-primary-foreground shadow-xs"
                             : "text-muted-foreground hover:text-foreground",
                         )}
                       >
@@ -1024,7 +1024,7 @@ export function PlanningWizardModal({
                             className={cn(
                               "px-3.5 py-2 rounded-lg border-2 text-xs font-semibold transition-all cursor-pointer",
                               isSelected
-                                ? "border-primary bg-primary text-white shadow-xs"
+                                ? "border-primary bg-primary text-primary-foreground shadow-xs"
                                 : "border-muted bg-card text-muted-foreground hover:border-primary/60",
                             )}
                           >
@@ -1052,7 +1052,7 @@ export function PlanningWizardModal({
                               )}
                             >
                               {selected && (
-                                <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-primary text-white flex items-center justify-center">
+                                <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                                   <Check className="w-2.5 h-2.5" />
                                 </span>
                               )}

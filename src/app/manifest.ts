@@ -7,6 +7,9 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Sua preparação rumo à nomeação. Planejamento, ciclos e histórico de estudos para concursos.",
     start_url: "/dashboard",
+    // UX-PWA-01: escopo explícito (o padrão já era "/"); o app instalado cobre
+    // todas as rotas, inclusive /login quando a sessão expira.
+    scope: "/",
     display: "standalone",
     // Fase E: fundo off-white do app (antes: azul-marinho, herança da marca antiga).
     background_color: "#fbfaf9",

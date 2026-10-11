@@ -1,53 +1,15 @@
-import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
-import { createServerClient } from "@supabase/ssr"
-
-import { MentorAIService } from "@/application/mentor-ai/mentor-ai.service"
-import { getEffectiveSessionUser } from "@/application/admin/auth-guard"
-import { env } from "@/config/env"
-import { MentorFeed } from "@/features/mentor-ai/components/mentor-feed"
-
-export const metadata = {
-  title: "Análise de desempenho",
-  description: "Análise de desempenho dos seus estudos no NomeIA.",
-}
-
-export default async function MentorPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            )
-          } catch {
-            // Ignore in server components
-          }
-        },
-      },
-    },
-  )
-
-  const effectiveUser = await getEffectiveSessionUser(supabase)
-
-  if (!effectiveUser) {
-    redirect("/login")
-  }
-
-  // Gera a sessão heurística
-  const mentorResponse = await MentorAIService.generateMentorSession(supabase, effectiveUser.id)
-
-  return (
-    <main className="p-4 sm:p-6 lg:p-8 min-h-screen bg-gray-50/50">
-      <MentorFeed response={mentorResponse} />
-    </main>
-  )
+/**
+ * G2.16 — feed antigo do Mentor (heurístico) APOSENTADO.
+ *
+ * Havia dois "Mentores": este feed (MentorAIService + burnout heurístico, que
+ * gravava uma linha em `mentor_history` a cada visita) e o Mentor
+ * determinístico de /mentor (G2.15/G2.16). Esta rota agora só encaminha para
+ * /mentor — nenhuma consulta, nenhum cálculo e nenhuma gravação acontecem
+ * aqui. A tabela `mentor_history` e as 5 linhas antigas NÃO foram apagadas
+ * (nenhuma tela as lê; ver docs/g2-16-mentor-llm-report.md).
+ */
+export default function LegacyMentorPage() {
+  redirect("/mentor")
 }

@@ -50,6 +50,16 @@ function makeRecord(overrides: Partial<SimuladoRecord>): SimuladoRecord {
   }
 }
 
+// G2.10: campos novos da análise por matéria, neutros para os testes antigos.
+const NEW_ANALYSIS_FIELDS = {
+  simuladosCount: 1,
+  firstAccuracy: null,
+  lastAccuracy: null,
+  bestAccuracy: null,
+  worstAccuracy: null,
+  trend: null,
+} as const
+
 // ── 1-3. Percentual, erros e brancos ──────────────────────────────────────
 test("percentual: 78/100 = 78%", () => {
   assert.equal(accuracyOf(78, 100), 78)
@@ -171,7 +181,7 @@ test("computePanelStats: tendência UP quando recente > antigo", () => {
   assert.equal(stats.trendMessage, "Seu desempenho está evoluindo")
 })
 
-test("computePanelStats: tendência DOWN/STABLE (limiar de 2 p.p.) e ramo curto (≤ 3 simulados)", () => {
+test("computePanelStats: tendência DOWN/STABLE (limiar de 2 p.p.); sem tendência com menos de 3 simulados", () => {
   const series = (accs: number[]) =>
     accs.map((accuracy, i) => makeRecord({ id: `t${i}`, simuladoDate: `2026-08-${String(i + 10)}`, accuracy }))
   const trendOf = (accs: number[]) => {
@@ -183,10 +193,14 @@ test("computePanelStats: tendência DOWN/STABLE (limiar de 2 p.p.) e ramo curto 
   assert.deepEqual(trendOf([60, 60, 62, 62, 62]), ["STABLE", "Seu desempenho está estável"]) // +2 não passa do limiar
   assert.deepEqual(trendOf([60, 60, 58, 58, 58]), ["STABLE", "Seu desempenho está estável"]) // −2 também não
   assert.deepEqual(trendOf([60, 60, 62.5, 62.5, 62.5]), ["UP", "Seu desempenho está evoluindo"])
-  // ramo curto: compara o último com o primeiro dos recentes, sem limiar
-  assert.deepEqual(trendOf([60, 61]), ["UP", "Seu desempenho está evoluindo"])
-  assert.deepEqual(trendOf([61, 60]), ["DOWN", "Seu desempenho caiu nos últimos simulados"])
+  // G2.10: com 2 simulados há variação, não tendência — antes 60→61 virava
+  // "evoluindo". Agora: menos de 3 pontos → sem tendência.
+  assert.deepEqual(trendOf([60, 61]), [null, null])
+  assert.deepEqual(trendOf([61, 60]), [null, null])
+  // exatamente 3: último vs primeiro, com o mesmo limiar de 2 p.p.
   assert.deepEqual(trendOf([60, 70, 60]), ["STABLE", "Seu desempenho está estável"])
+  assert.deepEqual(trendOf([60, 70, 63]), ["UP", "Seu desempenho está evoluindo"])
+  assert.deepEqual(trendOf([60, 50, 61]), ["STABLE", "Seu desempenho está estável"])
   // um único simulado não tem tendência
   assert.deepEqual(trendOf([60]), [null, null])
 })
@@ -222,9 +236,9 @@ test("buildSubjectAnalysis: agrega matéria entre simulados com evolução", () 
 
 test("findWeakSubjects: retorna matérias em FRACO/ATENCAO", () => {
   const analysis = [
-    { disciplineId: null, disciplineName: "A", totalQuestions: 100, totalCorrect: 50, accuracy: 50, band: "FRACO" as const, evolutionPp: null, history: [] },
-    { disciplineId: null, disciplineName: "B", totalQuestions: 100, totalCorrect: 80, accuracy: 80, band: "BOM" as const, evolutionPp: null, history: [] },
-    { disciplineId: null, disciplineName: "C", totalQuestions: 100, totalCorrect: 65, accuracy: 65, band: "ATENCAO" as const, evolutionPp: null, history: [] },
+    { disciplineId: null, disciplineName: "A", totalQuestions: 100, totalCorrect: 50, accuracy: 50, band: "FRACO" as const, evolutionPp: null, history: [], ...NEW_ANALYSIS_FIELDS },
+    { disciplineId: null, disciplineName: "B", totalQuestions: 100, totalCorrect: 80, accuracy: 80, band: "BOM" as const, evolutionPp: null, history: [], ...NEW_ANALYSIS_FIELDS },
+    { disciplineId: null, disciplineName: "C", totalQuestions: 100, totalCorrect: 65, accuracy: 65, band: "ATENCAO" as const, evolutionPp: null, history: [], ...NEW_ANALYSIS_FIELDS },
   ]
   const weak = findWeakSubjects(analysis)
   assert.equal(weak.length, 2)
@@ -246,6 +260,7 @@ test("findDecliningSubjects: detecta queda nos últimos 3", () => {
         { simuladoId: "s2", name: "S2", date: "2026-08-10", accuracy: 65 },
         { simuladoId: "s3", name: "S3", date: "2026-08-20", accuracy: 60 },
       ],
+      ...NEW_ANALYSIS_FIELDS,
     },
   ]
   const declining = findDecliningSubjects(analysis, 3)

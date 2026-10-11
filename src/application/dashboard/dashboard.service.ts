@@ -5,6 +5,15 @@ import { type DashboardDataIssues, type DashboardSnapshot } from "@/domain/dashb
 import { getTodayStudyItems, getCycleOverviewData } from "@/application/study-plan/study-plan.service"
 import { getUserDisciplines } from "@/application/disciplines/disciplines.service"
 import { getStudyHistoryForAnalytics, AnalyticsEngine } from "@/application/study-analytics/study-analytics.service"
+import { loadDisciplineIdentity } from "@/application/disciplines/discipline-identity.loader"
+import {
+  canonicalizeAttemptRows,
+  canonicalizeHistoryRows,
+  collectDashboardDisciplineIds,
+  mergeUserDisciplinesByIdentity,
+} from "@/application/dashboard/dashboard-identity"
+import { resolveTargetFields } from "@/application/dashboard/active-target"
+import { canonicalIdOf, EMPTY_DISCIPLINE_IDENTITY, identityDisplayName } from "@/domain/disciplines/discipline-identity"
 import { getRecentActivities } from "@/application/study-history/study-history.service"
 import { getDayInSaoPaulo, startOfDayInSaoPauloMs } from "@/lib/sao-paulo"
 import { getSaoPauloWeekRange, resolveWeekStartDay } from "@/lib/study-time-calculator"
@@ -84,7 +93,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     const cycleError = cycleOverviewOutcome.failed
     const todayPlanItems = todayPlanItemsOutcome.value
     const todayPlanError = todayPlanItemsOutcome.failed
-    const rawHistory = rawHistoryOutcome.value
+    const rawHistoryRead = rawHistoryOutcome.value
     const historyError = rawHistoryOutcome.failed
     const recentActivities = recentActivitiesOutcome.value
     const activitiesError = recentActivitiesOutcome.failed
@@ -95,8 +104,31 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
     // Fetch disciplines now that rawTarget is known
     const disciplinesOutcome = await readOrFlag(getUserDisciplines(supabase, userId, rawTarget?.id), [])
-    const disciplines = disciplinesOutcome.value
     const disciplinesError = disciplinesOutcome.failed
+
+    // G2.14: identidade canônica de TODAS as disciplinas desta carga, numa
+    // leitura só (loader da G2.12, em lotes), aplicada aqui: ranking por
+    // matéria, desempenho por matéria, cobertura do edital e contexto
+    // plano/ciclo passam a juntar alias + canônica. Falha na identidade não
+    // derruba o Dashboard: cada id vira a própria identidade (como antes).
+    const attemptsForIdentity = (questionAttemptsResult?.data || []).map((a) => ({
+      discipline_id: (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ?? null,
+    }))
+    const identityResult = await loadDisciplineIdentity(
+      supabase,
+      userId,
+      collectDashboardDisciplineIds({
+        history: rawHistoryRead,
+        attempts: attemptsForIdentity,
+        userDisciplines: disciplinesOutcome.value,
+        planItems: (todayPlanItemsOutcome.value || []) as { discipline_id?: string | null }[],
+        cycleBlocks: (cycleOverviewOutcome.value?.blocks || []) as { disciplineId?: string | null }[],
+      }),
+    )
+    if (identityResult.error) console.error("[DASHBOARD] Identidade de disciplinas indisponível:", identityResult.error)
+    const disciplineIdentity = identityResult.error ? EMPTY_DISCIPLINE_IDENTITY : identityResult.data
+    const rawHistory = canonicalizeHistoryRows(rawHistoryRead, disciplineIdentity)
+    const disciplines = mergeUserDisciplinesByIdentity(disciplinesOutcome.value || [], disciplineIdentity)
 
     const dataIssues: DashboardDataIssues = {
       profile: profileError,
@@ -109,24 +141,12 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       disciplines: disciplinesError,
     }
 
-    let exam_date = rawTarget?.exam_date || null
-    let exam_time = rawTarget?.exam_time || null
-    let exam_location = rawTarget?.exam_location || null
-    let exam_name = rawTarget?.exam_name || null
-
-    if (rawTarget?.main_study_source) {
-      try {
-        if (rawTarget.main_study_source.startsWith("{") && rawTarget.main_study_source.endsWith("}")) {
-          const meta = JSON.parse(rawTarget.main_study_source)
-          if (meta.examDate) exam_date = meta.examDate
-          if (meta.examTime) exam_time = meta.examTime
-          if (meta.examLocation) exam_location = meta.examLocation
-          if (meta.examName) exam_name = meta.examName
-        }
-      } catch {
-        // Ignorar se não for JSON válido
-      }
-    }
+    // G2.15: mesma leitura do alvo usada pelo contexto do Mentor.
+    const resolvedTarget = resolveTargetFields(rawTarget)
+    const exam_date = resolvedTarget.examDate
+    const exam_time = resolvedTarget.examTime
+    const exam_location = resolvedTarget.examLocation
+    let exam_name = resolvedTarget.examName
 
     if (!exam_name) {
       exam_name = rawTarget?.target_exam || "Concurso Alvo"
@@ -144,7 +164,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     } : null
 
     const attemptsRaw = questionAttemptsResult?.data || []
-    const attempts = attemptsRaw.map((a: {
+    const attempts = canonicalizeAttemptRows(attemptsRaw.map((a: {
       id: string
       correct: boolean
       question_id: string
@@ -158,7 +178,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
       created_at: a.created_at,
       answered_at: a.answered_at,
       discipline_id: (Array.isArray(a.questions) ? a.questions[0]?.discipline_id : a.questions?.discipline_id) ?? null,
-    }))
+    })), disciplineIdentity)
 
     // Determinar primeiro dia da semana do perfil (0 = Domingo, 1 = Segunda)
     const prefsFirstDay = (profile?.preferences as Record<string, unknown> | null)?.["firstDayOfWeek"]
@@ -292,21 +312,23 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
 
     const plannedById = new Map<string, { name: string }>()
     for (const item of todayPlanItems || []) {
-      const discId = (item as { discipline_id?: string }).discipline_id
+      const rawId = (item as { discipline_id?: string }).discipline_id
+      const discId = rawId ? canonicalIdOf(disciplineIdentity, rawId) : rawId
       const discName = (item as { discipline?: { name?: string } }).discipline?.name
       if (discId && !plannedById.has(discId)) {
-        plannedById.set(discId, { name: discName || "Desconhecida" })
+        plannedById.set(discId, { name: identityDisplayName(disciplineIdentity, discId, discName || "Desconhecida") })
       }
     }
 
     const cycleBlocks = cycleOverview?.blocks || []
     const cycleById = new Map<string, { name: string; order: number; isCurrent: boolean }>()
     cycleBlocks.forEach((block, index) => {
-      const discId = (block as { disciplineId?: string }).disciplineId
+      const rawId = (block as { disciplineId?: string }).disciplineId
+      const discId = rawId ? canonicalIdOf(disciplineIdentity, rawId) : rawId
       const discName = (block as { disciplineName?: string }).disciplineName
       if (discId && !cycleById.has(discId)) {
         cycleById.set(discId, {
-          name: discName || "Desconhecida",
+          name: identityDisplayName(disciplineIdentity, discId, discName || "Desconhecida"),
           order: index,
           isCurrent: index === (cycleOverview?.currentBlockIndex ?? -1),
         })
@@ -415,6 +437,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
           accuracyPercentage,
         }
       }),
+      disciplineIdentity,
       recentActivities,
       dataIssues,
       analytics: {

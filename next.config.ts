@@ -4,7 +4,20 @@ import { withSentryConfig } from "@sentry/nextjs"
 
 import { LEGACY_ROUTE_REDIRECTS } from "./src/config/legacy-routes"
 
+/**
+ * G2.20 — páginas de harness E2E (`page.e2e.tsx`, em src/app/e2e-harness) só
+ * viram rotas quando o Playwright sobe o servidor com NOMEIA_E2E_HARNESS=1.
+ * Em `npm run dev`/`npm run build` normais (e na Vercel) elas NÃO existem:
+ * `page.e2e.tsx` não casa com as extensões padrão. Ligar a flag num build de
+ * produção da Vercel é recusado.
+ */
+const E2E_HARNESS = process.env["NOMEIA_E2E_HARNESS"] === "1"
+if (E2E_HARNESS && process.env["VERCEL_ENV"] === "production") {
+  throw new Error("NOMEIA_E2E_HARNESS não pode ser usado em produção.")
+}
+
 const nextConfig: NextConfig = {
+  pageExtensions: E2E_HARNESS ? ["e2e.tsx", "tsx", "ts", "jsx", "js"] : ["tsx", "ts", "jsx", "js"],
   // Explicitly set the Turbopack root to avoid issues with non‑ASCII characters in the workspace path
   turbopack: {
     root: "./",

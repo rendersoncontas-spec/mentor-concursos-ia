@@ -249,10 +249,16 @@ describe("Edição: busca a linha COMPLETA da sessão", () => {
   it("a tela busca a linha completa antes de abrir o modal e não abre com dados parciais", () => {
     const src = fs.readFileSync(path.join(process.cwd(), "src/features/history/components/history-view.tsx"), "utf-8")
     const fn = src.slice(src.indexOf("const handleEditSession = async"), src.indexOf("const handleModalClose"))
-    assert.ok(fn.includes("await getHistorySessionForEditAction(session.id)"))
+    // G2.23: a tela chama as ações pela fronteira `useHistoryActions` (o padrão de
+    // produção são as próprias Server Actions — conferido abaixo).
+    assert.ok(fn.includes("await actionsRef.current.getSessionForEdit(session.id)"))
     assert.ok(fn.indexOf("return") < fn.indexOf("setEditingSession(full"))
-    assert.ok(src.includes("const { data: payload, error } = await getHistoryListAction()"))
+    assert.ok(src.includes("const { data: payload, error } = await actionsRef.current.getList()"))
     assert.equal(src.includes("getAllHistoryAction("), false)
+    const boundary = fs.readFileSync(path.join(process.cwd(), "src/features/history/history-actions.tsx"), "utf-8")
+    assert.ok(boundary.includes("getList: getHistoryListAction"))
+    assert.ok(boundary.includes("getSessionForEdit: getHistorySessionForEditAction"))
+    assert.equal(boundary.includes("getAllHistoryAction("), false)
   })
 
   it("pendentes offline, SAVED, QUEUED e OFFLINE_RESOLVED continuam tratados como antes", () => {

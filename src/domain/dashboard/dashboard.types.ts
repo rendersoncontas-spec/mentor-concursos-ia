@@ -1,3 +1,4 @@
+import type { DisciplineIdentitySnapshot } from "@/domain/disciplines/discipline-identity"
 import { type CycleBlock, type StudyPlanItemWithDetails } from "@/domain/study-plan/study-plan.types"
 import type { HeatmapDay, RankingItem, TimeSeriesDataPoint, GoalProgress } from "@/application/study-analytics/types"
 
@@ -171,6 +172,12 @@ export interface DashboardSnapshot {
    * produção `getDashboardData` sempre preenche os 8 campos.
    */
   dataIssues?: DashboardDataIssues
+  /**
+   * G2.14: identidade canônica das disciplinas desta carga (alias → canônica,
+   * nome exibido). Os ids do snapshot já estão na identidade; widgets que
+   * cruzam com dados lidos à parte (ex.: "Estudos de Hoje") usam isto.
+   */
+  disciplineIdentity?: DisciplineIdentitySnapshot
 }
 
 // Compatibilidade durante refatoração

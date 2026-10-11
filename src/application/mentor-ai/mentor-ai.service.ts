@@ -17,6 +17,11 @@ CapabilityRegistry.register(
   // new PerformanceCapability(), etc...
 )
 
+/**
+ * @deprecated G2.16 — feed heurístico antigo. /dashboard/mentor encaminha
+ * para /mentor e nada mais chama este serviço. Mantido (sem uso) até a
+ * remoção definitiva; não usar em código novo.
+ */
 export class MentorAIService {
   private static memoryCache = new Map<string, { data: MentorResponse; timestamp: number }>()
 

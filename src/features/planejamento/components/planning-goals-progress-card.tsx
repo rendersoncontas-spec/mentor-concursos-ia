@@ -210,10 +210,12 @@ export function PlanningGoalsProgressCard({
           {/* Date Navigator Controls */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
+              type="button"
+              aria-label="Período anterior"
               onClick={() => setCurrentOffset((prev) => prev - 1)}
               className="p-2 border rounded-xl hover:bg-muted text-muted-foreground transition-colors bg-background shadow-xs"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft aria-hidden className="w-4 h-4" />
             </button>
 
             <span className="text-xs font-semibold text-foreground px-3 py-2 bg-muted rounded-xl border flex-1 text-center min-w-0">
@@ -221,10 +223,12 @@ export function PlanningGoalsProgressCard({
             </span>
 
             <button
+              type="button"
+              aria-label="Próximo período"
               onClick={() => setCurrentOffset((prev) => prev + 1)}
               className="p-2 border rounded-xl hover:bg-muted text-muted-foreground transition-colors bg-background shadow-xs shrink-0"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight aria-hidden className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -244,8 +248,8 @@ export function PlanningGoalsProgressCard({
             <div
               className={
                 totalPercentage >= 100
-                  ? "text-emerald-600 dark:text-emerald-400 font-semibold"
-                  : "text-amber-600 dark:text-amber-400 font-semibold"
+                  ? "text-emerald-700 dark:text-emerald-400 font-semibold"
+                  : "text-amber-700 dark:text-amber-400 font-semibold"
               }
             >
               {totalPercentage >= 100
@@ -293,8 +297,8 @@ export function PlanningGoalsProgressCard({
                   <span
                     className={
                       isCompleted
-                        ? "text-emerald-600 dark:text-emerald-400 font-semibold"
-                        : "text-amber-600 dark:text-amber-400"
+                        ? "text-emerald-700 dark:text-emerald-400 font-semibold"
+                        : "text-amber-700 dark:text-amber-400"
                     }
                   >
                     {isCompleted
@@ -318,7 +322,7 @@ export function PlanningGoalsProgressCard({
 
                 <span
                   className={`text-xs font-semibold min-w-[48px] text-right ${
-                    isCompleted ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+                    isCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-foreground"
                   }`}
                 >
                   {d.percentage}%

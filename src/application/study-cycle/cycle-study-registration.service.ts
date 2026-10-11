@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache"
 
 import { getEffectiveUserId } from "@/application/admin/auth-guard"
 import { reconcileCycleFromStudies } from "@/application/study-cycle/cycle-reconciliation.engine"
-import { normalizeText, similarity } from "@/features/importacao/lib/subject-matcher"
+import { loadDisciplineIdentity } from "@/application/disciplines/discipline-identity.loader"
+import { buildCycleItemMatcher } from "@/application/study-cycle/cycle-item-matcher"
+import { EMPTY_DISCIPLINE_IDENTITY, type DisciplineIdentitySnapshot } from "@/domain/disciplines/discipline-identity"
 import { createClient } from "@/infrastructure/supabase/server"
 
 export interface RegisterStudyToCycleResult {
@@ -39,6 +41,8 @@ export interface RebuildResult {
   historyRows: number
   validRows: number
   matchedById: number
+  /** G2.14: estudos casados pela identidade canônica (alias ↔ canônica). */
+  matchedByIdentity?: number
   matchedByName: number
   matchedBySimilarity: number
   skippedNoMatch: number
@@ -141,6 +145,22 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
     .map((row) => ({ row, seconds: secondsForHistory(row) }))
     .filter(({ seconds }) => seconds > 0)
 
+  // G2.14: identidade das disciplinas do histórico + dos itens, carregada sob
+  // demanda e reaproveitada entre os ciclos ativos deste rebuild.
+  const historyDisciplineIds = [...new Set(validHistory.map(({ row }) => row.discipline_id).filter((id): id is string => !!id))]
+  let identityCache: { ids: Set<string>; data: DisciplineIdentitySnapshot } | null = null
+  const identityFor = async (itemIds: string[]): Promise<DisciplineIdentitySnapshot> => {
+    const wanted = new Set([...historyDisciplineIds, ...itemIds])
+    if (identityCache && [...wanted].every((id) => identityCache?.ids.has(id))) return identityCache.data
+    const loaded = await loadDisciplineIdentity(supabase, userId, wanted)
+    if (loaded.error) {
+      console.error("[CICLO] Identidade de disciplinas indisponível:", loaded.error)
+      return EMPTY_DISCIPLINE_IDENTITY
+    }
+    identityCache = { ids: wanted, data: loaded.data }
+    return loaded.data
+  }
+
   const { data: cycles, error: cyclesError } = await supabase
     .from("study_cycles")
     .select("id, name")
@@ -155,6 +175,7 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
 
   let processed = 0
   let matchedById = 0
+  let matchedByIdentity = 0
   let matchedByName = 0
   let matchedBySimilarity = 0
   let skippedNoMatch = 0
@@ -199,32 +220,23 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
       occurredAt: row.concluded_at as string,
     }))
 
-    const byId = new Map(items.map((item) => [item.discipline_id, item]))
-    const byName = new Map(items.map((item) => [normalizeText(itemDiscipline(item)?.name || ""), item]))
-    const matchBySimilarity = (name: string) => {
-      let best: CycleItemRow | null = null
-      let score = 0
-      for (const item of items) {
-        const candidate = similarity(name, itemDiscipline(item)?.name || "")
-        if (candidate > score) {
-          best = item
-          score = candidate
-        }
-      }
-      return score >= 0.8 ? best : null
-    }
+    // G2.14: identidade canônica (uma leitura por rebuild, em lotes). Falha
+    // na identidade → cada id é ele mesmo: exatamente o casamento anterior.
+    const identity = await identityFor(items.map((item) => item.discipline_id))
+    const matchStudy = buildCycleItemMatcher(
+      items.map((item) => ({ id: item.id, disciplineId: item.discipline_id, disciplineName: itemDiscipline(item)?.name || "", row: item })),
+      identity,
+    )
 
     const matchedStudies: { id: string; cycleItemId: string; disciplineId: string | null; seconds: number; startedAt: string | undefined }[] = []
     const statsByItem = new Map(items.map((item) => [item.id, { studies: 0 }]))
 
     for (const { row, seconds } of validHistory) {
       const name = disciplineName(row)
-      const direct = row.discipline_id ? byId.get(row.discipline_id) : null
-      const exact = !direct && name ? byName.get(normalizeText(name)) : null
-      const similar = !direct && !exact && name ? matchBySimilarity(name) : null
-      const item = direct || exact || similar
+      const match = matchStudy({ disciplineId: row.discipline_id, disciplineName: name })
+      const item = match?.item.row ?? null
 
-      if (!item) {
+      if (!match || !item) {
         skippedNoMatch += 1
         if (unmatchedSamples.length < 15) {
           unmatchedSamples.push({ disciplineId: row.discipline_id, disciplineName: name || "(sem nome)", minutes: seconds / 60, startedAt: row.started_at, studySource: row.study_source })
@@ -232,8 +244,9 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
         continue
       }
 
-      if (direct) matchedById += 1
-      else if (exact) matchedByName += 1
+      if (match.kind === "id") matchedById += 1
+      else if (match.kind === "identity") matchedByIdentity += 1
+      else if (match.kind === "name") matchedByName += 1
       else matchedBySimilarity += 1
 
       matchedStudies.push({ id: row.id, cycleItemId: item.id, disciplineId: row.discipline_id, seconds, startedAt: row.started_at ?? undefined })
@@ -279,7 +292,7 @@ async function rebuildForUser(userId: string): Promise<RebuildResult> {
   revalidatePath("/ciclos")
   revalidatePath("/dashboard")
   revalidatePath("/dashboard/history")
-  return { success: true, processed, errors: [], historyRows: history.length, validRows: validHistory.length, matchedById, matchedByName, matchedBySimilarity, skippedNoMatch, unmatchedSamples, items: diagnostics }
+  return { success: true, processed, errors: [], historyRows: history.length, validRows: validHistory.length, matchedById, matchedByIdentity, matchedByName, matchedBySimilarity, skippedNoMatch, unmatchedSamples, items: diagnostics }
 }
 
 /** Sole server-side authority for cycle aggregation, rounds and cursor. */

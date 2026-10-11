@@ -42,3 +42,13 @@ next-env.d.ts
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# G2.17 — resultados locais do piloto do Mentor IA (respostas para avaliação humana)
+/pilot-runs/
+
+# G2.20 — saídas dos testes E2E (screenshots, traces, relatório)
+/e2e/.results/
+/e2e/.report/
+/e2e/.auth/
+/playwright-report/
+/test-results/

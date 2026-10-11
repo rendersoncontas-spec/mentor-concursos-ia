@@ -15,6 +15,7 @@
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-text: hsl(var(--accent-text));
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-success: hsl(var(--success));
@@ -84,6 +85,9 @@
     --muted-foreground:   220 10% 40%;
     --accent:             28 65% 52%; /* terracota — destaque controlado, 1 por tela */
     --accent-foreground:  220 20% 14%;
+    /* G2.21: terracota para TEXTO pequeno (≥ 4,9:1 sobre fundo/card). O --accent
+       puro (3,0:1) continua para fundos, ícones e barras. */
+    --accent-text:        28 65% 38%;
     --destructive:        0 72% 51%;
     --destructive-foreground: 0 0% 98%;
     --success:            142 45% 32%;
@@ -138,18 +142,25 @@
     --card-foreground:    30 15% 94%;
     --popover:            220 14% 12%;
     --popover-foreground: 30 15% 94%;
-    --primary:            172 40% 42%;
-    --primary-hover:      172 40% 38%;
-    --primary-pressed:    172 40% 34%;
-    --primary-foreground: 0 0% 100%;
+    /* G2.22 (axe, tema escuro): com 42% de luminosidade e texto branco, os
+       botões principais davam 3,5:1, e text-primary sobre o card 4,2:1. Mesmo
+       matiz, um pouco mais claro, com texto grafite: botão 6,4:1, texto
+       primário sobre o card 6,1:1 (sobre primary/10, 5,3:1). */
+    --primary:            172 40% 48%;
+    --primary-hover:      172 40% 44%;
+    --primary-pressed:    172 40% 40%;
+    --primary-foreground: 220 20% 10%;
     --secondary:          30 12% 30%;
     --secondary-foreground: 30 15% 94%;
     --muted:              220 12% 16%;
     --muted-foreground:   30 10% 65%;
     --accent:             28 60% 58%;
     --accent-foreground:  220 20% 10%;
-    --destructive:        0 62% 52%;
-    --destructive-foreground: 0 0% 98%;
+    --accent-text:        28 60% 62%;
+    /* G2.22: text-destructive sobre o card dava 3,5:1 ("Sair" no menu). Mais
+       claro + texto grafite: texto 4,8:1, botão 5,0:1. */
+    --destructive:        0 62% 62%;
+    --destructive-foreground: 220 20% 10%;
     --success:            142 40% 45%;
     --success-foreground: 220 20% 10%;
     --warning:            38 70% 55%;
@@ -158,12 +169,12 @@
     --info-foreground:    220 20% 10%;
     --border:             220 12% 18%;
     --input:              220 12% 18%;
-    --ring:               172 40% 42%;
+    --ring:               172 40% 48%;
 
     /* ── Sidebar (Dark grafite sofisticado, nunca preto puro) ── */
     --sidebar-background: 220 16% 7%;
     --sidebar-foreground: 30 15% 92%;
-    --sidebar-primary:    172 40% 42%;
+    --sidebar-primary:    172 40% 48%;
     --sidebar-accent:     220 14% 13%;
     --sidebar-border:     220 12% 15%;
   }
@@ -379,4 +390,17 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── Toasts (sonner, richColors) — G2.21 ───────────────────────────────
+   As cores de texto padrão do tema claro do sonner ficam ABAIXO do contraste
+   mínimo WCAG AA (4,5:1) sobre o próprio fundo do toast (erro 4,3; sucesso
+   4,3; aviso 3,1; info 4,4 — medido pelo axe no harness E2E). Mesmos matizes,
+   só mais escuros (≥ 4,9:1). O tema escuro já passa e não muda.
+   Seletor com `html` para vencer o CSS que o sonner injeta em tempo de execução. */
+html [data-sonner-toaster][data-sonner-theme="light"] {
+  --success-text: #007a29;
+  --info-text: #0866c6;
+  --warning-text: #a85a00;
+  --error-text: #c00000;
 }
