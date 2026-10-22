@@ -2,7 +2,18 @@
 
 import { useMemo, useState } from "react"
 
-import { BookOpen, Check, ChevronLeft, ChevronRight, FileText, SquarePen, Timer, Trash2 } from "lucide-react"
+import {
+  AlertTriangle,
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  RotateCcw,
+  SquarePen,
+  Timer,
+  Trash2,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -24,6 +35,15 @@ interface StudyCalendarProps {
   onEditSession: (session: HistorySession) => void
   onDeleteSession: (sessionId: string) => void
   isLoading?: boolean
+  /**
+   * G2.24 — a leitura do mês FALHOU. Diferente de "mês sem estudos": no lugar da
+   * grade aparece um aviso com "Tentar novamente"; a navegação entre meses segue
+   * disponível e o mês escolhido é mantido.
+   */
+  hasError?: boolean
+  onRetry?: () => void
+  /** Há filtros ativos: a mensagem de vazio diz isso em vez de "nenhum estudo no mês". */
+  filtered?: boolean
 }
 
 /** Duração real da sessão em SEGUNDOS (unidade real do banco). */
@@ -69,6 +89,9 @@ export function StudyCalendar({
   onEditSession,
   onDeleteSession,
   isLoading,
+  hasError = false,
+  onRetry,
+  filtered = false,
 }: StudyCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
@@ -175,7 +198,39 @@ export function StudyCalendar({
         </div>
       </div>
 
+      {hasError && (
+        // G2.24: role="alert" → anunciado pelo leitor de tela assim que aparece.
+        <div
+          role="alert"
+          className="flex flex-col items-center justify-center gap-2 rounded-xl border border-destructive/40 bg-card px-4 py-10 text-center"
+        >
+          <AlertTriangle aria-hidden className="h-5 w-5 text-destructive" />
+          <h3 className="text-sm font-semibold text-foreground">
+            Não foi possível carregar {MONTH_NAMES[currentMonth - 1]} de {currentYear}
+          </h3>
+          <p className="max-w-md text-[13px] text-muted-foreground">
+            A leitura dos seus registros falhou. Isso não significa que você não estudou neste mês: nada foi
+            perdido. Tente novamente ou escolha outro mês.
+          </p>
+          {onRetry && (
+            <Button size="sm" variant="outline" onClick={onRetry} disabled={isLoading} className="mt-1 gap-1.5">
+              <RotateCcw aria-hidden className="h-3.5 w-3.5" />
+              Tentar novamente
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!hasError && !isLoading && sessions.length === 0 && (
+        <p role="status" className="rounded-xl border bg-card px-4 py-3 text-center text-[13px] text-muted-foreground">
+          {filtered
+            ? `Nenhum estudo de ${MONTH_NAMES[currentMonth - 1]} de ${currentYear} com os filtros selecionados.`
+            : `Nenhum estudo registrado em ${MONTH_NAMES[currentMonth - 1]} de ${currentYear}.`}
+        </p>
+      )}
+
       {/* Grid */}
+      {!hasError && (
       <div className="rounded-xl border bg-card overflow-hidden">
         {/* Days of week */}
         <div className="grid grid-cols-7 border-b bg-muted/30">
@@ -278,6 +333,7 @@ export function StudyCalendar({
           })}
         </div>
       </div>
+      )}
 
       {/* Modal de Detalhes do Dia */}
       <Dialog open={!!selectedDate} onOpenChange={(open) => !open && setSelectedDate(null)}>

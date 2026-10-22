@@ -20,8 +20,6 @@ import { toast } from "sonner"
 
 import {
   closeBlockManuallyAction,
-  getPeriodGoalAction,
-  getReplanInfoAction,
   pullPendingToTodayAction,
   runReplanningAction,
   setAutoReplanPreferenceAction,
@@ -45,7 +43,7 @@ import {
   LS_SHIFT_ANCHOR_DATE,
 } from "@/features/planejamento/lib/planning-form"
 import { REPLAN_UNAVAILABLE_MESSAGE } from "@/features/planejamento/lib/study-plan-shared"
-import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
+import { usePlanningActionsRef } from "@/features/planejamento/planning-actions"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 import { cn } from "@/lib/utils"
 
@@ -100,6 +98,7 @@ export function DailyPlanningView({
   className,
 }: DailyPlanningViewProps) {
   const router = useRouter()
+  const planningRef = usePlanningActionsRef()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
   const [mounted, setMounted] = useState(false)
@@ -140,7 +139,7 @@ export function DailyPlanningView({
   useEffect(() => {
     // P1.5: banco é a fonte oficial; sincroniza uma vez (down-sync ou lazy
     // migration) e o evento mentor_scale_updated atualiza este estado.
-    void syncPlanningPreferencesFromServer()
+    void planningRef.current.syncPlanningPreferencesFromServer()
     const handleUpdate = () => {
       const savedScale = localStorage.getItem("mentor_user_work_scale")
       if (savedScale) setScheduleMode(savedScale)
@@ -153,7 +152,7 @@ export function DailyPlanningView({
     }
     window.addEventListener("mentor_scale_updated", handleUpdate)
     return () => window.removeEventListener("mentor_scale_updated", handleUpdate)
-  }, [])
+  }, [planningRef])
 
   // ───────────────────────────────────────────────────────────────────────
   // REPLANEJAMENTO ADAPTATIVO: informações da janela ajustada + pendências (com SWR cache)
@@ -228,7 +227,7 @@ export function DailyPlanningView({
     const token = {}
     const promise = (async () => {
       try {
-        const res = await getReplanInfoAction(availability)
+        const res = await planningRef.current.getReplanInfoAction(availability)
         if (res.data) {
           setReplanInfo(res.data)
           setReplanError(false)
@@ -251,7 +250,7 @@ export function DailyPlanningView({
     })()
     replanInFlightRef.current = { key, token, promise }
     return promise
-  }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate])
+  }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate, planningRef])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -272,7 +271,7 @@ export function DailyPlanningView({
   useEffect(() => {
     const timer = setTimeout(async () => {
       try {
-        const res = await getPeriodGoalAction("semana")
+        const res = await planningRef.current.getPeriodGoalAction("semana")
         if (res.data) {
           setPeriodGoal(res.data)
         }
@@ -283,13 +282,13 @@ export function DailyPlanningView({
       }
     }, 0)
     return () => clearTimeout(timer)
-  }, [])
+  }, [planningRef])
 
   // Recarregar meta quando uma sessão é salva
   useEffect(() => {
     const handler = async () => {
       try {
-        const res = await getPeriodGoalAction("semana")
+        const res = await planningRef.current.getPeriodGoalAction("semana")
         if (res.data) {
           setPeriodGoal(res.data)
         }
@@ -299,7 +298,7 @@ export function DailyPlanningView({
     }
     window.addEventListener(STUDY_SESSION_SAVED_EVENT, handler)
     return () => window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handler)
-  }, [])
+  }, [planningRef])
 
   const handleManualReplan = async () => {
     setBusy(true)
@@ -757,23 +756,23 @@ export function DailyPlanningView({
   return (
     <div
       className={cn(
-        "p-4 space-y-3.5 w-full",
+        "p-3 space-y-2.5 w-full",
         !embedded && "bg-card border border-border rounded-lg",
         className,
       )}
     >
       {/* P1.1: erro de leitura ≠ "sem planejamento". Aviso discreto, resto segue. */}
       {replanError && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-800 dark:text-amber-300">
           {REPLAN_UNAVAILABLE_MESSAGE}
         </div>
       )}
       {/* Linha 1: Controles de Data e Navegação */}
-      <div className="flex items-start justify-between gap-3 border-b pb-2.5">
+      <div className="flex items-start justify-between gap-3 border-b pb-2">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-[15px] font-semibold text-foreground capitalize leading-tight">
+              <h2 className="text-[15px] font-semibold text-foreground first-letter:uppercase leading-tight">
                 {dateFormatted}
               </h2>
               {isToday && (
@@ -947,7 +946,7 @@ export function DailyPlanningView({
           antes eram 5 "pílulas" coloridas, uma cor por métrica). */}
       <div className="grid grid-cols-3 sm:grid-cols-5 divide-x divide-border border-y border-border [&>*]:border-border max-sm:[&>*:nth-child(4)]:border-l-0 max-sm:[&>*:nth-child(n+4)]:border-t">
         {/* Meta (semanal) */}
-        <div className="px-3 py-2 flex flex-col min-w-0">
+        <div className="px-3 py-1.5 flex flex-col min-w-0">
           <span className="text-xs text-muted-foreground truncate">
             {periodGoal?.goalSource === "suggested" ? "Meta sugerida" : "Meta"}
           </span>
@@ -959,7 +958,7 @@ export function DailyPlanningView({
         </div>
 
         {/* Estudado (período) */}
-        <div className="px-3 py-2 flex flex-col min-w-0">
+        <div className="px-3 py-1.5 flex flex-col min-w-0">
           <span className="text-xs text-muted-foreground truncate">
             Estudado
           </span>
@@ -973,7 +972,7 @@ export function DailyPlanningView({
         </div>
 
         {/* Falta (meta - estudado) */}
-        <div className="px-3 py-2 flex flex-col min-w-0">
+        <div className="px-3 py-1.5 flex flex-col min-w-0">
           <span className="text-xs text-muted-foreground truncate">
             Falta
           </span>
@@ -989,7 +988,7 @@ export function DailyPlanningView({
         </div>
 
         {/* Planejado para hoje */}
-        <div className="px-3 py-2 flex flex-col min-w-0">
+        <div className="px-3 py-1.5 flex flex-col min-w-0">
           <span className="text-xs text-muted-foreground truncate">
             Hoje
           </span>
@@ -1007,7 +1006,7 @@ export function DailyPlanningView({
             }
           }}
           className={cn(
-            "px-3 py-2 flex flex-col min-w-0 transition-colors",
+            "px-3 py-1.5 flex flex-col min-w-0 transition-colors",
             (replanInfo?.totalPendingMinutes ?? 0) > 0 &&
               "cursor-pointer hover:bg-muted/60",
           )}
@@ -1037,8 +1036,8 @@ export function DailyPlanningView({
       </div>
 
       {/* Linha 3: Cronograma do Dia */}
-      <div className="space-y-4 pt-1">
-        <div className="flex items-center justify-between border-b pb-2">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between border-b pb-1.5">
           <h3 className="text-[13px] font-semibold text-foreground">
             Cronograma do dia
           </h3>
@@ -1076,7 +1075,7 @@ export function DailyPlanningView({
               return (
                 <div
                   key={task.id}
-                  className="flex flex-col gap-3 py-3 px-1 hover:bg-muted/30 transition-colors"
+                  className="flex flex-col gap-1.5 py-2 px-1 hover:bg-muted/30 transition-colors"
                 >
                   {/* Header: color bar + discipline + time slot + badges */}
                   <div className="flex items-start gap-3">
@@ -1086,7 +1085,7 @@ export function DailyPlanningView({
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex-1 min-w-0 space-y-0.5">
                           {/* Line 1: time slot + duration + status badge + pending badge */}
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-xs tabular-nums text-muted-foreground">
@@ -1118,37 +1117,29 @@ export function DailyPlanningView({
                             )}
                           </div>
 
-                          {/* Line 2: discipline name */}
-                          <h4 className="text-sm font-semibold text-foreground truncate">{task.disciplineName}</h4>
-
-                          {/* Line 3: progress text */}
-                          <p className="text-xs text-muted-foreground">
-                            {getTaskProgressText(
-                              task.completed,
-                              task.studiedMinutes,
-                              task.durationMinutes,
-                              task.manuallyClosed,
-                              task.manualPendingMinutes,
-                            )}
-                          </p>
-
-                          {/* Line 4: remaining time (only for in-progress) */}
-                          {status === "EM_ANDAMENTO" && remaining > 0 && (
-                            <p className="text-[11px] font-medium text-muted-foreground">
-                              Faltam {remaining} min
+                          {/* Linhas 2-4 (V2.5 compacto): nome da disciplina + progresso + "faltam" na mesma linha */}
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                            <h4 className="text-sm font-semibold text-foreground truncate max-w-full">{task.disciplineName}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              {getTaskProgressText(
+                                task.completed,
+                                task.studiedMinutes,
+                                task.durationMinutes,
+                                task.manuallyClosed,
+                                task.manualPendingMinutes,
+                              )}
+                              {status === "EM_ANDAMENTO" && remaining > 0 ? ` · Faltam ${remaining} min` : ""}
                             </p>
-                          )}
+                          </div>
 
                           {/* Line 5: progress bar (for in-progress and completed) */}
                           {(status === "EM_ANDAMENTO" || status === "CONCLUIDO") && (
-                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                              {/* V2.5: a barra usa a cor da marca (a cor da matéria já está no
+                                  filete à esquerda); antes o verde-menta fixo de "concluído". */}
                               <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${progressPct}%`,
-                                  backgroundColor:
-                                    status === "CONCLUIDO" ? "#10b981" : task.color || "#2563EB",
-                                }}
+                                className="h-full rounded-full bg-primary transition-all duration-500"
+                                style={{ width: `${progressPct}%` }}
                               />
                             </div>
                           )}

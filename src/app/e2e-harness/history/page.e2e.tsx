@@ -8,7 +8,7 @@ import { HistoryHarness } from "./history-harness"
 export const metadata: Metadata = { title: "E2E · histórico", robots: { index: false, follow: false } }
 export const dynamic = "force-dynamic"
 
-const STATES = ["data", "empty", "error", "calendar-error"] as const
+const STATES = ["data", "empty", "error", "calendar-error", "calendar-retry", "calendar-month-error"] as const
 
 export default async function HistoryHarnessPage({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
   const { state } = await searchParams

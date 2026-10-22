@@ -67,13 +67,31 @@ describe("sessionStore (migração do cronômetro para IndexedDB)", () => {
     assert.equal(result, undefined)
   })
 
-  it("subscribe notifica outra aba quando a sessão do MESMO usuário muda", async () => {
+  it("subscribe NÃO notifica a própria aba (sem eco) — regressão do bug Play/Pause", async () => {
     const userId = "user-f"
     const received: string[] = []
     const unsubscribe = sessionStore.subscribe(userId, () => received.push("changed"))
     await sessionStore.set(userId, baseSession())
+    await sessionStore.set(userId, baseSession({ phase: "PAUSED", lastPauseStartTime: Date.now() }))
+    await sessionStore.clear(userId)
     await new Promise((resolve) => setTimeout(resolve, 50))
-    assert.equal(received.length, 1)
+    // Antes o canal da própria aba recebia o broadcast do `set()`/`clear()`:
+    // o provider reidratava, criava estado novo e gravava de novo → loop.
+    assert.deepEqual(received, [])
+    unsubscribe()
+  })
+
+  it("subscribe notifica quando OUTRA aba avisa que a sessão do mesmo usuário mudou", async () => {
+    const userId = "user-f2"
+    const received: string[] = []
+    const unsubscribe = sessionStore.subscribe(userId, () => received.push("changed"))
+    // Simula outra aba: mesma mensagem do protocolo, com tabId diferente.
+    const otherTab = new BroadcastChannel("nomeia-offline-session")
+    otherTab.postMessage({ userId, kind: "updated", tabId: "outra-aba" })
+    otherTab.postMessage({ userId, kind: "updated", tabId: "outra-aba" })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.equal(received.length, 2)
+    otherTab.close()
     unsubscribe()
   })
 

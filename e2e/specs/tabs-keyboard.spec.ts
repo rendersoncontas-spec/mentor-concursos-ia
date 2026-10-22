@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test"
 
-import { expectNoAxeViolations, type AxeException } from "../support/axe"
+import { expectNoAxeViolations } from "../support/axe"
 import { expect, expectNoHorizontalOverflow, test, unexpected } from "../support/test"
 
 // G2.23 — abas, teclado e foco (padrão WAI-ARIA APG "Tabs") em Histórico,
@@ -227,7 +227,7 @@ test.describe("Histórico — painel e estados de dados", () => {
     const tablist = page.getByRole("tablist", { name: "Visualização do histórico" })
     await tablist.getByRole("tab", { name: "Calendário" }).click()
     await expect(tablist.getByRole("tab", { name: "Calendário" })).toHaveAttribute("aria-selected", "true")
-    await expect(page.getByText(/Erro ao carregar calendário/)).toBeVisible()
+    await expect(page.getByRole("alert").filter({ hasText: "Não foi possível carregar" })).toBeVisible()
     await expectPanelOf(page, tablist.getByRole("tab", { name: "Calendário" }))
     // Volta para a Lista (pelo teclado) e tudo continua funcionando.
     await tablist.getByRole("tab", { name: "Calendário" }).focus()
@@ -377,15 +377,8 @@ test.describe("10 · abas em 320/375/768/1280", () => {
 })
 
 // ------------------------------------------------------------------- axe
-// Única exceção (escopada por seletor, nunca a regra inteira): chips de disciplina
-// do calendário usam a COR ESCOLHIDA PELO USUÁRIO como fundo com texto branco —
-// o contraste depende do dado, não da semântica de abas. Limitação registrada em
-// docs/g2-23-tabs-keyboard-accessibility-report.md (seção "Limitações").
-const USER_COLOR_CHIP: AxeException = {
-  rule: "color-contrast",
-  selector: ".shadow-2xs.gap-1.text-white",
-  reason: "cor de disciplina definida pelo usuário (dado) sob texto branco; não é defeito de abas",
-}
+// G2.24: sem exceções — os chips de disciplina calculam o texto pelo contraste da cor do usuário
+// (src/lib/a11y/contrast.ts), então o axe roda sobre a página inteira.
 
 for (const scheme of ["light", "dark"] as const) {
   test.describe(`11/13 · axe nas abas — tema ${scheme}`, () => {
@@ -419,7 +412,7 @@ for (const scheme of ["light", "dark"] as const) {
       for (const name of ["Mês", "Metas e horas"]) {
         await tablist.getByRole("tab", { name }).click()
         await expect(tablist.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true")
-        await expectNoAxeViolations(page, { exceptions: [USER_COLOR_CHIP] })
+        await expectNoAxeViolations(page)
       }
     })
 

@@ -42,7 +42,7 @@ export function Metric({ label, value, hint, size = "md", tone = "default", clas
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={cn(
-          "num font-semibold leading-tight",
+          "metric-value",
           size === "sm" && "text-base",
           size === "md" && "text-lg",
           size === "lg" && "text-2xl",

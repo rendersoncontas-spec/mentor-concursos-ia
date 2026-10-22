@@ -45,7 +45,7 @@ export function DayDetailModal({ open, onOpenChange, date }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[420px] max-h-[85vh] overflow-y-auto p-0">
         <DialogHeader className="p-4 pb-0">
-          <DialogTitle className="text-base font-semibold text-foreground capitalize">
+          <DialogTitle className="text-base font-semibold text-foreground first-letter:uppercase">
             {formatDateBR(date)}
           </DialogTitle>
         </DialogHeader>

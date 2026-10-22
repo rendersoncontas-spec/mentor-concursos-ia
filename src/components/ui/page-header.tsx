@@ -21,7 +21,10 @@ export interface PageHeaderProps extends Omit<React.HTMLAttributes<HTMLElement>,
   actions?: React.ReactNode | undefined
 }
 
-export function PageHeader({ title, description, icon: Icon, actions, className, ...props }: PageHeaderProps) {
+// V2.5: o ícone ao lado do título deixou de ser desenhado — ícone decorativo em
+// todo título de página é uma das marcas mais fortes de painel "gerado". A prop
+// continua aceita para não quebrar as páginas que a passam.
+export function PageHeader({ title, description, icon: _icon, actions, className, ...props }: PageHeaderProps) {
   return (
     <header
       className={cn("sticky top-0 z-20 border-b border-border bg-background", className)}
@@ -29,7 +32,6 @@ export function PageHeader({ title, description, icon: Icon, actions, className,
     >
       <div className="page-container flex min-h-14 items-center justify-between gap-3 py-2.5">
         <div className="flex min-w-0 items-center gap-3">
-          {Icon && <Icon aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />}
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold leading-tight text-foreground">{title}</h1>
             {/* No mobile a descrição some: o cabeçalho é fixo e cada linha dele

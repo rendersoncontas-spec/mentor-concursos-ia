@@ -17,19 +17,35 @@ import type { ActiveSessionRecord } from "./types"
 
 const BROADCAST_CHANNEL_NAME = "nomeia-offline-session"
 
+/**
+ * Identificador deste "documento" (aba/janela). BUG Play/Pause: o
+ * BroadcastChannel entrega a mensagem para TODOS os canais com o mesmo nome
+ * no mesmo contexto, exceto o objeto que a enviou. Como `broadcast()` cria um
+ * canal temporário novo, o canal de `subscribe()` da MESMA aba recebia o
+ * próprio aviso — o provider reidratava do IndexedDB, criava novo estado e
+ * gravava de novo (loop perpétuo de render + cliques desfeitos por snapshot
+ * obsoleto). A tag `tabId` permite ignorar o eco da própria aba sem afetar a
+ * sincronização real entre abas.
+ */
+const TAB_ID: string =
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+
 interface SessionBroadcastMessage {
   userId: string
   kind: "updated" | "cleared"
+  tabId: string
 }
 
 function hasBroadcastChannel(): boolean {
   return typeof BroadcastChannel !== "undefined"
 }
 
-function broadcast(message: SessionBroadcastMessage): void {
+function broadcast(message: Omit<SessionBroadcastMessage, "tabId">): void {
   if (!hasBroadcastChannel()) return
   const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME)
-  channel.postMessage(message)
+  channel.postMessage({ ...message, tabId: TAB_ID })
   channel.close()
 }
 
@@ -60,7 +76,10 @@ export const sessionStore = {
     if (!hasBroadcastChannel()) return () => {}
     const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME)
     const handler = (event: MessageEvent<SessionBroadcastMessage>) => {
-      if (event.data?.userId === userId) onChange()
+      if (event.data?.userId !== userId) return
+      // Eco da própria aba: quem gravou já tem esse estado em memória.
+      if (event.data.tabId === TAB_ID) return
+      onChange()
     }
     channel.addEventListener("message", handler)
     return () => {

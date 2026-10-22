@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react"
 
-import { ChevronLeft, ChevronRight, Play, Target } from "lucide-react"
+import { ChevronLeft, ChevronRight, Play } from "lucide-react"
 import { toast } from "sonner"
 
-import { getPeriodGoalAction } from "@/application/study-plan/replan/adaptive-replan.actions"
 import { type PeriodGoalData } from "@/application/study-plan/replan/adaptive-replan.service"
 import { type PeriodFilter as ServicePeriodFilter } from "@/application/study-plan/replan/adaptive-replan.service"
 import { Button } from "@/components/ui/button"
+import { usePlanningActionsRef } from "@/features/planejamento/planning-actions"
 
 import { type StudyCycleBlock } from "./planning-view"
 
@@ -27,16 +27,18 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
   custom: "Personalizado",
 }
 
+// V2.5: barra na cor da marca; a terracota marca só o que está atrasado
+// (< 50%). Antes: verde com sombra / teal / âmbar em cada linha.
 function getProgressBarClass(isCompleted: boolean, percentage: number): string {
-  if (isCompleted) return "bg-emerald-500 shadow-sm"
-  if (percentage >= 50) return "bg-primary"
-  return "bg-amber-500"
+  if (isCompleted || percentage >= 50) return "bg-primary"
+  return "bg-accent"
 }
 
 export function PlanningGoalsProgressCard({
   blocks,
   onStartSession,
 }: PlanningGoalsProgressCardProps) {
+  const planningRef = usePlanningActionsRef()
   const [period, setPeriod] = useState<PeriodFilter>("semana")
   const [currentOffset, setCurrentOffset] = useState(0) // offset for period navigation
 
@@ -52,7 +54,7 @@ export function PlanningGoalsProgressCard({
       try {
         // Mapear "custom" para "semana" (service não suporta custom)
         const servicePeriod: ServicePeriodFilter = period === "custom" ? "semana" : period
-        const res = await getPeriodGoalAction(servicePeriod, currentOffset)
+        const res = await planningRef.current.getPeriodGoalAction(servicePeriod, currentOffset)
         if (!cancelled && res.data) {
           setPeriodGoal(res.data)
         }
@@ -64,7 +66,7 @@ export function PlanningGoalsProgressCard({
     }
     void fetchGoal()
     return () => { cancelled = true }
-  }, [period, currentOffset])
+  }, [period, currentOffset, planningRef])
 
   // Dates calculation based on filter & offset
   const today = new Date()
@@ -166,16 +168,13 @@ export function PlanningGoalsProgressCard({
   }
 
   return (
-    <div className="bg-card border rounded-xl p-6 space-y-6">
+    <div className="bg-card border rounded-lg p-5 sm:p-6 space-y-5">
       {/* Top Header: Period Selector & Date Range */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-            <Target className="w-5 h-5" />
-          </div>
+        <div className="flex items-center gap-3 self-start">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">
-              Metas & Progresso do Planejamento
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-foreground">
+              Metas e progresso
             </h3>
             <p className="text-xs text-muted-foreground font-medium">
               {periodGoal
@@ -188,7 +187,7 @@ export function PlanningGoalsProgressCard({
         {/* Right Controls: Filters and Date Navigator */}
         <div className="flex flex-col sm:items-end gap-3">
           {/* Period Filter Buttons (Semana, Mês, Ano, Total) */}
-          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border">
+          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-md border">
             {(["semana", "mes", "ano", "total"] as PeriodFilter[]).map((f) => (
               <button
                 key={f}
@@ -196,9 +195,10 @@ export function PlanningGoalsProgressCard({
                   setPeriod(f)
                   setCurrentOffset(0)
                 }}
-                className={`font-semibold px-3 py-1.5 rounded-lg text-xs transition-all ${
+                aria-pressed={period === f}
+                className={`font-medium px-3 py-1.5 rounded-sm text-xs transition-colors ${
                   period === f
-                    ? "bg-primary text-primary-foreground shadow-sm"
+                    ? "bg-card text-foreground shadow-xs ring-1 ring-border"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -213,12 +213,12 @@ export function PlanningGoalsProgressCard({
               type="button"
               aria-label="Período anterior"
               onClick={() => setCurrentOffset((prev) => prev - 1)}
-              className="p-2 border rounded-xl hover:bg-muted text-muted-foreground transition-colors bg-background shadow-xs"
+              className="p-2 border rounded-md hover:bg-muted text-muted-foreground transition-colors bg-background"
             >
               <ChevronLeft aria-hidden className="w-4 h-4" />
             </button>
 
-            <span className="text-xs font-semibold text-foreground px-3 py-2 bg-muted rounded-xl border flex-1 text-center min-w-0">
+            <span className="text-xs font-medium tabular-nums text-foreground px-3 py-2 rounded-md border flex-1 text-center min-w-0">
               {getDateRangeLabel()}
             </span>
 
@@ -226,7 +226,7 @@ export function PlanningGoalsProgressCard({
               type="button"
               aria-label="Próximo período"
               onClick={() => setCurrentOffset((prev) => prev + 1)}
-              className="p-2 border rounded-xl hover:bg-muted text-muted-foreground transition-colors bg-background shadow-xs shrink-0"
+              className="p-2 border rounded-md hover:bg-muted text-muted-foreground transition-colors bg-background shrink-0"
             >
               <ChevronRight aria-hidden className="w-4 h-4" />
             </button>
@@ -235,10 +235,10 @@ export function PlanningGoalsProgressCard({
       </div>
 
       {/* Overall Period Progress Overview (Parte Superior) */}
-      <div className="bg-muted/30 p-5 rounded-xl border space-y-4">
+      <div className="space-y-3 border-b pb-5">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div>
-            <div className="text-2xl sm:text-3xl font-semibold text-foreground">{totalPercentage}%</div>
+            <div className="metric-value text-2xl sm:text-3xl text-foreground">{totalPercentage}%</div>
             <p className="text-xs text-muted-foreground font-medium">
               Tempo total cumprido em {periodGoal?.periodLabel || getDateRangeLabel()}
             </p>
@@ -248,12 +248,12 @@ export function PlanningGoalsProgressCard({
             <div
               className={
                 totalPercentage >= 100
-                  ? "text-emerald-700 dark:text-emerald-400 font-semibold"
-                  : "text-amber-700 dark:text-amber-400 font-semibold"
+                  ? "text-primary font-semibold"
+                  : "text-foreground font-semibold"
               }
             >
               {totalPercentage >= 100
-                ? "Meta Batida!"
+                ? "Meta cumprida"
                 : `Falta: ${formatHoursMinutesShort(totalMissingMinutes)}`}
             </div>
             <div className="text-muted-foreground">
@@ -263,46 +263,45 @@ export function PlanningGoalsProgressCard({
         </div>
 
         {/* Global Progress Bar */}
-        <div className="w-full bg-muted rounded-full h-3.5 sm:h-4 overflow-hidden border">
+        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-700 ${
-              totalPercentage >= 100 ? "bg-emerald-500" : "bg-primary"
-            }`}
+            className="h-full rounded-full bg-primary transition-all duration-700"
             style={{ width: `${Math.min(totalPercentage, 100)}%` }}
           />
         </div>
       </div>
 
       {/* Disciplines Goal List */}
-      <div className="space-y-4">
+      <div className="divide-y divide-border">
         {disciplineGoals.map((d) => {
           const isCompleted = d.percentage >= 100
 
           return (
             <div
               key={d.id}
-              className="p-4 rounded-xl border bg-muted/20 hover:border-primary/40 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+              className="py-3.5 first:pt-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4"
             >
               {/* Discipline Info & Missing/Target Labels */}
               <div className="space-y-1 w-full md:w-auto md:min-w-[240px] min-w-0">
                 <div className="flex items-center gap-2">
                   <span
-                    className="w-3 h-3 rounded-full shrink-0"
+                    aria-hidden
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: d.color }}
                   />
                   <h4 className="text-sm font-semibold text-foreground">{d.name}</h4>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs font-semibold">
+                <div className="flex items-center gap-3 text-xs font-medium">
                   <span
                     className={
                       isCompleted
-                        ? "text-emerald-700 dark:text-emerald-400 font-semibold"
-                        : "text-amber-700 dark:text-amber-400"
+                        ? "text-primary font-semibold"
+                        : "text-foreground"
                     }
                   >
                     {isCompleted
-                      ? "Meta Batida!"
+                      ? "Meta cumprida"
                       : `Falta: ${formatHoursMinutesShort(d.missingMinutes)}`}
                   </span>
                   <span className="text-muted-foreground">
@@ -313,7 +312,7 @@ export function PlanningGoalsProgressCard({
 
               {/* Progress Bar & Percentage */}
               <div className="flex-1 w-full md:max-w-md flex items-center gap-3">
-                <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden border">
+                <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${getProgressBarClass(isCompleted, d.percentage)}`}
                     style={{ width: `${d.percentage}%` }}
@@ -321,9 +320,7 @@ export function PlanningGoalsProgressCard({
                 </div>
 
                 <span
-                  className={`text-xs font-semibold min-w-[48px] text-right ${
-                    isCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-foreground"
-                  }`}
+                  className="text-xs font-semibold tabular-nums min-w-[48px] text-right text-foreground"
                 >
                   {d.percentage}%
                 </span>
@@ -336,7 +333,8 @@ export function PlanningGoalsProgressCard({
                   if (onStartSession) onStartSession(d.id)
                   else toast.info(`Iniciando estudo de ${d.name}...`)
                 }}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs h-9 px-4 rounded-xl gap-1.5 shrink-0"
+                variant="outline"
+                className="font-medium text-xs h-9 px-4 gap-1.5 shrink-0"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 Iniciar

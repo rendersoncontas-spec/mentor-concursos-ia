@@ -170,7 +170,11 @@ export function StudyHeaderControl() {
               <span className="tabular-nums font-semibold text-sm text-foreground whitespace-nowrap">
                 {formatTimerClock(displayTime)}
               </span>
-              <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap hidden sm:inline">
+              {/* Largura fixa: "Estudando" e "Pausado" têm larguras diferentes.
+                  Com largura automática, cada Play/Pause empurrava os ícones
+                  ao lado (o botão clicado saía de baixo do cursor), o que
+                  gerava cliques no controle errado e a sensação de "piscar". */}
+              <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap hidden sm:inline-block w-[64px] text-left">
                 {isStudying ? "Estudando" : isPaused ? "Pausado" : "Parado"}
               </span>
               {displayDiscipline && (

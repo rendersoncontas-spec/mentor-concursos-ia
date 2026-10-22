@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useReducer } from "react"
 
 import * as Sentry from "@sentry/nextjs"
 import {
@@ -47,6 +47,12 @@ import { formatDayLabel, getDayInSaoPaulo, getTimeInSaoPaulo } from "@/lib/sao-p
 import { formatDuration, formatDurationMinutes } from "@/lib/format-duration"
 
 import { StudyCalendar } from "./study-calendar"
+import {
+  createRequestTracker,
+  hasMonthlyError,
+  initialMonthlyLoad,
+  monthlyLoadReducer,
+} from "@/features/history/lib/monthly-load"
 
 // Carregado sob demanda (Fase 6, auditoria de bundle): ImportHistoryModal
 // importa estaticamente a biblioteca xlsx (pesada) via excel-reader.ts. Como
@@ -187,6 +193,14 @@ export function HistoryView() {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth() + 1)
   const [monthlySessions, setMonthlySessions] = useState<HistorySession[]>([])
   const [loadingMonthly, setLoadingMonthly] = useState(false)
+  // G2.24: a falha do calendário é um ESTADO (não só um toast): o painel mostra o
+  // erro do mês escolhido, com "Tentar novamente", em vez de um mês "sem estudos".
+  const [monthlyLoad, dispatchMonthlyLoad] = useReducer(
+    monthlyLoadReducer,
+    undefined,
+    () => initialMonthlyLoad(new Date().getFullYear(), new Date().getMonth() + 1),
+  )
+  const monthlyRequests = useRef(createRequestTracker())
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [isManageOpen, setIsManageOpen] = useState(false)
@@ -237,21 +251,33 @@ export function HistoryView() {
   }, [])
 
   const loadMonthlyHistory = useCallback(async (year: number, month: number) => {
+    // G2.24: só a chamada mais recente pode alterar a tela (o aluno pode trocar de
+    // mês antes de a anterior voltar) e o erro vira estado do mês escolhido.
+    const requestId = monthlyRequests.current.begin()
+    dispatchMonthlyLoad({ type: "start", year, month })
     setLoadingMonthly(true)
+    let failed = false
     // G2.23: chamada rejeitada (rede) deixava o calendário em "carregando"
     // para sempre e gerava uma promessa rejeitada sem tratamento.
     try {
       const { data, error } = await actionsRef.current.getMonthly(year, month)
-      if (error) {
-        toast.error("Erro ao carregar calendário: " + error)
-      } else if (data) {
+      if (!monthlyRequests.current.isLatest(requestId)) return
+      if (error || !data) {
+        failed = true
+      } else {
         setMonthlySessions(data)
       }
     } catch {
-      toast.error("Erro ao carregar calendário. Verifique sua conexão e tente novamente.")
-    } finally {
-      setLoadingMonthly(false)
+      if (!monthlyRequests.current.isLatest(requestId)) return
+      failed = true
     }
+    dispatchMonthlyLoad({ type: failed ? "failure" : "success", year, month })
+    if (failed) {
+      // O toast complementa o painel de erro; o `id` evita empilhar o mesmo aviso
+      // a cada nova tentativa.
+      toast.error("Não foi possível carregar o calendário deste mês.", { id: "history-calendar-error" })
+    }
+    setLoadingMonthly(false)
   }, [])
 
   // Insere/substitui a sessão REAL retornada pelo banco no estado local,
@@ -499,6 +525,9 @@ export function HistoryView() {
 
   // KPIs from filtered (todas as sessões estão em memória → soma sempre precisa)
   const activeFilterCount = countActiveFilters(filters)
+  // G2.24: leitura do mês falhou → o resumo não pode afirmar "0 sessões neste mês".
+  const monthlyUnavailable =
+    viewMode === "calendar" && !loadingMonthly && hasMonthlyError(monthlyLoad, calendarYear, calendarMonth)
   const currentSessions = viewMode === "calendar" ? filteredMonthlySessions : filteredSessions
   const totalMinutes = currentSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0)
   const totalCorrect = currentSessions.reduce(
@@ -933,9 +962,11 @@ export function HistoryView() {
             </p>
           ) : (
             <p className="text-xl font-semibold text-foreground tabular-nums">
-              {filteredMonthlySessions.length}
+              {monthlyUnavailable ? "—" : filteredMonthlySessions.length}
               <span className="text-xs font-normal text-muted-foreground ml-2 align-middle">
-                neste mês{activeFilterCount > 0 ? " · com filtros" : ""}
+                {monthlyUnavailable
+                  ? "indisponível neste mês"
+                  : `neste mês${activeFilterCount > 0 ? " · com filtros" : ""}`}
               </span>
             </p>
           )}
@@ -990,6 +1021,9 @@ export function HistoryView() {
                 onEditSession={handleEditSession}
                 onDeleteSession={handleDeleteSession}
                 isLoading={loadingMonthly}
+                hasError={!loadingMonthly && hasMonthlyError(monthlyLoad, calendarYear, calendarMonth)}
+                onRetry={() => void loadMonthlyHistory(calendarYear, calendarMonth)}
+                filtered={activeFilterCount > 0 || importFilterId !== null}
               />
             )
           }

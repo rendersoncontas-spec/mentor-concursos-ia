@@ -8,21 +8,7 @@ import { Check, ChevronDown, ChevronUp, ExternalLink, Plus } from "lucide-react"
 import { Loader2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  addCustomDisciplineAction,
-  removeCustomTopicAction,
-  removeDisciplineAction,
-  saveCustomTopicsAction,
-  searchDisciplinesAction,
-} from "@/application/edital/edital.action"
-import {
-  deleteEditalTopicProgressAction,
-  getEditalTopicProgressAction,
-  importEditalTopicProgressAction,
-  setEditalTopicProgressAction,
-} from "@/application/edital/edital-topic-progress.actions"
 import { isSafeHref } from "@/domain/library/library-url"
-import { createCustomTopicAction } from "@/application/topic-catalog/topic-catalog.actions"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
@@ -33,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { useEditalActionsRef } from "@/features/edital/edital-actions"
 import { TargetSelectorDropdown } from "@/features/dashboard/components/target-selector-dropdown"
 import { StudyRegisterModal } from "@/features/study-session/components/study-register-modal"
 import {
@@ -72,6 +59,7 @@ export function EditalAccordion({
   activeTargetId?: string
 }) {
   const router = useRouter()
+  const editalRef = useEditalActionsRef()
   const [data, setData] = useState<DisciplineData[]>(initialDisciplines || DEFAULT_EDITAL_DATA)
   const [completedTopics, setCompletedTopics] = useState<Record<string, boolean>>({})
   const [openDisciplineId, setOpenDisciplineId] = useState<string | null>(
@@ -96,13 +84,13 @@ export function EditalAccordion({
       return () => clearTimeout(timer)
     }
     const timer = setTimeout(async () => {
-      const res = await searchDisciplinesAction(newDisciplineName)
+      const res = await editalRef.current.searchDisciplinesAction(newDisciplineName)
       if (res.success && res.data) {
         setDisciplineSuggestions(res.data)
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [newDisciplineName])
+  }, [newDisciplineName, editalRef])
 
   // Modais Registro de Estudo e Editar Disciplina
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
@@ -135,6 +123,11 @@ export function EditalAccordion({
   }
 
   // Carregar progresso: servidor primeiro; legado só como fallback/migração.
+  const [serverUnavailable, setServerUnavailable] = useState(false)
+  // G2.24: falha ao LER o progresso ≠ "nenhum tópico concluído". Sem este aviso a
+  // barra dizia "0 de N" como se fosse verdade.
+  const [progressLoadFailed, setProgressLoadFailed] = useState(false)
+
   useEffect(() => {
     if (typeof window === "undefined") return
     let cancelled = false
@@ -153,7 +146,7 @@ export function EditalAccordion({
     }
 
     void (async () => {
-      const res = await getEditalTopicProgressAction(activeTargetId)
+      const res = await editalRef.current.getEditalTopicProgressAction(activeTargetId)
       if (cancelled) return
       if (!res.success && res.storageUnavailable) {
         // Banco sem a tabela G1.1: comportamento legado até a migration.
@@ -163,14 +156,18 @@ export function EditalAccordion({
         return
       }
       if (!res.success) {
-        setTimeout(() => !cancelled && setCompletedTopics({}), 0)
+        setTimeout(() => {
+          if (cancelled) return
+          setCompletedTopics({})
+          setProgressLoadFailed(true)
+        }, 0)
         return
       }
       const serverChecked = res.checked ?? {}
       // Lazy migration única: LS com dados + servidor vazio → importa e limpa.
       const legacy = readLegacyChecked(activeTargetId)
       if (legacy && Object.keys(legacy).length > 0 && Object.keys(serverChecked).length === 0) {
-        const imported = await importEditalTopicProgressAction(activeTargetId, legacy)
+        const imported = await editalRef.current.importEditalTopicProgressAction(activeTargetId, legacy)
         if (cancelled) return
         if (imported.success) {
           removeLegacyChecked(activeTargetId)
@@ -189,9 +186,7 @@ export function EditalAccordion({
     return () => {
       cancelled = true
     }
-  }, [activeTargetId])
-
-  const [serverUnavailable, setServerUnavailable] = useState(false)
+  }, [activeTargetId, editalRef])
 
   const toggleCheck = (topicId: string) => {
     const updated = { ...completedTopics, [topicId]: !completedTopics[topicId] }
@@ -214,7 +209,7 @@ export function EditalAccordion({
     }
     // Otimista com reversão honesta em falha (servidor é a verdade).
     void (async () => {
-      const res = await setEditalTopicProgressAction(activeTargetId, topicId, updated[topicId] === true)
+      const res = await editalRef.current.setEditalTopicProgressAction(activeTargetId, topicId, updated[topicId] === true)
       if (!res.success) {
         if (res.storageUnavailable) {
           setServerUnavailable(true)
@@ -257,7 +252,7 @@ export function EditalAccordion({
     setInputUrl("")
     void (async () => {
       const topics = updatedData.find((d) => d.id === discId)?.topics ?? []
-      const res = await saveCustomTopicsAction(activeTargetId, discId, topics)
+      const res = await editalRef.current.saveCustomTopicsAction(activeTargetId, discId, topics)
       if (res.success) {
         toast.success("Link do caderno de questões salvo!")
       } else {
@@ -281,7 +276,7 @@ export function EditalAccordion({
     // G1.16: trava de reentrância — duplo clique criava matérias duplicadas.
     if (isSaving) return
     setIsSaving(true)
-    const res = await addCustomDisciplineAction(newDisciplineName, activeTargetId)
+    const res = await editalRef.current.addCustomDisciplineAction(newDisciplineName, activeTargetId)
     if (res.success && res.data) {
       const addedDiscipline = res.data
       setData((prev) => [
@@ -314,7 +309,7 @@ export function EditalAccordion({
 
     // Registra no catálogo de tópicos (dedupe-safe) quando o nome não veio do catálogo nem foi criado agora
     if (source !== "catalog" && source !== "custom") {
-      void createCustomTopicAction(discId, topicName)
+      void editalRef.current.createCustomTopicAction(discId, topicName)
     }
 
     const newTopic: TopicItem = {
@@ -337,7 +332,7 @@ export function EditalAccordion({
 
     // Salva no backend (com rollback honesto em falha — G1.16)
     const previousTopics = disc.topics
-    const res = await saveCustomTopicsAction(activeTargetId, discId, updatedTopics)
+    const res = await editalRef.current.saveCustomTopicsAction(activeTargetId, discId, updatedTopics)
     if (res.success) {
       setNewTopicName("")
       setAddingTopicDiscId(null)
@@ -366,7 +361,7 @@ export function EditalAccordion({
       setIsSaving(false)
       return
     }
-    const res = await removeDisciplineAction(discId, activeTargetId)
+    const res = await editalRef.current.removeDisciplineAction(discId, activeTargetId)
     if (res.success) {
       const removedTopicIds =
         data.find((d) => d.id === discId)?.topics.map((t) => t.id) ?? []
@@ -381,7 +376,7 @@ export function EditalAccordion({
         })
         void Promise.all(
           removedTopicIds.map((topicId) =>
-            deleteEditalTopicProgressAction(activeTargetId, topicId).catch(() => undefined),
+            editalRef.current.deleteEditalTopicProgressAction(activeTargetId, topicId).catch(() => undefined),
           ),
         )
       }
@@ -409,7 +404,7 @@ export function EditalAccordion({
     // G1.16: trava de reentrância.
     if (isSaving) return
     setIsSaving(true)
-    const res = await removeCustomTopicAction(activeTargetId, discId, topicId)
+    const res = await editalRef.current.removeCustomTopicAction(activeTargetId, discId, topicId)
     if (res.success) {
       setData((prev) =>
         prev.map((d) =>
@@ -423,7 +418,7 @@ export function EditalAccordion({
         delete next[topicId]
         return next
       })
-      void deleteEditalTopicProgressAction(activeTargetId, topicId).catch(() => {
+      void editalRef.current.deleteEditalTopicProgressAction(activeTargetId, topicId).catch(() => {
         // Best-effort: a verdade local já foi corrigida acima.
       })
       toast.success("Tópico removido!")
@@ -448,6 +443,15 @@ export function EditalAccordion({
           Adicionar estudo
         </Button>
       </div>
+
+      {progressLoadFailed && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-800 dark:text-amber-300"
+        >
+          Não foi possível carregar seu progresso. Os tópicos aparecem sem marcação; recarregue a página para tentar de novo.
+        </div>
+      )}
 
       <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
         <div className="flex items-baseline justify-between gap-3">
@@ -528,7 +532,7 @@ export function EditalAccordion({
                       title="Excluir disciplina"
                       aria-label={`Excluir ${disc.name}`}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 aria-hidden className="h-3.5 w-3.5" />
                     </button>
                   </div>
 
@@ -602,14 +606,17 @@ export function EditalAccordion({
                               <td className="py-2.5 px-3 font-medium text-muted-foreground leading-relaxed max-w-[450px]">
                                 <div className="flex items-start gap-2.5 group/topic relative">
                                   <button
+                                    type="button"
                                     onClick={() => toggleCheck(topic.id)}
+                                    aria-pressed={isChecked}
+                                    aria-label={`Tópico concluído: ${topic.title}`}
                                     className={`w-4 h-4 rounded-full border shrink-0 mt-0.5 flex items-center justify-center transition-all ${
                                       isChecked
                                         ? "bg-primary border-primary text-primary-foreground"
                                         : "border-muted-foreground/40 hover:border-primary bg-background"
                                     }`}
                                   >
-                                    {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                                    {isChecked && <Check aria-hidden className="h-3 w-3 stroke-[3]" />}
                                   </button>
 
                                   <span
@@ -626,20 +633,21 @@ export function EditalAccordion({
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteTopic(disc.id, topic.id)}
-                                      className="opacity-0 group-hover/topic:opacity-100 absolute -right-6 top-0 p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                                      className="opacity-0 group-hover/topic:opacity-100 focus-visible:opacity-100 absolute -right-6 top-0 p-1 text-muted-foreground hover:text-red-500 transition-colors"
                                       title="Excluir Tópico"
+                                      aria-label={`Excluir tópico: ${topic.title}`}
                                     >
-                                      <Trash2 className="h-3 w-3" />
+                                      <Trash2 aria-hidden className="h-3 w-3" />
                                     </button>
                                   )}
                                 </div>
                               </td>
 
                               {/* Stats */}
-                              <td className="py-2.5 px-3 text-center tabular-nums font-semibold text-emerald-600">
+                              <td className="py-2.5 px-3 text-center tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">
                                 {topic.correct}
                               </td>
-                              <td className="py-2.5 px-3 text-center tabular-nums font-semibold text-rose-500">
+                              <td className="py-2.5 px-3 text-center tabular-nums font-semibold text-rose-700 dark:text-rose-400">
                                 {topic.wrong}
                               </td>
                               <td className="py-2.5 px-3 text-center tabular-nums text-primary font-semibold">
@@ -662,13 +670,16 @@ export function EditalAccordion({
                                     href={topic.link}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    aria-label={`Abrir caderno de questões: ${topic.title} (abre em nova aba)`}
                                     className="text-xs font-semibold text-primary hover:underline flex items-center justify-center gap-1"
                                   >
                                     <span>Abrir</span>
-                                    <ExternalLink className="h-3 w-3" />
+                                    <ExternalLink aria-hidden className="h-3 w-3" />
                                   </a>
                                 ) : (
                                   <button
+                                    type="button"
+                                    aria-label={`Adicionar link do caderno de questões: ${topic.title}`}
                                     onClick={() => {
                                       setLinkModalTopic(topic)
                                       setLinkModalDiscId(disc.id)

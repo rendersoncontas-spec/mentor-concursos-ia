@@ -5,10 +5,6 @@ import { useCallback, useEffect, useState } from "react"
 import { Check, Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  addTopicToReviewAction,
-  getReviewCatalogAction,
-} from "@/application/review-engine/review.actions"
 import type { ReviewCatalogTopic } from "@/application/review-engine/review.service"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -21,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useReviewActionsRef } from "@/features/reviews/review-actions"
 
 interface CatalogState {
   disciplines: { id: string; name: string }[]
@@ -38,6 +35,7 @@ export function AddToReviewModal({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const reviewRef = useReviewActionsRef()
   const [catalog, setCatalog] = useState<CatalogState | null>(null)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
@@ -45,14 +43,14 @@ export function AddToReviewModal({
 
   const load = useCallback(async (disciplineId?: string | null) => {
     setLoading(true)
-    const res = await getReviewCatalogAction(disciplineId ?? null)
+    const res = await reviewRef.current.getReviewCatalogAction(disciplineId ?? null)
     setLoading(false)
     if (res.error) {
       toast.error(res.error)
       return
     }
     setCatalog(res.data)
-  }, [])
+  }, [reviewRef])
 
   useEffect(() => {
     if (!open) return
@@ -66,7 +64,7 @@ export function AddToReviewModal({
   const add = useCallback(
     async (sourceType: "EDITAL_TOPIC" | "EDITAL_SUBTOPIC", sourceId: string, label: string) => {
       setAdding(sourceId)
-      const res = await addTopicToReviewAction({ sourceType, sourceId })
+      const res = await reviewRef.current.addTopicToReviewAction({ sourceType, sourceId })
       setAdding(null)
       if (res.error) {
         toast.error(res.error)
@@ -75,7 +73,7 @@ export function AddToReviewModal({
       toast.success(res.data?.alreadyExisted ? `${label} já estava nas revisões.` : `${label} adicionado às revisões.`)
       await load(catalog?.disciplineId ?? null)
     },
-    [catalog?.disciplineId, load],
+    [catalog?.disciplineId, load, reviewRef],
   )
 
   const query = search.trim().toLowerCase()

@@ -251,7 +251,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
         {/* ── Navegação agrupada ─────────────────────────────────────────── */}
         <nav
           aria-label="Menu principal"
-          className="relative flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3 space-y-4"
+          className="relative flex-1 overflow-y-auto overflow-x-hidden px-2 py-2.5 space-y-3"
         >
           {navGroups.map((group, groupIndex) => (
             <div key={group.label} className="space-y-0.5">
@@ -260,7 +260,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                   <div aria-hidden className="mx-3 my-3 h-px bg-border" />
                 )
               ) : (
-                <p className="type-label px-2.5 pb-1">
+                <p className="type-label px-2.5 pb-0.5">
                   {group.label}
                 </p>
               )}
@@ -275,7 +275,7 @@ export function AppSidebar({ className, isOpen, onClose, userRole }: AppSidebarP
                     onClick={onClose as MouseEventHandler<HTMLAnchorElement>}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "group relative flex items-center gap-2.5 h-10 md:h-9 rounded-md px-2.5 text-[13px] font-medium transition-colors duration-150 outline-none",
+                      "group relative flex items-center gap-2.5 h-10 md:h-8 rounded-md px-2.5 text-[13px] font-medium transition-colors duration-150 outline-none",
                       effectiveCollapsed ? "justify-center px-0" : "",
                       active
                         ? "bg-primary/[0.08] text-foreground"

@@ -54,9 +54,13 @@ O servidor nunca é reaproveitado por padrão, para não rodar contra um `npm ru
 | `/e2e-harness/study-register` | **G2.21.** Central de estudos (`StudyRegisterModal`) real, aberta por um botão (para testar a devolução do foco) |
 | `/e2e-harness/simulado-result?state=high\|low` | **G2.22.** `SimuladoResultView` (resultado do simulado interno) com payload sintético (`src/lib/testing/simulado-result-fixture.ts`), cobrindo acerto, erro, em branco, questão marcada, insights e tendências. Nenhuma página real importa esse componente hoje (Fase I.2), mas ele existe no código e foi auditado |
 | `/e2e-harness/history?state=data\|empty\|error\|calendar-error` | **G2.23.** `HistoryView` real (Lista/Calendário) com ações do servidor trocadas pela fronteira `HistoryActionsProvider` (`src/features/history/history-actions.tsx`; o padrão de produção são as próprias Server Actions). Dados sintéticos em `src/lib/testing/history-planning-fixtures.ts` (9 sessões, 3 disciplinas, mesmo `packHistoryList` do servidor) |
-| `/e2e-harness/planning?state=empty` | **G2.23.** `PlanejamentoClient` real com plano sintético de 3 blocos (`buildPlanningFixture`); `state=empty` mostra "Nenhum planejamento criado" (sem abas). As visões que buscam dados por conta própria (Dia, Semana…) recebem o erro real da Server Action sem sessão — estado de erro recuperável |
+| `/e2e-harness/planning?state=data\|empty\|error\|retry` | **G2.23/G2.24.** `PlanejamentoClient` real com plano sintético de 3 blocos. As visões (Dia, Semana, Ciclo, Mês, Metas) leem e gravam pela fronteira `PlanningActionsProvider` (`src/features/planejamento/planning-actions.tsx`), com ações sintéticas. `empty` mostra "Nenhum planejamento criado"; `error` falha todas as leituras; `retry` falha na primeira e acerta na segunda |
+| `/e2e-harness/statistics?state=data\|empty\|partial\|error\|retry` | **G2.24.** `StatisticsCenterView` real (Visão geral, disciplinas, evolução, ordenação) pela fronteira `StatisticsActionsProvider`; dados em `src/lib/testing/statistics-fixtures.ts`. `partial` = plano indisponível, mas estatísticas de estudo presentes |
+| `/e2e-harness/reviews?state=data\|empty\|error\|retry\|catalog-error\|session-error` | **G2.24.** `ReviewsView` real, com o modal de sessão de revisão (nota, devolução do foco) e "Adicionar à revisão", pela fronteira `ReviewActionsProvider`. A data de referência vem fixa do servidor (`nowIso`), evitando divergência de hidratação |
+| `/e2e-harness/edital?state=data\|progress-error\|save-error` | **G2.24.** `EditalAccordion` real (concurso → disciplinas → tópicos, marcar tópico, progresso) pela fronteira `EditalActionsProvider`. `progress-error` = falha ao ler o progresso (aviso, nunca 0%); `save-error` = falha ao marcar/gravar |
 
 Como o harness troca as dependências **sem tocar na rota real**:
+- **Fronteira de ações (G2.23/G2.24: Histórico, Planejamento, Estatísticas, Revisões, Edital):** cada tela tem um contexto cujo valor padrão são as **Server Actions reais**. O hook `use…ActionsRef()` devolve um `useRef` do valor capturado na montagem, então as dependências de `useEffect`/`useCallback` e os nomes das chamadas não mudam. Só o harness passa um provedor com dados sintéticos (`src/lib/testing/*-fixtures.ts`).
 - **Simulados:** os componentes chamam as Server Actions por uma fronteira (`src/features/simulados/simulados-actions.tsx`). O valor padrão do contexto **são as próprias Server Actions**, então a página real não muda. Só o harness passa um `SimuladosActionsProvider` com o backend em memória.
 - **Dashboard:** o snapshot e o layout entram pelas mesmas props que `page.tsx` usa, e os dados dos widgets entram pelo mesmo `InitialServerDataProvider`. As poucas leituras que os widgets fazem sozinhos (cronograma do dia ao vivo, alvos) vão à Server Action real, que, sem sessão, devolve erro. Isso exercita o estado de erro recuperável. O cache local do cronograma (`mentor_replan_info_cache`) é semeado no navegador do teste.
 - **Mentor:** a prop opcional `requestAnalysis` (G2.20).
@@ -130,7 +134,13 @@ O `playwright.config.ts` **recusa** `E2E_AUTH=1` com uma URL que não seja `loca
 | `accessibility-dark.spec.ts` (G2.22) | axe no **tema escuro**: login, menu da conta, "Minha conta", "Pedir um edital", modal PWA, Dashboard (dados, vazio, Central), Simulados (página, registro, detalhe, vazio, erro), Central (2 modos), Mentor (válido, vazio, indisponível), resultado de simulado |
 | `simulado-result.spec.ts` (G2.22) | estados alto/baixo com texto (não só cor), questões correta/errada/em branco/marcada anunciadas, `aria-expanded`, axe no tema claro |
 | `visual.spec.ts` (G2.22) | capturas localizadas com dados fixos (Dashboard topo e "Desempenho geral", 320 px, Central com foco nas abas, resultado de simulado claro/escuro, Simulados escuro, modal PWA) anexadas ao relatório e salvas em `e2e/.results/visual/`. Sem comparação pixel a pixel (ver abaixo) |
-| `tabs-keyboard.spec.ts` (G2.23) | padrão APG de abas em **Histórico** (manual), **Planejamento** (manual) e **Minha conta** (vertical, automática): nomes, roving tabindex, Enter/Espaço, setas e Home/End só movem o foco nos modos manuais, `aria-controls` → `tabpanel` rotulado, foco visível, vazio/erro/calendário com falha, retorno de foco do modal ("Editar registro" e "Minha conta"), matriz 320/375/768/1280 (só projeto desktop) e axe nos temas claro e escuro. Única exceção do axe: chips de disciplina com cor escolhida pelo usuário (escopada por seletor) |
+| `tabs-keyboard.spec.ts` (G2.23) | padrão APG de abas em **Histórico** (manual), **Planejamento** (manual) e **Minha conta** (vertical, automática): nomes, roving tabindex, Enter/Espaço, setas e Home/End só movem o foco nos modos manuais, `aria-controls` → `tabpanel` rotulado, foco visível, vazio/erro/calendário com falha, retorno de foco do modal ("Editar registro" e "Minha conta"), matriz 320/375/768/1280 (só projeto desktop) e axe nos temas claro e escuro. A exceção do axe para chips com cor do usuário existia na G2.23 e foi removida na G2.24 (ver abaixo) |
+| `tabs-keyboard.spec.ts` (G2.24, ajuste) | os chips de disciplina com cor escolhida pelo usuário passam a ter **contraste calculado** (`src/lib/a11y/contrast.ts`, `chipColors`): a cor armazenada vira fundo, e o texto é branco ou grafite conforme o que atingir 4,5:1. A exceção do axe foi **removida** — a varredura não tem mais nenhuma exceção |
+| `history-calendar.spec.ts` (G2.24) | calendário do Histórico: carregado; vazio (status, não erro); **erro anunciável** (`role=alert`, mês preservado, resumo "indisponível", nunca 0); nova tentativa; falha contínua sem empilhar avisos; erro após trocar o mês; foco/teclado durante o erro; axe claro/escuro; matriz 320/375/768/1280 |
+| `planning-views.spec.ts` (G2.24) | **Dia** e **Semana** do Planejamento: dados, vazio, erro com "Tentar novamente", recuperação, botões com nome acessível, axe claro/escuro, matriz de tamanhos (só desktop), sem erros de página |
+| `statistics.spec.ts` (G2.24) | Estatísticas: dados, vazio, parcial (plano indisponível ≠ zero), erro/nova tentativa, ordenação de disciplinas, regiões rolláveis focáveis, axe claro/escuro, matriz 320/375/768/1280 |
+| `reviews.spec.ts` (G2.24) | Revisões: lista, vazio, erro/nova tentativa, erro de catálogo, sessão de revisão (nota, erro ao gravar, foco devolvido), "Adicionar à revisão", axe claro/escuro (inclui modais), matriz de tamanhos |
+| `edital.spec.ts` (G2.24) | Edital: expandir/recolher, marcar tópico, progresso, falha ao ler o progresso (aviso, nunca 0%), falha ao gravar, teclado, axe claro/escuro, matriz de tamanhos |
 
 **PWA:** os eventos do navegador são **simulados** (`e2e/support/pwa.ts`). Isso valida a interface do NomeIA, **não** a instalação real, e a janela nativa do sistema não é automatizada.
 
@@ -138,6 +148,8 @@ O `playwright.config.ts` **recusa** `E2E_AUTH=1` com uma URL que não seja `loca
 
 - Prefira `getByRole`/`getByLabel`. Se um campo não é encontrado pelo rótulo, provavelmente o rótulo não está associado: é um defeito, não um motivo para trocar de seletor.
 - Espere a hidratação antes de clicar em telas pesadas. No Dashboard, o helper `open()` espera o `DndDescribedBy-*`, que só existe depois que a grade monta no cliente.
+- G2.24: `whenHydrated(locator)` (`e2e/support/hydration.ts`) espera o React assumir o nó (`__reactProps$…`). Use antes de clicar em ações **não idempotentes** (marcar/desmarcar): repetir o clique até "pegar" desfaz a ação. Datas e horas que aparecem na tela devem vir fixas do servidor do harness (`nowIso`), senão o minuto que vira causa divergência de hidratação.
+- G2.24: o sonner pausa o aviso enquanto o ponteiro está sobre a lista; com toque emulado o `mouseleave` só vem ao tocar fora. Antes de esperar um aviso sumir (por exemplo, antes do axe), solte o ponteiro (`page.mouse.move(2, 600)`). Não abra exceção no axe para o aviso.
 - Modais Radix com botão de dica (tooltip) focado: o 1º Esc fecha a dica e o 2º fecha o modal (camadas do Radix).
 - Para acessibilidade, chame `expectNoAxeViolations` com o estado já estável (sem "Carregando…").
 
@@ -161,7 +173,17 @@ As imagens "antes/depois" das correções da G2.22 estão em `docs/g2-22-visual/
 
 ## CI
 
-Workflow: `.github/workflows/ci.yml` (GitHub Actions). Uma cópia idêntica fica em `docs/ci/github-actions-ci.yml`, e o teste unitário da G2.22 exige que as duas sejam iguais. Na G2.22 a pasta `.github` não pôde ser gravada pela ferramenta de sincronização, então copie a cópia para `.github/workflows/ci.yml` antes do commit. Dispara em push e PR para a `main` e manualmente. Tem dois jobs em paralelo:
+Workflow: `.github/workflows/ci.yml` (GitHub Actions). Uma cópia idêntica fica em `docs/ci/github-actions-ci.yml`, e o teste unitário da G2.22 exige que as duas sejam iguais. Na G2.22 a pasta `.github` não pôde ser gravada pela ferramenta de sincronização, então copie a cópia para `.github/workflows/ci.yml` antes do commit.
+
+**Ativar o CI (passo manual, uma vez):**
+
+```powershell
+New-Item -ItemType Directory -Force .github\workflows | Out-Null
+Copy-Item docs\ci\github-actions-ci.yml .github\workflows\ci.yml
+git add .github/workflows/ci.yml
+```
+
+Depois do commit e do push, a aba *Actions* do GitHub mostra os jobs `checks` e `e2e`. Nada é executado pelo agente: o workflow só roda quando você fizer o push. Se alterar um dos dois arquivos, altere o outro igual (o teste `mobile-a11y-ci-g2-22.test.ts` compara os dois). Dispara em push e PR para a `main` e manualmente. Tem dois jobs em paralelo:
 
 | job | passos |
 |---|---|
@@ -200,4 +222,7 @@ npm run test:e2e
 - Conteúdo autenticado com dados reais do aluno exige o fluxo opcional com Supabase local. Os harnesses de Simulados e Dashboard cobrem a interface com dados sintéticos.
 - Leitor de tela real (TalkBack/VoiceOver/NVDA) não é automatizado. Os testes validam papéis, nomes acessíveis e foco pela árvore de acessibilidade do Chromium.
 - Apenas Chromium. Safari e Firefox não foram configurados.
-- O axe roda nos dois temas (claro e escuro) nas telas com harness. Planejamento e Histórico passaram a ser varridos na G2.23 (abas, Ciclo/Mês/Metas, lista, calendário e vazio). Telas sem harness (Estatísticas, Revisões, Edital) e as visões Dia/Semana do Planejamento com dados ainda não são varridas.
+- O axe roda nos dois temas (claro e escuro), **sem exceções**, em login, menu da conta, modais, Mentor, Simulados, Dashboard, Central de estudos, resultado de simulado, Histórico, Planejamento (abas, Ciclo, Mês, Metas, **Dia e Semana**), **Estatísticas, Revisões e Edital** (G2.24). Rotas reais continuam exigindo login, então a varredura é feita nos harnesses, com dados sintéticos.
+- O que o axe e o Playwright **não** substituem: leitor de tela real; teclado virtual e gestos em aparelho físico; Safari/Firefox; PWA instalado de verdade; dados reais do aluno. Roteiro manual sugerido: abrir cada tela (Estatísticas, Revisões, Edital, Planejamento Dia/Semana, Histórico/Calendário) logado, no celular e no desktop, nos temas claro e escuro, e conferir contraste dos chips das próprias disciplinas.
+- Não cobertos nos harnesses (G2.24): a Central de estudos embutida no Edital e o seletor de alvo (a Central tem harness próprio), e o autocomplete de tópicos, que ainda chama a ação real (sem sessão devolve erro tratado).
+- Pontos observados e **não alterados** (fora de escopo — regras de planejamento/produto): datas fixas no mini-calendário da visão Semana; o subtítulo estático "Sem plano ativo…" aparece ao lado de "Plano indisponível" no estado parcial de Estatísticas; a exclusão no Edital usa `confirm()` nativo.

@@ -28,10 +28,10 @@ export function SectionCard({
   className?: string
 }) {
   return (
-    <section className={`rounded-lg border border-border bg-card p-4 sm:p-5 space-y-4 ${className}`}>
+    <section className={`rounded-lg border border-border bg-card p-3.5 sm:p-4 space-y-3 ${className}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
+          <h3 className="text-[15px] font-semibold leading-5 tracking-[-0.01em] text-foreground">{title}</h3>
           {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
         {action}
@@ -65,26 +65,20 @@ export function EmptyState({
 // ─── Chips de classificação ─────────────────────────────────────────────────
 
 export function ClassificationChip({ classification }: { classification: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    DOMINADO: {
-      label: "Dominado",
-      cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-    },
-    EM_DESENVOLVIMENTO: {
-      label: "Em desenvolvimento",
-      cls: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-    },
-    ATENCAO: { label: "Atenção", cls: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
-    CRITICO: { label: "Crítico", cls: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
+  // V2.5: texto + marcador pequeno, em vez de "pílulas" coloridas com borda
+  // (verde/âmbar/laranja/vermelho) em toda linha da tabela. A cor só aparece no
+  // marcador e diz o mesmo que o texto: marca = dominado, terracota = atenção,
+  // vermelho = crítico, neutro = em desenvolvimento.
+  const map: Record<string, { label: string; dot: string }> = {
+    DOMINADO: { label: "Dominado", dot: "bg-primary" },
+    EM_DESENVOLVIMENTO: { label: "Em desenvolvimento", dot: "bg-muted-foreground/50" },
+    ATENCAO: { label: "Atenção", dot: "bg-accent" },
+    CRITICO: { label: "Crítico", dot: "bg-destructive" },
   }
-  const c = map[classification] ?? {
-    label: classification,
-    cls: "bg-muted text-muted-foreground border",
-  }
+  const c = map[classification] ?? { label: classification, dot: "bg-muted-foreground/40" }
   return (
-    <span
-      className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium border ${c.cls}`}
-    >
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-foreground">
+      <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.dot}`} />
       {c.label}
     </span>
   )
@@ -157,7 +151,7 @@ export function Metric({
   label,
   value,
   sub,
-  accent = false,
+  accent: _accent = false,
 }: {
   label: string
   value: ReactNode
@@ -174,7 +168,9 @@ export function Metric({
       <p className="text-xs text-muted-foreground">
         {label}
       </p>
-      <p className={`mt-0.5 font-semibold text-lg tabular-nums ${accent ? "text-primary" : "text-foreground"}`}>
+      {/* V2.5: número em serifada, sempre na cor do texto — `accent` deixou de
+          pintar o valor de verde (a hierarquia vem da forma, não da cor). */}
+      <p className="mt-0.5 metric-value text-lg text-foreground">
         {value}
       </p>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
@@ -186,10 +182,10 @@ export function Metric({
 
 const HEAT_LEVELS: Record<number, string> = {
   0: "bg-muted/30",
-  1: "bg-emerald-500/25",
-  2: "bg-emerald-500/45",
-  3: "bg-emerald-500/70",
-  4: "bg-emerald-500",
+  1: "bg-primary/20 dark:bg-primary/30",
+  2: "bg-primary/40 dark:bg-primary/50",
+  3: "bg-primary/65 dark:bg-primary/75",
+  4: "bg-primary",
 }
 
 const MONTH_NAMES = [
@@ -268,7 +264,7 @@ export function HeatmapCalendar({
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-1">
+      <div role="region" aria-label="Calendário de atividade (rolagem horizontal)" tabIndex={0} className="overflow-x-auto pb-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
         <div className="min-w-max">
           <div className="flex gap-[3px]">
             <div className="flex flex-col gap-[3px] pr-0.5">

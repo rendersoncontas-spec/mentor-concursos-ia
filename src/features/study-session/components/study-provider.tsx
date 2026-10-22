@@ -28,6 +28,13 @@ import {
   createStudySessionSyncTriggersInstaller,
   createTriggerStudySessionSync,
 } from "../lib/study-session-sync-bridge"
+// Cálculos de tempo e transições Play/Pause puros, testáveis sem React.
+import { calculateTimes, getActiveElapsedSeconds } from "../lib/session-timing"
+import { pauseAt, resumeAt } from "../lib/session-transitions"
+import { sessionSnapshotSignature } from "../lib/session-snapshot"
+
+export { calculateTimes, getActiveElapsedSeconds } from "../lib/session-timing"
+export type { SessionTiming } from "../lib/session-timing"
 
 import {
   focusSoundIdForModalPreference,
@@ -207,45 +214,6 @@ export interface StudyActionsContextType {
 const StudyLiveContext = createContext<StudyLiveContextType | null>(null)
 const StudyActionsContext = createContext<StudyActionsContextType | null>(null)
 
-/** Campos de tempo usados pelos cálculos — comuns à sessão em memória e ao snapshot do IndexedDB. */
-type SessionTiming = Pick<StudySessionState, "startTime" | "totalPausedMs" | "lastPauseStartTime">
-
-function totalPausedMsAt(state: SessionTiming, now: number): number {
-  let pausedMs = state.totalPausedMs
-  if (state.lastPauseStartTime !== null) {
-    pausedMs += now - state.lastPauseStartTime
-  }
-  return pausedMs
-}
-
-/**
- * FONTE ÚNICA DE VERDADE do tempo ativo da sessão (em segundos).
- * Usado pelo cronômetro visual, widget flutuante, título da guia e salvamento.
- * Calculado sempre a partir de timestamps reais (Date.now()):
- *   elapsed = now - startTime - totalPaused - pausaAtual
- * Nunca incrementa por +1.
- */
-export function getActiveElapsedSeconds(state: StudySessionState): number {
-  if (!state.startTime) return 0
-  const now = Date.now()
-  const pausedMs = totalPausedMsAt(state, now)
-  return Math.max(0, Math.floor((now - state.startTime - pausedMs) / 1000))
-}
-
-function calculateTimes(state: SessionTiming): {
-  activeSeconds: number
-  pausedSeconds: number
-} {
-  if (!state.startTime) return { activeSeconds: 0, pausedSeconds: 0 }
-  const now = Date.now()
-  const pausedMs = totalPausedMsAt(state, now)
-  const activeMs = Math.max(0, now - state.startTime - pausedMs)
-  return {
-    activeSeconds: Math.floor(activeMs / 1000),
-    pausedSeconds: Math.floor(pausedMs / 1000),
-  }
-}
-
 /**
  * G2.3 — `pausedSeconds` sem o dwell parado na tela de avaliação (o timer já
  * estava pausado no Encerrar). Sem `evaluation_started_at` válido, devolve o
@@ -267,6 +235,11 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [isCentralOpen, setIsCentralOpen] = useState(false)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Assinatura do último snapshot gravado no IndexedDB (bug Play/Pause): o
+  // tick de 1s muda `session`, mas o snapshot persistido é idêntico. Regravar
+  // a cada segundo disparava broadcast → reidratação → novo estado → nova
+  // gravação, em loop (a UI "piscava" e cliques eram desfeitos).
+  const persistedSnapshotRef = useRef<{ userId: string; signature: string } | null>(null)
 
   // Fase B (offline-first): userId do cliente, usado para namespacear a
   // sessão ativa no IndexedDB (nunca via rede — ver getClientUserId). `userId`
@@ -424,6 +397,16 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     const currentUserId = userIdRef.current
     if (!currentUserId) return
     if (session && session.isActive) {
+      const signature = sessionSnapshotSignature(session)
+      // Dedupe: só grava quando algum campo persistido mudou de verdade.
+      // O tick muda activeSeconds/pausedSeconds, que nem entram no snapshot.
+      if (
+        persistedSnapshotRef.current?.userId === currentUserId &&
+        persistedSnapshotRef.current.signature === signature
+      ) {
+        return
+      }
+      persistedSnapshotRef.current = { userId: currentUserId, signature }
       const { activeSeconds, pausedSeconds, ...rest } = session
       void activeSeconds
       void pausedSeconds
@@ -433,6 +416,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           console.error("[STUDY_PROVIDER] Falha ao persistir sessão no IndexedDB:", error)
         })
     } else {
+      persistedSnapshotRef.current = null
       void offlineStore.session.clear(currentUserId).catch(() => {})
     }
   }, [session, userId])
@@ -607,26 +591,17 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Play/Pause — um clique = uma transição. `pauseAt`/`resumeAt` são puras e
+  // idempotentes: fora da fase esperada devolvem a MESMA referência, então
+  // cliques repetidos (ou um clique durante o render do tick) não invertem o
+  // estado nem criam um snapshot inconsistente para a persistência.
   const pauseSession = useCallback(() => {
-    setSession((prev) => {
-      if (!prev || prev.phase !== "STUDYING") return prev
-      return { ...prev, phase: "PAUSED", lastPauseStartTime: Date.now() }
-    })
+    setSession((prev) => (prev ? pauseAt(prev, Date.now()) : prev))
     focusSound.pauseSound()
   }, [focusSound])
 
   const resumeSession = useCallback(() => {
-    setSession((prev) => {
-      if (!prev || prev.phase !== "PAUSED") return prev
-      const pauseDuration =
-        prev.lastPauseStartTime !== null ? Date.now() - prev.lastPauseStartTime : 0
-      return {
-        ...prev,
-        phase: "STUDYING",
-        totalPausedMs: prev.totalPausedMs + pauseDuration,
-        lastPauseStartTime: null,
-      }
-    })
+    setSession((prev) => (prev ? resumeAt(prev, Date.now()) : prev))
     if (focusSound.selectedSound !== "off") {
       void focusSound.resumeSound()
     }
@@ -802,7 +777,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           return
         }
         const { activeSeconds, pausedSeconds } = calculateTimes(stored)
-        setSession({
+        const next: StudySessionState = {
           isActive: stored.isActive,
           isMinimized: stored.isMinimized,
           phase: stored.phase,
@@ -822,7 +797,13 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           source: stored.source,
           cycleId: stored.cycleId,
           cycleItemId: stored.cycleItemId,
-        })
+        }
+        // Snapshot igual ao estado atual não gera novo estado (nem novo
+        // render). Antes, cada eco do canal substituía `session` por um objeto
+        // novo e reacendia o efeito de persistência — o loop de re-render.
+        setSession((prev) =>
+          prev && sessionSnapshotSignature(prev) === sessionSnapshotSignature(next) ? prev : next,
+        )
       })
     })
     return unsubscribe

@@ -1,15 +1,11 @@
 "use client"
 
-import { useCallback, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 
 import { useRouter } from "next/navigation"
 import { Archive, PauseCircle, Play, Plus, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  getReviewsOverviewAction,
-  setReviewItemFlagAction,
-} from "@/application/review-engine/review.actions"
 import {
   filterReviewQueue,
   REVIEW_PERIOD_FILTERS,
@@ -29,6 +25,7 @@ import {
 } from "@/domain/reviews/models"
 import { AddToReviewModal } from "@/features/reviews/components/add-to-review-modal"
 import { ReviewSessionModal } from "@/features/reviews/components/review-session-modal"
+import { useReviewActionsRef } from "@/features/reviews/review-actions"
 import { formatStudyDateInSaoPaulo, getDayInSaoPaulo, todayKeyInSaoPaulo } from "@/lib/sao-paulo"
 
 /** Data/hora de vencimento em texto curto, no fuso do aluno. */
@@ -69,24 +66,39 @@ function ItemRow({
 
 export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverview }) {
   const router = useRouter()
+  const reviewRef = useReviewActionsRef()
   const [overview, setOverview] = useState<ReviewsOverview>(initialOverview)
   const [sessionOpen, setSessionOpen] = useState(false)
   const [sessionItemId, setSessionItemId] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  // G2.24: ao fechar a sessão, `refresh()` deixa o botão "Iniciar revisão"
+  // desabilitado por um instante (isPending) e o foco que o diálogo devolve a
+  // ele se perdia no <body>. Marcamos que o foco deve voltar e o devolvemos
+  // quando a atualização termina (ou ao resumo, se não houver mais o que revisar).
+  const startButtonRef = useRef<HTMLButtonElement>(null)
+  const summaryRef = useRef<HTMLElement>(null)
+  const returnFocusRef = useRef(false)
+  useEffect(() => {
+    if (isPending || !returnFocusRef.current) return
+    returnFocusRef.current = false
+    const start = startButtonRef.current
+    if (start && !start.disabled) start.focus()
+    else summaryRef.current?.focus()
+  }, [isPending, overview])
   // G2.1 FASE 2 — filtro de período client-side (apresentação; o cache e os
   // dados canônicos não mudam). Sem persistência em URL nesta fase.
   const [periodFilter, setPeriodFilter] = useState<ReviewPeriodFilter>("todas")
 
   const refresh = useCallback(async () => {
-    const res = await getReviewsOverviewAction()
+    const res = await reviewRef.current.getReviewsOverviewAction()
     if (res.data) setOverview(res.data)
     startTransition(() => router.refresh())
-  }, [router])
+  }, [router, reviewRef])
 
   const flag = useCallback(
     async (itemId: string, action: "SUSPEND" | "UNSUSPEND" | "ARCHIVE" | "RESTORE", message: string) => {
-      const res = await setReviewItemFlagAction(itemId, action)
+      const res = await reviewRef.current.setReviewItemFlagAction(itemId, action)
       if (res.error) {
         toast.error(res.error)
         return
@@ -94,7 +106,7 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
       toast.success(message)
       await refresh()
     },
-    [refresh],
+    [refresh, reviewRef],
   )
 
   const { counts, due, upcoming, suspended, archived, retention, nextDueAt } = overview
@@ -170,8 +182,10 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
     <div className="space-y-6">
       {/* Resumo: só números medidos. Sem revisões respondidas, a retenção é "—". */}
       <section
+        ref={summaryRef}
+        tabIndex={-1}
         aria-label="Resumo das revisões"
-        className="rounded-lg border border-border bg-card"
+        className="rounded-lg border border-border bg-card focus:outline-none"
       >
         <div className="grid grid-cols-2 divide-border md:grid-cols-4 md:divide-x">
           <div className="p-4">
@@ -205,6 +219,7 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
               Adicionar tópico
             </Button>
             <Button
+              ref={startButtonRef}
               size="sm"
               disabled={dueTotal === 0 || isPending}
               onClick={() => {
@@ -399,19 +414,23 @@ export function ReviewsView({ initialOverview }: { initialOverview: ReviewsOverv
         </p>
       )}
 
-      <p className="text-xs text-muted-foreground">
+      {/* G2.24: era <p> com <Badge> (um <div>) dentro — HTML inválido que gerava erro de hidratação. */}
+      <div className="text-xs text-muted-foreground">
         <Badge variant="outline">Como funciona</Badge>{" "}
         Cada resposta recalcula a data da próxima revisão pelo algoritmo FSRS, a partir do seu
         histórico. Nada é agendado automaticamente a partir das sessões de estudo: você escolhe o que
         entra na revisão.
-      </p>
+      </div>
 
       <ReviewSessionModal
         open={sessionOpen}
         itemId={sessionItemId}
         onOpenChange={(open) => {
           setSessionOpen(open)
-          if (!open) void refresh()
+          if (!open) {
+            returnFocusRef.current = true
+            void refresh()
+          }
         }}
       />
       <AddToReviewModal

@@ -16,8 +16,8 @@ import {
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { chipColors } from "@/lib/a11y/contrast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getReplanInfoAction } from "@/application/study-plan/replan/adaptive-replan.actions"
 import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive-replan.service"
 import {
   CUSTOM_SCALE_RE,
@@ -30,7 +30,7 @@ import {
   isDutyShiftDate,
   WEEKDAY_KEYS,
 } from "@/features/planejamento/lib/study-plan-shared"
-import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
+import { usePlanningActionsRef } from "@/features/planejamento/planning-actions"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { type StudyCycleBlock } from "./planning-view"
@@ -64,6 +64,7 @@ interface StudyCalendarViewProps {
 
 export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendarViewProps) {
   const router = useRouter()
+  const planningRef = usePlanningActionsRef()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDayDetail, setSelectedDayDetail] = useState<{
     dayNum: number
@@ -108,7 +109,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
   useEffect(() => {
     // P1.5: banco é a fonte oficial; sincroniza uma vez (down-sync ou lazy
     // migration) e o evento mentor_scale_updated atualiza este estado.
-    void syncPlanningPreferencesFromServer()
+    void planningRef.current.syncPlanningPreferencesFromServer()
     const handleUpdate = () => {
       const savedScale = localStorage.getItem("mentor_user_work_scale")
       if (isScheduleMode(savedScale)) setScheduleMode(savedScale)
@@ -121,7 +122,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     }
     window.addEventListener("mentor_scale_updated", handleUpdate)
     return () => window.removeEventListener("mentor_scale_updated", handleUpdate)
-  }, [])
+  }, [planningRef])
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -189,7 +190,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
     let active = true
     const load = async () => {
       try {
-        const res = await getReplanInfoAction({
+        const res = await planningRef.current.getReplanInfoAction({
           studyDays,
           scheduleMode,
           firstShiftDay,
@@ -212,7 +213,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
       active = false
       window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handleSaved)
     }
-  }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate])
+  }, [studyDays, scheduleMode, firstShiftDay, anchorShiftDate, planningRef])
 
   const isShiftDay = (dayNum: number) => {
     const padM = String(month + 1).padStart(2, "0")
@@ -295,7 +296,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground capitalize">{monthName}</h2>
+            <h2 className="text-lg font-semibold text-foreground first-letter:uppercase">{monthName}</h2>
             <p className="text-xs text-muted-foreground font-medium">
               Cronograma com Escala de Trabalho & Plantões
             </p>
@@ -483,16 +484,24 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
                   )}
                   {(!onShift || scheduleMode === "normal") && !isScheduledBreak && (
                     <>
-                      {dayDisciplines.slice(0, 2).map((disc, idx) => (
-                        <div
-                          key={`${disc.id}-${idx}`}
-                          className="text-[10px] font-semibold truncate px-1.5 py-0.5 rounded-md text-white flex items-center gap-1 shadow-2xs"
-                          style={{ backgroundColor: disc.color || "#2563EB" }}
-                        >
-                          <span className="w-1 h-1 rounded-full bg-white shrink-0" />
-                          <span className="truncate">{disc.disciplineName}</span>
-                        </div>
-                      ))}
+                      {dayDisciplines.slice(0, 2).map((disc, idx) => {
+                        // G2.24: a cor é do aluno; o texto se adapta para manter 4,5:1 (WCAG AA)
+                        const chip = chipColors(disc.color || "#2563EB")
+                        return (
+                          <div
+                            key={`${disc.id}-${idx}`}
+                            className="text-[10px] font-semibold truncate px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs"
+                            style={{ backgroundColor: chip.background, color: chip.color }}
+                          >
+                            <span
+                              className="w-1 h-1 rounded-full shrink-0"
+                              style={{ backgroundColor: chip.color }}
+                              aria-hidden="true"
+                            />
+                            <span className="truncate">{disc.disciplineName}</span>
+                          </div>
+                        )
+                      })}
                       {dayDisciplines.length > 2 && (
                         <span className="text-[10px] text-muted-foreground font-semibold">
                           +{dayDisciplines.length - 2} mais
@@ -515,8 +524,7 @@ export function StudyCalendarView({ blocks, onReplan: _onReplan }: StudyCalendar
       <Dialog open={Boolean(selectedDayDetail)} onOpenChange={() => setSelectedDayDetail(null)}>
         <DialogContent className="sm:max-w-md p-6 rounded-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-foreground capitalize flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-primary" />
+            <DialogTitle className="text-lg font-semibold text-foreground first-letter:uppercase">
               {selectedDayDetail?.fullDate.toLocaleDateString("pt-BR", {
                 weekday: "long",
                 day: "numeric",

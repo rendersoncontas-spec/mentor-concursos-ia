@@ -73,11 +73,9 @@ import {
   mondayKeyOf,
   todayKey,
 } from "@/application/study-analytics/engine/stats-engine"
-import {
-  type StatisticsCenterPayload,
-  getStatisticsCenterAction,
-} from "@/application/study-analytics/statistics-center.action"
+import { type StatisticsCenterPayload } from "@/application/study-analytics/statistics-center.action"
 import { Button } from "@/components/ui/button"
+import { useStatisticsActionsRef } from "@/features/statistics/statistics-actions"
 
 import {
   ClassificationChip,
@@ -158,9 +156,9 @@ function formatPlanningSubtitle(planning: {
 }
 
 function adherenceClass(adherencePct: number): string {
-  if (adherencePct >= 100) return "text-emerald-600"
-  if (adherencePct >= 50) return "text-amber-600"
-  return "text-rose-600"
+  if (adherencePct >= 100) return "text-emerald-700 dark:text-emerald-400"
+  if (adherencePct >= 50) return "text-amber-700 dark:text-amber-400"
+  return "text-rose-700 dark:text-rose-400"
 }
 
 function daysSinceLastStudyLabel(days: number | null): string {
@@ -183,6 +181,7 @@ export interface StatisticsCenterInitialData {
 }
 
 export function StatisticsCenterView({ initialData }: { initialData?: StatisticsCenterInitialData | null } = {}) {
+  const statisticsRef = useStatisticsActionsRef()
   // ── Estado bruto ──────────────────────────────────────────────────────────
   // Fase F (performance): quando a página já trouxe os dados do servidor, a
   // tela nasce pronta — sem esperar o JavaScript carregar, hidratar e só
@@ -219,7 +218,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    const { data, error: err } = await getStatisticsCenterAction()
+    const { data, error: err } = await statisticsRef.current.getStatisticsCenterAction()
     if (err) {
       setError(err)
       if (!silent) toast.error(err)
@@ -229,7 +228,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
       setLastRefresh(new Date())
     }
     if (!silent) setLoading(false)
-  }, [])
+  }, [statisticsRef])
 
   const hasInitialData = Boolean(initialData)
   useEffect(() => {
@@ -587,15 +586,15 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
 
   if (loading && !payload) {
     return (
-      <div className="flex items-center justify-center p-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div role="status" aria-label="Carregando estatísticas" className="flex items-center justify-center p-20">
+        <Loader2 aria-hidden className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   if (error && !payload) {
     return (
-      <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+      <div role="alert" className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
         <p className="font-semibold text-foreground mb-1">
           Não foi possível carregar suas estatísticas
         </p>
@@ -816,11 +815,11 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Concluídas</span>
-              <span className="font-semibold text-emerald-600">{sessionStats.completed}</span>
+              <span className="font-semibold text-emerald-700 dark:text-emerald-400">{sessionStats.completed}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Interrompidas</span>
-              <span className="font-semibold text-amber-600">{sessionStats.interrupted}</span>
+              <span className="font-semibold text-amber-700 dark:text-amber-400">{sessionStats.interrupted}</span>
             </div>
           </div>
         </SectionCard>
@@ -831,11 +830,11 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
             <div className="space-y-1 text-sm flex-1">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Acertos</span>
-                <span className="font-semibold text-emerald-600">{questionStats.correct}</span>
+                <span className="font-semibold text-emerald-700 dark:text-emerald-400">{questionStats.correct}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Erros</span>
-                <span className="font-semibold text-rose-600">{questionStats.wrong}</span>
+                <span className="font-semibold text-rose-700 dark:text-rose-400">{questionStats.wrong}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Acurácia</span>
@@ -854,7 +853,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
 
         <SectionCard title="Qualidade" subtitle="Foco e pausas">
           <div className="text-sm">
-            <div className="font-semibold text-3xl mb-1">
+            <div className="metric-value text-3xl mb-1">
               {focusStats.average === null ? "—" : `${Math.round(focusStats.average)}%`}
             </div>
             <p className="text-xs text-muted-foreground mb-3">foco médio das sessões</p>
@@ -901,16 +900,13 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
               <span className="font-semibold">{frequency.weeklyAvgDays.toFixed(1)} dias</span>
             </div>
             {frequency.daysSinceLastStudy !== null && frequency.daysSinceLastStudy > 0 && (
-              <p className="text-[11px] text-amber-600 font-semibold">
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
                 {frequency.daysSinceLastStudy} dias sem estudar
                 {streaks.current === 0 ? " — quebre o ciclo hoje" : ""}
               </p>
             )}
-            {streaks.current >= 3 && (
-              <p className="text-[11px] text-emerald-600 font-semibold">
-                Sequência de {streaks.current} dias!
-              </p>
-            )}
+            {/* V2.5: removido o "Sequência de N dias!" em verde — repetia a linha
+                "Sequência atual" logo acima, só como comemoração. */}
           </div>
         </SectionCard>
       </div>
@@ -1085,7 +1081,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
         subtitle="Índice 0-100 com fórmula documentada abaixo"
         action={
           productivity.score !== null ? (
-            <span className="text-3xl font-semibold text-primary tabular-nums">
+            <span className="metric-value text-3xl text-foreground">
               {productivity.score}
             </span>
           ) : null
@@ -1295,7 +1291,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
         subtitle="Status das disciplinas do seu concurso e cobertura geral"
         action={
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-semibold text-primary tabular-nums">
+            <span className="metric-value text-2xl text-foreground">
               {Math.round(edital.percentage)}%
             </span>
             <div className="w-28">
@@ -1319,7 +1315,7 @@ export function StatisticsCenterView({ initialData }: { initialData?: Statistics
               <Metric label="Em estudo" value={edital.studying} sub="status EM_ESTUDO" />
               <Metric label="Não iniciadas" value={edital.notStarted} sub="status NOT_STARTED" />
             </div>
-            <div className="max-h-72 overflow-auto">
+            <div role="region" aria-label="Disciplinas do edital (tabela rolável)" tabIndex={0} className="max-h-72 overflow-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
               <table className="w-full text-xs min-w-[480px]">
                 <thead>
                   <tr className="type-label border-b">
@@ -1498,13 +1494,13 @@ function typeLabel(t: string): string {
 
 function statusLabel(status: string): ReactNode {
   const map: Record<string, { label: string; icon: ElementType; className: string }> = {
-    CONCLUIDA: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-600 dark:text-emerald-400" },
-    COMPLETED: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-600 dark:text-emerald-400" },
-    CONCLUÍDA: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-600 dark:text-emerald-400" },
+    CONCLUIDA: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-700 dark:text-emerald-400" },
+    COMPLETED: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-700 dark:text-emerald-400" },
+    CONCLUÍDA: { label: "Concluída", icon: CheckCircle2, className: "text-emerald-700 dark:text-emerald-400" },
     EM_ESTUDO: { label: "Em estudo", icon: BookOpen, className: "text-primary" },
     STUDYING: { label: "Em estudo", icon: BookOpen, className: "text-primary" },
-    EM_REVISAO: { label: "Em revisão", icon: RefreshCw, className: "text-amber-600 dark:text-amber-400" },
-    REVISING: { label: "Em revisão", icon: RefreshCw, className: "text-amber-600 dark:text-amber-400" },
+    EM_REVISAO: { label: "Em revisão", icon: RefreshCw, className: "text-amber-700 dark:text-amber-400" },
+    REVISING: { label: "Em revisão", icon: RefreshCw, className: "text-amber-700 dark:text-amber-400" },
     NOT_STARTED: { label: "Não iniciada", icon: Clock, className: "text-muted-foreground" },
     NOT_STARTED_: { label: "Não iniciada", icon: Clock, className: "text-muted-foreground" },
   }
@@ -1521,9 +1517,9 @@ function statusLabel(status: string): ReactNode {
 
 function focusBarCls(pct: number | null): string {
   if (pct === null) return "bg-muted"
-  if (pct >= 75) return "bg-emerald-500"
-  if (pct >= 50) return "bg-amber-500"
-  return "bg-rose-500"
+  // V2.5: marca para a quantidade, terracota só abaixo de 50%.
+  if (pct >= 50) return "bg-primary"
+  return "bg-accent"
 }
 
 function Donut({ value, size }: { value: number | null; size: number }) {
@@ -1890,6 +1886,7 @@ function DisciplinasSection({
       subtitle="Fórmulas documentadas: acurácia = acertos ÷ questões · tendência = 2ª metade ÷ 1ª metade do período · classificação pelas regras do painel"
       action={
         <select
+          aria-label="Ordenar disciplinas"
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
           className="rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground print:hidden"
@@ -1965,7 +1962,7 @@ function DisciplinasSection({
                       <span className="hidden md:block text-right text-xs tabular-nums">
                         {d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}
                       </span>
-                      <span className="hidden md:block text-right text-xs font-semibold tabular-nums text-rose-600">
+                      <span className="hidden md:block text-right text-xs font-semibold tabular-nums text-rose-700 dark:text-rose-400">
                         {d.wrong}
                       </span>
                       <span className="hidden md:flex md:justify-end">
@@ -2004,7 +2001,7 @@ function DisciplinasSection({
                         <div><dt className="text-muted-foreground">Sessões</dt><dd className="font-semibold">{d.sessions}</dd></div>
                         <div><dt className="text-muted-foreground">Questões</dt><dd className="font-semibold">{d.questions}</dd></div>
                         <div><dt className="text-muted-foreground">Acurácia</dt><dd className="font-semibold">{d.accuracy === null ? "—" : `${Math.round(d.accuracy)}%`}</dd></div>
-                        <div><dt className="text-muted-foreground">Erros</dt><dd className="font-semibold text-rose-600">{d.wrong}</dd></div>
+                        <div><dt className="text-muted-foreground">Erros</dt><dd className="font-semibold text-rose-700 dark:text-rose-400">{d.wrong}</dd></div>
                         <div><dt className="text-muted-foreground">Foco</dt><dd className="font-semibold">{d.focusAvg === null ? "—" : `${Math.round(d.focusAvg)}%`}</dd></div>
                         <div><dt className="text-muted-foreground">Tendência</dt><dd className="font-semibold"><TendenciaChip trend={d.trendDirection} delta={d.accuracyTrend} /></dd></div>
                         <div><dt className="text-muted-foreground">Atenção</dt><dd className="font-semibold">{d.attentionScore}/100</dd></div>
@@ -2066,10 +2063,10 @@ function TendenciaChip({
 }) {
   if (trend === "UP")
     return (
-      <span className="text-emerald-600">▲ {delta === null ? "" : `+${Math.round(delta)}%`}</span>
+      <span className="text-emerald-700 dark:text-emerald-400">▲ {delta === null ? "" : `+${Math.round(delta)}%`}</span>
     )
   if (trend === "DOWN")
-    return <span className="text-rose-600">▼ {delta === null ? "" : `${Math.round(delta)}%`}</span>
+    return <span className="text-rose-700 dark:text-rose-400">▼ {delta === null ? "" : `${Math.round(delta)}%`}</span>
   return <span className="text-muted-foreground">■ estável</span>
 }
 
@@ -2123,11 +2120,11 @@ function ErrorMap({
               <span className="w-40 truncate font-semibold">{d.name}</span>
               <div className="flex-1 h-2 bg-muted/40 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-rose-500 rounded-full"
+                  className="h-full bg-accent rounded-full"
                   style={{ width: `${(d.wrong / maxErr) * 100}%` }}
                 />
               </div>
-              <span className="font-semibold text-rose-600 w-6 text-right">{d.wrong}</span>
+              <span className="font-semibold tabular-nums text-foreground w-6 text-right">{d.wrong}</span>
             </div>
           ))}
         </div>
@@ -2144,7 +2141,7 @@ function ErrorMap({
                 <span className="truncate font-medium">
                   {t.topicName} <span className="text-muted-foreground">· {t.disciplineName}</span>
                 </span>
-                <span className="font-semibold text-rose-600">{t.wrong} erros</span>
+                <span className="font-semibold text-rose-700 dark:text-rose-400">{t.wrong} erros</span>
               </div>
             ))}
           </div>
@@ -2202,7 +2199,7 @@ function RevisionSection({
             />
           </div>
           {revision.byDiscipline.length > 0 && (
-            <div className="max-h-56 overflow-auto">
+            <div role="region" aria-label="Revisões por disciplina (tabela rolável)" tabIndex={0} className="max-h-56 overflow-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
               <table className="w-full text-xs min-w-[380px]">
                 <thead>
                   <tr className="type-label border-b">
@@ -2217,7 +2214,7 @@ function RevisionSection({
                     <tr key={d.disciplineId} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
                       <td className="py-2.5 px-3 font-semibold">{d.name}</td>
                       <td
-                        className={`font-semibold py-2.5 px-3 text-right ${d.overdue > 0 ? "text-rose-600" : ""}`}
+                        className={`font-semibold py-2.5 px-3 text-right ${d.overdue > 0 ? "text-rose-700 dark:text-rose-400" : ""}`}
                       >
                         {d.overdue}
                       </td>
@@ -2249,7 +2246,7 @@ const CMP_COLUMNS: { key: CmpKey; label: string }[] = [
 
 function ComparisonsTable({ rows }: { rows: ComparisonRow[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div role="region" aria-label="Comparação entre períodos (tabela rolável)" tabIndex={0} className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
       <table className="w-full text-xs">
         <thead>
           <tr className="type-label border-b">
@@ -2320,7 +2317,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
         </div>
 
         <div className="flex flex-wrap items-baseline gap-2 mb-3">
-          <p className="text-lg font-semibold text-primary">{ob.label}</p>
+          <p className="metric-value text-lg text-foreground">{ob.label}</p>
           <span className="text-sm tabular-nums text-muted-foreground">{ob.range}</span>
         </div>
 
@@ -2372,7 +2369,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
               </p>
               <p className="text-sm font-semibold text-foreground mt-0.5">{bf.label}</p>
               <p className="text-xs tabular-nums text-muted-foreground">{bf.range}</p>
-              <p className="text-lg font-semibold text-primary mt-1">
+              <p className="metric-value text-lg text-foreground mt-1">
                 {bf.focusAvg !== null ? `${Math.round(bf.focusAvg)}%` : "—"}
               </p>
             </div>
@@ -2384,7 +2381,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
               </p>
               <p className="text-sm font-semibold text-foreground mt-0.5">{ba.label}</p>
               <p className="text-xs tabular-nums text-muted-foreground">{ba.range}</p>
-              <p className="text-lg font-semibold text-primary mt-1">
+              <p className="metric-value text-lg text-foreground mt-1">
                 {ba.accuracy !== null ? `${Math.round(ba.accuracy)}%` : "—"}
               </p>
             </div>
@@ -2397,7 +2394,7 @@ function BestTimeOfDaySection({ analysis }: { analysis: TimeOfDayAnalysis }) {
         <div className="px-3 py-2 border-b border-border/40 bg-muted/5">
           <p className="text-xs font-semibold text-foreground">Desempenho por horário</p>
         </div>
-        <div className="overflow-x-auto">
+        <div role="region" aria-label="Desempenho por horário (tabela rolável)" tabIndex={0} className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
           <table className="w-full text-xs">
             <thead>
               <tr className="type-label border-b">
@@ -2530,7 +2527,7 @@ function HoursSection({ hours, empty }: { hours: HourBucket[]; empty: boolean })
             </div>
           </div>
           {h.best && h.questions >= 5 && (
-            <p className="text-[10px] text-emerald-600 mt-1.5">
+            <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1.5">
               Melhor desempenho registrado (maior acurácia com ≥ 5 questões) — considere fixar a
               prática nesse horário.
             </p>
@@ -2562,7 +2559,7 @@ function ReportTable({
   }[]
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div role="region" aria-label="Relatório do período (tabela rolável)" tabIndex={0} className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
       <table className="w-full text-xs">
         <thead>
           <tr className="type-label border-b">
@@ -2579,7 +2576,7 @@ function ReportTable({
               <td className="py-2.5 px-3 text-right font-semibold">{r.current}</td>
               <td className="py-2.5 px-3 text-right text-muted-foreground">{r.previous}</td>
               <td
-                className={`py-2.5 px-3 text-right font-semibold ${r.positive ? "text-emerald-600" : "text-rose-600"}`}
+                className={`py-2.5 px-3 text-right font-semibold ${r.positive ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}
               >
                 {r.deltaLabel}
               </td>

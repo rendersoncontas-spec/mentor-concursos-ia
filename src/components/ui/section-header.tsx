@@ -25,7 +25,7 @@ export function SectionHeader({
   return (
     <div className={cn("flex items-end justify-between gap-3", className)} {...props}>
       <div className="min-w-0">
-        <Heading className="type-h3 text-foreground">{title}</Heading>
+        <Heading className="text-[15px] font-semibold leading-5 tracking-[-0.01em] text-foreground">{title}</Heading>
         {description && <p className="type-secondary mt-0.5">{description}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}

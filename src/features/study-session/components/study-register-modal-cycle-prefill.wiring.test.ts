@@ -61,6 +61,7 @@ function sliceBetween(source: string, startMarker: string, endMarker: string): s
 const MODAL_PATH = "src/features/study-session/components/study-register-modal.tsx"
 const CYCLE_WIDGET_PATH = "src/features/study-cycle/components/intelligent-cycle-widget.tsx"
 const PROVIDER_PATH = "src/features/study-session/components/study-provider.tsx"
+const TIMER_TRANSITIONS_PATH = "src/features/study-session/lib/session-transitions.ts"
 
 describe("StudyRegisterModal: pré-preenchimento da disciplina ao abrir a Central para uma sessão de ciclo já ativa", () => {
   const source = readSource(MODAL_PATH)
@@ -167,10 +168,32 @@ describe("PROTEÇÃO: vínculo do ciclo (source/cycleId/cycleItemId/disciplineId
 })
 
 describe("PROTEÇÃO: mecânica do timer (pause/resume/save/minimize) não foi tocada por esta correção", () => {
-  it("study-provider.tsx: pauseSession/resumeSession/endSession continuam com a mesma lógica de timestamps", () => {
+  it("study-provider.tsx: pauseSession/resumeSession mantêm a mesma lógica de timestamps", () => {
     const source = readSource(PROVIDER_PATH)
-    assert.ok(source.includes('phase: "PAUSED", lastPauseStartTime: Date.now() }'), "pauseSession deve continuar gravando lastPauseStartTime")
-    assert.ok(source.includes("totalPausedMs: prev.totalPausedMs + pauseDuration,"), "resumeSession deve continuar acumulando totalPausedMs")
+    // Bug Play/Pause: as transições continuam idênticas, mas agora vivem em
+    // funções puras (lib/session-transitions.ts) para serem testáveis.
+    assert.ok(
+      source.includes("pauseAt(prev, Date.now())"),
+      "pauseSession deve continuar chamando a transição que grava lastPauseStartTime",
+    )
+    assert.ok(
+      source.includes("resumeAt(prev, Date.now())"),
+      "resumeSession deve continuar chamando a transição que acumula totalPausedMs",
+    )
+
+    const transitions = readSource(TIMER_TRANSITIONS_PATH)
+    assert.ok(
+      transitions.includes('phase: "PAUSED", lastPauseStartTime: now'),
+      "pauseAt deve gravar lastPauseStartTime",
+    )
+    assert.ok(
+      transitions.includes("totalPausedMs: session.totalPausedMs + pauseDuration"),
+      "resumeAt deve continuar acumulando totalPausedMs",
+    )
+    assert.ok(
+      transitions.includes("lastPauseStartTime: null"),
+      "resumeAt deve continuar limpando lastPauseStartTime",
+    )
   })
 
   it("study-register-modal.tsx: handleClose ainda minimiza (não encerra) quando a fase não é IDLE", () => {

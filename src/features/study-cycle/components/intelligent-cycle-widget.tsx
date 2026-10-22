@@ -265,13 +265,14 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
   }
 
   const content = (
-    <div className="p-4 space-y-3">
+    <div className="p-3 space-y-2">
       {/* HEADER */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-foreground truncate leading-tight">
-              Ciclo {cycle.name}
+              {/* V2.5: nomes como "Ciclo Receita Federal" viravam "Ciclo Ciclo …". */}
+              {/^ciclo\b/i.test(cycle.name.trim()) ? cycle.name : `Ciclo ${cycle.name}`}
             </p>
             <p className="text-xs text-muted-foreground truncate leading-tight mt-0.5 tabular-nums">
               {currentRound}ª volta · {items.length} {items.length === 1 ? "matéria" : "matérias"} · {roundProgressPercentage}%
@@ -339,7 +340,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
 
       {/* CURRENT SUBJECT — matéria em foco: filete teal à esquerda, sem caixa */}
       <div className={cn(
-        "border-l-2 pl-3 py-0.5 space-y-1.5",
+        "border-l-2 pl-3 py-0 space-y-1",
         currentItem ? "border-primary" : "border-border"
       )}>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -394,7 +395,7 @@ export function IntelligentCycleWidget({ embedded = false, onDeleteCycle }: Inte
       </div>
 
       {/* NEXT — linha simples, separada por divisória */}
-      <div className="flex items-center gap-2 border-t border-border pt-2.5">
+      <div className="flex items-center gap-2 border-t border-border pt-2">
         <span className="type-label shrink-0 w-16">
           Próxima
         </span>

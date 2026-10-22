@@ -106,7 +106,7 @@
     --sidebar-primary:     172 45% 24%;
     --sidebar-accent:      30 10% 93%;
     --sidebar-border:      30 8% 88%;
-    --sidebar-width:       256px;
+    --sidebar-width:       232px; /* V2.5: 256 → 232 (mais área útil em notebooks de 1366 px) */
     --sidebar-width-collapsed: 76px;
 
     /* Fase E — largura máxima da área de conteúdo das páginas (depois da
@@ -263,6 +263,15 @@
   .type-label   { font-size: 0.6875rem; line-height: 1rem; font-weight: 500; letter-spacing: 0.01em; color: var(--color-muted-foreground); }
   @media (min-width: 768px) {
     .type-h1 { font-size: 1.75rem; line-height: 2.25rem; }
+  }
+
+  /* V2.5 — número de destaque (métricas de topo): mesma fonte da interface,
+     algarismos tabulares e peso 600; a cor é a do texto (o peso vem da forma,
+     não do verde/laranja). */
+  .metric-value {
+    font-variant-numeric: lining-nums tabular-nums;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   /* Fase E — container único de página: mesma largura, centralização e

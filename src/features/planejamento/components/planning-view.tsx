@@ -29,7 +29,7 @@ import { PlanningGoalsProgressCard } from "./planning-goals-progress-card"
 import { PlanningWizardModal } from "./planning-wizard-modal"
 import { StudyCalendarView } from "./study-calendar-view"
 import { WeeklyPlanningView } from "./weekly-planning-view"
-import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
+import { usePlanningActionsRef } from "@/features/planejamento/planning-actions"
 import { isUuid } from "@/domain/study-session/study-input"
 import { handleTabListKeyDown } from "@/lib/a11y/tab-keyboard"
 
@@ -50,6 +50,7 @@ interface PlanningViewProps {
 
 export function PlanningView({ initialData }: PlanningViewProps) {
   const router = useRouter()
+  const planningRef = usePlanningActionsRef()
   const [hasPlanning, setHasPlanning] = useState(() =>
     Boolean(initialData && initialData.blocks && initialData.blocks.length > 0),
   )
@@ -92,8 +93,8 @@ export function PlanningView({ initialData }: PlanningViewProps) {
   // P1.6: a aba "ciclo" (default) não monta weekly/daily/calendar — sem este
   // sync, o down-sync do banco nunca rodaria aqui. Fonte oficial = banco.
   useEffect(() => {
-    void syncPlanningPreferencesFromServer()
-  }, [])
+    void planningRef.current.syncPlanningPreferencesFromServer()
+  }, [planningRef])
   useEffect(() => {
     const timer = setTimeout(() => {
       if (initialData?.blocks && initialData.blocks.length > 0) {

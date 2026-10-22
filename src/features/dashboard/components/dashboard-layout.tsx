@@ -63,7 +63,7 @@ export function DashboardLayout({ snapshot, serverDate, children }: DashboardLay
     <div className="flex flex-col min-h-full bg-background">
       {/* Fase E: mesmo container de todas as páginas (antes: 1440px fixos,
           que deixavam faixas vazias nas laterais em monitores de 1600–1920px). */}
-      <div className="flex-1 page-container pt-5 pb-8 space-y-5">
+      <div className="flex-1 page-container pt-4 pb-8 space-y-4">
         {/* 1. Header: Saudação + Frase Motivacional */}
 {(() => {
             const msg = getDailyMessage(date)
@@ -71,18 +71,25 @@ export function DashboardLayout({ snapshot, serverDate, children }: DashboardLay
             // Redesign 2.0 — cabeçalho editorial: data como contexto, saudação
             // em grafite (sem destaque colorido), mensagem do dia como linha
             // secundária discreta e ações à direita.
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 min-w-0 border-b border-border pb-4">
-              <div className="flex-1 min-w-0 space-y-1">
-                <p className="text-[13px] text-muted-foreground">{capitalizedDate}</p>
-                <h1 className="type-h1 text-foreground">
-                  Olá, {snapshot?.user?.name || "Estudante"}
-                </h1>
+            // V2.5 — cabeçalho compacto (o espaço vertical é o recurso mais caro
+            // num notebook de 768 px de altura): saudação e data na mesma linha,
+            // mensagem do dia em uma linha só no desktop (o texto inteiro fica no
+            // `title`), ações à direita.
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 min-w-0 border-b border-border pb-3">
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <h1 className="type-h2 text-foreground">
+                    Olá, {snapshot?.user?.name || "Estudante"}
+                  </h1>
+                  <p className="text-[13px] text-muted-foreground">{capitalizedDate}</p>
+                </div>
                 <p
-                  className="text-[13px] text-muted-foreground leading-relaxed max-w-3xl"
+                  className="text-[14px] text-muted-foreground leading-snug max-w-3xl max-md:line-clamp-2 md:line-clamp-1"
                   style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                  title={`“${msg.text}” — ${msg.author}`}
                 >
                   &ldquo;{msg.text}&rdquo;
-                  <span className="text-muted-foreground ml-1.5">— {msg.author}</span>
+                  <span className="not-italic font-sans text-[12px] ml-1.5">— {msg.author}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2 w-full md:w-auto shrink-0">

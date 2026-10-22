@@ -17,7 +17,6 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { getReplanInfoAction } from "@/application/study-plan/replan/adaptive-replan.actions"
 import { type ReplanInfoPayload } from "@/application/study-plan/replan/adaptive-replan.service"
 import {
   CUSTOM_SCALE_RE,
@@ -31,7 +30,7 @@ import {
   WEEKDAY_KEYS,
   type SharedPlanConfig,
 } from "@/features/planejamento/lib/study-plan-shared"
-import { syncPlanningPreferencesFromServer } from "@/features/planejamento/lib/planning-prefs-sync"
+import { usePlanningActionsRef } from "@/features/planejamento/planning-actions"
 import { STUDY_SESSION_SAVED_EVENT } from "@/features/study-session/lib/study-session-events"
 
 import { type StudyCycleBlock } from "./planning-view"
@@ -65,6 +64,7 @@ export function WeeklyPlanningView({
   onReplan?: () => void
   onRemove?: () => void
 }) {
+  const planningRef = usePlanningActionsRef()
   const [events, setEvents] = useState<WeeklyStudyEvent[]>([])
   const [completedTaskIds, setCompletedTaskIds] = useState<Record<string, boolean>>({})
 
@@ -86,7 +86,7 @@ export function WeeklyPlanningView({
     // migration) e o evento mentor_scale_updated atualiza este estado.
     // P1.6.1: primeiro dia da semana canônico — banco vence quando configurado;
     // ausência real preserva o legado local/default (Domingo).
-    void syncPlanningPreferencesFromServer().then((res) => {
+    void planningRef.current.syncPlanningPreferencesFromServer().then((res) => {
       if (res?.weekStartDaySource !== "configured") return
       const label = res.weekStartDay === 1 ? "Segunda-feira" : "Domingo"
       setFirstDayOfWeek(label)
@@ -107,7 +107,7 @@ export function WeeklyPlanningView({
       window.removeEventListener("mentor_scale_updated", handleUpdate)
       window.removeEventListener("storage", handleUpdate)
     }
-  }, [])
+  }, [planningRef])
 
   const [replanInfo, setReplanInfo] = useState<ReplanInfoPayload | null>(() => {
     if (typeof window === "undefined") return null
@@ -125,7 +125,7 @@ export function WeeklyPlanningView({
     let active = true
     const load = async () => {
       try {
-        const res = await getReplanInfoAction({
+        const res = await planningRef.current.getReplanInfoAction({
           studyDays: scaleConfig.studyDays,
           scheduleMode: scaleConfig.scheduleMode,
           firstShiftDay: scaleConfig.firstShiftDay,
@@ -155,7 +155,7 @@ export function WeeklyPlanningView({
       active = false
       window.removeEventListener(STUDY_SESSION_SAVED_EVENT, handleSaved)
     }
-  }, [scaleConfig])
+  }, [scaleConfig, planningRef])
 
   const today = new Date()
   const todayDayIdx = today.getDay() // 0 a 6
@@ -365,7 +365,7 @@ export function WeeklyPlanningView({
     <div className="space-y-6">
       {/* P1.1: erro de leitura ≠ "sem planejamento". Aviso discreto, página segue. */}
       {replanError && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <div role="status" className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
           {REPLAN_UNAVAILABLE_MESSAGE}
         </div>
       )}
@@ -373,7 +373,7 @@ export function WeeklyPlanningView({
       <div className="flex items-center justify-between bg-card border rounded-xl p-4 text-xs font-semibold">
         <span className="text-muted-foreground">Status da Meta Diária de Estudo:</span>
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+          <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
             <span className="w-2 h-2 rounded-full bg-success inline-block" />
             Meta Batida
           </span>
@@ -454,17 +454,17 @@ export function WeeklyPlanningView({
 
                 if (hasEvts) {
                   if (isAllCompleted) {
-                    headerStyle = "bg-emerald-600 text-white font-semibold"
+                    headerStyle = "bg-emerald-700 text-white font-semibold"
                     statusTag = "Meta Batida"
                   } else if (isPastOrToday) {
-                    headerStyle = "bg-rose-600 text-white font-semibold"
+                    headerStyle = "bg-rose-700 text-white font-semibold"
                     statusTag = "Incompleta"
                   } else {
                     headerStyle = "bg-primary text-primary-foreground font-semibold"
                     statusTag = "Programado"
                   }
                 } else if (isDuty) {
-                  headerStyle = "bg-rose-500/10 text-rose-500 font-semibold border-b-rose-500/20"
+                  headerStyle = "bg-rose-500/10 text-rose-700 dark:text-rose-300 font-semibold border-b-rose-500/20"
                   statusTag = "Plantão"
                 }
 
@@ -486,7 +486,7 @@ export function WeeklyPlanningView({
                     <div className="p-2 flex-1 space-y-2">
                       {isDuty && (
                         <div className="text-center py-8">
-                          <p className="text-[10px] font-semibold text-rose-500/80 bg-rose-500/10 p-2 rounded-md">
+                          <p className="text-[10px] font-semibold text-rose-700 dark:text-rose-300 bg-rose-500/10 p-2 rounded-md">
                             Sem estudos (Plantão)
                           </p>
                         </div>
@@ -504,9 +504,10 @@ export function WeeklyPlanningView({
                           <button
                             type="button"
                             onClick={() => handleOpenAddModal(d.dayIdx)}
+                            aria-label={`Adicionar evento em ${d.label}`}
                             className="w-full py-1.5 bg-slate-500 hover:bg-slate-600 text-white rounded-md flex items-center justify-center transition-colors shadow-xs"
                           >
-                            <Plus className="h-4 w-4" />
+                            <Plus className="h-4 w-4" aria-hidden="true" />
                           </button>
 
                             {/* Cards de Estudos Agendados no Dia */}
@@ -523,7 +524,7 @@ export function WeeklyPlanningView({
                                     <h4
                                       className={`text-[11px] font-semibold leading-tight truncate ${
                                         isDone
-                                          ? "text-emerald-700 dark:text-emerald-300 opacity-80"
+                                          ? "text-emerald-800 dark:text-emerald-300"
                                           : "text-foreground"
                                       }`}
                                     >
@@ -532,7 +533,7 @@ export function WeeklyPlanningView({
                                     <button
                                       type="button"
                                       onClick={(e) => toggleEventCompleted(evt.id, e)}
-                                      className={`shrink-0 text-xs ${isDone ? "text-emerald-600" : "text-rose-500 hover:text-emerald-500"}`}
+                                      className={`shrink-0 text-xs ${isDone ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400 hover:text-emerald-700 dark:hover:text-emerald-400"}`}
                                       title={
                                         isDone
                                           ? "Concluído (Clique para alternar)"
@@ -547,7 +548,7 @@ export function WeeklyPlanningView({
                                     <span
                                       className={`font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md tabular-nums ${
                                         isDone
-                                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                          ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300"
                                           : "bg-primary/10 text-primary"
                                       }`}
                                     >
@@ -595,12 +596,12 @@ export function WeeklyPlanningView({
 
             {/* Grade Numérica dos Dias do Mês */}
             <div className="grid grid-cols-7 text-[11px] font-semibold gap-1">
-              <span className="text-muted-foreground/40">26</span>
-              <span className="text-muted-foreground/40">27</span>
-              <span className="text-muted-foreground/40">28</span>
-              <span className="text-muted-foreground/40">29</span>
-              <span className="text-muted-foreground/40">30</span>
-              <span className="text-muted-foreground/40">31</span>
+              <span className="text-muted-foreground">26</span>
+              <span className="text-muted-foreground">27</span>
+              <span className="text-muted-foreground">28</span>
+              <span className="text-muted-foreground">29</span>
+              <span className="text-muted-foreground">30</span>
+              <span className="text-muted-foreground">31</span>
               <span>1</span>
 
               {/* Semana Ativa Destacada */}
@@ -697,9 +698,10 @@ export function WeeklyPlanningView({
                 <button
                   type="button"
                   onClick={handleDeleteEvent}
-                  className="text-emerald-400 hover:text-rose-500 transition-colors p-1"
+                  aria-label="Excluir evento"
+                  className="text-emerald-700 dark:text-emerald-400 hover:text-rose-700 dark:hover:text-rose-400 transition-colors p-1"
                 >
-                  <Trash2 className="h-5 w-5" />
+                  <Trash2 className="h-5 w-5" aria-hidden="true" />
                 </button>
               ) : (
                 <div />

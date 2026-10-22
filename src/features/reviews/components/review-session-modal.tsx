@@ -5,12 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { CheckCircle2, Eye, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  answerReviewCardAction,
-  finalizeReviewSessionAction,
-  getActiveReviewSessionAction,
-  startReviewSessionAction,
-} from "@/application/review-engine/review.actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -21,6 +15,7 @@ import {
   type ReviewSessionReport,
   type ReviewSessionState,
 } from "@/domain/reviews/models"
+import { useReviewActionsRef } from "@/features/reviews/review-actions"
 import { formatStudyDateInSaoPaulo } from "@/lib/sao-paulo"
 
 /** Identificador da resposta: o servidor usa isso para não aplicar duas vezes. */
@@ -66,6 +61,7 @@ export function ReviewSessionModal({
   itemId?: string | null
   onOpenChange: (open: boolean) => void
 }) {
+  const reviewRef = useReviewActionsRef()
   const [session, setSession] = useState<ReviewSessionState | null>(null)
   const [revealed, setRevealed] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -84,7 +80,7 @@ export function ReviewSessionModal({
     setLoading(true)
     setReport(null)
     setRevealed(false)
-    const res = itemId ? await startReviewSessionAction(itemId) : await startReviewSessionAction()
+    const res = itemId ? await reviewRef.current.startReviewSessionAction(itemId) : await reviewRef.current.startReviewSessionAction()
     setLoading(false)
     if (res.error) {
       toast.error(res.error)
@@ -93,7 +89,7 @@ export function ReviewSessionModal({
     }
     setSession(res.data)
     shownAtRef.current = Date.now()
-  }, [itemId, onOpenChange])
+  }, [itemId, onOpenChange, reviewRef])
 
   useEffect(() => {
     if (!open) return
@@ -113,7 +109,7 @@ export function ReviewSessionModal({
     if (loading) return
     setLoading(true)
     try {
-      const res = await finalizeReviewSessionAction(session.sessionId)
+      const res = await reviewRef.current.finalizeReviewSessionAction(session.sessionId)
       if (res.error) {
         toast.error(res.error)
         return
@@ -123,7 +119,7 @@ export function ReviewSessionModal({
     } finally {
       setLoading(false)
     }
-  }, [session, loading, onOpenChange])
+  }, [session, loading, onOpenChange, reviewRef])
 
   const answer = useCallback(
     async (grade: ReviewGrade) => {
@@ -134,7 +130,7 @@ export function ReviewSessionModal({
         if (answerOpRef.current?.key !== opKey) {
           answerOpRef.current = { key: opKey, id: operationId() }
         }
-        const res = await answerReviewCardAction({
+        const res = await reviewRef.current.answerReviewCardAction({
           sessionId: session.sessionId,
           itemId: session.card.itemId,
           grade,
@@ -170,7 +166,7 @@ export function ReviewSessionModal({
         // lida — nesse caso NÃO encerramos nada. Encerrar por falha de leitura era
         // como tratar erro igual a "acabou": o aluno perderia a sessão em curso.
         if (next && !next.card && next.remaining === 0) {
-          const finalize = await finalizeReviewSessionAction(next.sessionId)
+          const finalize = await reviewRef.current.finalizeReviewSessionAction(next.sessionId)
           if (finalize.data) setReport(finalize.data)
           if (finalize.data?.cycleSyncError) toast.error(finalize.data.cycleSyncError)
         }
@@ -179,17 +175,17 @@ export function ReviewSessionModal({
         setAnswering(false)
       }
     },
-    [session, answering, load],
+    [session, answering, load, reviewRef],
   )
 
   // Ao reabrir depois de fechar no meio, retoma a sessão que ficou aberta.
   useEffect(() => {
     if (!open || session || loading || report) return
     void (async () => {
-      const res = await getActiveReviewSessionAction()
+      const res = await reviewRef.current.getActiveReviewSessionAction()
       if (res.data) setSession(res.data)
     })()
-  }, [open, session, loading, report])
+  }, [open, session, loading, report, reviewRef])
 
   const card = session?.card ?? null
 
@@ -301,7 +297,7 @@ export function ReviewSessionModal({
                       className="h-auto flex-col py-2"
                     >
                       <span className="text-[13px] font-medium">{preview?.label}</span>
-                      <span className="text-[11px] font-normal opacity-80">{preview?.preview}</span>
+                      <span className="text-[11px] font-normal">{preview?.preview}</span>
                     </Button>
                   )
                 })}

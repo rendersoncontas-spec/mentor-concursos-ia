@@ -309,7 +309,6 @@ export function SimuladosView() {
           <MetricStat
             label="Média de acertos"
             value={stats.averageAccuracy !== null ? `${Math.round(stats.averageAccuracy)}%` : "—"}
-            valueClass={accuracyColor(stats.averageAccuracy)}
           />
           <MetricStat
             label="Melhor desempenho"
@@ -318,7 +317,6 @@ export function SimuladosView() {
           <MetricStat
             label="Último simulado"
             value={stats.lastAccuracy !== null ? `${Math.round(stats.lastAccuracy)}%` : "—"}
-            valueClass={accuracyColor(stats.lastAccuracy)}
           />
         </div>
 
@@ -326,16 +324,16 @@ export function SimuladosView() {
         {evolution.length >= 2 && (
           <div className="rounded-xl border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" /> Evolução de acertos
+              <h3 className="text-[13px] font-semibold text-foreground">
+                Evolução de acertos
               </h3>
               {stats.trendMessage && (
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-[10px] font-bold gap-1",
-                    stats.trend === "UP" && "text-emerald-700 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10",
-                    stats.trend === "DOWN" && "text-rose-600 border-rose-500/40 bg-rose-500/10",
+                    "border-transparent bg-transparent px-0 text-[10px] font-medium gap-1",
+                    stats.trend === "UP" && "text-primary",
+                    stats.trend === "DOWN" && "text-rose-700 dark:text-rose-400",
                     stats.trend === "STABLE" && "text-muted-foreground"
                   )}
                 >
@@ -430,8 +428,8 @@ export function SimuladosView() {
             apontadas com o motivo. */}
         {bottlenecks.primary && (
           <section aria-labelledby="gargalos" className="rounded-xl border bg-card p-4 space-y-3">
-            <h3 id="gargalos" className="text-[13px] font-semibold text-foreground flex items-center gap-2">
-              <AlertTriangle aria-hidden className="h-4 w-4 text-amber-600" /> Onde você está perdendo pontos
+            <h3 id="gargalos" className="text-[13px] font-semibold text-foreground">
+              Onde você está perdendo pontos
             </h3>
             <p className="text-sm text-foreground">
               <span className="font-semibold">Gargalo atual: </span>
@@ -462,8 +460,8 @@ export function SimuladosView() {
           {/* LISTA DE SIMULADOS */}
           <div className="rounded-xl border bg-card overflow-hidden">
             <div className="p-4 border-b bg-card flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
-                <TrendingUp aria-hidden className="h-4 w-4 text-muted-foreground" /> Simulados recentes
+              <h3 className="text-[13px] font-semibold text-foreground">
+                Simulados recentes
               </h3>
               <Badge variant="outline" className="text-[10px] font-semibold">
                 {filteredRecords.length} registro{filteredRecords.length !== 1 ? "s" : ""}
@@ -610,18 +608,18 @@ export function SimuladosView() {
 function MetricStat({
   label,
   value,
-  valueClass,
 }: {
   label: string
   value: string
-  valueClass?: string
 }) {
   return (
     <div className="p-4 min-w-0">
       <span className="type-label truncate block">
         {label}
       </span>
-      <span className={cn("mt-1 text-2xl font-semibold tabular-nums truncate block", valueClass)}>
+      {/* V2.5: o valor não muda mais de cor conforme a nota (laranja/verde nas
+          métricas de topo) — a faixa de acerto já aparece, com texto, abaixo. */}
+      <span className="mt-1 metric-value text-2xl truncate block text-foreground">
         {value}
       </span>
     </div>
